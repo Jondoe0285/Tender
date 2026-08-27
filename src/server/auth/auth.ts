@@ -22,21 +22,35 @@ export const authOptions: AuthOptions = {
         const password = typeof credentials?.password === 'string' ? credentials.password : '';
         if (!email || !password) return null;
 
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await prisma.user.findUnique({
+          where: { email },
+          include: { roleMemberships: { select: { role: true } } },
+        });
         if (!user || user.suspended) return null;
 
         const validPassword = await verifyPassword(password, user.passwordHash);
         if (!validPassword) return null;
 
-        return { id: user.id, email: user.email, role: user.role };
+        const roles = user.roleMemberships.length > 0
+          ? user.roleMemberships.map((membership) => membership.role)
+          : [user.role];
+        return { id: user.id, email: user.email, role: user.role, roles };
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.role = (user as { role: string }).role;
+        token.roles = (user as { roles: string[] }).roles;
+      }
+      if (trigger === 'update' && session?.role && token.id) {
+        const membership = await prisma.userRole.findUnique({
+          where: { userId_role: { userId: token.id, role: session.role } },
+          select: { role: true },
+        });
+        if (membership) token.role = membership.role;
       }
       return token;
     },
@@ -44,6 +58,7 @@ export const authOptions: AuthOptions = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
+        session.user.roles = (token.roles ?? [token.role]) as string[];
       }
       return session;
     },

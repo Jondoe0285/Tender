@@ -3,13 +3,18 @@ import { buildQuoteReference } from '@/lib/identifiers';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { ForbiddenError } from '@/server/auth/session';
 import type { SubmitQuoteInput } from '@/lib/schemas/quote';
+import { quoteReceivedTemplate } from '@/server/notifications/emailTemplates';
+import { sendTransactionalEmail } from '@/server/notifications/resend';
 
 /** A Retailer may only submit a quote for a tender they have legitimately unlocked (FR-040). */
 export async function submitQuote(retailerId: string, tenderId: string, input: SubmitQuoteInput) {
   const unlock = await prisma.unlock.findUnique({ where: { tenderId_retailerId: { tenderId, retailerId } } });
   if (!unlock) throw new ForbiddenError('Tender has not been unlocked by this Retailer');
 
-  const tender = await prisma.tender.findUniqueOrThrow({ where: { id: tenderId } });
+  const tender = await prisma.tender.findUniqueOrThrow({
+    where: { id: tenderId },
+    include: { client: { select: { email: true } } },
+  });
   const existingQuoteCount = await prisma.quote.count({ where: { tenderId } });
   const reference = buildQuoteReference(tender.reference, existingQuoteCount + 1);
 
@@ -35,6 +40,25 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
     targetType: 'Quote',
     targetId: quote.id,
     metadata: { reference: quote.reference, tenderId },
+  });
+
+  const emailResult = await sendTransactionalEmail(
+    tender.client.email,
+    quoteReceivedTemplate({
+      tenderReference: tender.reference,
+      quoteReference: quote.reference,
+      category: tender.category,
+      priceGbp: quote.priceGbp,
+      leadTimeDays: quote.leadTimeDays,
+      reviewPath: `/client/tenders/${tender.id}`,
+    })
+  ).catch((error: unknown) => ({ sent: false as const, reason: error instanceof Error ? error.message : 'Email delivery failed' }));
+  await recordAuditEvent({
+    actorId: null,
+    action: emailResult.sent ? 'QUOTE_NOTIFICATION_SENT' : 'QUOTE_NOTIFICATION_FAILED',
+    targetType: 'Quote',
+    targetId: quote.id,
+    metadata: { recipientRole: 'CLIENT', reason: emailResult.sent ? undefined : emailResult.reason },
   });
 
   return quote;

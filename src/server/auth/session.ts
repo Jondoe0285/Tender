@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/server/auth/auth';
 
-export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'CLIENT' | 'RETAILER' };
+export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'CLIENT' | 'RETAILER'; roles: SessionUser['role'][] };
 
 /** Resolves the authenticated user from the server-side session only — never trust client-supplied identity. */
 export async function getCurrentUser(): Promise<SessionUser | null> {
@@ -11,6 +11,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     id: session.user.id,
     email: session.user.email ?? '',
     role: session.user.role as SessionUser['role'],
+    roles: (session.user.roles ?? [session.user.role]) as SessionUser['role'][],
   };
 }
 

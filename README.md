@@ -1,3 +1,5 @@
+| `RESEND_API_KEY` | Server-only Resend API key. Never commit this value. |
+| `RESEND_FROM_EMAIL` | Sender using a verified Resend domain/address. |
 # Trade Tender
 
 A UK construction tendering marketplace connecting Clients with registered Retailers, built with
@@ -22,6 +24,18 @@ First-time Client and Retailer flows now include clearer role onboarding, explic
 explanations, and resumable accepted-quote payment state after refresh.
 Sign-in is a single mechanism: after successful authentication, the server-issued approved role
 routes the user to exactly one workspace (`/client`, `/retailer`, or `/super-user`).
+Accounts with both Client and Retailer memberships see a workspace selector in the authenticated
+dashboard header. Switching is revalidated against persisted role membership on the server.
+Tender saving now preserves the draft and reports actionable validation, server, or connection
+errors instead of collapsing every failure into one generic message.
+Retailer profile and team management is available from the Retailer workspace, including company
+details, operational counties, service categories, master-user designation, and team permissions.
+Transactional email now uses a central corporate template library for retailer invitations, matched
+tender alerts, quote events, payment events, contact release, account updates, password reset, and
+failed-payment recovery. Resend delivery is server-only and controlled by environment variables.
+New account registrations notify `info@sinclairsafetysolutions.co.uk` when Resend is configured;
+the notification contains role and contact details but never a password or authentication secret.
+| `REGISTRATION_NOTIFICATION_EMAIL` | Internal recipient for new-account notifications; defaults to `info@sinclairsafetysolutions.co.uk` in `.env.example`. |
 
 See [Outstanding Tasks](#outstanding-tasks) for what is not yet built.
 
@@ -55,8 +69,8 @@ Not yet built — tracked here and kept current as work progresses:
 
 - [x] Core unit tests for identifiers, tender/quote validation, and same-origin protection
 - [ ] Super User management actions (categories, fees, users, waivers) — dashboard is currently read-only
-- [ ] Email notifications to matched Retailers (currently only an audit event + DB row is created)
-- [ ] File/attachment upload for tenders and quotes — the tender creation wizard's "Upload Files" step lets Clients select files, but they are not yet persisted anywhere (no storage backend)
+- [x] Resend corporate templates and matched-Retailer summary delivery; production sender/domain configuration and delivery monitoring remain outstanding
+- [x] File/attachment upload for tenders is now persisted with the tender record; quote document storage remains to be expanded once the storage/permission model is hardened for production
 - [ ] Rate limiting and abuse monitoring on sensitive endpoints (SEC-084/096)
 - [ ] Data retention and deletion jobs for 30-day quote retention / 5-year audit retention (SEC-100/101)
 - [x] Basic same-origin protection for browser mutation requests (SEC-085); production review of CSRF strategy still required
@@ -117,7 +131,7 @@ cp .env.example .env
 ```bash
 npm run db:generate   # generate the Prisma client
 npm run db:migrate    # create/apply local SQLite migrations
-npm run db:seed       # seed demo accounts (see "Demo accounts" below)
+npm run db:seed       # verify the database without adding fabricated records
 ```
 
 ### Run the app
@@ -126,24 +140,8 @@ npm run db:seed       # seed demo accounts (see "Demo accounts" below)
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and sign in with one of the
-[demo accounts](#demo-accounts) below, or register your own from `/register`.
-
-## Demo accounts
-
-`npm run db:seed` creates these accounts (local/dev only — change or remove before any real
-deployment):
-
-| Role | Email | Password | Notes |
-| --- | --- | --- | --- |
-| Super User | `admin@tradetender.test` | `ChangeMe123!` | Platform overview dashboard |
-| Client | `demo.client@tradetender.test` | `Demo1234!` | Has one seeded tender (`Bricks and blocks`, Leeds) already matched to the materials Retailer |
-| Retailer | `demo.retailer.materials@tradetender.test` | `Demo1234!` | Northern Builders Merchants Ltd — Materials, Waste; covers Leeds, Manchester, Sheffield |
-| Retailer | `demo.retailer.plant@tradetender.test` | `Demo1234!` | Pennine Plant Hire Ltd — Plant hire; covers Leeds, York |
-
-Sign in as `demo.retailer.materials@tradetender.test` to see the seeded tender as a matched
-opportunity, unlock it (a free launch credit is applied automatically), and submit a quote back to
-`demo.client@tradetender.test`.
+Open [http://localhost:3000](http://localhost:3000) and register an account from `/register`.
+The seed command intentionally creates no users, tenders, profiles, or fabricated business data.
 
 ### Building for production
 

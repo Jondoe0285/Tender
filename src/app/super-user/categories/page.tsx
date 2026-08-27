@@ -15,14 +15,14 @@ export default async function CategoriesPage() {
           Tender categories used for structured tender creation and Retailer matching.
         </p>
         <div className="grid gap-5 sm:grid-cols-3">
-          {Object.entries(CATEGORIES).map(([name, subcategories]) => (
-            <Card key={name} interactive>
-              <h2 className="font-heading text-lg font-bold text-foundation-navy">{name}</h2>
-              <p className="mt-2 text-sm text-concrete-grey">{subcategories.length} subcategories</p>
+          {Object.entries(CATEGORIES).map(([service, categoryMap]) => (
+            <Card key={service} interactive>
+              <h2 className="font-heading text-lg font-bold text-foundation-navy">{service}</h2>
+              <p className="mt-2 text-sm text-concrete-grey">{Object.keys(categoryMap).length} categories</p>
               <p className="mt-1 text-sm font-semibold text-steel-blue">£{RETAILER_UNLOCK_FEE_GBP} unlock fee</p>
               <ul className="mt-4 flex flex-col gap-1 text-sm text-concrete-grey">
-                {subcategories.map((subcategory) => (
-                  <li key={subcategory}>{subcategory}</li>
+                {Object.entries(categoryMap).map(([category, items]) => (
+                  <li key={category}><span className="font-semibold text-foundation-navy">{category}</span> ({items.length} items)</li>
                 ))}
               </ul>
             </Card>

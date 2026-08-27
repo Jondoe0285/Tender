@@ -101,7 +101,7 @@ export async function getUnlockedTenderForRetailer(retailerId: string, tenderId:
       status: true,
       createdAt: true,
       items: {
-        select: { id: true, category: true, subcategory: true, quantity: true, description: true },
+        select: { id: true, category: true, subcategory: true, item: true, quantity: true, description: true },
         orderBy: { createdAt: 'asc' },
       },
     },

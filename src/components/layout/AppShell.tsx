@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { AccountControls } from '@/components/layout/AccountControls';
 import { CLIENT_NAV, RETAILER_NAV, SUPER_USER_NAV, type NavGroup } from '@/lib/navigation';
 
@@ -18,6 +19,12 @@ const roleLabels: Record<Role, string> = {
   client: 'Client space',
   retailer: 'Retailer space',
   'super-user': 'Super User space',
+};
+
+const workspaceOptions: Record<string, { label: string; path: string }> = {
+  CLIENT: { label: 'Client workspace', path: '/client' },
+  RETAILER: { label: 'Retailer workspace', path: '/retailer' },
+  SUPER_USER: { label: 'Super User workspace', path: '/super-user' },
 };
 
 /** Finds the most specific nav item for the current path, so parent and child routes don't both light up. */
@@ -66,11 +73,22 @@ function SidebarNav({ groups, activeHref, onNavigate }: { groups: NavGroup[]; ac
 
 export function AppShell({ role, title, children }: { role: Role; title: string; children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { data: session, update } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const groups = navByRole[role];
   const activeHref = findActiveHref(pathname, groups);
+  const availableWorkspaces = (session?.user?.roles ?? []).filter((workspaceRole) => workspaceOptions[workspaceRole]);
+
+  async function switchWorkspace(event: React.ChangeEvent<HTMLSelectElement>) {
+    const workspace = workspaceOptions[event.target.value];
+    if (!workspace) return;
+    await update({ role: event.target.value });
+    router.push(workspace.path);
+    router.refresh();
+  }
 
   useEffect(() => {
     if (mobileOpen) drawerRef.current?.focus();
@@ -141,7 +159,25 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
               <h1 className="font-heading text-lg font-bold text-foundation-navy">{title}</h1>
             </div>
           </div>
-          <AccountControls />
+          <div className="flex items-center gap-3">
+            {availableWorkspaces.length > 1 && (
+              <label className="flex items-center gap-2 text-xs font-semibold text-concrete-grey">
+                <span className="sr-only">Switch workspace</span>
+                <select
+                  value={role === 'client' ? 'CLIENT' : role === 'retailer' ? 'RETAILER' : 'SUPER_USER'}
+                  onChange={switchWorkspace}
+                  className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-foundation-navy shadow-soft focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                >
+                  {availableWorkspaces.map((workspaceRole) => (
+                    <option key={workspaceRole} value={workspaceRole}>
+                      {workspaceOptions[workspaceRole].label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <AccountControls />
+          </div>
         </header>
         <main className="flex-1 px-6 py-8 sm:px-8">{children}</main>
       </div>

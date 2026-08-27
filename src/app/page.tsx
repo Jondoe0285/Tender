@@ -40,9 +40,14 @@ export default function HomePage() {
             competitive tender on every requirement &mdash; covering materials, waste services, and
             plant hire &mdash; to secure better pricing.
           </p>
-          <LinkButton href="/login" size="lg" className="mt-8">
-            Sign in to Trade Tender
-          </LinkButton>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <LinkButton href="/login" size="lg">
+              Sign in to Trade Tender
+            </LinkButton>
+            <LinkButton href="/register" variant="secondary" size="lg">
+              Register now
+            </LinkButton>
+          </div>
         </section>
 
         <section aria-label="Trade Tender workspaces" className="mx-auto grid max-w-5xl gap-5 pb-24 sm:grid-cols-3">

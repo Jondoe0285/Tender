@@ -3,12 +3,14 @@ import { createPayment } from '@/server/payments/paymentService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { CLIENT_RELEASE_FEE_GBP } from '@/lib/categories';
 import { ForbiddenError } from '@/server/auth/session';
+import { contactReleaseTemplate, quoteAcceptedTemplate } from '@/server/notifications/emailTemplates';
+import { sendTransactionalEmail } from '@/server/notifications/resend';
 
 type AcceptOutcome = { paymentId: string; checkoutUrl: string | null; devMode: boolean };
 
 /** Accepting a quote enters a pending release-fee state — no contact data is exposed yet (SEC-035). */
 export async function acceptQuote(clientId: string, quoteId: string): Promise<AcceptOutcome> {
-  const quote = await prisma.quote.findUnique({ where: { id: quoteId }, include: { tender: true, releasePayment: true } });
+  const quote = await prisma.quote.findUnique({ where: { id: quoteId }, include: { tender: true, retailer: { select: { email: true } }, releasePayment: true } });
   if (!quote || quote.tender.clientId !== clientId) throw new ForbiddenError('Quote not found for this Client');
   if (quote.status === 'ACCEPTED' && quote.releasePayment) {
     return {
@@ -31,6 +33,10 @@ export async function acceptQuote(clientId: string, quoteId: string): Promise<Ac
   }
 
   const payment = await createPayment({ type: 'CLIENT_RELEASE', amountGbp: CLIENT_RELEASE_FEE_GBP, userId: clientId, quoteId });
+  await sendTransactionalEmail(
+    quote.retailer.email,
+    quoteAcceptedTemplate({ quoteReference: quote.reference, tenderReference: quote.tender.reference, feeGbp: CLIENT_RELEASE_FEE_GBP, paymentPath: `/retailer/tenders/${quote.tenderId}` })
+  ).catch(() => undefined);
   return payment;
 }
 
@@ -65,6 +71,32 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
     targetId: quoteId,
     metadata: { tenderId: quote.tenderId, authorizingPaymentId: paymentId },
   });
+
+  const parties = await prisma.user.findMany({
+    where: { id: { in: [clientId, quote.retailerId] } },
+    select: { id: true, email: true },
+  });
+  await Promise.allSettled(
+    parties.map(async (party) => {
+      const recipientRole = party.id === clientId ? 'CLIENT' : 'RETAILER';
+      const result = await sendTransactionalEmail(
+        party.email,
+        contactReleaseTemplate({
+          quoteReference: quote.reference,
+          tenderReference: quote.tender.reference,
+          recipientRole,
+          workspacePath: recipientRole === 'CLIENT' ? `/client/tenders/${quote.tenderId}` : `/retailer/tenders/${quote.tenderId}`,
+        })
+      ).catch(() => ({ sent: false as const }));
+      await recordAuditEvent({
+        actorId: null,
+        action: result.sent ? 'CONTACT_RELEASE_NOTIFICATION_SENT' : 'CONTACT_RELEASE_NOTIFICATION_FAILED',
+        targetType: 'Quote',
+        targetId: quoteId,
+        metadata: { recipientRole },
+      });
+    })
+  );
 
   return release;
 }

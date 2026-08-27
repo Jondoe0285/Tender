@@ -9,7 +9,8 @@ import { Card } from '@/components/ui/Card';
 import { Combobox } from '@/components/ui/Combobox';
 import { Stepper, type WizardStep } from '@/components/ui/Stepper';
 import { Label, Input, Select, Textarea, FieldGroup } from '@/components/ui/Field';
-import { CATEGORIES, REQUIREMENT_OPTIONS, type CategoryName } from '@/lib/categories';
+import { REQUIREMENT_OPTIONS, SERVICE_NAMES, categoriesForService, itemsForCategory, type ServiceName } from '@/lib/categories';
+import { buildSafeAttachmentName } from '@/lib/attachment-utils';
 
 const QUANTITY_UNITS = ['units', 'tonnes', 'bags', 'pallets', 'm³', 'skips', 'days', 'weeks'];
 
@@ -26,8 +27,9 @@ const STEPS: WizardStep[] = [
 type FormState = {
   projectName: string;
   budget: string;
-  category: CategoryName | '';
+  category: ServiceName | '';
   subcategory: string;
+  item: string;
   location: string;
   requirements: string[];
   quantityValue: string;
@@ -40,8 +42,9 @@ type FormState = {
 
 type TenderItem = {
   id: string;
-  category: CategoryName | '';
+  category: ServiceName | '';
   subcategory: string;
+  item: string;
   quantityValue: string;
   quantityUnit: string;
   description: string;
@@ -52,6 +55,7 @@ const EMPTY_FORM: FormState = {
   budget: '',
   category: '',
   subcategory: '',
+  item: '',
   location: '',
   requirements: [],
   quantityValue: '',
@@ -124,7 +128,7 @@ export default function NewTenderPage() {
       ...prev,
       items: [
         ...prev.items,
-        { id: `${Date.now()}-${prev.items.length}`, category: '', subcategory: '', quantityValue: '', quantityUnit: '', description: '' },
+        { id: `${Date.now()}-${prev.items.length}`, category: '', subcategory: '', item: '', quantityValue: '', quantityUnit: '', description: '' },
       ],
     }));
   }
@@ -148,9 +152,11 @@ export default function NewTenderPage() {
     if (targetStep === 2) {
       if (!form.category) next.category = 'Select a category.';
       if (!form.subcategory) next.subcategory = 'Select a subcategory.';
+      if (!form.item) next.item = 'Select an item.';
       form.items.forEach((item, index) => {
         if (!item.category) next[`item-${index}-category`] = 'Select a category.';
         if (!item.subcategory) next[`item-${index}-subcategory`] = 'Select a subcategory.';
+        if (!item.item) next[`item-${index}-item`] = 'Select an item.';
       });
     }
     if (targetStep === 3 && form.location.trim().length < 2) {
@@ -195,6 +201,26 @@ export default function NewTenderPage() {
     setFiles((prev) => prev.filter((file) => file.name !== name));
   }
 
+  async function prepareAttachments() {
+    return Promise.all(
+      files.map(async (file) => {
+        const arrayBuffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        bytes.forEach((byte) => {
+          binary += String.fromCharCode(byte);
+        });
+
+        return {
+          name: buildSafeAttachmentName(file.name),
+          mimeType: file.type || 'application/octet-stream',
+          sizeBytes: file.size,
+          dataBase64: btoa(binary),
+        };
+      })
+    );
+  }
+
   async function handleSubmit() {
     const requiredStepsValid = [1, 2, 3, 4, 5].every((targetStep) => validateStep(targetStep));
     if (!requiredStepsValid) {
@@ -205,43 +231,58 @@ export default function NewTenderPage() {
     setSubmitting(true);
     setError(null);
 
-    const response = await fetch('/api/tenders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        projectName: form.projectName,
-        category: form.category,
-        subcategory: form.subcategory,
-        location: form.location,
-        quantity: `${form.quantityValue} ${form.quantityUnit}`.trim(),
-        urgency: form.urgency,
-        closingDate: form.closingDate,
-        budget: form.budget || undefined,
-        requirements: form.requirements,
-        description: form.description,
-        items: form.items.map((item) => ({
-          category: item.category,
-          subcategory: item.subcategory,
-          quantity: `${item.quantityValue} ${item.quantityUnit}`.trim(),
-          description: item.description,
-        })),
-      }),
-    });
-
-    if (!response.ok) {
-      setSubmitting(false);
-      setError('Unable to save this tender. Check the form and try again.');
-      return;
-    }
-
-    setSuccess(true);
     try {
-      window.localStorage.removeItem(DRAFT_KEY);
+      const response = await fetch('/api/tenders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectName: form.projectName,
+          category: form.category,
+          subcategory: form.subcategory,
+          item: form.item,
+          location: form.location,
+          quantity: `${form.quantityValue} ${form.quantityUnit}`.trim(),
+          urgency: form.urgency,
+          closingDate: form.closingDate,
+          budget: form.budget || undefined,
+          requirements: form.requirements,
+          description: form.description,
+          items: form.items.map((item) => ({
+            category: item.category,
+            subcategory: item.subcategory,
+            item: item.item,
+            quantity: `${item.quantityValue} ${item.quantityUnit}`.trim(),
+            description: item.description,
+          })),
+          attachments: await prepareAttachments(),
+        }),
+      });
+
+      const responseBody = await response.json().catch(() => null) as {
+        error?: string;
+        issues?: { fieldErrors?: Record<string, string[]> };
+      } | null;
+
+      if (!response.ok) {
+        const fieldErrors = responseBody?.issues?.fieldErrors ?? {};
+        const firstFieldError = Object.values(fieldErrors).flat()[0];
+        setError(firstFieldError ?? responseBody?.error ?? `Unable to save this tender (HTTP ${response.status}).`);
+        setSubmitting(false);
+        return;
+      }
+
+      setSuccess(true);
+      try {
+        window.localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // Nothing to clean up if storage was never available.
+      }
+      router.push('/client/tenders');
+      router.refresh();
     } catch {
-      // Nothing to clean up if storage was never available.
+      setSubmitting(false);
+      setError('We could not reach Trade Tender. Check your connection and try again.');
     }
-    router.push('/client/tenders');
-    router.refresh();
   }
 
   return (
@@ -302,14 +343,14 @@ export default function NewTenderPage() {
                 id="category"
                 value={form.category}
                 onChange={(event) => {
-                  update('category', event.target.value as CategoryName);
+                  update('category', event.target.value as ServiceName);
                   update('subcategory', '');
                 }}
               >
                 <option value="" disabled>
                   Select a category
                 </option>
-                {Object.keys(CATEGORIES).map((option) => (
+                {SERVICE_NAMES.map((option) => (
                   <option key={option} value={option}>
                     {option}
                   </option>
@@ -318,17 +359,22 @@ export default function NewTenderPage() {
               {errors.category && <p className="text-sm font-semibold text-attention">{errors.category}</p>}
             </FieldGroup>
             <FieldGroup>
-              <Label htmlFor="subcategory">Subcategory</Label>
+              <Label htmlFor="subcategory">Category</Label>
               <Combobox
                 id="subcategory"
                 name="subcategory"
                 value={form.subcategory}
                 onChange={(value) => update('subcategory', value)}
                 disabled={!form.category}
-                placeholder={form.category ? 'Search subcategories…' : 'Choose a category first'}
-                groups={form.category ? [{ label: form.category, options: [...CATEGORIES[form.category]] }] : []}
+                placeholder={form.category ? 'Search categories…' : 'Choose a service first'}
+                groups={form.category ? [{ label: form.category, options: categoriesForService(form.category) }] : []}
               />
               {errors.subcategory && <p className="text-sm font-semibold text-attention">{errors.subcategory}</p>}
+            </FieldGroup>
+            <FieldGroup>
+              <Label htmlFor="item">Item</Label>
+              <Combobox id="item" name="item" value={form.item} onChange={(value) => update('item', value)} disabled={!form.subcategory} required placeholder={form.subcategory ? 'Search items…' : 'Choose a category first'} groups={form.category ? [{ label: form.subcategory, options: itemsForCategory(form.category, form.subcategory) }] : []} />
+              {errors.item && <p className="text-sm font-semibold text-attention">{errors.item}</p>}
             </FieldGroup>
             <div className="border-t border-slate-200 pt-5 sm:col-span-2">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -348,32 +394,46 @@ export default function NewTenderPage() {
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <FieldGroup>
-                          <Label htmlFor={`item-${index}-category`}>Category</Label>
+                          <Label htmlFor={`item-${index}-category`}>Service</Label>
                           <Select
                             id={`item-${index}-category`}
                             value={item.category}
                             onChange={(event) => {
-                              updateItem(index, 'category', event.target.value as CategoryName);
+                              updateItem(index, 'category', event.target.value as ServiceName);
                               updateItem(index, 'subcategory', '');
+                              updateItem(index, 'item', '');
                             }}
                           >
                             <option value="" disabled>Select a category</option>
-                            {Object.keys(CATEGORIES).map((option) => <option key={option} value={option}>{option}</option>)}
+                            {SERVICE_NAMES.map((option) => <option key={option} value={option}>{option}</option>)}
                           </Select>
                           {errors[`item-${index}-category`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-category`]}</p>}
                         </FieldGroup>
                         <FieldGroup>
-                          <Label htmlFor={`item-${index}-subcategory`}>Subcategory</Label>
+                          <Label htmlFor={`item-${index}-subcategory`}>Category</Label>
                           <Combobox
                             id={`item-${index}-subcategory`}
                             name={`item-${index}-subcategory-input`}
                             value={item.subcategory}
                             onChange={(value) => updateItem(index, 'subcategory', value)}
                             disabled={!item.category}
-                            placeholder={item.category ? 'Search subcategories…' : 'Choose a category first'}
-                            groups={item.category ? [{ label: item.category, options: [...CATEGORIES[item.category]] }] : []}
+                            placeholder={item.category ? 'Search categories…' : 'Choose a service first'}
+                            groups={item.category ? [{ label: item.category, options: categoriesForService(item.category) }] : []}
                           />
                           {errors[`item-${index}-subcategory`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-subcategory`]}</p>}
+                        </FieldGroup>
+                        <FieldGroup>
+                          <Label htmlFor={`item-${index}-item`}>Item</Label>
+                          <Combobox
+                            id={`item-${index}-item`}
+                            name={`item-${index}-item-input`}
+                            value={item.item}
+                            onChange={(value) => updateItem(index, 'item', value)}
+                            disabled={!item.subcategory}
+                            placeholder={item.subcategory ? 'Search items…' : 'Choose a category first'}
+                            groups={item.category ? [{ label: item.subcategory, options: itemsForCategory(item.category, item.subcategory) }] : []}
+                          />
+                          {errors[`item-${index}-item`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-item`]}</p>}
                         </FieldGroup>
                       </div>
                     </div>
@@ -533,9 +593,8 @@ export default function NewTenderPage() {
           <Card className="flex flex-col gap-4">
             <h2 className="font-heading text-lg font-bold text-foundation-navy">Upload Files (optional)</h2>
             <p className="text-sm text-concrete-grey">
-              Attach drawings, specifications, or site photos. File storage is coming soon &mdash; for
-              now, selected files are listed here for your reference only and are not saved with the
-              tender. Mention any key documents in your specification notes (Step 4) instead.
+              Attach drawings, specifications, or site photos. These files are saved with the tender so
+              Retailers can review the project context before they unlock the full detail set.
             </p>
             <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-6 py-10 text-center hover:border-steel-blue">
               <span className="text-sm font-semibold text-steel-blue">Choose files or drag them here</span>
@@ -582,7 +641,7 @@ export default function NewTenderPage() {
               <ReviewItem label="Tender items" value={`${form.items.length + 1} item(s)`} />
               <ReviewItem
                 label="Attachments"
-                value={files.length > 0 ? `${files.length} file(s) selected (not yet saved)` : 'None'}
+                value={files.length > 0 ? `${files.length} file(s) selected and saved with this tender` : 'None'}
               />
             </dl>
             <div>

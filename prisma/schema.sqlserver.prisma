@@ -57,23 +57,65 @@ model User {
   createdAt         DateTime @default(now())
 
   retailerProfile   RetailerProfile?
+  roleMemberships   UserRole[]
+  masterOfRetailers RetailerProfile[] @relation("MasterUser")
+  teamMember        RetailerTeamMember?
   tenders           Tender[]        @relation("ClientTenders")
   quotes            Quote[]         @relation("RetailerQuotes")
   unlocks           Unlock[]        @relation("RetailerUnlocks")
+  itemMatches       TenderItemMatch[] @relation("RetailerItemMatches")
   payments          Payment[]
   auditLogs         AuditLog[]
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role
+  createdAt DateTime @default(now())
+
+  @@unique([userId, role])
+}
+
+enum RetailerPermission {
+  VIEW
+  EDIT
+  SUPER_USER
+  PAYMENTS
 }
 
 model RetailerProfile {
   id                String   @id @default(cuid())
   userId            String   @unique
   user              User     @relation(fields: [userId], references: [id])
+  masterUserId      String?
+  masterUser        User?    @relation("MasterUser", fields: [masterUserId], references: [id])
   companyName       String
+  companyNumber     String?
+  address           String?
+  counties          String   @default("") // comma-separated UK county names
   categories        String   // comma-separated category names
   coverageAreas     String   // comma-separated postcode areas / towns
   accreditations    String?
   launchCreditsLeft Int      @default(3)
   createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now())
+
+  teamMembers       RetailerTeamMember[]
+}
+
+model RetailerTeamMember {
+  id                String   @id @default(cuid())
+  retailerId        String
+  retailerProfile   RetailerProfile @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id])
+  permissions       String   // comma-separated permission names
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([retailerId, userId])
 }
 
 model Tender {
@@ -83,6 +125,8 @@ model Tender {
   client        User         @relation("ClientTenders", fields: [clientId], references: [id])
   category      String
   subcategory   String
+  service       String   @default("Materials")
+  item          String?
   location      String
   quantity      String
   urgency       String
@@ -96,6 +140,43 @@ model Tender {
   matches       TenderMatch[]
   unlocks       Unlock[]
   quotes        Quote[]
+  items         TenderItem[]
+  attachments   TenderAttachment[]
+}
+
+model TenderAttachment {
+  id          String   @id @default(cuid())
+  tenderId    String
+  tender      Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  fileName    String
+  mimeType    String
+  sizeBytes   Int
+  content     Bytes
+  uploadedAt  DateTime @default(now())
+}
+
+model TenderItem {
+  id          String   @id @default(cuid())
+  tenderId    String
+  tender      Tender   @relation(fields: [tenderId], references: [id])
+  category    String
+  subcategory String
+  item        String?
+  quantity    String
+  description String
+  createdAt   DateTime @default(now())
+  matches     TenderItemMatch[]
+}
+
+model TenderItemMatch {
+  id         String     @id @default(cuid())
+  tenderItemId String
+  tenderItem TenderItem @relation(fields: [tenderItemId], references: [id], onDelete: Cascade)
+  retailerId String
+  retailer   User       @relation("RetailerItemMatches", fields: [retailerId], references: [id])
+  notifiedAt DateTime   @default(now())
+
+  @@unique([tenderItemId, retailerId])
 }
 
 model TenderMatch {

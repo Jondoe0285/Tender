@@ -26,7 +26,7 @@ type TenderFull = TenderSummary & {
   budget: number | null;
   requirements: string;
   description: string;
-  items: { id: string; category: string; subcategory: string; quantity: string; description: string }[];
+  items: { id: string; category: string; subcategory: string; item: string | null; quantity: string; description: string }[];
 };
 
 export default function RetailerTenderDetailPage() {
@@ -198,9 +198,9 @@ export default function RetailerTenderDetailPage() {
               <Card className="mb-6">
                 <h2 className="font-heading text-lg font-bold text-foundation-navy">Tender requirements</h2>
                 <div className="mt-4 flex flex-col gap-4">
-                  <TenderItemDetail subcategory={full.subcategory} quantity={full.quantity} description={full.description} />
-                  {full.items.map((item) => (
-                    <TenderItemDetail key={item.id} subcategory={item.subcategory} quantity={item.quantity} description={item.description} />
+                  <TenderItemDetail subcategory={full.subcategory} item={null} quantity={full.quantity} description={full.description} />
+                  {full.items.slice(1).map((item) => (
+                    <TenderItemDetail key={item.id} subcategory={item.subcategory} item={item.item} quantity={item.quantity} description={item.description} />
                   ))}
                 </div>
                 {full.budget != null && <p className="mt-1 text-sm text-concrete-grey">Budget: £{full.budget}</p>}
@@ -260,10 +260,11 @@ export default function RetailerTenderDetailPage() {
   );
 }
 
-function TenderItemDetail({ subcategory, quantity, description }: { subcategory: string; quantity: string; description: string }) {
+function TenderItemDetail({ subcategory, item, quantity, description }: { subcategory: string; item: string | null; quantity: string; description: string }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-      <h3 className="font-heading text-base font-bold text-foundation-navy">{subcategory}</h3>
+      <h3 className="font-heading text-base font-bold text-foundation-navy">{item ?? subcategory}</h3>
+      {item && <p className="text-xs text-concrete-grey">{subcategory}</p>}
       <p className="mt-1 text-sm text-concrete-grey">Quantity: {quantity}</p>
       <p className="mt-3 whitespace-pre-line text-sm text-foundation-navy">{description}</p>
     </div>
