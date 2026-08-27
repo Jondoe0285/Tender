@@ -26,7 +26,7 @@ export const authOptions: AuthOptions = {
           where: { email },
           include: { roleMemberships: { select: { role: true } } },
         });
-        if (!user || user.suspended) return null;
+        if (!user || user.suspended || !user.emailVerifiedAt) return null;
 
         const validPassword = await verifyPassword(password, user.passwordHash);
         if (!validPassword) return null;

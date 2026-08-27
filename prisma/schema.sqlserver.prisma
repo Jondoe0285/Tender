@@ -45,19 +45,32 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum ModerationDecision {
+  ALLOW
+  WARN
+  BLOCK
+  REVIEW
+}
+
 model User {
   id                String   @id @default(cuid())
   email             String   @unique
   passwordHash      String
   role              Role
   contactName       String
+  firstName         String?
+  lastName          String?
   contactPhone      String?
   suspended         Boolean  @default(false)
+  emailVerifiedAt   DateTime?
   termsAcceptedAt   DateTime?
   createdAt         DateTime @default(now())
 
   retailerProfile   RetailerProfile?
+  primaryClientCompany ClientCompany? @relation("ClientCompanyPrimary")
+  clientCompanyMembership ClientCompanyMember?
   roleMemberships   UserRole[]
+  emailVerificationTokens EmailVerificationToken[]
   masterOfRetailers RetailerProfile[] @relation("MasterUser")
   teamMember        RetailerTeamMember?
   tenders           Tender[]        @relation("ClientTenders")
@@ -66,6 +79,61 @@ model User {
   itemMatches       TenderItemMatch[] @relation("RetailerItemMatches")
   payments          Payment[]
   auditLogs         AuditLog[]
+  moderationEvents  ModerationEvent[] @relation("ModerationActor")
+  reviewedModerationEvents ModerationEvent[] @relation("ModerationReviewer")
+}
+
+model ModerationEvent {
+  id           String             @id @default(cuid())
+  actorId      String
+  actor        User               @relation("ModerationActor", fields: [actorId], references: [id])
+  contentType  String
+  contentHash  String
+  decision     ModerationDecision
+  riskScore    Int
+  reasons      String
+  entities     String
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewedBy   User?              @relation("ModerationReviewer", fields: [reviewedById], references: [id])
+  reviewNote   String?
+  createdAt    DateTime           @default(now())
+
+  @@index([decision, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model ClientCompany {
+  id            String   @id @default(cuid())
+  companyName   String
+  primaryUserId String   @unique
+  primaryUser   User     @relation("ClientCompanyPrimary", fields: [primaryUserId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  members ClientCompanyMember[]
+}
+
+model ClientCompanyMember {
+  id        String        @id @default(cuid())
+  companyId String
+  userId    String        @unique
+  company   ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@unique([companyId, userId])
 }
 
 model UserRole {

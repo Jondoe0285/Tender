@@ -25,7 +25,7 @@ function detailRows(rows: Array<[string, string]>): string {
   return `<table style="border-collapse:collapse;width:100%;margin:24px 0">${rows.map(([label, value]) => `<tr><td style="padding:9px 0;color:${GREY};vertical-align:top">${escapeHtml(label)}</td><td style="padding:9px 0;font-weight:700;vertical-align:top">${escapeHtml(value)}</td></tr>`).join('')}</table>`;
 }
 
-function appUrl(path: string): string {
+export function appUrl(path: string): string {
   return `${process.env.NEXTAUTH_URL ?? 'http://localhost:3000'}${path}`;
 }
 
@@ -99,6 +99,19 @@ export function newRegistrationTemplate(input: { role: string; email: string; co
         ...(input.companyName ? [['Company', input.companyName] as [string, string]] : []),
       ]) + '<p style="font-size:14px;line-height:1.6">No password or authentication secret is included in this notification.</p>',
       action: { label: 'Open administration', href: appUrl('/super-user') },
+    }),
+  };
+}
+
+export function emailVerificationTemplate(input: { verificationLink: string }): EmailTemplate {
+  return {
+    subject: 'Verify your Trade Tender email address',
+    html: layout({
+      eyebrow: 'Account verification',
+      title: 'Verify your email address',
+      intro: 'Confirm your email address to activate your Trade Tender account.',
+      body: '<p style="font-size:14px;line-height:1.6">This verification link expires in 24 hours. If you did not create this account, no action is required.</p>',
+      action: { label: 'Verify email address', href: input.verificationLink },
     }),
   };
 }

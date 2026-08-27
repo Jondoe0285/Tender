@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { AccountControls } from '@/components/layout/AccountControls';
+import { TradeTenderLogo } from '@/components/layout/TradeTenderLogo';
+import { SiteFooter } from '@/components/layout/SiteFooter';
 import { CLIENT_NAV, RETAILER_NAV, SUPER_USER_NAV, type NavGroup } from '@/lib/navigation';
 
 type Role = 'client' | 'retailer' | 'super-user';
@@ -99,9 +101,8 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
     <div className="flex min-h-screen bg-site-white">
       {/* Desktop sidebar */}
       <aside className="hidden w-64 flex-shrink-0 bg-foundation-navy md:flex md:flex-col">
-        <Link href="/" className="flex items-center gap-2.5 px-6 py-5 font-heading text-lg font-bold text-site-white">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-safety-amber text-foundation-navy shadow-soft">T</span>
-          <span>Trade Tender</span>
+        <Link href="/" className="mx-4 mt-4 block bg-site-white p-2" aria-label="Trade Tender home">
+          <TradeTenderLogo />
         </Link>
         <SidebarNav groups={groups} activeHref={activeHref} />
       </aside>
@@ -124,9 +125,8 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
             className="relative flex h-full w-72 flex-col bg-foundation-navy shadow-soft-lg"
           >
             <div className="flex items-center justify-between px-6 py-5">
-              <Link href="/" className="flex items-center gap-2.5 font-heading text-lg font-bold text-site-white">
-                <span className="grid h-9 w-9 place-items-center rounded-lg bg-safety-amber text-foundation-navy">T</span>
-                <span>Trade Tender</span>
+              <Link href="/" className="block w-52 bg-site-white p-2" aria-label="Trade Tender home">
+                <TradeTenderLogo />
               </Link>
               <button
                 type="button"
@@ -180,6 +180,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
           </div>
         </header>
         <main className="flex-1 px-6 py-8 sm:px-8">{children}</main>
+        <SiteFooter />
       </div>
     </div>
   );

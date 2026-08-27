@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { Suspense, useState, type FormEvent } from 'react';
 import { getSession, signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { Button } from '@/components/ui/Button';
@@ -15,7 +15,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col bg-site-white">
       <SiteHeader />
       <main className="flex-1 px-6 sm:px-10">
-        <LoginForm />
+        <Suspense fallback={null}><LoginForm /></Suspense>
       </main>
       <SiteFooter />
     </div>
@@ -24,6 +24,7 @@ export default function LoginPage() {
 
 function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -59,6 +60,9 @@ function LoginForm() {
     <section className="mx-auto max-w-md pt-16 pb-24">
       <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-steel-blue">Sign in</p>
       <h1 className="font-heading text-3xl font-bold tracking-tight text-foundation-navy">Sign in to your workspace</h1>
+      {searchParams.get('verification') === 'pending' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Check your email and use the verification link to activate your account.</p>}
+      {searchParams.get('verification') === 'verified' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your email address is verified. You can now sign in.</p>}
+      {searchParams.get('verification') === 'invalid' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">This verification link is invalid or has expired. Register again with the same details to request a new link.</p>}
 
       <Card className="mt-8">
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">

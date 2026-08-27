@@ -7,6 +7,15 @@ import { rejectCrossOrigin } from '@/server/http/origin';
 import { verifyPassword } from '@/server/auth/password';
 import { newRegistrationTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
+import { appUrl, emailVerificationTemplate } from '@/server/notifications/emailTemplates';
+import { createEmailVerificationToken } from '@/server/auth/emailVerification';
+
+async function sendVerificationEmail(userId: string, email: string) {
+  const token = await createEmailVerificationToken(userId);
+  return sendTransactionalEmail(email, emailVerificationTemplate({
+    verificationLink: appUrl(`/api/auth/verify-email?token=${encodeURIComponent(token)}`),
+  }));
+}
 
 export async function POST(request: Request) {
   const originError = rejectCrossOrigin(request);
@@ -18,9 +27,10 @@ export async function POST(request: Request) {
   }
   const input = parsed.data;
 
-  if (input.role === 'RETAILER' && !input.companyName) {
-    return NextResponse.json({ error: 'Company name is required for Retailer accounts' }, { status: 400 });
+  if (!input.companyName) {
+    return NextResponse.json({ error: 'Company name is required' }, { status: 400 });
   }
+  const companyName = input.companyName;
 
   const existing = await prisma.user.findUnique({
     where: { email: input.email },
@@ -29,25 +39,34 @@ export async function POST(request: Request) {
   if (existing) {
     const validPassword = await verifyPassword(input.password, existing.passwordHash);
     const hasRole = existing.roleMemberships.some((membership) => membership.role === input.role) || existing.role === input.role;
-    if (!validPassword || hasRole || existing.suspended) {
+    if (!validPassword || existing.suspended) {
       return NextResponse.json({ error: 'Unable to complete registration with those details' }, { status: 400 });
     }
 
-    await prisma.$transaction([
-      prisma.userRole.create({ data: { userId: existing.id, role: input.role } }),
-      ...(input.role === 'RETAILER'
-        ? [
-            prisma.retailerProfile.create({
+    if (hasRole && !existing.emailVerifiedAt) {
+      const emailResult = await sendVerificationEmail(existing.id, existing.email);
+      if (!emailResult.sent) return NextResponse.json({ error: 'Unable to send verification email. Please contact support.' }, { status: 503 });
+      return NextResponse.json({ status: 'verification_sent' }, { status: 202 });
+    }
+    if (hasRole) return NextResponse.json({ error: 'Unable to complete registration with those details' }, { status: 400 });
+
+    await prisma.$transaction(async (transaction) => {
+      await transaction.userRole.create({ data: { userId: existing.id, role: input.role } });
+      if (input.role === 'RETAILER') {
+        await transaction.retailerProfile.create({
               data: {
                 userId: existing.id,
                 companyName: input.companyName ?? '',
                 categories: (input.categories ?? []).join(','),
                 coverageAreas: input.coverageAreas ?? '',
               },
-            }),
-          ]
-        : []),
-    ]);
+            });
+      }
+      if (input.role === 'CLIENT') {
+        const company = await transaction.clientCompany.create({ data: { companyName, primaryUserId: existing.id } });
+        await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: existing.id } });
+      }
+    });
     await recordAuditEvent({
       actorId: existing.id,
       action: 'WORKSPACE_ADDED',
@@ -60,12 +79,15 @@ export async function POST(request: Request) {
 
   const passwordHash = await hashPassword(input.password);
 
-  const user = await prisma.user.create({
-    data: {
+  const user = await prisma.$transaction(async (transaction) => {
+    const createdUser = await transaction.user.create({
+      data: {
       email: input.email,
       passwordHash,
       role: input.role,
       contactName: input.contactName,
+      firstName: input.firstName ?? null,
+      lastName: input.lastName ?? null,
       contactPhone: input.contactPhone ?? null,
       termsAcceptedAt: new Date(),
       roleMemberships: { create: { role: input.role } },
@@ -80,7 +102,13 @@ export async function POST(request: Request) {
             },
           }
         : {}),
-    },
+      },
+    });
+    if (input.role === 'CLIENT') {
+      const company = await transaction.clientCompany.create({ data: { companyName, primaryUserId: createdUser.id } });
+      await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: createdUser.id } });
+    }
+    return createdUser;
   });
 
   await recordAuditEvent({
@@ -90,6 +118,13 @@ export async function POST(request: Request) {
     targetId: user.id,
     metadata: { role: user.role },
   });
+
+  const verificationResult = await sendVerificationEmail(user.id, user.email);
+  if (!verificationResult.sent) {
+    await recordAuditEvent({ actorId: null, action: 'EMAIL_VERIFICATION_DELIVERY_FAILED', targetType: 'User', targetId: user.id });
+    return NextResponse.json({ error: 'Unable to send verification email. Please contact support.' }, { status: 503 });
+  }
+  await recordAuditEvent({ actorId: null, action: 'EMAIL_VERIFICATION_SENT', targetType: 'User', targetId: user.id });
 
   const notificationRecipient = process.env.REGISTRATION_NOTIFICATION_EMAIL ?? 'info@sinclairsafetysolutions.co.uk';
   if (notificationRecipient) {
@@ -111,5 +146,5 @@ export async function POST(request: Request) {
     });
   }
 
-  return NextResponse.json({ status: 'ok' });
+  return NextResponse.json({ status: 'verification_sent' }, { status: 201 });
 }

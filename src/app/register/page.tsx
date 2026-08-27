@@ -29,7 +29,9 @@ export default function RegisterPage() {
       body: JSON.stringify({
         email: form.get('email'),
         password: form.get('password'),
-        contactName: form.get('contactName'),
+        contactName: `${form.get('firstName')} ${form.get('lastName')}`.trim(),
+        firstName: form.get('firstName'),
+        lastName: form.get('lastName'),
         contactPhone: form.get('contactPhone') || undefined,
         role,
         termsAccepted: form.get('termsAccepted') === 'on',
@@ -41,10 +43,11 @@ export default function RegisterPage() {
 
     if (!response.ok) {
       setSubmitting(false);
-      setError('Unable to complete registration. Check your details and try again.');
+      const data = await response.json().catch(() => null);
+      setError(data?.error ?? 'Unable to complete registration. Check your details and try again.');
       return;
     }
-    router.push('/login');
+    router.push('/login?verification=pending');
   }
 
   return (
@@ -84,10 +87,16 @@ export default function RegisterPage() {
 
           <Card className="mt-6">
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-              <FieldGroup>
-                <Label htmlFor="contactName">Full name</Label>
-                <Input id="contactName" name="contactName" required autoComplete="name" />
-              </FieldGroup>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <FieldGroup>
+                  <Label htmlFor="firstName">First name</Label>
+                  <Input id="firstName" name="firstName" required autoComplete="given-name" />
+                </FieldGroup>
+                <FieldGroup>
+                  <Label htmlFor="lastName">Last name</Label>
+                  <Input id="lastName" name="lastName" required autoComplete="family-name" />
+                </FieldGroup>
+              </div>
               <FieldGroup>
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" name="email" type="email" required autoComplete="email" />
@@ -101,13 +110,13 @@ export default function RegisterPage() {
                 <Input id="password" name="password" type="password" minLength={10} required autoComplete="new-password" />
                 <p className="text-xs text-concrete-grey">Use at least 10 characters.</p>
               </FieldGroup>
+              <FieldGroup>
+                <Label htmlFor="companyName">Company name</Label>
+                <Input id="companyName" name="companyName" required autoComplete="organization" />
+              </FieldGroup>
 
               {role === 'RETAILER' && (
                 <>
-                  <FieldGroup>
-                    <Label htmlFor="companyName">Company name</Label>
-                    <Input id="companyName" name="companyName" required />
-                  </FieldGroup>
                   <fieldset className="flex flex-col gap-2">
                     <legend className="text-sm font-semibold text-foundation-navy">Categories you supply</legend>
                     <p className="text-xs text-concrete-grey">These categories determine which tender opportunities are matched to you.</p>

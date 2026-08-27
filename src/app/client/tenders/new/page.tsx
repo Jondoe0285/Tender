@@ -261,12 +261,13 @@ export default function NewTenderPage() {
       const responseBody = await response.json().catch(() => null) as {
         error?: string;
         issues?: { fieldErrors?: Record<string, string[]> };
+        reasons?: string[];
       } | null;
 
       if (!response.ok) {
         const fieldErrors = responseBody?.issues?.fieldErrors ?? {};
         const firstFieldError = Object.values(fieldErrors).flat()[0];
-        setError(firstFieldError ?? responseBody?.error ?? `Unable to save this tender (HTTP ${response.status}).`);
+        setError(firstFieldError ?? responseBody?.reasons?.join(' ') ?? responseBody?.error ?? `Unable to save this tender (HTTP ${response.status}).`);
         setSubmitting(false);
         return;
       }

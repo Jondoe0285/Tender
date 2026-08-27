@@ -3,6 +3,15 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    background: #f4f6f8;
+  }
+
+  body {
+    background-image: linear-gradient(rgba(14, 28, 46, 0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(14, 28, 46, 0.025) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
   :focus-visible {
     outline: 2px solid theme('colors.safety-amber');
     outline-offset: 2px;

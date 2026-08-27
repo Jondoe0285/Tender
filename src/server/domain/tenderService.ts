@@ -4,9 +4,28 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { estimateValueBand } from '@/lib/valueBands';
 import { sendTenderOpportunityEmail } from '@/server/notifications/resend';
 import type { CreateTenderInput } from '@/lib/schemas/tender';
+import { enforceContentModeration } from '@/server/moderation/contentModeration';
 
 /** Creates a tender, assigns its reference, and matches it to eligible Retailers. Ownership is the caller's job. */
 export async function createTender(clientId: string, input: CreateTenderInput) {
+  await enforceContentModeration(clientId, 'TENDER_SUBMISSION', [
+    { name: 'project name', value: input.projectName },
+    { name: 'category', value: input.category },
+    { name: 'subcategory', value: input.subcategory },
+    { name: 'item', value: input.item },
+    { name: 'location', value: input.location },
+    { name: 'quantity', value: input.quantity },
+    { name: 'requirements', value: input.requirements.join(', ') },
+    { name: 'description', value: input.description },
+    ...(input.items ?? []).flatMap((item, index) => [
+      { name: `item ${index + 1} category`, value: item.category },
+      { name: `item ${index + 1} subcategory`, value: item.subcategory },
+      { name: `item ${index + 1} item`, value: item.item },
+      { name: `item ${index + 1} description`, value: item.description },
+      { name: `item ${index + 1} quantity`, value: item.quantity },
+    ]),
+    ...(input.attachments ?? []).map((attachment, index) => ({ name: `attachment ${index + 1} filename`, value: attachment.name })),
+  ]);
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
   const tendersToday = await prisma.tender.count({ where: { createdAt: { gte: startOfDay } } });

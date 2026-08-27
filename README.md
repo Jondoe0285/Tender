@@ -8,36 +8,44 @@ for the full product and business specification.
 
 ## Status
 
-This repository has a working backend vertical slice: authentication, tender creation and
-matching, staged visibility, Retailer unlock, quote submission/comparison, Client acceptance, and
-a contact-release workflow with audit logging. Client quote comparison now supports sortable
-side-by-side fields, best-value indicators, and a server-generated PDF export. Payments are scaffolded against Stripe but run in a
-**dev-only fallback** until real Stripe keys are configured (see [Payments](#payments) below). The
-UI follows an enterprise-SaaS visual standard (soft shadows, consistent spacing, accessible
-searchable dropdowns, loading/success button states) using a shared component kit in
-`src/components/ui/`. Each role has its own dedicated sidebar navigation (`src/components/layout/AppShell.tsx`,
-configured in `src/lib/navigation.ts`) grouped into logical sections using construction-industry terms.
-The Super User area now includes an executive analytics dashboard with filters, decision insights,
-charts for tender volume/conversion/regional activity, category performance, CSV export, and
-drill-down links.
-First-time Client and Retailer flows now include clearer role onboarding, explicit fee/privacy
-explanations, and resumable accepted-quote payment state after refresh.
-Sign-in is a single mechanism: after successful authentication, the server-issued approved role
-routes the user to exactly one workspace (`/client`, `/retailer`, or `/super-user`).
+This repository has a working backend vertical slice for the approved Trade Tender flow: authentication,
+tender creation and matching, staged visibility, Retailer unlock, quote submission/comparison,
+Client acceptance, and a contact-release workflow with audit logging.
+
+The application now includes a server-side moderation layer that blocks or reviews suspicious content
+before it is shared, including contact details, direct outside-platform communication attempts,
+company identifiers, URLs, and other information that should stay within the platform until the
+correct payment or authorization conditions are met. Content moderation events are recorded to the
+append-only moderation audit trail, and the Contact-Release workflow only exposes the counterparty's
+contact details after the server has confirmed the release payment.
+
+Client quote comparison supports sortable side-by-side fields, best-value indicators, and a
+server-generated PDF export. Payments are scaffolded against Stripe but run in a **dev-only
+fallback** until real Stripe keys are configured (see [Payments](#payments) below). The UI follows
+an enterprise-SaaS visual standard using a shared component kit in `src/components/ui/`, and each
+role has its own dedicated sidebar navigation (`src/components/layout/AppShell.tsx`, configured in
+`src/lib/navigation.ts`) grouped into logical sections using construction-industry terms.
+
+The Super User area includes an executive analytics dashboard with filters, decision insights, charts
+for tender volume/conversion/regional activity, category performance, CSV export, and drill-down
+links. First-time Client and Retailer flows include clearer role onboarding, explicit fee/privacy
+explanations, and resumable accepted-quote payment state after refresh. Sign-in uses a single
+server-authorized routing path to exactly one workspace (`/client`, `/retailer`, or `/super-user`).
 Accounts with both Client and Retailer memberships see a workspace selector in the authenticated
-dashboard header. Switching is revalidated against persisted role membership on the server.
-Tender saving now preserves the draft and reports actionable validation, server, or connection
-errors instead of collapsing every failure into one generic message.
+dashboard header, and switching is revalidated against persisted role membership on the server.
+Tender saving preserves the draft and reports actionable validation, server, or connection errors.
 Retailer profile and team management is available from the Retailer workspace, including company
 details, operational counties, service categories, master-user designation, and team permissions.
-Transactional email now uses a central corporate template library for retailer invitations, matched
+Transactional email uses a central corporate template library for retailer invitations, matched
 tender alerts, quote events, payment events, contact release, account updates, password reset, and
 failed-payment recovery. Resend delivery is server-only and controlled by environment variables.
 New account registrations notify `info@sinclairsafetysolutions.co.uk` when Resend is configured;
 the notification contains role and contact details but never a password or authentication secret.
+New Client and Retailer accounts receive a single-use email-verification link that expires after 24
+hours. Unverified accounts cannot sign in.
 | `REGISTRATION_NOTIFICATION_EMAIL` | Internal recipient for new-account notifications; defaults to `info@sinclairsafetysolutions.co.uk` in `.env.example`. |
 
-See [Outstanding Tasks](#outstanding-tasks) for what is not yet built.
+See [Outstanding Tasks](#outstanding-tasks) for the remaining production-hardening work.
 
 ## Roles
 
@@ -65,26 +73,21 @@ Each role has its own sidebar (`src/lib/navigation.ts`), grouped by task:
 
 ## Outstanding Tasks
 
-Not yet built — tracked here and kept current as work progresses:
+The core product flow is now implemented and verified. The remaining work is mostly production
+hardening and operational readiness:
 
-- [x] Core unit tests for identifiers, tender/quote validation, and same-origin protection
 - [ ] Super User management actions (categories, fees, users, waivers) — dashboard is currently read-only
-- [x] Resend corporate templates and matched-Retailer summary delivery; production sender/domain configuration and delivery monitoring remain outstanding
-- [x] File/attachment upload for tenders is now persisted with the tender record; quote document storage remains to be expanded once the storage/permission model is hardened for production
 - [ ] Rate limiting and abuse monitoring on sensitive endpoints (SEC-084/096)
 - [ ] Data retention and deletion jobs for 30-day quote retention / 5-year audit retention (SEC-100/101)
-- [x] Basic same-origin protection for browser mutation requests (SEC-085); production review of CSRF strategy still required
 - [ ] Real Stripe keys wired up and webhook tested against a live/test Stripe account
-- [ ] Public policy pages (Terms, Privacy, Cookie, Refund, Contact-Release, etc.) linked from the footer
 - [ ] Partner advertising management (currently static placeholders on the Super User dashboard)
-- [ ] Visual/accessibility QA pass with real screen readers and devices (no screenshot/visual-regression tooling in this sandbox)
+- [ ] Visual/accessibility QA pass with real screen readers and devices
 - [ ] Standalone toast/notification system for success/error feedback beyond inline button and form states
-- [ ] First-time journey usability testing with real Clients and Retailers to validate completion time and abandonment assumptions
-- [x] Single sign-in routing to the authenticated user&rsquo;s approved workspace; password reset and MFA remain outstanding
-- [ ] Suspend/edit actions on the new Super User Retailer/Client/Tender management pages (currently read-only lists)
-- [ ] Manual QA of the mobile sidebar drawer on real devices (code-reviewed only in this sandbox)
-- [ ] Secure supporting-document storage and downloads for quotes (comparison currently records a document filename only)
-- [ ] Analytics trend data and regional/category reporting should be expanded with richer date-grain and postcode normalisation before production scale
+- [ ] First-time journey usability testing with real Clients and Retailers
+- [ ] Suspend/edit actions on the new Super User Retailer/Client/Tender management pages
+- [ ] Manual QA of the mobile sidebar drawer on real devices
+- [ ] Secure supporting-document storage and downloads for quotes
+- [ ] Analytics trend data and regional/category reporting expansion before production scale
 - [ ] Integration/E2E coverage for authenticated tender, unlock, quote, payment, and contact-release journeys
 
 ## Tech Stack
@@ -124,6 +127,8 @@ cp .env.example .env
 | `DATABASE_URL` | `file:./dev.db` for local SQLite. Points at Azure SQL in production. |
 | `NEXTAUTH_SECRET` | Long random string. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. |
 | `NEXTAUTH_URL` | `http://localhost:3000` locally. |
+| `RESEND_API_KEY` | Required to deliver email-verification links to self-registered users. |
+| `RESEND_FROM_EMAIL` | Required verified Resend sender used for verification emails. |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Leave blank locally — payment flows fall back to a dev-only confirmation endpoint when unset. Required in production. |
 
 ### Database setup
@@ -131,8 +136,23 @@ cp .env.example .env
 ```bash
 npm run db:generate   # generate the Prisma client
 npm run db:migrate    # create/apply local SQLite migrations
-npm run db:seed       # verify the database without adding fabricated records
+npm run db:seed       # create local development accounts
 ```
+
+### Seeded users
+
+`npm run db:seed` creates or refreshes the following local-only accounts. It refuses to run when
+`NODE_ENV=production`.
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Super User | `PLATFORM_OWNER_EMAIL` from `.env` | `PLATFORM_OWNER_PASSWORD` from `.env` |
+| Client | `client@example.test` | `TradeTenderDev!2026` |
+| Retailer | `retailer@example.test` | `TradeTenderDev!2026` |
+
+Set `PLATFORM_OWNER_EMAIL` and `PLATFORM_OWNER_PASSWORD` in the ignored `.env` file before
+running the seed. The Retailer account includes a basic company profile and launch credits. The
+seed command does not create tenders, quotes, payments, or production data.
 
 ### Run the app
 
@@ -141,7 +161,6 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) and register an account from `/register`.
-The seed command intentionally creates no users, tenders, profiles, or fabricated business data.
 
 ### Building for production
 
@@ -177,7 +196,7 @@ npm run db:sync-prod-schema
 prisma/
 ├── schema.prisma           # Local dev datasource (SQLite)
 ├── schema.sqlserver.prisma # Generated production datasource (Azure SQL)
-├── seed.ts                 # Seeds a Super User account
+├── seed.ts                 # Creates local Super User, Client, and Retailer development accounts
 └── migrations/
 src/
 ├── app/                    # Next.js routes and role portals

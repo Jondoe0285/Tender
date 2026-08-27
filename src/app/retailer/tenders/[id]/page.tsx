@@ -133,7 +133,8 @@ export default function RetailerTenderDetailPage() {
     });
     setSubmittingQuote(false);
     if (!response.ok) {
-      setMessage('Unable to submit quote.');
+      const data = await response.json().catch(() => null) as { error?: string; reasons?: string[] } | null;
+      setMessage(data?.reasons?.join(' ') ?? data?.error ?? 'Unable to submit quote.');
       return;
     }
     setQuoteSubmitted(true);

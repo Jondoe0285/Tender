@@ -5,11 +5,19 @@ import { ForbiddenError } from '@/server/auth/session';
 import type { SubmitQuoteInput } from '@/lib/schemas/quote';
 import { quoteReceivedTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
+import { enforceContentModeration } from '@/server/moderation/contentModeration';
 
 /** A Retailer may only submit a quote for a tender they have legitimately unlocked (FR-040). */
 export async function submitQuote(retailerId: string, tenderId: string, input: SubmitQuoteInput) {
   const unlock = await prisma.unlock.findUnique({ where: { tenderId_retailerId: { tenderId, retailerId } } });
   if (!unlock) throw new ForbiddenError('Tender has not been unlocked by this Retailer');
+
+  await enforceContentModeration(retailerId, 'QUOTE_SUBMISSION', [
+    { name: 'delivery information', value: input.deliveryInfo },
+    { name: 'accreditations', value: input.accreditations },
+    { name: 'supporting document name', value: input.supportingDocumentName },
+    { name: 'notes', value: input.notes },
+  ]);
 
   const tender = await prisma.tender.findUniqueOrThrow({
     where: { id: tenderId },
