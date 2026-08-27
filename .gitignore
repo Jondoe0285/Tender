@@ -11,6 +11,7 @@ build/
 dist/
 .next/
 out/
+*.tsbuildinfo
 
 # Misc
 .DS_Store
@@ -27,6 +28,10 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+
+# Local database
+prisma/dev.db
+prisma/dev.db-journal
 
 # IDE
 .vscode/

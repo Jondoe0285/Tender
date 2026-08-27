@@ -1,0 +1,198 @@
+// Local development datasource. Production targets Azure SQL via prisma/schema.sqlserver.prisma
+// — keep both schemas' models in sync when making changes (see package.json db:* scripts).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_USER
+  CLIENT
+  RETAILER
+}
+
+enum TenderStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+enum UnlockMethod {
+  CREDIT
+  PAID
+  WAIVED
+}
+
+enum QuoteStatus {
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+}
+
+enum PaymentType {
+  RETAILER_UNLOCK
+  CLIENT_RELEASE
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  passwordHash      String
+  role              Role
+  contactName       String
+  contactPhone      String?
+  suspended         Boolean  @default(false)
+  termsAcceptedAt   DateTime?
+  createdAt         DateTime @default(now())
+
+  retailerProfile   RetailerProfile?
+  tenders           Tender[]        @relation("ClientTenders")
+  quotes            Quote[]         @relation("RetailerQuotes")
+  unlocks           Unlock[]        @relation("RetailerUnlocks")
+  payments          Payment[]
+  auditLogs         AuditLog[]
+}
+
+model RetailerProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id])
+  companyName       String
+  categories        String   // comma-separated category names
+  coverageAreas     String   // comma-separated postcode areas / towns
+  accreditations    String?
+  launchCreditsLeft Int      @default(3)
+  createdAt         DateTime @default(now())
+}
+
+model Tender {
+  id            String       @id @default(cuid())
+  reference     String       @unique
+  clientId      String
+  client        User         @relation("ClientTenders", fields: [clientId], references: [id])
+  category      String
+  subcategory   String
+  location      String
+  quantity      String
+  urgency       String
+  closingDate   DateTime
+  budget        Int?
+  requirements  String       // comma-separated tick-box requirements
+  description   String
+  status        TenderStatus @default(OPEN)
+  createdAt     DateTime     @default(now())
+
+  matches       TenderMatch[]
+  unlocks       Unlock[]
+  quotes        Quote[]
+  items         TenderItem[]
+}
+
+model TenderItem {
+  id          String   @id @default(cuid())
+  tenderId    String
+  tender      Tender   @relation(fields: [tenderId], references: [id])
+  category    String
+  subcategory String
+  quantity    String
+  description String
+  createdAt   DateTime @default(now())
+}
+
+model TenderMatch {
+  id         String    @id @default(cuid())
+  tenderId   String
+  tender     Tender    @relation(fields: [tenderId], references: [id])
+  retailerId String
+  notifiedAt DateTime  @default(now())
+  viewedAt   DateTime?
+
+  @@unique([tenderId, retailerId])
+}
+
+model Unlock {
+  id         String       @id @default(cuid())
+  tenderId   String
+  tender     Tender       @relation(fields: [tenderId], references: [id])
+  retailerId String
+  retailer   User         @relation("RetailerUnlocks", fields: [retailerId], references: [id])
+  method     UnlockMethod
+  paymentId  String?      @unique
+  payment    Payment?     @relation(fields: [paymentId], references: [id])
+  unlockedAt DateTime     @default(now())
+
+  @@unique([tenderId, retailerId])
+}
+
+model Quote {
+  id           String      @id @default(cuid())
+  reference    String      @unique
+  tenderId     String
+  tender       Tender      @relation(fields: [tenderId], references: [id])
+  retailerId   String
+  retailer     User        @relation("RetailerQuotes", fields: [retailerId], references: [id])
+  priceGbp     Int
+  leadTimeDays Int
+  deliveryInfo String
+  accreditations String
+  supportingDocumentName String?
+  validityDays Int
+  notes        String
+  status       QuoteStatus @default(SUBMITTED)
+  submittedAt  DateTime    @default(now())
+
+  releases     ContactRelease[]
+  releasePayment Payment? @relation("QuoteReleasePayment")
+}
+
+model Payment {
+  id                    String        @id @default(cuid())
+  type                  PaymentType
+  amountGbp             Int
+  status                PaymentStatus @default(PENDING)
+  userId                String
+  user                  User          @relation(fields: [userId], references: [id])
+  stripePaymentIntentId String?       @unique
+  stripeCheckoutUrl     String?
+  quoteId               String?       @unique
+  createdAt             DateTime      @default(now())
+  confirmedAt           DateTime?
+
+  unlock                Unlock?
+  quote                 Quote?        @relation("QuoteReleasePayment", fields: [quoteId], references: [id])
+  releases              ContactRelease[]
+}
+
+model ContactRelease {
+  id                  String   @id @default(cuid())
+  tenderId            String
+  quoteId             String
+  quote               Quote    @relation(fields: [quoteId], references: [id])
+  clientId            String
+  retailerId          String
+  releasedAt          DateTime @default(now())
+  authorizingPaymentId String
+  authorizingPayment  Payment  @relation(fields: [authorizingPaymentId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  action     String
+  targetType String
+  targetId   String
+  metadata   String?
+  createdAt  DateTime @default(now())
+}

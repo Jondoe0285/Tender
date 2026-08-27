@@ -1,0 +1,47 @@
+import { redirect } from 'next/navigation';
+import { AppShell } from '@/components/layout/AppShell';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Card } from '@/components/ui/Card';
+import { getCurrentUser } from '@/server/auth/session';
+import { prisma } from '@/server/data/prisma';
+
+export default async function QuotesReceivedPage() {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'CLIENT') redirect('/login');
+
+  const quotes = await prisma.quote.findMany({
+    where: { tender: { clientId: user.id } },
+    orderBy: { submittedAt: 'desc' },
+    include: { tender: { select: { id: true, reference: true, subcategory: true } } },
+  });
+
+  return (
+    <AppShell role="client" title="Quotes Received">
+      <div className="mx-auto max-w-4xl">
+        <p className="mb-6 max-w-xl text-sm text-concrete-grey">
+          Every quote submitted against your tenders, across all projects.
+        </p>
+        {quotes.length === 0 ? (
+          <Card className="py-16 text-center text-sm text-concrete-grey">No quotes have been received for this account.</Card>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {quotes.map((quote) => (
+              <a key={quote.id} href={`/client/tenders/${quote.tender.id}`} className="block">
+                <Card interactive className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-steel-blue">
+                      {quote.reference} &middot; {quote.tender.subcategory}
+                    </p>
+                    <h3 className="font-heading text-lg font-bold text-foundation-navy">&pound;{quote.priceGbp}</h3>
+                    <p className="mt-1 text-sm text-concrete-grey">Valid for {quote.validityDays} days</p>
+                  </div>
+                  <StatusBadge status={quote.status === 'ACCEPTED' ? 'approved' : 'neutral'}>{quote.status}</StatusBadge>
+                </Card>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </AppShell>
+  );
+}
