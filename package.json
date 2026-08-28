@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "UK Construction Tendering Marketplace - Prototype",
   "private": true,
+  "engines": {
+    "node": ">=20 <21"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -13,7 +16,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
-    "db:sync-prod-schema": "node scripts/generate-sqlserver-schema.js"
+    "db:sync-prod-schema": "node scripts/generate-sqlserver-schema.js",
+    "retention:purge": "tsx --env-file=.env scripts/purge-retention.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

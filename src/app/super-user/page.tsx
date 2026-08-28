@@ -9,6 +9,7 @@ type SearchParams = Record<string, string | string[] | undefined>;
 export default async function SuperUserPage({ searchParams }: { searchParams?: SearchParams }) {
   const user = await getCurrentUser();
   if (!user || user.role !== 'SUPER_USER') redirect('/login');
+  if (user.isAccountant) redirect('/super-user/accounting');
 
   const data = await getAnalytics(parseAnalyticsFilters(searchParams ?? {}));
 

@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { requireRole } from '@/server/auth/session';
 import { toErrorResponse } from '@/server/http/errors';
 import { rejectCrossOrigin } from '@/server/http/origin';
-import { createTenderSchema } from '@/lib/schemas/tender';
+import { createTenderSchemaForCatalog } from '@/lib/schemas/tender';
 import { createTender, listTendersForClient } from '@/server/domain/tenderService';
+import { getCategoryCatalog } from '@/server/domain/categoryService';
 
 export async function POST(request: Request) {
   try {
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
     if (originError) return originError;
     const user = await requireRole('CLIENT');
     const body = await request.json().catch(() => null);
-    const parsed = createTenderSchema.safeParse(body);
+    const parsed = createTenderSchemaForCatalog(await getCategoryCatalog()).safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid tender details', issues: parsed.error.flatten() }, { status: 400 });
     }

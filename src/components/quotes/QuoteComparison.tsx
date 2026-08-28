@@ -18,6 +18,7 @@ type Quote = {
   notes: string;
   status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
   submittedAt: string;
+  sponsoredPlacementActive?: boolean;
 };
 
 type SortKey = 'priceGbp' | 'leadTimeDays' | 'validityDays' | 'submittedAt';
@@ -49,6 +50,7 @@ export function QuoteComparison({
   const submittedQuotes = quotes.filter((quote) => quote.status === 'SUBMITTED');
   const bestPrice = submittedQuotes.length ? Math.min(...submittedQuotes.map((quote) => quote.priceGbp)) : null;
   const bestLeadTime = submittedQuotes.length ? Math.min(...submittedQuotes.map((quote) => quote.leadTimeDays)) : null;
+  const sponsoredQuotes = quotes.filter((quote) => quote.sponsoredPlacementActive);
 
   const sortedQuotes = useMemo(() => {
     return [...quotes].sort((first, second) => {
@@ -69,6 +71,19 @@ export function QuoteComparison({
 
   return (
     <>
+      {sponsoredQuotes.length > 0 && (
+        <section className="mb-5 rounded-lg border border-safety-amber/50 bg-amber-50 px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">Sponsored Retailer placement</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {sponsoredQuotes.map((quote) => (
+              <div key={quote.id} className="rounded-lg bg-white px-4 py-3 shadow-soft">
+                <p className="font-semibold text-foundation-navy">{quote.reference}</p>
+                <p className="mt-1 text-sm text-concrete-grey">£{quote.priceGbp} · {quote.leadTimeDays} days</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-concrete-grey">Compare {quotes.length} formal quote{quotes.length === 1 ? '' : 's'} side by side.</p>
         <p className="text-xs text-concrete-grey">Select a column heading to sort</p>

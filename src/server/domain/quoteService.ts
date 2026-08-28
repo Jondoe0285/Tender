@@ -6,6 +6,21 @@ import type { SubmitQuoteInput } from '@/lib/schemas/quote';
 import { quoteReceivedTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
+import { sponsoredPlacementEnabled } from '@/server/domain/sponsoredPlacementService';
+
+export function isQuoteRetentionLocked(retentionLockedUntil: Date | null | undefined, now = new Date()): boolean {
+  return retentionLockedUntil !== null && retentionLockedUntil !== undefined && retentionLockedUntil > now;
+}
+
+/** Deletes only quotes outside the mandatory retention window. Callers must authorize the actor. */
+export async function deleteQuote(quoteId: string) {
+  const quote = await prisma.quote.findUnique({ where: { id: quoteId }, select: { retentionLockedUntil: true } });
+  if (!quote) return null;
+  if (isQuoteRetentionLocked(quote.retentionLockedUntil)) {
+    throw new ForbiddenError('Accepted quotes are retained for five years and cannot be deleted');
+  }
+  return prisma.quote.delete({ where: { id: quoteId } });
+}
 
 /** A Retailer may only submit a quote for a tender they have legitimately unlocked (FR-040). */
 export async function submitQuote(retailerId: string, tenderId: string, input: SubmitQuoteInput) {
@@ -78,10 +93,11 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
   if (!tender || tender.clientId !== clientId) throw new ForbiddenError('Tender not found for this Client');
 
   // Retailer contact details are never selected here — they are withheld until contact release.
-  return prisma.quote.findMany({
+  const quotes = await prisma.quote.findMany({
     where: { tenderId },
     select: {
       id: true,
+      retailerId: true,
       reference: true,
       priceGbp: true,
       leadTimeDays: true,
@@ -95,4 +111,11 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
     },
     orderBy: { submittedAt: 'asc' },
   });
+  const sponsoredRetailerIds = await sponsoredPlacementEnabled()
+    ? new Set((await prisma.retailerSponsoredPlacement.findMany({
+        where: { active: true, retailerId: { in: quotes.map((quote) => quote.retailerId) } },
+        select: { retailerId: true },
+      })).map((placement) => placement.retailerId))
+    : new Set<string>();
+  return quotes.map(({ retailerId, ...quote }) => ({ ...quote, sponsoredPlacementActive: sponsoredRetailerIds.has(retailerId) }));
 }

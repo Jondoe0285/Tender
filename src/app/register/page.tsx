@@ -6,8 +6,8 @@ import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Label, Input, FieldGroup } from '@/components/ui/Field';
 import { CATEGORY_NAMES } from '@/lib/categories';
+import { FieldGroup, Input, Label, PasswordInput } from '@/components/ui/Field';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -107,7 +107,7 @@ export default function RegisterPage() {
               </FieldGroup>
               <FieldGroup>
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" name="password" type="password" minLength={10} required autoComplete="new-password" />
+                <PasswordInput id="password" name="password" minLength={10} required autoComplete="new-password" />
                 <p className="text-xs text-concrete-grey">Use at least 10 characters.</p>
               </FieldGroup>
               <FieldGroup>

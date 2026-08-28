@@ -29,6 +29,7 @@ async function main() {
     update: {
       passwordHash: platformOwnerPasswordHash,
       role: Role.SUPER_USER,
+      isOwner: true,
       contactName: 'Demo Super User',
       contactPhone: '07000000000',
       suspended: false,
@@ -39,6 +40,7 @@ async function main() {
       email: platformOwnerEmail,
       passwordHash: platformOwnerPasswordHash,
       role: Role.SUPER_USER,
+      isOwner: true,
       contactName: 'Demo Super User',
       contactPhone: '07000000000',
       emailVerifiedAt: new Date(),

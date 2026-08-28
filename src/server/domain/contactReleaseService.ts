@@ -1,10 +1,12 @@
 import { prisma } from '@/server/data/prisma';
+import { Prisma } from '@prisma/client';
 import { createPayment } from '@/server/payments/paymentService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
-import { CLIENT_RELEASE_FEE_GBP } from '@/lib/categories';
 import { ForbiddenError } from '@/server/auth/session';
+import { getClientReleaseFeeGbp } from '@/server/domain/platformSettings';
 import { contactReleaseTemplate, quoteAcceptedTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
+import { getPurchasedRetentionDeadline } from '@/server/domain/retentionService';
 
 type AcceptOutcome = { paymentId: string; checkoutUrl: string | null; devMode: boolean };
 
@@ -22,7 +24,11 @@ export async function acceptQuote(clientId: string, quoteId: string): Promise<Ac
   if (quote.status !== 'SUBMITTED' && quote.status !== 'ACCEPTED') throw new ForbiddenError('Quote is not in a state that can be accepted');
 
   if (quote.status === 'SUBMITTED') {
-    await prisma.quote.update({ where: { id: quoteId }, data: { status: 'ACCEPTED' } });
+    const retentionLockedUntil = getPurchasedRetentionDeadline();
+    await prisma.$transaction([
+      prisma.quote.update({ where: { id: quoteId }, data: { status: 'ACCEPTED', retentionLockedUntil } }),
+      prisma.tenderAttachment.updateMany({ where: { tenderId: quote.tenderId }, data: { retentionLockedUntil } }),
+    ]);
     await recordAuditEvent({
       actorId: clientId,
       action: 'QUOTE_ACCEPTED',
@@ -32,10 +38,21 @@ export async function acceptQuote(clientId: string, quoteId: string): Promise<Ac
     });
   }
 
-  const payment = await createPayment({ type: 'CLIENT_RELEASE', amountGbp: CLIENT_RELEASE_FEE_GBP, userId: clientId, quoteId });
+  const releaseFeeGbp = await getClientReleaseFeeGbp(quote.priceGbp);
+  let payment: AcceptOutcome;
+  try {
+    payment = await createPayment({ type: 'CLIENT_RELEASE', amountGbp: releaseFeeGbp, userId: clientId, quoteId, quotePriceGbp: quote.priceGbp });
+  } catch (error) {
+    // A concurrent accept already created the release payment (Payment.quoteId is unique) — return it instead of failing.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const concurrent = await prisma.payment.findUnique({ where: { quoteId } });
+      if (concurrent) return { paymentId: concurrent.id, checkoutUrl: concurrent.stripeCheckoutUrl, devMode: !concurrent.stripeCheckoutUrl };
+    }
+    throw error;
+  }
   await sendTransactionalEmail(
     quote.retailer.email,
-    quoteAcceptedTemplate({ quoteReference: quote.reference, tenderReference: quote.tender.reference, feeGbp: CLIENT_RELEASE_FEE_GBP, paymentPath: `/retailer/tenders/${quote.tenderId}` })
+    quoteAcceptedTemplate({ quoteReference: quote.reference, tenderReference: quote.tender.reference, feeGbp: releaseFeeGbp, paymentPath: `/retailer/tenders/${quote.tenderId}` })
   ).catch(() => undefined);
   return payment;
 }
@@ -51,18 +68,28 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
     throw new ForbiddenError('Payment is not a confirmed release payment for this Client');
   }
 
-  const existing = await prisma.contactRelease.findFirst({ where: { quoteId } });
+  const existing = await prisma.contactRelease.findUnique({ where: { quoteId } });
   if (existing) return existing;
 
-  const release = await prisma.contactRelease.create({
-    data: {
-      tenderId: quote.tenderId,
-      quoteId,
-      clientId,
-      retailerId: quote.retailerId,
-      authorizingPaymentId: paymentId,
-    },
-  });
+  let release;
+  try {
+    release = await prisma.contactRelease.create({
+      data: {
+        tenderId: quote.tenderId,
+        quoteId,
+        clientId,
+        retailerId: quote.retailerId,
+        authorizingPaymentId: paymentId,
+      },
+    });
+  } catch (error) {
+    // The quoteId unique constraint rejects a concurrent duplicate finalisation; return the row it created.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const concurrent = await prisma.contactRelease.findUnique({ where: { quoteId } });
+      if (concurrent) return concurrent;
+    }
+    throw error;
+  }
 
   await recordAuditEvent({
     actorId: clientId,

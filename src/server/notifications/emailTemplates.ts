@@ -36,10 +36,10 @@ export function retailerInvitationTemplate(input: { companyName: string; inviteL
   };
 }
 
-export function tenderOpportunityTemplate(input: { id: string; reference: string; category: string; locationArea: string; closingDate: Date; requirementSummary: string; valueBand: string }): EmailTemplate {
+export function tenderOpportunityTemplate(input: { id: string; reference: string; category: string; clientTradeTenderId: string; locationArea: string; closingDate: Date; requirementSummary: string; valueBand: string }): EmailTemplate {
   return {
     subject: `New matched tender: ${input.reference}`,
-      html: layout({ eyebrow: 'New opportunity', title: 'Review a matched tender opportunity', intro: 'A tender has been matched to your registered categories and operating area.', body: detailRows([['Tender ID', input.reference], ['Category', input.category], ['Location area', input.locationArea], ['Requirement', input.requirementSummary], ['Indicative value band', input.valueBand], ['Quote deadline', input.closingDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })]]) + `<p style="font-size:14px;line-height:1.6">Client identity, precise site information, full specification, attachments, and direct communication details remain restricted until the required unlock stage.</p>`, action: { label: 'Review opportunity', href: appUrl(`/retailer/tenders/${encodeURIComponent(input.id)}`) } }),
+      html: layout({ eyebrow: 'New opportunity', title: 'Review a matched tender opportunity', intro: 'A tender has been matched to your registered categories and operating area.', body: detailRows([['Tender ID', input.reference], ['Client Trade Tender ID', input.clientTradeTenderId], ['Category', input.category], ['Location area', input.locationArea], ['Requirement', input.requirementSummary], ['Indicative value band', input.valueBand], ['Quote deadline', input.closingDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })]]) + `<p style="font-size:14px;line-height:1.6">Client identity, precise site information, full specification, attachments, and direct communication details remain restricted until the required unlock stage.</p>`, action: { label: 'Review opportunity', href: appUrl(`/retailer/tenders/${encodeURIComponent(input.id)}`) } }),
   };
 }
 

@@ -8,6 +8,7 @@ import { prisma } from '@/server/data/prisma';
 export default async function TenderManagementPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== 'SUPER_USER') redirect('/login');
+  if (user.isAccountant) redirect('/super-user/accounting');
 
   const tenders = await prisma.tender.findMany({
     orderBy: { createdAt: 'desc' },

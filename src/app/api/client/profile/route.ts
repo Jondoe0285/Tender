@@ -52,6 +52,7 @@ export async function GET() {
       email: account.email,
       phoneNumber: account.contactPhone ?? '',
       companyName: membership?.company.companyName ?? null,
+      tradeTenderId: membership?.company.tradeTenderId ?? null,
       isPrimaryUser: membership ? isPrimaryClientUser(membership.company.primaryUserId, user.id) : false,
       additionalUsers: membership && isPrimaryClientUser(membership.company.primaryUserId, user.id)
         ? await prisma.clientCompanyMember.findMany({

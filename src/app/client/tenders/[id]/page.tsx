@@ -7,6 +7,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/Card';
 import { CLIENT_RELEASE_FEE_GBP } from '@/lib/categories';
 import { QuoteComparison } from '@/components/quotes/QuoteComparison';
+import { TenderMessages } from '@/components/quotes/TenderMessages';
 
 type Tender = {
   id: string;
@@ -31,6 +32,7 @@ type Quote = {
   notes: string;
   status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
   submittedAt: string;
+  sponsoredPlacementActive?: boolean;
 };
 
 type Contact = { contactName: string; contactPhone: string | null; email: string };
@@ -43,13 +45,20 @@ export default function ClientTenderDetailPage() {
   const [pendingPayment, setPendingPayment] = useState<{ quoteId: string; paymentId: string; checkoutUrl: string | null } | null>(null);
   const [contacts, setContacts] = useState<Record<string, Contact>>({});
   const [message, setMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   async function load() {
     const [tenderResponse, quotesResponse] = await Promise.all([
       fetch(`/api/tenders/${params.id}`),
       fetch(`/api/tenders/${params.id}/quotes`),
     ]);
-    if (tenderResponse.ok) setTender((await tenderResponse.json()).tender);
+    if (tenderResponse.ok) {
+      setTender((await tenderResponse.json()).tender);
+      setLoadError(null);
+    } else if (!tender) {
+      const data = await tenderResponse.json().catch(() => null);
+      setLoadError(data?.error ?? 'Unable to load this tender.');
+    }
     if (quotesResponse.ok) {
       const nextQuotes: Quote[] = (await quotesResponse.json()).quotes;
       setQuotes(nextQuotes);
@@ -140,7 +149,7 @@ export default function ClientTenderDetailPage() {
   if (!tender) {
     return (
       <AppShell role="client" title="Tender">
-        <p className="text-sm text-concrete-grey">Loading&hellip;</p>
+        <p className="text-sm text-concrete-grey">{loadError ?? 'Loading\u2026'}</p>
       </AppShell>
     );
   }
@@ -200,6 +209,11 @@ export default function ClientTenderDetailPage() {
             />
           </>
         )}
+        {quotes.map((quote) => (
+          <div key={quote.id} className="mt-6">
+            <TenderMessages tenderId={params.id} quoteId={quote.id} role="client" />
+          </div>
+        ))}
       </section>
     </AppShell>
   );

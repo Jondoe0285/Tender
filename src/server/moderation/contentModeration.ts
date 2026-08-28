@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { ModerationDecision } from '@prisma/client';
 import { prisma } from '@/server/data/prisma';
 
-type EntityType = 'EMAIL' | 'PHONE' | 'URL' | 'DOMAIN' | 'SOCIAL_HANDLE' | 'COMPANY' | 'COMPANY_NUMBER' | 'VAT_NUMBER' | 'POSTCODE' | 'ADDRESS_HINT' | 'OFF_PLATFORM' | 'QR_REFERENCE';
+type EntityType = 'EMAIL' | 'PHONE' | 'URL' | 'DOMAIN' | 'SOCIAL_HANDLE' | 'COMPANY' | 'COMPANY_NUMBER' | 'VAT_NUMBER' | 'POSTCODE' | 'ADDRESS_HINT' | 'CONTRACT_REFERENCE' | 'OFF_PLATFORM' | 'QR_REFERENCE';
 
 export type ModerationEntity = { type: EntityType; field: string; reason: string; risk: number };
 export type ModerationResult = {
@@ -63,6 +63,7 @@ function findEntities(value: string, field: string): { entities: ModerationEntit
   add(/\b(?:gb)?\d{9}(?:\d{3})?\b/i, 'VAT_NUMBER', 'VAT number detected', 70);
   add(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i, 'POSTCODE', 'Postcode detected', 65);
   add(/\b(?:depot|warehouse|yard|branch|industrial estate|unit\s+\d+)\b/i, 'ADDRESS_HINT', 'Business location reference detected', 45);
+  add(/\b(?:contract|contract\s*(?:number|no)|purchase\s*order|po\s*(?:number|no)|agreement\s*(?:number|no))\b\s*[:#-]?\s*[a-z0-9/-]{3,}/i, 'CONTRACT_REFERENCE', 'Contract or purchase-order reference detected', 70);
 
   return { entities, wasObfuscated: normalized !== value.toLowerCase() && entities.length > 0 };
 }

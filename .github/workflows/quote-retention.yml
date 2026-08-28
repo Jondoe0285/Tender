@@ -1,0 +1,19 @@
+name: Quote retention
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  purge-expired-quotes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Purge expired unpurchased quotes
+        env:
+          RETENTION_JOB_URL: ${{ secrets.RETENTION_JOB_URL }}
+          RETENTION_JOB_SECRET: ${{ secrets.RETENTION_JOB_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --request POST "$RETENTION_JOB_URL" \
+            --header "Authorization: Bearer $RETENTION_JOB_SECRET"

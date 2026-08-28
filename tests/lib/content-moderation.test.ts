@@ -30,6 +30,12 @@ test('blocks requests to continue communication off platform', () => {
   assert.equal(result.containsOffPlatformAttempt, true);
 });
 
+test('requires review for contract and purchase-order references', () => {
+  const result = moderateContent([{ name: 'message', value: 'Please update contract number TT-4821 before delivery.' }]);
+  assert.equal(result.decision, 'REVIEW');
+  assert.match(result.reasons.join(' '), /Contract or purchase-order reference detected/);
+});
+
 test('screens structured fields and attachment filenames', () => {
   const result = moderateContent([
     { name: 'category', value: 'Construction Materials' },

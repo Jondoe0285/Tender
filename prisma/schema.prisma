@@ -36,6 +36,8 @@ enum QuoteStatus {
 enum PaymentType {
   RETAILER_UNLOCK
   CLIENT_RELEASE
+  SPONSORED_PLACEMENT
+  MEMBERSHIP_TIER
 }
 
 enum PaymentStatus {
@@ -57,6 +59,8 @@ model User {
   email             String   @unique
   passwordHash      String
   role              Role
+  isOwner           Boolean  @default(false)
+  isAccountant      Boolean  @default(false)
   contactName       String
   firstName         String?
   lastName          String?
@@ -78,7 +82,13 @@ model User {
   unlocks           Unlock[]        @relation("RetailerUnlocks")
   itemMatches       TenderItemMatch[] @relation("RetailerItemMatches")
   payments          Payment[]
+  memberships       RetailerMembership[]
+  subscriptions     RetailerSubscription[]
+  sponsoredPlacements RetailerSponsoredPlacement[]
   auditLogs         AuditLog[]
+  sentTenderMessages TenderMessage[] @relation("TenderMessageSender")
+  retailerMessages TenderMessage[] @relation("TenderMessageRetailer")
+  clientMessages TenderMessage[] @relation("TenderMessageClient")
   moderationEvents  ModerationEvent[] @relation("ModerationActor")
   reviewedModerationEvents ModerationEvent[] @relation("ModerationReviewer")
 }
@@ -116,6 +126,7 @@ model EmailVerificationToken {
 
 model ClientCompany {
   id            String   @id @default(cuid())
+  tradeTenderId String?  @unique
   companyName   String
   primaryUserId String   @unique
   primaryUser   User     @relation("ClientCompanyPrimary", fields: [primaryUserId], references: [id])
@@ -134,6 +145,86 @@ model ClientCompanyMember {
   createdAt DateTime      @default(now())
 
   @@unique([companyId, userId])
+}
+
+model PlatformSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model CategoryDefinition {
+  id        String   @id @default(cuid())
+  service   String
+  name      String
+  itemsJson String
+  active    Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+
+  @@unique([service, name])
+}
+
+model MembershipTier {
+  id                              String   @id @default(cuid())
+  name                            String   @unique
+  description                     String
+  monthlyPriceGbp                 Int
+  freeTenderOpportunitiesPerMonth Int      @default(0)
+  active                          Boolean  @default(false)
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+  retailers      RetailerMembership[]
+  payments       Payment[] @relation("MembershipTierPayments")
+}
+
+model RetailerMembership {
+  id         String         @id @default(cuid())
+  retailerId String
+  retailer   User           @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  tierId     String
+  tier       MembershipTier @relation(fields: [tierId], references: [id])
+  paymentId  String?        @unique
+  payment    Payment?       @relation(fields: [paymentId], references: [id])
+  active     Boolean        @default(true)
+  assignedAt DateTime       @default(now())
+
+  @@unique([retailerId, tierId])
+}
+
+model SubscriptionPlan {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  description    String
+  annualPriceGbp Int
+  active         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  subscriptions  RetailerSubscription[]
+}
+
+model RetailerSubscription {
+  id         String           @id @default(cuid())
+  retailerId String
+  retailer   User             @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  planId     String
+  plan       SubscriptionPlan @relation(fields: [planId], references: [id])
+  active     Boolean          @default(true)
+  startedAt  DateTime         @default(now())
+
+  @@unique([retailerId, planId])
+}
+
+model RetailerSponsoredPlacement {
+  id          String   @id @default(cuid())
+  retailerId  String
+  retailer    User     @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  paymentId   String?  @unique
+  payment     Payment? @relation(fields: [paymentId], references: [id])
+  active      Boolean  @default(true)
+  purchasedAt DateTime @default(now())
+
+  @@index([retailerId, active])
 }
 
 model UserRole {
@@ -207,9 +298,27 @@ model Tender {
 
   matches       TenderMatch[]
   unlocks       Unlock[]
+  unlockPayments Payment[] @relation("TenderUnlockPayments")
   quotes        Quote[]
   items         TenderItem[]
   attachments   TenderAttachment[]
+  messages      TenderMessage[]
+}
+
+model TenderMessage {
+  id         String   @id @default(cuid())
+  tenderId   String
+  tender     Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  retailerId String
+  retailer   User     @relation("TenderMessageRetailer", fields: [retailerId], references: [id])
+  clientId   String
+  client     User     @relation("TenderMessageClient", fields: [clientId], references: [id])
+  senderId   String
+  sender     User     @relation("TenderMessageSender", fields: [senderId], references: [id])
+  body       String
+  createdAt  DateTime @default(now())
+
+  @@index([tenderId, retailerId, createdAt])
 }
 
 model TenderAttachment {
@@ -221,6 +330,7 @@ model TenderAttachment {
   sizeBytes   Int
   content     Bytes
   uploadedAt  DateTime @default(now())
+  retentionLockedUntil DateTime?
 }
 
 model TenderItem {
@@ -288,6 +398,7 @@ model Quote {
   notes        String
   status       QuoteStatus @default(SUBMITTED)
   submittedAt  DateTime    @default(now())
+  retentionLockedUntil DateTime?
 
   releases     ContactRelease[]
   releasePayment Payment? @relation("QuoteReleasePayment")
@@ -296,12 +407,19 @@ model Quote {
 model Payment {
   id                    String        @id @default(cuid())
   type                  PaymentType
-  amountGbp             Int
+  amountGbp             Float
   status                PaymentStatus @default(PENDING)
   userId                String
   user                  User          @relation(fields: [userId], references: [id])
+  tenderId              String?
+  tender                Tender?       @relation("TenderUnlockPayments", fields: [tenderId], references: [id])
+  tierId                String?
+  tier                  MembershipTier? @relation("MembershipTierPayments", fields: [tierId], references: [id])
   stripePaymentIntentId String?       @unique
   stripeCheckoutUrl     String?
+  stripeEventId         String?       @unique
+  stripeReceiptUrl      String?
+  accountingRecordPath  String?
   quoteId               String?       @unique
   createdAt             DateTime      @default(now())
   confirmedAt           DateTime?
@@ -309,12 +427,14 @@ model Payment {
   unlock                Unlock?
   quote                 Quote?        @relation("QuoteReleasePayment", fields: [quoteId], references: [id])
   releases              ContactRelease[]
+  sponsoredPlacement    RetailerSponsoredPlacement?
+  retailerMembership    RetailerMembership?
 }
 
 model ContactRelease {
   id                  String   @id @default(cuid())
   tenderId            String
-  quoteId             String
+  quoteId             String   @unique
   quote               Quote    @relation(fields: [quoteId], references: [id])
   clientId            String
   retailerId          String

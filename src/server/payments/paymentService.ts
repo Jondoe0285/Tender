@@ -1,6 +1,7 @@
 import { prisma } from '@/server/data/prisma';
 import { getStripeClient, isStripeConfigured } from '@/server/payments/stripeClient';
 import type { PaymentType } from '@prisma/client';
+import { getClientReleaseFeeGbp, getPaymentFeeGbp } from '@/server/domain/platformSettings';
 
 type CreatePaymentResult = {
   paymentId: string;
@@ -19,13 +20,21 @@ export async function createPayment(params: {
   type: PaymentType;
   amountGbp: number;
   userId: string;
+  tenderId?: string;
+  tierId?: string;
   quoteId?: string;
+  quotePriceGbp?: number;
 }): Promise<CreatePaymentResult> {
+  const amountGbp = params.type === 'CLIENT_RELEASE' && params.quotePriceGbp !== undefined
+    ? await getClientReleaseFeeGbp(params.quotePriceGbp)
+    : await getPaymentFeeGbp(params.type);
   const payment = await prisma.payment.create({
     data: {
       type: params.type,
-      amountGbp: params.amountGbp,
+      amountGbp,
       userId: params.userId,
+      tenderId: params.tenderId,
+      tierId: params.tierId,
       quoteId: params.quoteId,
       status: 'PENDING',
     },
@@ -43,8 +52,8 @@ export async function createPayment(params: {
       {
         price_data: {
           currency: 'gbp',
-          unit_amount: params.amountGbp * 100,
-          product_data: { name: params.type === 'RETAILER_UNLOCK' ? 'Tender unlock fee' : 'Accepted quote release fee' },
+          unit_amount: Math.floor(amountGbp * 100),
+          product_data: { name: params.type === 'RETAILER_UNLOCK' ? 'Tender unlock fee' : params.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : params.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : 'Accepted quote release fee' },
         },
         quantity: 1,
       },

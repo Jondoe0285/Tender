@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react';
 import { AccountControls } from '@/components/layout/AccountControls';
 import { TradeTenderLogo } from '@/components/layout/TradeTenderLogo';
 import { SiteFooter } from '@/components/layout/SiteFooter';
-import { CLIENT_NAV, RETAILER_NAV, SUPER_USER_NAV, type NavGroup } from '@/lib/navigation';
+import { CLIENT_NAV, RETAILER_NAV, SUPER_USER_NAV, ACCOUNTANT_NAV, type NavGroup } from '@/lib/navigation';
 
 type Role = 'client' | 'retailer' | 'super-user';
 
@@ -80,7 +80,12 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
-  const groups = navByRole[role];
+  const isOwner = Boolean(session?.user?.isOwner);
+  const isAccountant = Boolean(session?.user?.isAccountant);
+  const baseGroups = role === 'super-user' && isAccountant ? ACCOUNTANT_NAV : navByRole[role];
+  const groups = baseGroups
+    .map((group) => ({ ...group, items: group.items.filter((item) => !item.ownerOnly || isOwner) }))
+    .filter((group) => group.items.length > 0);
   const activeHref = findActiveHref(pathname, groups);
   const availableWorkspaces = (session?.user?.roles ?? []).filter((workspaceRole) => workspaceOptions[workspaceRole]);
 

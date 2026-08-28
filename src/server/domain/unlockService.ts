@@ -1,7 +1,6 @@
 import { prisma } from '@/server/data/prisma';
 import { createPayment } from '@/server/payments/paymentService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
-import { RETAILER_UNLOCK_FEE_GBP } from '@/lib/categories';
 import { ForbiddenError } from '@/server/auth/session';
 
 async function assertMatched(tenderId: string, retailerId: string) {
@@ -27,26 +26,42 @@ export async function requestUnlock(retailerId: string, tenderId: string): Promi
 
   const profile = await prisma.retailerProfile.findUnique({ where: { userId: retailerId } });
   if (profile && profile.launchCreditsLeft > 0) {
-    await prisma.$transaction([
-      prisma.retailerProfile.update({
-        where: { userId: retailerId },
-        data: { launchCreditsLeft: { decrement: 1 } },
-      }),
-      prisma.unlock.create({
-        data: { tenderId, retailerId, method: 'CREDIT' },
-      }),
-    ]);
-    await recordAuditEvent({
-      actorId: retailerId,
-      action: 'TENDER_UNLOCKED',
-      targetType: 'Tender',
-      targetId: tenderId,
-      metadata: { method: 'CREDIT' },
+    // Conditional update guards against two concurrent requests spending the same last credit.
+    const spent = await prisma.retailerProfile.updateMany({
+      where: { userId: retailerId, launchCreditsLeft: { gt: 0 } },
+      data: { launchCreditsLeft: { decrement: 1 } },
     });
-    return { status: 'UNLOCKED_WITH_CREDIT' };
+    if (spent.count > 0) {
+      await prisma.unlock.create({ data: { tenderId, retailerId, method: 'CREDIT' } });
+      await recordAuditEvent({
+        actorId: retailerId,
+        action: 'TENDER_UNLOCKED',
+        targetType: 'Tender',
+        targetId: tenderId,
+        metadata: { method: 'CREDIT' },
+      });
+      return { status: 'UNLOCKED_WITH_CREDIT' };
+    }
   }
 
-  const payment = await createPayment({ type: 'RETAILER_UNLOCK', amountGbp: RETAILER_UNLOCK_FEE_GBP, userId: retailerId });
+  const currentMonthStart = new Date();
+  currentMonthStart.setUTCDate(1);
+  currentMonthStart.setUTCHours(0, 0, 0, 0);
+  const membership = await prisma.retailerMembership.findFirst({
+    where: { retailerId, active: true, tier: { active: true } },
+    include: { tier: true },
+    orderBy: { assignedAt: 'desc' },
+  });
+  if (membership && membership.tier.freeTenderOpportunitiesPerMonth > 0) {
+    const monthlyUnlockCount = await prisma.unlock.count({ where: { retailerId, unlockedAt: { gte: currentMonthStart } } });
+    if (monthlyUnlockCount < membership.tier.freeTenderOpportunitiesPerMonth) {
+      await prisma.unlock.create({ data: { tenderId, retailerId, method: 'CREDIT' } });
+      await recordAuditEvent({ actorId: retailerId, action: 'TENDER_UNLOCKED', targetType: 'Tender', targetId: tenderId, metadata: { method: 'MEMBERSHIP', tierId: membership.tierId, monthlyAllowance: membership.tier.freeTenderOpportunitiesPerMonth } });
+      return { status: 'UNLOCKED_WITH_CREDIT' };
+    }
+  }
+
+  const payment = await createPayment({ type: 'RETAILER_UNLOCK', amountGbp: 0, userId: retailerId, tenderId });
   return { status: 'PAYMENT_REQUIRED', ...payment };
 }
 
@@ -55,7 +70,7 @@ export async function finalizeUnlockWithPayment(retailerId: string, tenderId: st
   await assertMatched(tenderId, retailerId);
 
   const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
-  if (!payment || payment.userId !== retailerId || payment.type !== 'RETAILER_UNLOCK' || payment.status !== 'CONFIRMED') {
+  if (!payment || payment.userId !== retailerId || payment.tenderId !== tenderId || payment.type !== 'RETAILER_UNLOCK' || payment.status !== 'CONFIRMED') {
     throw new ForbiddenError('Payment is not a confirmed unlock payment for this Retailer');
   }
 

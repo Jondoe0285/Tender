@@ -7,6 +7,7 @@ import { prisma } from '@/server/data/prisma';
 export default async function RetailerManagementPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== 'SUPER_USER') redirect('/login');
+  if (user.isAccountant) redirect('/super-user/accounting');
 
   const retailers = await prisma.user.findMany({
     where: { role: 'RETAILER' },

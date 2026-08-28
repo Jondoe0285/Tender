@@ -9,6 +9,7 @@ import { newRegistrationTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { appUrl, emailVerificationTemplate } from '@/server/notifications/emailTemplates';
 import { createEmailVerificationToken } from '@/server/auth/emailVerification';
+import { buildClientTradeTenderId } from '@/lib/identifiers';
 
 async function sendVerificationEmail(userId: string, email: string) {
   const token = await createEmailVerificationToken(userId);
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
             });
       }
       if (input.role === 'CLIENT') {
-        const company = await transaction.clientCompany.create({ data: { companyName, primaryUserId: existing.id } });
+        const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, primaryUserId: existing.id } });
         await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: existing.id } });
       }
     });
@@ -105,7 +106,7 @@ export async function POST(request: Request) {
       },
     });
     if (input.role === 'CLIENT') {
-      const company = await transaction.clientCompany.create({ data: { companyName, primaryUserId: createdUser.id } });
+      const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, primaryUserId: createdUser.id } });
       await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: createdUser.id } });
     }
     return createdUser;

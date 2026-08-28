@@ -7,7 +7,7 @@ import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Label, Input, FieldGroup } from '@/components/ui/Field';
+import { FieldGroup, Input, Label, PasswordInput } from '@/components/ui/Field';
 import { workspaceForRole } from '@/lib/navigation';
 
 export default function LoginPage() {
@@ -21,7 +21,6 @@ export default function LoginPage() {
     </div>
   );
 }
-
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -72,7 +71,7 @@ function LoginForm() {
           </FieldGroup>
           <FieldGroup>
             <Label htmlFor="password">Password</Label>
-            <Input id="password" name="password" type="password" required autoComplete="current-password" />
+            <PasswordInput id="password" name="password" required autoComplete="current-password" />
           </FieldGroup>
           {error && (
             <p role="alert" className="text-sm font-semibold text-attention">

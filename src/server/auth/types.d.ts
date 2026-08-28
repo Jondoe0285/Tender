@@ -6,6 +6,8 @@ declare module 'next-auth' {
       id: string;
       role: string;
       roles: string[];
+      isOwner: boolean;
+      isAccountant: boolean;
     } & DefaultSession['user'];
   }
 
@@ -13,6 +15,8 @@ declare module 'next-auth' {
     id: string;
     role: string;
     roles: string[];
+    isOwner: boolean;
+    isAccountant: boolean;
   }
 }
 
@@ -21,5 +25,7 @@ declare module 'next-auth/jwt' {
     id: string;
     role: string;
     roles: string[];
+    isOwner: boolean;
+    isAccountant: boolean;
   }
 }

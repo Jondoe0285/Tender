@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Combobox } from '@/components/ui/Combobox';
 import { Stepper, type WizardStep } from '@/components/ui/Stepper';
 import { Label, Input, Select, Textarea, FieldGroup } from '@/components/ui/Field';
-import { REQUIREMENT_OPTIONS, SERVICE_NAMES, categoriesForService, itemsForCategory, type ServiceName } from '@/lib/categories';
+import { REQUIREMENT_OPTIONS, SERVICE_CATALOG, type ServiceName } from '@/lib/categories';
 import { buildSafeAttachmentName } from '@/lib/attachment-utils';
 
 const QUANTITY_UNITS = ['units', 'tonnes', 'bags', 'pallets', 'm³', 'skips', 'days', 'weeks'];
@@ -84,6 +84,7 @@ export default function NewTenderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [catalog, setCatalog] = useState<Record<string, Record<string, string[]>>>(() => Object.fromEntries(Object.entries(SERVICE_CATALOG).map(([service, categories]) => [service, Object.fromEntries(Object.entries(categories).map(([name, items]) => [name, [...items]]))])));
 
   // Restore a saved draft after mount only, so server and first client render still match.
   useEffect(() => {
@@ -96,6 +97,12 @@ export default function NewTenderPage() {
     } catch {
       // Corrupt or unavailable storage — start with a blank form.
     }
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/categories').then((response) => response.ok ? response.json() : null).then((data: { catalog?: Record<string, Record<string, string[]>> } | null) => {
+      if (data?.catalog) setCatalog(data.catalog);
+    }).catch(() => undefined);
   }, []);
 
   // Auto-save progress as the Client works through the form (files are never persisted here).
@@ -351,7 +358,7 @@ export default function NewTenderPage() {
                 <option value="" disabled>
                   Select a category
                 </option>
-                {SERVICE_NAMES.map((option) => (
+                {Object.keys(catalog).map((option) => (
                   <option key={option} value={option}>
                     {option}
                   </option>
@@ -368,13 +375,13 @@ export default function NewTenderPage() {
                 onChange={(value) => update('subcategory', value)}
                 disabled={!form.category}
                 placeholder={form.category ? 'Search categories…' : 'Choose a service first'}
-                groups={form.category ? [{ label: form.category, options: categoriesForService(form.category) }] : []}
+                groups={form.category ? [{ label: form.category, options: Object.keys(catalog[form.category] ?? {}) }] : []}
               />
               {errors.subcategory && <p className="text-sm font-semibold text-attention">{errors.subcategory}</p>}
             </FieldGroup>
             <FieldGroup>
               <Label htmlFor="item">Item</Label>
-              <Combobox id="item" name="item" value={form.item} onChange={(value) => update('item', value)} disabled={!form.subcategory} required placeholder={form.subcategory ? 'Search items…' : 'Choose a category first'} groups={form.category ? [{ label: form.subcategory, options: itemsForCategory(form.category, form.subcategory) }] : []} />
+              <Combobox id="item" name="item" value={form.item} onChange={(value) => update('item', value)} disabled={!form.subcategory} required placeholder={form.subcategory ? 'Search items…' : 'Choose a category first'} groups={form.category ? [{ label: form.subcategory, options: catalog[form.category]?.[form.subcategory] ?? [] }] : []} />
               {errors.item && <p className="text-sm font-semibold text-attention">{errors.item}</p>}
             </FieldGroup>
             <div className="border-t border-slate-200 pt-5 sm:col-span-2">
@@ -406,7 +413,7 @@ export default function NewTenderPage() {
                             }}
                           >
                             <option value="" disabled>Select a category</option>
-                            {SERVICE_NAMES.map((option) => <option key={option} value={option}>{option}</option>)}
+                            {Object.keys(catalog).map((option) => <option key={option} value={option}>{option}</option>)}
                           </Select>
                           {errors[`item-${index}-category`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-category`]}</p>}
                         </FieldGroup>
@@ -419,7 +426,7 @@ export default function NewTenderPage() {
                             onChange={(value) => updateItem(index, 'subcategory', value)}
                             disabled={!item.category}
                             placeholder={item.category ? 'Search categories…' : 'Choose a service first'}
-                            groups={item.category ? [{ label: item.category, options: categoriesForService(item.category) }] : []}
+                            groups={item.category ? [{ label: item.category, options: Object.keys(catalog[item.category] ?? {}) }] : []}
                           />
                           {errors[`item-${index}-subcategory`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-subcategory`]}</p>}
                         </FieldGroup>
@@ -432,7 +439,7 @@ export default function NewTenderPage() {
                             onChange={(value) => updateItem(index, 'item', value)}
                             disabled={!item.subcategory}
                             placeholder={item.subcategory ? 'Search items…' : 'Choose a category first'}
-                            groups={item.category ? [{ label: item.subcategory, options: itemsForCategory(item.category, item.subcategory) }] : []}
+                            groups={item.category ? [{ label: item.subcategory, options: catalog[item.category]?.[item.subcategory] ?? [] }] : []}
                           />
                           {errors[`item-${index}-item`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-item`]}</p>}
                         </FieldGroup>

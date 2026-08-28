@@ -1,4 +1,4 @@
-export type NavItem = { label: string; href: string };
+export type NavItem = { label: string; href: string; ownerOnly?: boolean };
 export type NavGroup = { label: string | null; items: NavItem[] };
 export type ApprovedRole = 'SUPER_USER' | 'CLIENT' | 'RETAILER';
 
@@ -69,6 +69,17 @@ export const SUPER_USER_NAV: NavGroup[] = [
     items: [
       { label: 'Categories', href: '/super-user/categories' },
       { label: 'Site Settings', href: '/super-user/settings' },
+      { label: 'Accountant Management', href: '/super-user/accountants' },
+      { label: 'Accounting Space', href: '/super-user/accounting' },
     ],
   },
+  {
+    label: 'Owner',
+    items: [{ label: 'Owner Console', href: '/super-user/owner', ownerOnly: true }],
+  },
+];
+
+/** Accountant nav: restricted to the Accounting Space only \u2014 no marketplace or configuration access. */
+export const ACCOUNTANT_NAV: NavGroup[] = [
+  { label: null, items: [{ label: 'Accounting Space', href: '/super-user/accounting' }] },
 ];

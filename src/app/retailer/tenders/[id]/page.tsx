@@ -9,11 +9,13 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { AppShell } from '@/components/layout/AppShell';
 import { Label, Input, Textarea, FieldGroup } from '@/components/ui/Field';
 import { RETAILER_UNLOCK_FEE_GBP } from '@/lib/categories';
+import { TenderMessages } from '@/components/quotes/TenderMessages';
 
 type TenderSummary = {
   id: string;
   reference: string;
   category: string;
+  clientTradeTenderId: string | null;
   location: string;
   urgency: string;
   closingDate: string;
@@ -164,6 +166,7 @@ export default function RetailerTenderDetailPage() {
 
       <section className="mx-auto mt-6 max-w-2xl">
           <Card className="mb-6">
+            {tender.clientTradeTenderId && <p className="text-sm font-semibold text-steel-blue">Client Trade Tender ID: {tender.clientTradeTenderId}</p>}
             <p className="text-sm text-concrete-grey">Location: {tender.location}</p>
             <p className="mt-1 text-sm text-concrete-grey">Urgency: {tender.urgency}</p>
             <p className="mt-1 text-sm text-concrete-grey">
@@ -256,6 +259,7 @@ export default function RetailerTenderDetailPage() {
               )}
             </>
           )}
+          {unlocked && <TenderMessages tenderId={params.id} role="retailer" />}
       </section>
     </AppShell>
   );

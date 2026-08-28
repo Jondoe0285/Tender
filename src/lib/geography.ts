@@ -78,6 +78,17 @@ function normalizeTownName(value: string): string {
   return value.trim().toLowerCase();
 }
 
+/** Returns a broad town/area label suitable for pre-unlock opportunity views. */
+export function getBroadLocation(location: string): string {
+  const normalized = location.trim();
+  const knownTown = Object.keys(TOWN_COORDINATES).find((town) => normalized.toLowerCase().includes(town));
+  if (knownTown) return knownTown.replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+  const withoutPostcode = normalized.replace(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/gi, '').trim();
+  const area = withoutPostcode.split(',')[0]?.trim();
+  return area || 'Location area available after unlock';
+}
+
 /** Finds the first known town name contained within free-text location/coverage strings. */
 function findKnownTown(value: string): { lat: number; lon: number } | null {
   const normalized = normalizeTownName(value);

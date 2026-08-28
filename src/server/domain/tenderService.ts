@@ -5,6 +5,7 @@ import { estimateValueBand } from '@/lib/valueBands';
 import { sendTenderOpportunityEmail } from '@/server/notifications/resend';
 import type { CreateTenderInput } from '@/lib/schemas/tender';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
+import { getBroadLocation } from '@/lib/geography';
 
 /** Creates a tender, assigns its reference, and matches it to eligible Retailers. Ownership is the caller's job. */
 export async function createTender(clientId: string, input: CreateTenderInput) {
@@ -80,18 +81,20 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
   });
 
   if (matchedRetailers.length > 0) {
+    const clientCompany = await prisma.clientCompanyMember.findUnique({ where: { userId: clientId }, select: { company: { select: { tradeTenderId: true } } } });
+    const clientTradeTenderId = clientCompany?.company.tradeTenderId ?? 'Pending assignment';
     const retailerByService = new Map<string, typeof matchedRetailers>();
     for (const service of services) {
       retailerByService.set(service, matchedRetailers.filter((retailer) => retailer.categories.split(',').map((value) => value.trim()).includes(service)));
     }
     const uniqueRetailerIds = [...new Set(matchedRetailers.map((retailer) => retailer.userId))];
-    await prisma.tenderMatch.createMany({
-      data: uniqueRetailerIds.map((retailerId) => ({ tenderId: tender.id, retailerId })),
-    });
     const itemMatches = tenderItems.flatMap((item) =>
       (retailerByService.get(item.category) ?? []).map((retailer) => ({ tenderItemId: item.id, retailerId: retailer.userId }))
     );
-    if (itemMatches.length > 0) await prisma.tenderItemMatch.createMany({ data: itemMatches });
+    await prisma.$transaction([
+      prisma.tenderMatch.createMany({ data: uniqueRetailerIds.map((retailerId) => ({ tenderId: tender.id, retailerId })) }),
+      ...(itemMatches.length > 0 ? [prisma.tenderItemMatch.createMany({ data: itemMatches })] : []),
+    ]);
     await recordAuditEvent({
       actorId: null,
       action: 'TENDER_MATCHED',
@@ -105,6 +108,7 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
         const result = await sendTenderOpportunityEmail(retailer.user.email, {
             id: tender.id,
             reference: tender.reference,
+            clientTradeTenderId,
             category: `${item.category} / ${item.subcategory}`,
             locationArea: tender.location,
             closingDate: tender.closingDate,
@@ -130,6 +134,11 @@ export function listTendersForClient(clientId: string) {
   return prisma.tender.findMany({ where: { clientId }, orderBy: { createdAt: 'desc' } });
 }
 
+export function buildRetailerTenderSummary(requirements: string | null | undefined): string[] {
+  if (!requirements || requirements.trim().length === 0) return ['No specific requirements listed'];
+  return ['Unlock required to view detailed requirements'];
+}
+
 /** Approved non-sensitive summary fields only (SEC-030/031) — the full free-text description
  *  and precise budget figure remain hidden until unlock; only a coarse value band is exposed. */
 export async function listMatchedSummariesForRetailer(retailerId: string) {
@@ -147,6 +156,7 @@ export async function listMatchedSummariesForRetailer(retailerId: string) {
           status: true,
           budget: true,
           requirements: true,
+          client: { select: { clientCompanyMembership: { select: { company: { select: { tradeTenderId: true } } } } } },
         },
       },
     },
@@ -161,12 +171,13 @@ export async function listMatchedSummariesForRetailer(retailerId: string) {
       id: match.tender.id,
       reference: match.tender.reference,
       category: match.tender.category,
-      location: match.tender.location,
+      location: getBroadLocation(match.tender.location),
       urgency: match.tender.urgency,
       closingDate: match.tender.closingDate,
       status: match.tender.status,
+      clientTradeTenderId: match.tender.client.clientCompanyMembership?.company.tradeTenderId ?? null,
       valueBand: estimateValueBand(match.tender.budget),
-      requirements: match.tender.requirements ? match.tender.requirements.split(',').filter(Boolean) : [],
+      requirements: buildRetailerTenderSummary(match.tender.requirements),
     },
   }));
 }

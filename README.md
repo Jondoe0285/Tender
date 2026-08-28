@@ -43,7 +43,33 @@ New account registrations notify `info@sinclairsafetysolutions.co.uk` when Resen
 the notification contains role and contact details but never a password or authentication secret.
 New Client and Retailer accounts receive a single-use email-verification link that expires after 24
 hours. Unverified accounts cannot sign in.
+
+Super Users can edit categories, payment fees, Client acceptance fee mode, membership tiers,
+annual subscription plans, and Retailer assignments. Client acceptance fees support a fixed amount
+or separate percentage rules for quote values up to £10,000 and above £10,000. Retailers and Clients
+can use tender-scoped internal messaging after a Retailer unlocks an opportunity; messages are
+moderated for contact, company, contract, and off-platform information. Client companies receive a
+unique Trade Tender ID for retailer quoting, and retention jobs delete unpurchased quotes and
+documents after 30 days while purchased records are retained for five years.
+Super Users can also activate a paid sponsored-placement product for Retailers; purchased placements
+appear in a separate labelled area on Client quote pages and do not change quote ranking or sorting.
 | `REGISTRATION_NOTIFICATION_EMAIL` | Internal recipient for new-account notifications; defaults to `info@sinclairsafetysolutions.co.uk` in `.env.example`. |
+
+Within the Super User role, an **Owner** flag gates the most critical controls — fees, adspace,
+membership tiers, sponsored placement, and creating or managing other Super User accounts — from the
+Owner Console at `/super-user/owner`. An **Accountant** flag restricts a Super User sub-account to a
+read-only Accounting Space (`/super-user/accounting`) with receipts, invoices, and performance
+reporting only, with no access to Super User settings or user management. Both are attributes on the
+existing Super User role, not additional roles, and both account types are created only by a full
+Super User. The Retailer Performance dashboard now surfaces trends, category/regional performance,
+quote value, response time, and platform benchmark sections, each independently toggleable from Site
+Settings.
+
+A structured production-readiness review (architecture, security, backend correctness, QA, brand/UI,
+and deployment) was completed on 2026-08-28; see
+[docs/PRODUCTION-READINESS-REVIEW.md](docs/PRODUCTION-READINESS-REVIEW.md) for fixed findings and
+remaining outstanding items, most notably the unresolved Azure SQL migration path and missing CI/CD
+deploy pipeline.
 
 See [Outstanding Tasks](#outstanding-tasks) for the remaining production-hardening work.
 
@@ -53,8 +79,9 @@ See [Outstanding Tasks](#outstanding-tasks) for the remaining production-hardeni
   Accepted Quote Release Fee.
 - **Retailer** — manages categories and coverage, receives matched tender summaries, unlocks full
   tender details, and submits quotes.
-- **Super User** — reviews platform activity, categories, fees, and partner advertising (currently
-  read-only).
+- **Super User** — manages platform activity, categories, fees, memberships, subscriptions, and
+  partner advertising. Two attributes on this role narrow access further: **Owner** (critical
+  settings and Super User account management) and **Accountant** (read-only Accounting Space only).
 
 ## Navigation
 
@@ -70,25 +97,34 @@ Each role has its own sidebar (`src/lib/navigation.ts`), grouped by task:
 | Billing | Billing | Analytics |
 | Profile | Profile | Categories |
 | | | Site Settings |
+| | | Accountant Management |
+| | | Accounting Space |
+| | | Owner Console (Owner only) |
+
+An Accountant sub-account only ever sees Accounting Space; every other Super User page redirects it there.
 
 ## Outstanding Tasks
 
-The core product flow is now implemented and verified. The remaining work is mostly production
-hardening and operational readiness:
+The core product flow is now implemented and verified. See
+[docs/PRODUCTION-READINESS-REVIEW.md](docs/PRODUCTION-READINESS-REVIEW.md) for the full, prioritized
+list from the latest structured production-readiness review. Highlights:
 
-- [ ] Super User management actions (categories, fees, users, waivers) — dashboard is currently read-only
+- [ ] **Critical:** verify/build a working Azure SQL migration path (current migrations are SQLite-only)
+- [ ] **Critical:** CI/CD pipeline gating PRs and deploying to Azure App Service
+- [x] Super User management actions for users and waivers, plus Owner/Accountant governance tiers
 - [ ] Rate limiting and abuse monitoring on sensitive endpoints (SEC-084/096)
-- [ ] Data retention and deletion jobs for 30-day quote retention / 5-year audit retention (SEC-100/101)
-- [ ] Real Stripe keys wired up and webhook tested against a live/test Stripe account
+- [x] Data retention job for 30-day non-accepted quote deletion and five-year accepted quote locks (SEC-100/101)
+- [ ] Configure real Stripe keys and test signed webhooks, refunds, and chargebacks against a live/test Stripe account
 - [ ] Partner advertising management (currently static placeholders on the Super User dashboard)
 - [ ] Visual/accessibility QA pass with real screen readers and devices
 - [ ] Standalone toast/notification system for success/error feedback beyond inline button and form states
 - [ ] First-time journey usability testing with real Clients and Retailers
 - [ ] Suspend/edit actions on the new Super User Retailer/Client/Tender management pages
 - [ ] Manual QA of the mobile sidebar drawer on real devices
-- [ ] Secure supporting-document storage and downloads for quotes
-- [ ] Analytics trend data and regional/category reporting expansion before production scale
-- [ ] Integration/E2E coverage for authenticated tender, unlock, quote, payment, and contact-release journeys
+- [ ] Secure supporting-document storage and downloads for Retailer quote documents
+- [x] Retailer analytics expansion (trends, category, regional, quote value, response time, benchmark)
+- [ ] Integration/E2E test coverage for unlock, payment, webhook, and contact-release journeys
+  (see docs/PRODUCTION-READINESS-REVIEW.md for the specific gaps)
 
 ## Tech Stack
 
@@ -103,7 +139,7 @@ hardening and operational readiness:
 
 ### Prerequisites
 
-- Node.js 18+ (recommended 20)
+- Node.js 20.x (pinned via `engines` in `package.json`)
 - npm
 
 ### Installation
@@ -130,6 +166,7 @@ cp .env.example .env
 | `RESEND_API_KEY` | Required to deliver email-verification links to self-registered users. |
 | `RESEND_FROM_EMAIL` | Required verified Resend sender used for verification emails. |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Leave blank locally — payment flows fall back to a dev-only confirmation endpoint when unset. Required in production. |
+| `RETENTION_JOB_SECRET` | Secret used by the scheduled retention endpoint and CLI job. Required in production. |
 
 ### Database setup
 
@@ -138,6 +175,14 @@ npm run db:generate   # generate the Prisma client
 npm run db:migrate    # create/apply local SQLite migrations
 npm run db:seed       # create local development accounts
 ```
+
+### Quote retention job
+
+`npm run retention:purge` deletes non-accepted quotes and their unpurchased tender documents submitted
+more than 30 days ago and records each deletion in the audit log. In production, schedule that command
+or `POST /api/internal/retention` daily with the `Authorization: Bearer $RETENTION_JOB_SECRET` header.
+Documents linked to an accepted purchase remain locked for five years. The included GitHub Actions workflow runs daily; configure repository secrets
+`RETENTION_JOB_URL` and `RETENTION_JOB_SECRET` to enable it.
 
 ### Seeded users
 
