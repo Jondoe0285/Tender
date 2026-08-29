@@ -39,11 +39,17 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         return NextResponse.json({ tender, unlocked: true });
       }
 
-      // Pre-unlock: approved non-sensitive summary only (SEC-030/031).
+      // Pre-unlock: approved non-sensitive summary only (SEC-030/031). Item name/subcategory and
+      // quantity are headline requirement details permitted by SEC-030; the free-text
+      // description (full specification) stays hidden until unlock.
       const [tender, unlockFeeGbp] = await Promise.all([
         prisma.tender.findUniqueOrThrow({
           where: { id: params.id },
-          select: { id: true, reference: true, category: true, location: true, urgency: true, closingDate: true, status: true, client: { select: { clientCompanyMembership: { select: { company: { select: { tradeTenderId: true } } } } } } },
+          select: {
+            id: true, reference: true, category: true, location: true, urgency: true, closingDate: true, status: true,
+            client: { select: { clientCompanyMembership: { select: { company: { select: { tradeTenderId: true } } } } } },
+            items: { orderBy: { createdAt: 'asc' }, select: { id: true, category: true, subcategory: true, item: true, quantity: true } },
+          },
         }),
         getPaymentFeeGbp('RETAILER_UNLOCK'),
       ]);

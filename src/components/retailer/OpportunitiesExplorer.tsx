@@ -73,9 +73,14 @@ export function OpportunitiesExplorer({ opportunities }: { opportunities: Opport
         if (urgencies.length > 0 && !urgencies.includes(item.urgency)) return false;
         return true;
       })
-      // Strong matches (within the Retailer's selected coverage area) bubble to the top; ties
-      // keep the original order since Array.prototype.sort is stable.
-      .sort((a, b) => Number(b.strongMatch) - Number(a.strongMatch));
+      // Prioritise strong matches (category + location match), followed by category matches,
+      // then unread items, and finally closing date.
+      .sort((a, b) => {
+        if (a.strongMatch !== b.strongMatch) return Number(b.strongMatch) - Number(a.strongMatch);
+        if ((a.categoryMatch ?? false) !== (b.categoryMatch ?? false)) return Number(b.categoryMatch) - Number(a.categoryMatch);
+        if (a.isNew !== b.isNew) return Number(b.isNew) - Number(a.isNew);
+        return new Date(a.closingDate).getTime() - new Date(b.closingDate).getTime();
+      });
   }, [opportunities, search, categories, urgencies]);
 
   const newCount = opportunities.filter((item) => item.isNew).length;

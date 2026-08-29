@@ -20,9 +20,10 @@ type TenderSummary = {
   closingDate: string;
   status: string;
   unlockFeeGbp?: number;
+  items: { id: string; category: string; subcategory: string; item: string | null; quantity: string }[];
 };
 
-type TenderFull = TenderSummary & {
+type TenderFull = Omit<TenderSummary, 'items'> & {
   subcategory: string;
   quantity: string;
   budget: number | null;
@@ -184,7 +185,21 @@ export default function RetailerTenderDetailPage() {
               <p className="mt-3 text-sm font-semibold text-steel-blue">
                 Cost: £{tender.unlockFeeGbp ?? 0}, unless you have a launch credit available.
               </p>
-              {message && <p className="mb-4 text-sm font-semibold text-attention">{message}</p>}
+              {tender.items.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="text-sm font-semibold text-foundation-navy">Items requested</h3>
+                  <ul className="mt-2 flex flex-col gap-2">
+                    {tender.items.map((item) => (
+                      <li key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-concrete-grey">
+                        <span className="font-semibold text-foundation-navy">{item.item ?? item.subcategory}</span>
+                        {item.item && <span className="ml-1 text-xs text-concrete-grey">({item.subcategory})</span>}
+                        <span className="block">Quantity: {item.quantity}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {message && <p className="mb-4 mt-4 text-sm font-semibold text-attention">{message}</p>}
               {pendingPaymentId ? (
                 <Button onClick={handleSimulatePayment} loading={simulating} size="lg">
                   Simulate payment (dev)

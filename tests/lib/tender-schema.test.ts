@@ -33,11 +33,22 @@ test('requires a UK postcode in a tender location', () => {
   assert.equal(createTenderSchema.safeParse({ ...base, location: 'Leeds LS10 2AB' }).success, true);
 });
 
-test('matches a tender postcode against a Retailer\'s selected counties', () => {
-  const retailer = { coverageScope: 'COUNTY', counties: 'West Yorkshire, Greater Manchester', regions: '' };
+test('matches a tender location against a Retailer\'s selected counties or regions without requiring postcodes', () => {
+  const retailerCounty = { coverageScope: 'COUNTY', counties: 'West Yorkshire, Greater Manchester', regions: '' };
+  assert.equal(retailerCoversTenderLocation(retailerCounty, 'Leeds'), true);
+  assert.equal(retailerCoversTenderLocation(retailerCounty, 'Manchester'), true);
+  assert.equal(retailerCoversTenderLocation(retailerCounty, 'Bristol'), false);
 
-  assert.equal(retailerCoversTenderLocation(retailer, 'Leeds LS10 2AB'), true);
-  assert.equal(retailerCoversTenderLocation(retailer, 'Bristol BS1 4DJ'), false);
+  const retailerRegion = { coverageScope: 'REGION', counties: '', regions: 'Yorkshire and The Humber' };
+  assert.equal(retailerCoversTenderLocation(retailerRegion, 'Leeds'), true);
+  assert.equal(retailerRegion.regions.toLowerCase().includes('yorkshire and the humber'), true);
+});
+
+test('ignores coverageAreas for matching since it is used for distance estimates only', () => {
+  const retailer = { coverageScope: 'REGION', counties: '', regions: 'East Midlands', coverageAreas: 'Birmingham' };
+
+  assert.equal(retailerCoversTenderLocation(retailer, 'Birmingham B1 1AA'), false);
+  assert.equal(retailerCoversTenderLocation(retailer, 'Nottingham NG1 5FS'), true);
 });
 
 test('matches a tender postcode against a Retailer\'s selected regions', () => {

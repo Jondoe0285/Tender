@@ -19,7 +19,17 @@ export default async function RetailerPage() {
   const [unlockCount, quoteCount, profile, unlockFeeGbp] = await Promise.all([
     prisma.unlock.count({ where: { retailerId: user.id } }),
     prisma.quote.count({ where: { retailerId: user.id } }),
-    prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { launchCreditsLeft: true, coverageAreas: true, coverageScope: true, counties: true, regions: true } }),
+    prisma.retailerProfile.findUnique({
+      where: { userId: user.id },
+      select: {
+        categories: true,
+        launchCreditsLeft: true,
+        coverageAreas: true,
+        coverageScope: true,
+        counties: true,
+        regions: true,
+      },
+    }),
     getPaymentFeeGbp('RETAILER_UNLOCK'),
   ]);
   const unlockedIds = new Set(
@@ -28,6 +38,10 @@ export default async function RetailerPage() {
   const newOpportunities = matches.filter(({ tender }) => !unlockedIds.has(tender.id));
   const hasCredits = (profile?.launchCreditsLeft ?? 0) > 0;
   const coverageAreas = profile?.coverageAreas ?? '';
+
+  const retailerCategories = profile?.categories
+    ? profile.categories.split(',').map((c) => c.trim().toLowerCase()).filter(Boolean)
+    : [];
 
   const metrics = [
     { label: 'New opportunities', value: newOpportunities.length },
@@ -39,6 +53,11 @@ export default async function RetailerPage() {
   const latest: OpportunityCardData[] = matches
     .map(({ tender, viewedAt }) => {
       const unlocked = unlockedIds.has(tender.id);
+      const categoryMatch =
+        retailerCategories.length === 0 || retailerCategories.includes(tender.category.trim().toLowerCase());
+      const locationMatch = profile != null && retailerCoversTenderLocation(profile, tender.location);
+      const strongMatch = categoryMatch && locationMatch;
+
       return {
         tenderId: tender.id,
         reference: tender.reference,
@@ -51,12 +70,17 @@ export default async function RetailerPage() {
         unlockFeeLabel: unlocked ? 'Unlocked' : hasCredits ? 'Free (launch credit)' : `£${unlockFeeGbp}`,
         unlocked,
         isNew: !viewedAt,
-        strongMatch: profile != null && retailerCoversTenderLocation(profile, tender.location),
+        strongMatch,
+        categoryMatch,
+        locationMatch,
       };
     })
-    // Strong matches (within the Retailer's selected coverage area) bubble to the top; ties
-    // keep the original notifiedAt-desc order since Array.prototype.sort is stable.
-    .sort((a, b) => Number(b.strongMatch) - Number(a.strongMatch))
+    .sort((a, b) => {
+      if (a.strongMatch !== b.strongMatch) return Number(b.strongMatch) - Number(a.strongMatch);
+      if ((a.categoryMatch ?? false) !== (b.categoryMatch ?? false)) return Number(b.categoryMatch) - Number(a.categoryMatch);
+      if (a.isNew !== b.isNew) return Number(b.isNew) - Number(a.isNew);
+      return new Date(a.closingDate).getTime() - new Date(b.closingDate).getTime();
+    })
     .slice(0, 5);
 
   return (

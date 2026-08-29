@@ -31,6 +31,8 @@ export type OpportunityCardData = {
   unlocked: boolean;
   isNew: boolean;
   strongMatch: boolean;
+  categoryMatch?: boolean;
+  locationMatch?: boolean;
 };
 
 export function TenderOpportunityCard({ data, href }: { data: OpportunityCardData; href: string }) {

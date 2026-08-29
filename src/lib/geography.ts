@@ -221,44 +221,178 @@ const POSTCODE_AREA_TO_REGION: Record<string, string> = {
   GY: 'Channel Islands & Isle of Man', IM: 'Channel Islands & Isle of Man', JE: 'Channel Islands & Isle of Man',
 };
 
+// Maps major UK construction towns/cities to county and region for location matching without full postcodes.
+const TOWN_LOCATION_MAP: Record<string, { county: string; region: string }> = {
+  leeds: { county: 'West Yorkshire', region: 'Yorkshire and The Humber' },
+  manchester: { county: 'Greater Manchester', region: 'North West' },
+  sheffield: { county: 'South Yorkshire', region: 'Yorkshire and The Humber' },
+  york: { county: 'North Yorkshire', region: 'Yorkshire and The Humber' },
+  bradford: { county: 'West Yorkshire', region: 'Yorkshire and The Humber' },
+  wakefield: { county: 'West Yorkshire', region: 'Yorkshire and The Humber' },
+  huddersfield: { county: 'West Yorkshire', region: 'Yorkshire and The Humber' },
+  bristol: { county: 'Bristol', region: 'South West' },
+  london: { county: 'Greater London', region: 'London' },
+  birmingham: { county: 'West Midlands', region: 'West Midlands' },
+  liverpool: { county: 'Merseyside', region: 'North West' },
+  newcastle: { county: 'Tyne and Wear', region: 'North East' },
+  nottingham: { county: 'Nottinghamshire', region: 'East Midlands' },
+  leicester: { county: 'Leicestershire', region: 'East Midlands' },
+  hull: { county: 'Humberside', region: 'Yorkshire and The Humber' },
+  preston: { county: 'Lancashire', region: 'North West' },
+  'milton keynes': { county: 'Milton Keynes', region: 'South East' },
+  oxford: { county: 'Oxfordshire', region: 'South East' },
+  cambridge: { county: 'Cambridgeshire', region: 'East of England' },
+  peterborough: { county: 'Peterborough', region: 'East of England' },
+  reading: { county: 'Berkshire', region: 'South East' },
+  southampton: { county: 'Hampshire', region: 'South East' },
+  portsmouth: { county: 'Hampshire', region: 'South East' },
+  brighton: { county: 'East Sussex', region: 'South East' },
+  plymouth: { county: 'Devon', region: 'South West' },
+  exeter: { county: 'Devon', region: 'South West' },
+  gloucester: { county: 'Gloucestershire', region: 'South West' },
+  cardiff: { county: 'Wales', region: 'Wales' },
+  swansea: { county: 'Wales', region: 'Wales' },
+  edinburgh: { county: 'Scotland', region: 'Scotland' },
+  glasgow: { county: 'Scotland', region: 'Scotland' },
+  belfast: { county: 'Northern Ireland', region: 'Northern Ireland' },
+};
+
+// Maps UK counties to official UK regions/nations.
+const COUNTY_TO_REGION: Record<string, string> = {
+  Bedfordshire: 'East of England',
+  Berkshire: 'South East',
+  Bristol: 'South West',
+  Buckinghamshire: 'South East',
+  Cambridgeshire: 'East of England',
+  Cheshire: 'North West',
+  Cleveland: 'North East',
+  Cornwall: 'South West',
+  Cumbria: 'North West',
+  Derbyshire: 'East Midlands',
+  Devon: 'South West',
+  Dorset: 'South West',
+  Durham: 'North East',
+  'East Sussex': 'South East',
+  Essex: 'East of England',
+  Gloucestershire: 'South West',
+  'Greater London': 'London',
+  'Greater Manchester': 'North West',
+  Hampshire: 'South East',
+  'Hereford and Worcester': 'West Midlands',
+  Hertfordshire: 'East of England',
+  Humberside: 'Yorkshire and The Humber',
+  'Isle of Wight': 'South East',
+  Kent: 'South East',
+  Lancashire: 'North West',
+  Leicestershire: 'East Midlands',
+  Lincolnshire: 'East Midlands',
+  Merseyside: 'North West',
+  Middlesex: 'London',
+  'Milton Keynes': 'South East',
+  Norfolk: 'East of England',
+  'North Yorkshire': 'Yorkshire and The Humber',
+  Northamptonshire: 'East Midlands',
+  Northumberland: 'North East',
+  Nottinghamshire: 'East Midlands',
+  Oxfordshire: 'South East',
+  Peterborough: 'East of England',
+  Rutland: 'East Midlands',
+  Shropshire: 'West Midlands',
+  Somerset: 'South West',
+  'South Yorkshire': 'Yorkshire and The Humber',
+  Staffordshire: 'West Midlands',
+  Suffolk: 'East of England',
+  Surrey: 'South East',
+  'Tyne and Wear': 'North East',
+  Warwickshire: 'West Midlands',
+  'West Midlands': 'West Midlands',
+  'West Sussex': 'South East',
+  'West Yorkshire': 'Yorkshire and The Humber',
+  Wiltshire: 'South West',
+  Worcestershire: 'West Midlands',
+  Yorkshire: 'Yorkshire and The Humber',
+};
+
 /** Extracts just the postcode area letters (e.g. "LS" from "LS10 2AB"); null when no postcode is present. */
 export function getPostcodeAreaCode(location: string): string | null {
   const postcode = extractPostcode(location)?.replace(/\s+/g, '');
   return postcode?.match(/^[A-Z]{1,2}/i)?.[0].toUpperCase() ?? null;
 }
 
-/** Resolves a tender location's historic county from its postcode — null outside England or without a postcode. */
+/** Resolves a tender location's historic county from its postcode, town, or county name. */
 export function getCountyForPostcode(location: string): string | null {
   const area = getPostcodeAreaCode(location);
-  return area ? POSTCODE_AREA_TO_COUNTY[area] ?? null : null;
+  if (area && POSTCODE_AREA_TO_COUNTY[area]) {
+    return POSTCODE_AREA_TO_COUNTY[area];
+  }
+
+  const normalized = location.trim().toLowerCase();
+  for (const [town, info] of Object.entries(TOWN_LOCATION_MAP)) {
+    if (normalized.includes(town)) return info.county;
+  }
+
+  for (const county of UK_COUNTIES) {
+    if (normalized.includes(county.toLowerCase())) return county;
+  }
+
+  return null;
 }
 
-/** Resolves a tender location's UK region/nation from its postcode — null without a recognised postcode. */
+/** Resolves a tender location's UK region/nation from its postcode, town, county, or region name. */
 export function getRegionForPostcode(location: string): string | null {
   const area = getPostcodeAreaCode(location);
-  return area ? POSTCODE_AREA_TO_REGION[area] ?? null : null;
+  if (area && POSTCODE_AREA_TO_REGION[area]) {
+    return POSTCODE_AREA_TO_REGION[area];
+  }
+
+  const normalized = location.trim().toLowerCase();
+  for (const [town, info] of Object.entries(TOWN_LOCATION_MAP)) {
+    if (normalized.includes(town)) return info.region;
+  }
+
+  for (const region of UK_REGIONS) {
+    if (normalized.includes(region.toLowerCase())) return region;
+  }
+
+  const county = getCountyForPostcode(location);
+  if (county && COUNTY_TO_REGION[county]) {
+    return COUNTY_TO_REGION[county];
+  }
+
+  return null;
 }
 
 export type RetailerCoverageScope = 'COUNTY' | 'REGION' | 'UK';
 
 /**
  * Determines whether a tender location falls inside a Retailer's selected operating area.
- * COUNTY and REGION scopes match only when the tender's postcode resolves to one of the
- * Retailer's selected counties/regions; UK scope always matches.
+ * COUNTY and REGION scopes match only against the Retailer's selected counties or regions;
+ * UK scope always matches. `coverageAreas` is used for distance estimates only (see schema)
+ * and must not override the explicit coverageScope selection here.
  */
 export function retailerCoversTenderLocation(
-  retailer: { coverageScope: string; counties: string; regions: string },
+  retailer: { coverageScope: string; counties: string; regions: string; coverageAreas?: string },
   tenderLocation: string
 ): boolean {
   if (retailer.coverageScope === 'UK') return true;
 
+  const normalizedLocation = tenderLocation.trim().toLowerCase();
+
   if (retailer.coverageScope === 'REGION') {
     const region = getRegionForPostcode(tenderLocation);
-    if (!region) return false;
-    return retailer.regions.split(',').map((value) => value.trim()).filter(Boolean).includes(region);
+    const selectedRegions = retailer.regions.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+    if (region && selectedRegions.includes(region.toLowerCase())) return true;
+    if (selectedRegions.some((selected) => normalizedLocation.includes(selected))) return true;
+    return false;
   }
 
-  const county = getCountyForPostcode(tenderLocation);
-  if (!county) return false;
-  return retailer.counties.split(',').map((value) => value.trim()).filter(Boolean).includes(county);
+  if (retailer.coverageScope === 'COUNTY') {
+    const county = getCountyForPostcode(tenderLocation);
+    const selectedCounties = retailer.counties.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+    if (county && selectedCounties.includes(county.toLowerCase())) return true;
+    if (selectedCounties.some((selected) => normalizedLocation.includes(selected))) return true;
+    return false;
+  }
+
+  return false;
 }
