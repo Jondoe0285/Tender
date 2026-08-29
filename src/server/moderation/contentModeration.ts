@@ -61,7 +61,7 @@ function findEntities(value: string, field: string): { entities: ModerationEntit
   add(/\b(?:ltd|limited|plc|llp|inc|company\s+number|trading\s+as)\b/i, 'COMPANY', 'Business identifier detected', 65);
   add(/\b(?:company\s*(?:no|number)|crn)\s*[:#]?\s*\d{6,8}\b/i, 'COMPANY_NUMBER', 'Company registration number detected', 70);
   add(/\b(?:gb)?\d{9}(?:\d{3})?\b/i, 'VAT_NUMBER', 'VAT number detected', 70);
-  add(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i, 'POSTCODE', 'Postcode detected', 65);
+  if (field !== 'location') add(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i, 'POSTCODE', 'Postcode detected', 65);
   add(/\b(?:depot|warehouse|yard|branch|industrial estate|unit\s+\d+)\b/i, 'ADDRESS_HINT', 'Business location reference detected', 45);
   add(/\b(?:contract|contract\s*(?:number|no)|purchase\s*order|po\s*(?:number|no)|agreement\s*(?:number|no))\b\s*[:#-]?\s*[a-z0-9/-]{3,}/i, 'CONTRACT_REFERENCE', 'Contract or purchase-order reference detected', 70);
 

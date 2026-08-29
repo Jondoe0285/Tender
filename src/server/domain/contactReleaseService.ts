@@ -8,7 +8,7 @@ import { contactReleaseTemplate, quoteAcceptedTemplate } from '@/server/notifica
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { getPurchasedRetentionDeadline } from '@/server/domain/retentionService';
 
-type AcceptOutcome = { paymentId: string; checkoutUrl: string | null; devMode: boolean };
+type AcceptOutcome = { status: 'PAYMENT_REQUIRED' | 'RELEASED_WITH_CREDIT'; paymentId: string; checkoutUrl: string | null; devMode: boolean; feeGbp: number; creditsLeft?: number };
 
 /** Accepting a quote enters a pending release-fee state — no contact data is exposed yet (SEC-035). */
 export async function acceptQuote(clientId: string, quoteId: string): Promise<AcceptOutcome> {
@@ -16,9 +16,11 @@ export async function acceptQuote(clientId: string, quoteId: string): Promise<Ac
   if (!quote || quote.tender.clientId !== clientId) throw new ForbiddenError('Quote not found for this Client');
   if (quote.status === 'ACCEPTED' && quote.releasePayment) {
     return {
+      status: 'PAYMENT_REQUIRED',
       paymentId: quote.releasePayment.id,
       checkoutUrl: quote.releasePayment.stripeCheckoutUrl,
       devMode: !quote.releasePayment.stripeCheckoutUrl,
+      feeGbp: quote.releasePayment.amountGbp,
     };
   }
   if (quote.status !== 'SUBMITTED' && quote.status !== 'ACCEPTED') throw new ForbiddenError('Quote is not in a state that can be accepted');
@@ -39,14 +41,46 @@ export async function acceptQuote(clientId: string, quoteId: string): Promise<Ac
   }
 
   const releaseFeeGbp = await getClientReleaseFeeGbp(quote.priceGbp);
+  const clientCompanyMembership = await prisma.clientCompanyMember.findUnique({
+    where: { userId: clientId },
+    select: { company: { select: { id: true, releaseCreditsLeft: true } } },
+  });
+  if ((clientCompanyMembership?.company.releaseCreditsLeft ?? 0) > 0) {
+    const spent = await prisma.clientCompany.updateMany({
+      where: { id: clientCompanyMembership?.company.id, releaseCreditsLeft: { gt: 0 } },
+      data: { releaseCreditsLeft: { decrement: 1 } },
+    });
+    if (spent.count > 0) {
+      const creditPayment = await prisma.payment.create({
+        data: {
+          type: 'CLIENT_RELEASE',
+          amountGbp: 0,
+          status: 'CONFIRMED',
+          userId: clientId,
+          quoteId,
+          confirmedAt: new Date(),
+        },
+      });
+      await recordAuditEvent({
+        actorId: clientId,
+        action: 'CLIENT_RELEASE_CREDIT_USED',
+        targetType: 'Quote',
+        targetId: quoteId,
+        metadata: { tenderId: quote.tenderId, paymentId: creditPayment.id, waivedFeeGbp: releaseFeeGbp },
+      });
+      await finalizeContactRelease(clientId, quoteId, creditPayment.id);
+      return { status: 'RELEASED_WITH_CREDIT', paymentId: creditPayment.id, checkoutUrl: null, devMode: false, feeGbp: 0, creditsLeft: clientCompanyMembership!.company.releaseCreditsLeft - 1 };
+    }
+  }
+
   let payment: AcceptOutcome;
   try {
-    payment = await createPayment({ type: 'CLIENT_RELEASE', amountGbp: releaseFeeGbp, userId: clientId, quoteId, quotePriceGbp: quote.priceGbp });
+    payment = { status: 'PAYMENT_REQUIRED', ...(await createPayment({ type: 'CLIENT_RELEASE', amountGbp: releaseFeeGbp, userId: clientId, quoteId, quotePriceGbp: quote.priceGbp })), feeGbp: releaseFeeGbp };
   } catch (error) {
     // A concurrent accept already created the release payment (Payment.quoteId is unique) — return it instead of failing.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       const concurrent = await prisma.payment.findUnique({ where: { quoteId } });
-      if (concurrent) return { paymentId: concurrent.id, checkoutUrl: concurrent.stripeCheckoutUrl, devMode: !concurrent.stripeCheckoutUrl };
+      if (concurrent) return { status: 'PAYMENT_REQUIRED', paymentId: concurrent.id, checkoutUrl: concurrent.stripeCheckoutUrl, devMode: !concurrent.stripeCheckoutUrl, feeGbp: concurrent.amountGbp };
     }
     throw error;
   }

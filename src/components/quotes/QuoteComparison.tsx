@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { CLIENT_RELEASE_FEE_GBP } from '@/lib/categories';
 
 type Quote = {
   id: string;
@@ -19,6 +18,7 @@ type Quote = {
   status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
   submittedAt: string;
   sponsoredPlacementActive?: boolean;
+  releaseFeeGbp: number;
 };
 
 type SortKey = 'priceGbp' | 'leadTimeDays' | 'validityDays' | 'submittedAt';
@@ -306,7 +306,7 @@ function DecisionActions({
   pendingCheckoutUrl?: string | null;
 }) {
   if (quote.status === 'SUBMITTED') {
-    return <Button onClick={() => onAccept(quote.id)} loading={busy}>Accept quote · £{CLIENT_RELEASE_FEE_GBP} release fee</Button>;
+    return <Button onClick={() => onAccept(quote.id)} loading={busy}>Accept quote · £{quote.releaseFeeGbp} release fee</Button>;
   }
   if (quote.status === 'ACCEPTED' && isPendingPayment) {
     if (pendingCheckoutUrl) {

@@ -27,10 +27,10 @@ export type OpportunityCardData = {
   distanceMiles: number | null;
   requirements: string[];
   closingDate: string | Date;
-  valueBand: string;
   unlockFeeLabel: string;
   unlocked: boolean;
   isNew: boolean;
+  strongMatch: boolean;
 };
 
 export function TenderOpportunityCard({ data, href }: { data: OpportunityCardData; href: string }) {
@@ -38,12 +38,21 @@ export function TenderOpportunityCard({ data, href }: { data: OpportunityCardDat
 
   return (
     <Link href={href} className="block">
-      <Card interactive className="relative">
+      <Card
+        interactive
+        className={`relative ${data.strongMatch ? 'border-2 border-approved bg-approved/5' : ''}`}
+      >
         {data.isNew && (
           <span className="absolute right-4 top-4 flex items-center gap-1.5 text-xs font-semibold text-safety-amber">
             <span className="h-2 w-2 rounded-full bg-safety-amber" aria-hidden="true" />
             New
           </span>
+        )}
+
+        {data.strongMatch && (
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-approved">
+            Strong match — within your selected coverage area
+          </p>
         )}
 
         <div className="flex flex-wrap items-center gap-2">
@@ -57,7 +66,6 @@ export function TenderOpportunityCard({ data, href }: { data: OpportunityCardDat
             value={data.distanceMiles != null ? `${data.location} · ${data.distanceMiles.toFixed(0)} mi away` : data.location}
           />
           <Fact label="Deadline" value={deadline.label} attention={deadline.urgent} />
-          <Fact label="Estimated value" value={data.valueBand} />
           <Fact label="Unlock fee" value={data.unlockFeeLabel} />
           <div className="sm:col-span-2">
             <Fact label="Requirements" value={formatRequirementSummary(data.requirements)} />

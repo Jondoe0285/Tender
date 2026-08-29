@@ -15,12 +15,16 @@ export type AccountRow = {
   quotes?: number;
   unlocks?: number;
   launchCreditsLeft?: number | null;
+  releaseCreditsLeft?: number | null;
 };
 
 export function AccountManagementTable({ role, rows }: { role: 'CLIENT' | 'RETAILER'; rows: AccountRow[] }) {
   const [showCreate, setShowCreate] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState<string | null>(null);
+  const [creditInputs, setCreditInputs] = useState<Record<string, string>>(
+    Object.fromEntries(rows.map((row) => [row.id, String((role === 'RETAILER' ? row.launchCreditsLeft : row.releaseCreditsLeft) ?? 0)]))
+  );
   const [form, setForm] = useState({
     email: '',
     password: '',
@@ -80,6 +84,56 @@ export function AccountManagementTable({ role, rows }: { role: 'CLIENT' | 'RETAI
       window.location.reload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Action failed');
+    } finally {
+      setIsBusy(null);
+    }
+  }
+
+  async function updateLaunchCredits(accountId: string) {
+    const launchCreditsLeft = Number(creditInputs[accountId]);
+    if (!Number.isInteger(launchCreditsLeft) || launchCreditsLeft < 0) {
+      setMessage('Launch credits must be a non-negative whole number.');
+      return;
+    }
+    setIsBusy(`credits-${accountId}`);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/super-user/users/${accountId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set-launch-credits', launchCreditsLeft }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? 'Unable to update launch credits');
+      setMessage(`Launch credits updated to ${launchCreditsLeft}.`);
+      window.location.reload();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to update launch credits');
+    } finally {
+      setIsBusy(null);
+    }
+  }
+
+  async function updateReleaseCredits(accountId: string) {
+    const releaseCreditsLeft = Number(creditInputs[accountId]);
+    if (!Number.isInteger(releaseCreditsLeft) || releaseCreditsLeft < 0) {
+      setMessage('Release credits must be a non-negative whole number.');
+      return;
+    }
+    setIsBusy(`client-credits-${accountId}`);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/super-user/users/${accountId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set-release-credits', releaseCreditsLeft }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? 'Unable to update release credits');
+      setMessage(`Release credits updated to ${releaseCreditsLeft}.`);
+      window.location.reload();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to update release credits');
     } finally {
       setIsBusy(null);
     }
@@ -216,6 +270,54 @@ export function AccountManagementTable({ role, rows }: { role: 'CLIENT' | 'RETAI
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
+                {role === 'RETAILER' && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-medium text-concrete-grey" htmlFor={`credits-${account.id}`}>
+                      Launch credits
+                    </label>
+                    <input
+                      id={`credits-${account.id}`}
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={creditInputs[account.id] ?? '0'}
+                      onChange={(event) => setCreditInputs((current) => ({ ...current, [account.id]: event.target.value }))}
+                      className="w-16 rounded-md border border-slate-300 bg-white px-2 py-2 text-xs text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => updateLaunchCredits(account.id)}
+                      disabled={isBusy === `credits-${account.id}`}
+                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-foundation-navy transition hover:border-safety-amber hover:text-foundation-navy disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isBusy === `credits-${account.id}` ? 'Saving...' : 'Update'}
+                    </button>
+                  </div>
+                )}
+                {role === 'CLIENT' && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-medium text-concrete-grey" htmlFor={`release-credits-${account.id}`}>
+                      Release credits
+                    </label>
+                    <input
+                      id={`release-credits-${account.id}`}
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={creditInputs[account.id] ?? '0'}
+                      onChange={(event) => setCreditInputs((current) => ({ ...current, [account.id]: event.target.value }))}
+                      className="w-16 rounded-md border border-slate-300 bg-white px-2 py-2 text-xs text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => updateReleaseCredits(account.id)}
+                      disabled={isBusy === `client-credits-${account.id}`}
+                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-foundation-navy transition hover:border-safety-amber hover:text-foundation-navy disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isBusy === `client-credits-${account.id}` ? 'Saving...' : 'Update'}
+                    </button>
+                  </div>
+                )}
                 <StatusBadge status={account.suspended ? 'attention' : 'approved'}>
                   {account.suspended ? 'Suspended' : 'Active'}
                 </StatusBadge>

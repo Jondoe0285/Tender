@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CATEGORIES, isValidSubcategory, URGENCY_OPTIONS, REQUIREMENT_OPTIONS } from '@/lib/categories';
 import type { CategoryCatalog } from '@/server/domain/categoryService';
+import { locationHasPostcode } from '@/lib/geography';
 
 const tenderAttachmentSchema = z.object({
   name: z.string().trim().min(1).max(255),
@@ -46,6 +47,10 @@ export function createTenderSchemaForCatalog(catalog: CategoryCatalog = CATEGORI
     .refine((value) => value.item ? hasValidSubcategory(value.category, value.subcategory, value.item) : hasValidSubcategory(value.category, value.subcategory), {
       message: 'Subcategory does not belong to the selected category',
       path: ['subcategory'],
+    })
+    .refine((value) => locationHasPostcode(value.location), {
+      message: 'Enter a valid UK postcode so delivery fees and matching companies can be determined',
+      path: ['location'],
     })
     .refine((value) => value.closingDate.getTime() > Date.now(), {
       message: 'Closing date must be in the future',

@@ -12,7 +12,10 @@ export default async function ClientManagementPage() {
   const clients = await prisma.user.findMany({
     where: { role: 'CLIENT' },
     orderBy: { createdAt: 'desc' },
-    include: { _count: { select: { tenders: true } } },
+    include: {
+      _count: { select: { tenders: true } },
+      clientCompanyMembership: { select: { company: { select: { releaseCreditsLeft: true } } } },
+    },
   });
 
   return (
@@ -26,6 +29,7 @@ export default async function ClientManagementPage() {
           contactName: client.contactName,
           suspended: client.suspended,
           tenders: client._count.tenders,
+          releaseCreditsLeft: client.clientCompanyMembership?.company.releaseCreditsLeft ?? 0,
         }))}
       />
     </AppShell>

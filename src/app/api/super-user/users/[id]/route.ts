@@ -84,5 +84,61 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ status: 'password-reset', temporaryPassword });
   }
 
+  if (action === 'set-release-credits') {
+    if (user.role !== 'CLIENT') {
+      return NextResponse.json({ error: 'Release credits only apply to Client accounts' }, { status: 400 });
+    }
+    const releaseCreditsLeft = Number(body?.releaseCreditsLeft);
+    if (!Number.isInteger(releaseCreditsLeft) || releaseCreditsLeft < 0) {
+      return NextResponse.json({ error: 'releaseCreditsLeft must be a non-negative integer' }, { status: 400 });
+    }
+
+    const membership = await prisma.clientCompanyMember.findUnique({
+      where: { userId: user.id },
+      include: { company: { select: { id: true, releaseCreditsLeft: true } } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Client company record not found' }, { status: 404 });
+    }
+
+    await prisma.clientCompany.update({
+      where: { id: membership.company.id },
+      data: { releaseCreditsLeft },
+    });
+    await recordAuditEvent({
+      actorId: admin.id,
+      action: 'CLIENT_RELEASE_CREDITS_UPDATED',
+      targetType: 'ClientCompany',
+      targetId: membership.company.id,
+      metadata: { email: user.email, previous: membership.company.releaseCreditsLeft, next: releaseCreditsLeft },
+    });
+    return NextResponse.json({ status: 'release-credits-updated', releaseCreditsLeft });
+  }
+
+  if (action === 'set-launch-credits') {
+    if (user.role !== 'RETAILER') {
+      return NextResponse.json({ error: 'Launch credits only apply to Retailer accounts' }, { status: 400 });
+    }
+    const launchCreditsLeft = Number(body?.launchCreditsLeft);
+    if (!Number.isInteger(launchCreditsLeft) || launchCreditsLeft < 0) {
+      return NextResponse.json({ error: 'launchCreditsLeft must be a non-negative integer' }, { status: 400 });
+    }
+
+    const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { launchCreditsLeft: true } });
+    if (!profile) {
+      return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
+    }
+
+    await prisma.retailerProfile.update({ where: { userId: user.id }, data: { launchCreditsLeft } });
+    await recordAuditEvent({
+      actorId: admin.id,
+      action: 'RETAILER_LAUNCH_CREDITS_UPDATED',
+      targetType: 'User',
+      targetId: user.id,
+      metadata: { email: user.email, previous: profile.launchCreditsLeft, next: launchCreditsLeft },
+    });
+    return NextResponse.json({ status: 'launch-credits-updated', launchCreditsLeft });
+  }
+
   return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });
 }

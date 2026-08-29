@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/server/auth/session';
 import { isSameOriginRequest } from '@/server/http/origin';
 import { prisma } from '@/server/data/prisma';
 import { z } from 'zod';
+import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,9 @@ const updateProfileSchema = z.object({
   companyName: z.string().min(1, 'Company name is required').max(200),
   companyNumber: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
+  coverageScope: z.enum(['COUNTY', 'REGION', 'UK']),
   counties: z.string(), // comma-separated
+  regions: z.string(), // comma-separated
   categories: z.string(), // comma-separated
   masterUserId: z.string().optional().nullable(),
 });
@@ -50,11 +53,17 @@ export async function PUT(req: NextRequest) {
         companyName: parsed.companyName,
         companyNumber: parsed.companyNumber || null,
         address: parsed.address || null,
+        coverageScope: parsed.coverageScope,
         counties: parsed.counties,
+        regions: parsed.regions,
         categories: parsed.categories,
         masterUserId: parsed.masterUserId || null,
       },
     });
+
+    // Categories/coverage may now qualify this Retailer for tenders that were already open —
+    // matching otherwise only runs once, at tender creation time.
+    await matchRetailerToOpenTenders(user.id);
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {

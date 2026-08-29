@@ -5,7 +5,6 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/Card';
-import { CLIENT_RELEASE_FEE_GBP } from '@/lib/categories';
 import { QuoteComparison } from '@/components/quotes/QuoteComparison';
 import { TenderMessages } from '@/components/quotes/TenderMessages';
 
@@ -33,6 +32,7 @@ type Quote = {
   status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
   submittedAt: string;
   sponsoredPlacementActive?: boolean;
+  releaseFeeGbp: number;
 };
 
 type Contact = { contactName: string; contactPhone: string | null; email: string };
@@ -69,7 +69,7 @@ export default function ClientTenderDetailPage() {
           const release = await releaseResponse.json();
           if (release.status === 'PENDING') {
             setPendingPayment({ quoteId: acceptedQuote.id, paymentId: release.paymentId, checkoutUrl: release.checkoutUrl });
-            setMessage('Your quote is accepted. Complete the £10 release fee to share contact details.');
+            setMessage(`Your quote is accepted. Complete the £${release.amountGbp} release fee to share contact details.`);
           } else if (release.status === 'CONFIRMED') {
             await loadContact(acceptedQuote.id);
           }
@@ -109,7 +109,7 @@ export default function ClientTenderDetailPage() {
     if (data.devMode) {
       setPendingPayment({ quoteId, paymentId: data.paymentId, checkoutUrl: data.checkoutUrl });
       setMessage(
-        `Quote accepted. A £${CLIENT_RELEASE_FEE_GBP} release fee is now due — this environment has no Stripe keys configured, use the dev payment simulation below.`
+        `Quote accepted. A £${data.feeGbp} release fee is now due — this environment has no Stripe keys configured, use the dev payment simulation below.`
       );
       await load();
     }
@@ -195,7 +195,8 @@ export default function ClientTenderDetailPage() {
         ) : (
           <>
             <p className="mb-4 text-sm text-concrete-grey">
-              Compare the commercial details first. Accepting a quote starts a £{CLIENT_RELEASE_FEE_GBP} contact-release payment; contact details remain hidden until payment is confirmed.
+              Compare the commercial details first. Accepting a quote starts the contact-release payment shown against
+              that quote; contact details remain hidden until payment is confirmed.
             </p>
             <QuoteComparison
               quotes={quotes}

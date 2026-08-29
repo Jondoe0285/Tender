@@ -3,19 +3,22 @@ import { AppShell } from '@/components/layout/AppShell';
 import { getCurrentUser } from '@/server/auth/session';
 import { listMatchedSummariesForRetailer } from '@/server/domain/tenderService';
 import { prisma } from '@/server/data/prisma';
-import { estimateDistanceMiles } from '@/lib/geography';
-import { RETAILER_UNLOCK_FEE_GBP } from '@/lib/categories';
+import { estimateDistanceMiles, retailerCoversTenderLocation } from '@/lib/geography';
+import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
 import { OpportunitiesExplorer } from '@/components/retailer/OpportunitiesExplorer';
 import type { OpportunityCardData } from '@/components/retailer/TenderOpportunityCard';
+
+export const dynamic = 'force-dynamic';
 
 export default async function NewOpportunitiesPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== 'RETAILER') redirect('/login');
 
-  const [matches, unlocks, profile] = await Promise.all([
+  const [matches, unlocks, profile, unlockFeeGbp] = await Promise.all([
     listMatchedSummariesForRetailer(user.id),
     prisma.unlock.findMany({ where: { retailerId: user.id }, select: { tenderId: true } }),
-    prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { coverageAreas: true, launchCreditsLeft: true } }),
+    prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { coverageAreas: true, coverageScope: true, counties: true, regions: true, launchCreditsLeft: true } }),
+    getPaymentFeeGbp('RETAILER_UNLOCK'),
   ]);
   const unlockedIds = new Set(unlocks.map((u) => u.tenderId));
   const hasCredits = (profile?.launchCreditsLeft ?? 0) > 0;
@@ -32,10 +35,10 @@ export default async function NewOpportunitiesPage() {
       distanceMiles: estimateDistanceMiles(coverageAreas, tender.location),
       requirements: tender.requirements,
       closingDate: tender.closingDate,
-      valueBand: tender.valueBand,
-      unlockFeeLabel: hasCredits ? 'Free (launch credit)' : `£${RETAILER_UNLOCK_FEE_GBP}`,
+      unlockFeeLabel: hasCredits ? 'Free (launch credit)' : `£${unlockFeeGbp}`,
       unlocked: false,
       isNew: !viewedAt,
+      strongMatch: profile != null && retailerCoversTenderLocation(profile, tender.location),
     }));
 
   return (

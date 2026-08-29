@@ -66,5 +66,18 @@ export const authOptions: AuthOptions = {
       }
       return session;
     },
+    // Relative callback URLs (what our sign-in/sign-out calls always pass) must resolve
+    // against the browser's actual current origin, not the static NEXTAUTH_URL/baseUrl — those
+    // can differ behind a dev proxy or forwarded port, which previously sent users to the wrong
+    // host and made sign-out look like it did nothing.
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith('/')) return url;
+      try {
+        if (new URL(url).origin === baseUrl) return url;
+      } catch {
+        // Malformed URL — fall through to the safe default below.
+      }
+      return baseUrl;
+    },
   },
 };

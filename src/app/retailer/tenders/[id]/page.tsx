@@ -8,7 +8,6 @@ import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { AppShell } from '@/components/layout/AppShell';
 import { Label, Input, Textarea, FieldGroup } from '@/components/ui/Field';
-import { RETAILER_UNLOCK_FEE_GBP } from '@/lib/categories';
 import { TenderMessages } from '@/components/quotes/TenderMessages';
 
 type TenderSummary = {
@@ -20,6 +19,7 @@ type TenderSummary = {
   urgency: string;
   closingDate: string;
   status: string;
+  unlockFeeGbp?: number;
 };
 
 type TenderFull = TenderSummary & {
@@ -182,7 +182,7 @@ export default function RetailerTenderDetailPage() {
                 Client contact details remain private until a quote is accepted and the release fee is paid.
               </p>
               <p className="mt-3 text-sm font-semibold text-steel-blue">
-                Cost: £{RETAILER_UNLOCK_FEE_GBP}, unless you have a launch credit available.
+                Cost: £{tender.unlockFeeGbp ?? 0}, unless you have a launch credit available.
               </p>
               {message && <p className="mb-4 text-sm font-semibold text-attention">{message}</p>}
               {pendingPaymentId ? (
@@ -191,7 +191,7 @@ export default function RetailerTenderDetailPage() {
                 </Button>
               ) : (
                 <Button onClick={handleUnlock} loading={unlocking} size="lg">
-                  {`Unlock full details — £${RETAILER_UNLOCK_FEE_GBP}`}
+                  {`Unlock full details — £${tender.unlockFeeGbp ?? 0}`}
                 </Button>
               )}
             </Card>

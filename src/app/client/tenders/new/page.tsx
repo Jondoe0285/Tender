@@ -17,7 +17,7 @@ const QUANTITY_UNITS = ['units', 'tonnes', 'bags', 'pallets', 'm³', 'skips', 'd
 const STEPS: WizardStep[] = [
   { id: 1, label: 'Project Information' },
   { id: 2, label: 'Category Selection' },
-  { id: 3, label: 'Location & Access' },
+  { id: 3, label: 'Postcode & Access' },
   { id: 4, label: 'Materials / Services' },
   { id: 5, label: 'Schedule' },
   { id: 6, label: 'Upload Files' },
@@ -166,8 +166,8 @@ export default function NewTenderPage() {
         if (!item.item) next[`item-${index}-item`] = 'Select an item.';
       });
     }
-    if (targetStep === 3 && form.location.trim().length < 2) {
-      next.location = 'Enter a delivery or site location.';
+    if (targetStep === 3 && !/\b(?:GIR\s?0AA|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})\b/i.test(form.location)) {
+      next.location = 'Enter a valid UK delivery or site postcode.';
     }
     if (targetStep === 4) {
       if (!form.quantityValue.trim()) next.quantityValue = 'Enter a quantity.';
@@ -454,15 +454,16 @@ export default function NewTenderPage() {
 
         {step === 3 && (
           <Card className="flex flex-col gap-6">
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">Location &amp; Access</h2>
+            <h2 className="font-heading text-lg font-bold text-foundation-navy">Postcode &amp; Access</h2>
             <FieldGroup>
-              <Label htmlFor="location">Delivery or site location</Label>
+              <Label htmlFor="location">Delivery or site postcode</Label>
               <Input
                 id="location"
-                placeholder="Town or postcode"
+                placeholder="e.g. LS10 2AB"
                 value={form.location}
                 onChange={(event) => update('location', event.target.value)}
               />
+              <p className="text-xs text-concrete-grey">The postcode is required to calculate delivery fees and notify applicable companies.</p>
               {errors.location && <p className="text-sm font-semibold text-attention">{errors.location}</p>}
             </FieldGroup>
             <fieldset className="flex flex-col gap-3">
@@ -641,7 +642,7 @@ export default function NewTenderPage() {
               <ReviewItem label="Tender name" value={form.projectName} />
               <ReviewItem label="Budget" value={form.budget ? `£${form.budget}` : 'Not specified'} />
               <ReviewItem label="Category" value={`${form.category} / ${form.subcategory}`} />
-              <ReviewItem label="Location" value={form.location} />
+              <ReviewItem label="Delivery postcode" value={form.location} />
               <ReviewItem label="Requirements" value={form.requirements.join(', ') || 'None'} />
               <ReviewItem label="Quantity" value={`${form.quantityValue} ${form.quantityUnit}`.trim()} />
               <ReviewItem label="Urgency" value={form.urgency} />

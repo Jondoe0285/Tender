@@ -111,6 +111,7 @@ async function main() {
       companyName: 'Demo Builders Merchant Ltd',
       categories: 'Construction Materials',
       coverageAreas: 'Birmingham',
+      coverageScope: 'UK',
     },
     create: {
       userId: retailer.id,
@@ -118,6 +119,7 @@ async function main() {
       companyName: 'Demo Builders Merchant Ltd',
       categories: 'Construction Materials',
       coverageAreas: 'Birmingham',
+      coverageScope: 'UK',
     },
   });
 

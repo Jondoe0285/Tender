@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  validate:
+    name: Lint, type-check, tests, build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      NODE_ENV: test
+      DATABASE_URL: file:./dev.db
+      NEXTAUTH_SECRET: test-secret
+      NEXTAUTH_URL: http://localhost:3000
+      RESEND_API_KEY: test-key
+      RESEND_FROM_EMAIL: no-reply@example.com
+      STRIPE_SECRET_KEY: sk_test_dummy
+      STRIPE_WEBHOOK_SECRET: whsec_dummy
+      RETENTION_JOB_SECRET: test-secret
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Test
+        run: npm test
+
+      - name: Production build
+        run: npm run build

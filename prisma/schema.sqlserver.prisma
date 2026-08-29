@@ -130,6 +130,7 @@ model ClientCompany {
   companyName   String
   primaryUserId String   @unique
   primaryUser   User     @relation("ClientCompanyPrimary", fields: [primaryUserId], references: [id])
+  releaseCreditsLeft Int  @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -244,22 +245,30 @@ enum RetailerPermission {
   PAYMENTS
 }
 
+enum RetailerCoverageScope {
+  COUNTY
+  REGION
+  UK
+}
+
 model RetailerProfile {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id])
+  id                String                @id @default(cuid())
+  userId            String                @unique
+  user              User                  @relation(fields: [userId], references: [id])
   masterUserId      String?
-  masterUser        User?    @relation("MasterUser", fields: [masterUserId], references: [id])
+  masterUser        User?                 @relation("MasterUser", fields: [masterUserId], references: [id])
   companyName       String
   companyNumber     String?
   address           String?
-  counties          String   @default("") // comma-separated UK county names
-  categories        String   // comma-separated category names
-  coverageAreas     String   // comma-separated postcode areas / towns
+  coverageScope     RetailerCoverageScope @default(COUNTY)
+  counties          String                @default("") // comma-separated UK county names, used when coverageScope = COUNTY
+  regions           String                @default("") // comma-separated UK region names, used when coverageScope = REGION
+  categories        String                // comma-separated category names
+  coverageAreas     String                // comma-separated postcode areas / towns, used for distance estimates only
   accreditations    String?
-  launchCreditsLeft Int      @default(3)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @default(now())
+  launchCreditsLeft Int                   @default(3)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @default(now())
 
   teamMembers       RetailerTeamMember[]
 }

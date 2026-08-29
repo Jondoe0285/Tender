@@ -21,6 +21,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       paymentId: payment.id,
       checkoutUrl: payment.stripeCheckoutUrl,
       devMode: !payment.stripeCheckoutUrl,
+      amountGbp: payment.amountGbp,
     });
   } catch (error) {
     return toErrorResponse(error);

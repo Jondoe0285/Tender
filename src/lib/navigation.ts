@@ -63,7 +63,13 @@ export const SUPER_USER_NAV: NavGroup[] = [
       { label: 'Payment Monitoring', href: '/super-user/payments' },
     ],
   },
-  { label: 'Insights', items: [{ label: 'Analytics', href: '/super-user/analytics' }] },
+  {
+    label: 'Insights',
+    items: [
+      { label: 'Activity Log', href: '/super-user/activity-log' },
+      { label: 'Analytics', href: '/super-user/analytics' },
+    ],
+  },
   {
     label: 'Configuration',
     items: [

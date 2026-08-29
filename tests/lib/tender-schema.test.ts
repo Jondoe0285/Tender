@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createTenderSchema } from '../../src/lib/schemas/tender';
 import { buildRetailerTenderSummary } from '../../src/server/domain/tenderService';
-import { getBroadLocation } from '../../src/lib/geography';
+import { getBroadLocation, retailerCoversTenderLocation } from '../../src/lib/geography';
 import { isQuoteRetentionLocked } from '../../src/server/domain/quoteService';
 import { getPurchasedRetentionDeadline, getUnpurchasedQuoteCutoff } from '../../src/server/domain/retentionService';
 import { calculatePercentageFee } from '../../src/server/domain/platformSettings';
@@ -16,6 +16,47 @@ test('removes raw requirement detail from pre-unlock retailer summaries', () => 
 test('reduces precise tender locations to a broad area before unlock', () => {
   assert.equal(getBroadLocation('42 Example Road, Leeds LS10 2AB'), 'Leeds');
   assert.equal(getBroadLocation('Bristol BS1 4DJ'), 'Bristol');
+});
+
+test('requires a UK postcode in a tender location', () => {
+  const base = {
+    projectName: 'Warehouse concrete supply',
+    category: 'Materials',
+    subcategory: 'Aggregates',
+    quantity: '20 tonnes',
+    urgency: 'standard' as const,
+    closingDate: '2099-08-27',
+    description: 'Twenty tonnes of aggregate with delivery to the project site.',
+  };
+
+  assert.equal(createTenderSchema.safeParse({ ...base, location: 'Leeds' }).success, false);
+  assert.equal(createTenderSchema.safeParse({ ...base, location: 'Leeds LS10 2AB' }).success, true);
+});
+
+test('matches a tender postcode against a Retailer\'s selected counties', () => {
+  const retailer = { coverageScope: 'COUNTY', counties: 'West Yorkshire, Greater Manchester', regions: '' };
+
+  assert.equal(retailerCoversTenderLocation(retailer, 'Leeds LS10 2AB'), true);
+  assert.equal(retailerCoversTenderLocation(retailer, 'Bristol BS1 4DJ'), false);
+});
+
+test('matches a tender postcode against a Retailer\'s selected regions', () => {
+  const retailer = { coverageScope: 'REGION', counties: '', regions: 'Yorkshire and The Humber' };
+
+  assert.equal(retailerCoversTenderLocation(retailer, 'Leeds LS10 2AB'), true);
+  assert.equal(retailerCoversTenderLocation(retailer, 'Bristol BS1 4DJ'), false);
+});
+
+test('matches any UK postcode when a Retailer covers the whole UK', () => {
+  const retailer = { coverageScope: 'UK', counties: '', regions: '' };
+
+  assert.equal(retailerCoversTenderLocation(retailer, 'Leeds LS10 2AB'), true);
+  assert.equal(retailerCoversTenderLocation(retailer, 'Cardiff CF10 1AA'), true);
+});
+
+test('does not match when a Retailer has not configured any counties or regions', () => {
+  assert.equal(retailerCoversTenderLocation({ coverageScope: 'COUNTY', counties: '', regions: '' }, 'Leeds LS10 2AB'), false);
+  assert.equal(retailerCoversTenderLocation({ coverageScope: 'REGION', counties: '', regions: '' }, 'Leeds LS10 2AB'), false);
 });
 
 test('locks purchased quotes until their five-year retention deadline', () => {
@@ -49,7 +90,7 @@ test('accepts a valid structured construction tender', () => {
     projectName: 'Warehouse concrete supply',
     category: 'Materials',
     subcategory: 'Aggregates',
-    location: 'Leeds LS10',
+    location: 'Leeds LS10 2AB',
     quantity: '20 tonnes',
     urgency: 'standard',
     closingDate: '2099-08-27',
@@ -66,7 +107,7 @@ test('rejects a subcategory from a different category', () => {
     projectName: 'Plant requirement',
     category: 'Plant hire',
     subcategory: 'Aggregates',
-    location: 'Leeds',
+    location: 'Leeds LS10 2AB',
     quantity: '1 unit',
     urgency: 'urgent',
     closingDate: '2099-08-27',

@@ -64,14 +64,18 @@ export function OpportunitiesExplorer({ opportunities }: { opportunities: Opport
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return opportunities.filter((item) => {
-      if (term && !item.location.toLowerCase().includes(term) && !item.reference.toLowerCase().includes(term)) {
-        return false;
-      }
-      if (categories.length > 0 && !categories.includes(item.category)) return false;
-      if (urgencies.length > 0 && !urgencies.includes(item.urgency)) return false;
-      return true;
-    });
+    return opportunities
+      .filter((item) => {
+        if (term && !item.location.toLowerCase().includes(term) && !item.reference.toLowerCase().includes(term)) {
+          return false;
+        }
+        if (categories.length > 0 && !categories.includes(item.category)) return false;
+        if (urgencies.length > 0 && !urgencies.includes(item.urgency)) return false;
+        return true;
+      })
+      // Strong matches (within the Retailer's selected coverage area) bubble to the top; ties
+      // keep the original order since Array.prototype.sort is stable.
+      .sort((a, b) => Number(b.strongMatch) - Number(a.strongMatch));
   }, [opportunities, search, categories, urgencies]);
 
   const newCount = opportunities.filter((item) => item.isNew).length;

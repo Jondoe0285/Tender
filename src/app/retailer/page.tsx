@@ -5,19 +5,22 @@ import { Card } from '@/components/ui/Card';
 import { getCurrentUser } from '@/server/auth/session';
 import { listMatchedSummariesForRetailer } from '@/server/domain/tenderService';
 import { prisma } from '@/server/data/prisma';
-import { estimateDistanceMiles } from '@/lib/geography';
-import { RETAILER_UNLOCK_FEE_GBP } from '@/lib/categories';
+import { retailerCoversTenderLocation, estimateDistanceMiles } from '@/lib/geography';
+import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
 import { TenderOpportunityCard, type OpportunityCardData } from '@/components/retailer/TenderOpportunityCard';
+
+export const dynamic = 'force-dynamic';
 
 export default async function RetailerPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== 'RETAILER') redirect('/login');
 
   const matches = await listMatchedSummariesForRetailer(user.id);
-  const [unlockCount, quoteCount, profile] = await Promise.all([
+  const [unlockCount, quoteCount, profile, unlockFeeGbp] = await Promise.all([
     prisma.unlock.count({ where: { retailerId: user.id } }),
     prisma.quote.count({ where: { retailerId: user.id } }),
-    prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { launchCreditsLeft: true, coverageAreas: true } }),
+    prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { launchCreditsLeft: true, coverageAreas: true, coverageScope: true, counties: true, regions: true } }),
+    getPaymentFeeGbp('RETAILER_UNLOCK'),
   ]);
   const unlockedIds = new Set(
     (await prisma.unlock.findMany({ where: { retailerId: user.id }, select: { tenderId: true } })).map((u) => u.tenderId)
@@ -33,23 +36,28 @@ export default async function RetailerPage() {
     { label: 'Launch credits left', value: profile?.launchCreditsLeft ?? 0 },
   ];
 
-  const latest: OpportunityCardData[] = matches.slice(0, 5).map(({ tender, viewedAt }) => {
-    const unlocked = unlockedIds.has(tender.id);
-    return {
-      tenderId: tender.id,
-      reference: tender.reference,
-      category: tender.category,
-      urgency: tender.urgency,
-      location: tender.location,
-      distanceMiles: estimateDistanceMiles(coverageAreas, tender.location),
-      requirements: tender.requirements,
-      closingDate: tender.closingDate,
-      valueBand: tender.valueBand,
-      unlockFeeLabel: unlocked ? 'Unlocked' : hasCredits ? 'Free (launch credit)' : `£${RETAILER_UNLOCK_FEE_GBP}`,
-      unlocked,
-      isNew: !viewedAt,
-    };
-  });
+  const latest: OpportunityCardData[] = matches
+    .map(({ tender, viewedAt }) => {
+      const unlocked = unlockedIds.has(tender.id);
+      return {
+        tenderId: tender.id,
+        reference: tender.reference,
+        category: tender.category,
+        urgency: tender.urgency,
+        location: tender.location,
+        distanceMiles: estimateDistanceMiles(coverageAreas, tender.location),
+        requirements: tender.requirements,
+        closingDate: tender.closingDate,
+        unlockFeeLabel: unlocked ? 'Unlocked' : hasCredits ? 'Free (launch credit)' : `£${unlockFeeGbp}`,
+        unlocked,
+        isNew: !viewedAt,
+        strongMatch: profile != null && retailerCoversTenderLocation(profile, tender.location),
+      };
+    })
+    // Strong matches (within the Retailer's selected coverage area) bubble to the top; ties
+    // keep the original notifiedAt-desc order since Array.prototype.sort is stable.
+    .sort((a, b) => Number(b.strongMatch) - Number(a.strongMatch))
+    .slice(0, 5);
 
   return (
     <AppShell role="retailer" title="Dashboard">

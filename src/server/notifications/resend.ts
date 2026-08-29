@@ -22,7 +22,6 @@ export type TenderNotification = {
   locationArea: string;
   closingDate: Date;
   requirementSummary: string;
-  valueBand: string;
 };
 
 export async function sendTransactionalEmail(to: string, template: EmailTemplate) {

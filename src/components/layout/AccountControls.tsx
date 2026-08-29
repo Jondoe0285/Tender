@@ -22,7 +22,13 @@ export function AccountControls() {
       variant="ghost"
       size="md"
       className="h-9 px-4 text-sm"
-      onClick={() => signOut({ callbackUrl: '/' })}
+      onClick={() => {
+        // Falls back to a hard navigation if the sign-out request itself fails, so the user is
+        // never left on a protected page believing sign-out silently did nothing.
+        signOut({ callbackUrl: '/' }).catch(() => {
+          window.location.href = '/';
+        });
+      }}
     >
       Sign out
     </Button>

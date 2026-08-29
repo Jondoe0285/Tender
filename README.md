@@ -42,8 +42,7 @@ failed-payment recovery. Resend delivery is server-only and controlled by enviro
 New account registrations notify `info@sinclairsafetysolutions.co.uk` when Resend is configured;
 the notification contains role and contact details but never a password or authentication secret.
 New Client and Retailer accounts receive a single-use email-verification link that expires after 24
-hours. Unverified accounts cannot sign in.
-
+hours. Unverified accounts cannot sign in
 Super Users can edit categories, payment fees, Client acceptance fee mode, membership tiers,
 annual subscription plans, and Retailer assignments. Client acceptance fees support a fixed amount
 or separate percentage rules for quote values up to £10,000 and above £10,000. Retailers and Clients
@@ -56,7 +55,7 @@ appear in a separate labelled area on Client quote pages and do not change quote
 | `REGISTRATION_NOTIFICATION_EMAIL` | Internal recipient for new-account notifications; defaults to `info@sinclairsafetysolutions.co.uk` in `.env.example`. |
 
 Within the Super User role, an **Owner** flag gates the most critical controls — fees, adspace,
-membership tiers, sponsored placement, and creating or managing other Super User accounts — from the
+membership tiers, sponsored placement, and creating or managing other Super Userlogout button still does not go to landing accounts — from the
 Owner Console at `/super-user/owner`. An **Accountant** flag restricts a Super User sub-account to a
 read-only Accounting Space (`/super-user/accounting`) with receipts, invoices, and performance
 reporting only, with no access to Super User settings or user management. Both are attributes on the
@@ -107,21 +106,30 @@ An Accountant sub-account only ever sees Accounting Space; every other Super Use
 
 The core product flow is now implemented and verified. See
 [docs/PRODUCTION-READINESS-REVIEW.md](docs/PRODUCTION-READINESS-REVIEW.md) for the full, prioritized
-list from the latest structured production-readiness review. Highlights:
+list from the latest structured production-readiness review, including a dedicated
+[Business Plan Alignment Assessment](docs/PRODUCTION-READINESS-REVIEW.md#business-plan-alignment-assessment-2026-08-28).
+Highlights:
 
 - [ ] **Critical:** verify/build a working Azure SQL migration path (current migrations are SQLite-only)
-- [ ] **Critical:** CI/CD pipeline gating PRs and deploying to Azure App Service
+- [x] **CI/CD baseline implemented:** GitHub Actions gates lint, type-check, tests, and production build on PRs and pushes to `main`; Azure deployment workflow is scaffolded and requires Azure secrets and live environment validation.
+- [x] **Auth abuse hardening in repo:** login and registration routes now enforce a simple in-app rate limit using source IP headers.
+- [ ] **Critical (business plan §4.9):** misuse/fraud monitoring — repeated parties, unusual payment
+  behaviour, duplicate/near-duplicate tenders — is not implemented
 - [x] Super User management actions for users and waivers, plus Owner/Accountant governance tiers
-- [ ] Rate limiting and abuse monitoring on sensitive endpoints (SEC-084/096)
 - [x] Data retention job for 30-day non-accepted quote deletion and five-year accepted quote locks (SEC-100/101)
 - [ ] Configure real Stripe keys and test signed webhooks, refunds, and chargebacks against a live/test Stripe account
-- [ ] Partner advertising management (currently static placeholders on the Super User dashboard)
+- [ ] Partner advertising management (currently static placeholders; business plan §10 requires this to be
+  Super-User-managed, not hardcoded)
+- [ ] Super User analytics filters are missing status, value band, payment status, subscription plan, and
+  Client/Retailer/identifier search required by business plan §4.6
+- [ ] Clarify whether a formal Retailer approval/vetting gate is required before matching begins (§10 Phase Three)
 - [ ] Visual/accessibility QA pass with real screen readers and devices
 - [ ] Standalone toast/notification system for success/error feedback beyond inline button and form states
 - [ ] First-time journey usability testing with real Clients and Retailers
 - [ ] Suspend/edit actions on the new Super User Retailer/Client/Tender management pages
 - [ ] Manual QA of the mobile sidebar drawer on real devices
 - [ ] Secure supporting-document storage and downloads for Retailer quote documents
+- [ ] Load/performance testing evidence against the 1,000-concurrent-user target (§4.10)
 - [x] Retailer analytics expansion (trends, category, regional, quote value, response time, benchmark)
 - [ ] Integration/E2E test coverage for unlock, payment, webhook, and contact-release journeys
   (see docs/PRODUCTION-READINESS-REVIEW.md for the specific gaps)
@@ -176,6 +184,19 @@ npm run db:migrate    # create/apply local SQLite migrations
 npm run db:seed       # create local development accounts
 ```
 
+### CI/CD and release status
+
+The repository now includes GitHub Actions workflows for validation and Azure deployment:
+
+- `.github/workflows/ci.yml` runs `npm run lint`, `npm run type-check`, `npm test`, and `npm run build` on PRs and pushes to `main`.
+- `.github/workflows/deploy-azure.yml` builds the app and deploys to Azure App Service when the required Azure secrets are present.
+
+This closes the missing pipeline scaffolding, but live Azure deployment still requires:
+
+- Azure App Service app name and credentials stored as GitHub repository secrets
+- a verified Azure SQL migration path for production
+- post-deployment smoke checks for auth, payment, and privacy flows
+
 ### Quote retention job
 
 `npm run retention:purge` deletes non-accepted quotes and their unpurchased tender documents submitted
@@ -213,6 +234,10 @@ Open [http://localhost:3000](http://localhost:3000) and register an account from
 npm run build
 npm start
 ```
+
+### Azure deployment notes
+
+A production deployment is expected to run behind Azure Front Door, App Service, Azure SQL, and Blob Storage. The repository includes the deployment workflow scaffolding, but Azure secrets and a verified SQL Server migration strategy remain required before a live release is production-safe.
 
 ## Payments
 

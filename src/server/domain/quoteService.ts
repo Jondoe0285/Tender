@@ -7,6 +7,7 @@ import { quoteReceivedTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
 import { sponsoredPlacementEnabled } from '@/server/domain/sponsoredPlacementService';
+import { getClientReleaseFeeGbp } from '@/server/domain/platformSettings';
 
 export function isQuoteRetentionLocked(retentionLockedUntil: Date | null | undefined, now = new Date()): boolean {
   return retentionLockedUntil !== null && retentionLockedUntil !== undefined && retentionLockedUntil > now;
@@ -117,5 +118,9 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
         select: { retailerId: true },
       })).map((placement) => placement.retailerId))
     : new Set<string>();
-  return quotes.map(({ retailerId, ...quote }) => ({ ...quote, sponsoredPlacementActive: sponsoredRetailerIds.has(retailerId) }));
+  return Promise.all(quotes.map(async ({ retailerId, ...quote }) => ({
+    ...quote,
+    sponsoredPlacementActive: sponsoredRetailerIds.has(retailerId),
+    releaseFeeGbp: await getClientReleaseFeeGbp(quote.priceGbp),
+  })));
 }

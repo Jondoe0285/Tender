@@ -10,6 +10,8 @@ import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { appUrl, emailVerificationTemplate } from '@/server/notifications/emailTemplates';
 import { createEmailVerificationToken } from '@/server/auth/emailVerification';
 import { buildClientTradeTenderId } from '@/lib/identifiers';
+import { createRateLimitResponse } from '@/server/http/rateLimit';
+import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
 
 async function sendVerificationEmail(userId: string, email: string) {
   const token = await createEmailVerificationToken(userId);
@@ -19,6 +21,9 @@ async function sendVerificationEmail(userId: string, email: string) {
 }
 
 export async function POST(request: Request) {
+  const rateLimitError = createRateLimitResponse(request, 'register', { maxRequests: 5, windowMs: 60_000 });
+  if (rateLimitError) return rateLimitError;
+
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
   const body = await request.json().catch(() => null);
@@ -75,6 +80,7 @@ export async function POST(request: Request) {
       targetId: existing.id,
       metadata: { role: input.role },
     });
+    if (input.role === 'RETAILER') await matchRetailerToOpenTenders(existing.id);
     return NextResponse.json({ status: 'workspace_added' });
   }
 
@@ -119,6 +125,7 @@ export async function POST(request: Request) {
     targetId: user.id,
     metadata: { role: user.role },
   });
+  if (user.role === 'RETAILER') await matchRetailerToOpenTenders(user.id);
 
   const verificationResult = await sendVerificationEmail(user.id, user.email);
   if (!verificationResult.sent) {

@@ -5,6 +5,78 @@ QA Engineer, Corporate Frontend Developer, and Azure Release Engineer agents. Th
 that were **fixed** in this pass and items that remain **outstanding** and require a human/product decision
 before the platform can be considered production ready.
 
+## Business Plan Alignment Assessment (2026-08-28)
+
+Assessment of the current implementation against [docs/TradeTender-Business-Plan.md](TradeTender-Business-Plan.md).
+This is a point-in-time gap analysis, not a repeat of the earlier technical review above.
+
+### Confirmed aligned with the business plan
+
+- Roles, workflow order (Raise Tender → Retailers Tender → Compare Prices → Award Contract), and the
+  £10 Retailer unlock fee / £10 Client Accepted Quote Release Fee model (§5, §5.1) match the implementation.
+- Retailer subscriptions (§5.2) and tiered Client release fees (§5.1) are built but correctly gated inactive
+  behind Owner-controlled platform settings, matching "must not be included in the current revenue forecast."
+- Staged visibility rules (§4.7): pre-unlock summary only, full detail after unlock, contact identities hidden
+  until the release fee is confirmed — verified server-side and in rendered markup in the earlier security review.
+- Tender/quote identifier format (`TND-YYYYMMDD-000001`, `-Q01`) (§4.9) matches exactly.
+- 30-day quote retention / five-year accepted-quote-and-audit retention (§4.10) is implemented and tested.
+- All 12 required footer/policy documents (§10, "Website Footer and Public Policy Documents") exist on
+  `/policies`, including the Marketplace Disclaimer and Platform Role Statement.
+- Retailer accreditations field, category/coverage-area matching, and email notifications (§4.3–§4.4) exist.
+
+### Gaps found — recommended additions
+
+1. **No misuse/fraud monitoring (§4.9 — Critical, recommended for launch readiness).** The business plan
+   requires monitoring for "repeated parties, unusual payment behaviour, repeated cancellations, duplicate or
+   near-duplicate tenders, and other potential misuse." No such detection exists today — `contentModeration.ts`
+   only screens for premature contact/company disclosure in free-text fields, which is a different control.
+   **Recommendation:** add a lightweight monitoring service (e.g. flag tenders with near-identical
+   description/category/location from the same Client within a short window, flag Retailers with an unusually
+   high ratio of unlocks-to-quotes, surface both as a Super User "Flags" panel) before scaling past pilot volume.
+
+2. **Super User analytics filtering is incomplete against §4.6.** The plan requires filtering by "Client,
+   Retailer, tender identifier, quote identifier, category, geographical area, status, date range, value band,
+   subscription plan, and payment status." The current `getAnalytics`/`parseAnalyticsFilters`
+   ([src/server/domain/analyticsService.ts](../src/server/domain/analyticsService.ts)) only supports date
+   range, category, and region. **Recommendation:** extend the filter set to include tender/quote status,
+   value band, and a free-text Client/Retailer/identifier search; expose subscription plan and payment status
+   filters once membership/subscription usage data exists to filter against.
+
+3. **Partner advertising is static, not Super-User-managed (§10).** The plan requires the Super User to
+   "manage partner names, locations, destination links, active status, and display positions." Sinclair Safety
+   Solutions Ltd and Smart Works Civils Ltd are currently hardcoded in
+   [src/components/layout/SiteFooter.tsx](../src/components/layout/SiteFooter.tsx). This was already tracked
+   as an outstanding README item; re-confirmed here as a direct business-plan requirement, not just a "nice to
+   have."
+
+4. **No formal Retailer approval/vetting gate (§10, Phase Three).** The plan lists "Retailer approval"
+   alongside Super User suspension as a Phase Three control. Today, Retailer accounts are self-serve and active
+   immediately after email verification; there is no admin review step before a new Retailer can receive
+   matched opportunities or submit quotes. **Recommendation:** clarify with the business owner whether this
+   means (a) a formal pre-activation approval queue, or (b) the existing suspend/activate control is sufficient
+   post-launch moderation. If (a), add a `pendingApproval` state to `RetailerProfile` and a Super User approval
+   queue before matching/notification begins.
+
+5. **No performance/load testing evidence for the "1,000 concurrent users" target (§4.10).** No load-testing
+   scripts, results, or CI job exist in the repository. This is an operational/QA task, not a code gap, but
+   should be scheduled before the funded pre-launch assurance budget (§7.5, £770–£2,150) is spent.
+
+6. **Retailer confirmation step (§4.6) is not implemented.** The plan lists "Retailer confirmations where a
+   confirmation step is used" as an analytics metric, implying an optional post-acceptance confirmation from
+   the Retailer (e.g. confirming they will fulfil the awarded work). No such step exists; quote lifecycle stops
+   at `ACCEPTED`. **Recommendation:** treat as an optional Phase Seven enhancement — confirm with the business
+   owner whether this is required for the Year 1 launch or a later refinement.
+
+7. **Launch-credit window is a fixed field (`launchCreditsLeft`), not a time-boxed 90-day window (§Executive
+   Summary, §5, §9.4).** The plan describes a 90-day Retailer launch credit window, extendable "selectively by
+   category, region, or Retailer group." The current implementation grants a flat credit count per Retailer
+   with no start/end date or category/region-scoped extension mechanism. **Recommendation:** clarify whether
+   the flat-credit model is an accepted simplification for Year 1, or whether a dated window with
+   category/region overrides is required before the marketing launch begins.
+
+None of the above are security defects; they are business-requirement gaps and are listed here so they can be
+prioritized alongside the technical outstanding items below.
+
 ## Fixed in this review
 
 - **Race condition on Retailer launch-credit unlocks** — concurrent unlock requests could both spend the same
@@ -113,6 +185,22 @@ before the platform can be considered production ready.
     palette hexes. Cosmetic; swap for `concrete-grey` at reduced opacity if desired.
 20. No breached-password check (e.g. HaveIBeenPwned k-anonymity) beyond the existing 10-character minimum.
     Acceptable under NIST 800-63B guidance; flagged for awareness only.
+
+### Business plan gaps (see full assessment above)
+
+21. **Critical for launch:** no misuse/fraud monitoring (duplicate tenders, repeated parties, unusual payment
+    behaviour) per business plan §4.9.
+22. **High:** Super User analytics filters are missing status, value band, payment status, subscription plan,
+    and Client/Retailer/identifier search per §4.6.
+23. **High:** partner advertising (Sinclair Safety Solutions Ltd, Smart Works Civils Ltd) is hardcoded rather
+    than Super-User-managed per §10.
+24. **Medium:** no formal Retailer approval/vetting gate before matching begins — clarify against §10 Phase
+    Three intent.
+25. **Medium:** no evidence of load testing against the 1,000-concurrent-user target in §4.10.
+26. **Low:** optional Retailer confirmation step from §4.6 is not implemented — confirm whether required for
+    Year 1.
+27. **Low:** the 90-day, category/region-extendable launch credit window from the Executive Summary/§9.4 is
+    currently a flat per-Retailer credit count with no time window or scoped extension mechanism.
 
 ## Verified secure / no action needed
 

@@ -6,6 +6,7 @@ import { markMatchViewed } from '@/server/domain/tenderService';
 import { ForbiddenError, UnauthorizedError } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
 import { getBroadLocation } from '@/lib/geography';
+import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
@@ -39,11 +40,14 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       }
 
       // Pre-unlock: approved non-sensitive summary only (SEC-030/031).
-      const tender = await prisma.tender.findUniqueOrThrow({
-        where: { id: params.id },
-        select: { id: true, reference: true, category: true, location: true, urgency: true, closingDate: true, status: true, client: { select: { clientCompanyMembership: { select: { company: { select: { tradeTenderId: true } } } } } } },
-      });
-      return NextResponse.json({ tender: { ...tender, location: getBroadLocation(tender.location), clientTradeTenderId: tender.client.clientCompanyMembership?.company.tradeTenderId ?? null }, unlocked: false });
+      const [tender, unlockFeeGbp] = await Promise.all([
+        prisma.tender.findUniqueOrThrow({
+          where: { id: params.id },
+          select: { id: true, reference: true, category: true, location: true, urgency: true, closingDate: true, status: true, client: { select: { clientCompanyMembership: { select: { company: { select: { tradeTenderId: true } } } } } } },
+        }),
+        getPaymentFeeGbp('RETAILER_UNLOCK'),
+      ]);
+      return NextResponse.json({ tender: { ...tender, location: getBroadLocation(tender.location), clientTradeTenderId: tender.client.clientCompanyMembership?.company.tradeTenderId ?? null, unlockFeeGbp }, unlocked: false });
     }
 
     throw new ForbiddenError();

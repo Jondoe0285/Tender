@@ -16,6 +16,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
+    "db:seed-fake-tenders": "tsx --env-file=.env scripts/seed-fake-tenders.ts",
     "db:sync-prod-schema": "node scripts/generate-sqlserver-schema.js",
     "retention:purge": "tsx --env-file=.env scripts/purge-retention.ts"
   },
