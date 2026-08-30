@@ -1,14 +1,13 @@
 'use client';
 
 import { Suspense, useState, type FormEvent } from 'react';
-import { getSession, signIn } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { FieldGroup, Input, Label, PasswordInput } from '@/components/ui/Field';
-import { workspaceForRole } from '@/lib/navigation';
 
 export default function LoginPage() {
   return (
@@ -44,15 +43,7 @@ function LoginForm() {
       setError('Incorrect email or password.');
       return;
     }
-    const session = await getSession();
-    const workspace = workspaceForRole(session?.user?.role);
-    if (!workspace) {
-      setSubmitting(false);
-      setError('Your account is not assigned to an approved workspace.');
-      return;
-    }
-    router.replace(workspace);
-    router.refresh();
+    router.replace('/api/auth/workspace');
   }
 
   return (
@@ -63,6 +54,7 @@ function LoginForm() {
       {searchParams.get('verification') === 'verified' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your email address is verified. You can now sign in.</p>}
       {searchParams.get('verification') === 'invalid' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">This verification link is invalid or has expired. Register again with the same details to request a new link.</p>}
       {searchParams.get('password') === 'set' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your password is set. Sign in with your new password.</p>}
+      {searchParams.get('error') === 'workspace' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">Your account is not assigned to an approved workspace.</p>}
 
       <Card className="mt-8">
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
