@@ -1,5 +1,4 @@
-export DATABASE_URL='actual staging pooled Neon URL'
-export DATABASE_URL_UNPOOLED='actual staging direct Neon URL'# Trade Tender
+# Trade Tender
 
 A UK construction tendering marketplace connecting Clients with registered Retailers, built with
 Next.js, TypeScript, Tailwind CSS, Prisma, and NextAuth. See [docs/TradeTender-Business-Plan.md](docs/TradeTender-Business-Plan.md)
