@@ -54,6 +54,7 @@ function isPlaceholder(value) {
 
 const args = parseArgs(process.argv.slice(2));
 const target = (args.target ?? '').trim();
+const mainRef = (args['main-ref'] ?? 'origin/main').trim();
 
 if (!Object.prototype.hasOwnProperty.call(EXPECTED_STATEMENT, target)) {
   console.error(`VERIFICATION FAILED: --target must be "staging-branch", "staging" or "production", received "${target}".`);
@@ -91,16 +92,22 @@ if (isPlaceholder(sha)) {
   } else {
     pass('Commit exists in the repository');
     try {
-      execFileSync('git', ['merge-base', '--is-ancestor', sha, 'origin/main'], { stdio: 'ignore' });
+      git('rev-parse', '--verify', mainRef);
+    } catch {
+      block(`Main reference "${mainRef}" is not available in this checkout.`);
+    }
+
+    try {
+      execFileSync('git', ['merge-base', '--is-ancestor', sha, mainRef], { stdio: 'ignore' });
       pass('Commit is present on main');
     } catch {
       block(`Commit ${sha} is not present on main. Only reviewed, merged commits may be deployed.`);
     }
 
     // 4. Nothing may have landed on main after the approved commit.
-    const head = git('rev-parse', 'origin/main');
+    const head = git('rev-parse', mainRef);
     if (head !== sha) {
-      const ahead = git('rev-list', '--count', `${sha}..origin/main`);
+      const ahead = git('rev-list', '--count', `${sha}..${mainRef}`);
       block(`main has advanced ${ahead} commit(s) beyond the approved commit (main is at ${head.slice(0, 12)}). The approval is stale.`);
     } else {
       pass('Approved commit is the current head of main; no code changed after approval');

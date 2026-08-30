@@ -9,7 +9,7 @@ const DIR = 'docs/health-check/deployments';
 /** Runs the gate and returns its exit code plus combined output. */
 function runGate(args: string[]): { code: number; output: string } {
   try {
-    const output = execFileSync('node', [SCRIPT, ...args], { encoding: 'utf8', stdio: 'pipe' });
+    const output = execFileSync('node', [SCRIPT, '--main-ref', 'HEAD', ...args], { encoding: 'utf8', stdio: 'pipe' });
     return { code: 0, output };
   } catch (error) {
     const failure = error as { status?: number; stdout?: string; stderr?: string };
@@ -18,7 +18,7 @@ function runGate(args: string[]): { code: number; output: string } {
 }
 
 function headSha(): string {
-  return execFileSync('git', ['rev-parse', 'origin/main'], { encoding: 'utf8' }).trim();
+  return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 }
 
 function writeStagingRecord(name: string, record: Record<string, unknown>): void {
