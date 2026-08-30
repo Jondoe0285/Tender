@@ -9,20 +9,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        'foundation-navy': '#0E1C2E',
-        'safety-amber': '#F5A524',
-        'steel-blue': '#1D3D5C',
-        'site-white': '#F4F6F8',
-        'hi-viz-tint': '#FFD166',
-        'concrete-grey': '#8A94A0',
-        ink: '#0A0F16',
+        'foundation-navy': '#0D1B2A',
+        'safety-amber': '#1D6FB8',
+        'steel-blue': '#6EB1E4',
+        'site-white': '#F2F4F7',
+        'hi-viz-tint': '#6EB1E4',
+        'concrete-grey': '#6B7280',
+        ink: '#0D1B2A',
         approved: '#2E7D32',
         attention: '#B23B3B',
         pending: '#C77D11',
       },
       fontFamily: {
-        heading: ['var(--font-archivo)', 'Arial', 'sans-serif'],
-        sans: ['var(--font-inter)', 'Arial', 'sans-serif'],
+        heading: ['var(--font-montserrat)', 'Arial', 'sans-serif'],
+        sans: ['var(--font-source-sans)', 'Arial', 'sans-serif'],
       },
       boxShadow: {
         soft: '0 1px 2px rgba(14,28,46,0.06)',

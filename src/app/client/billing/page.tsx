@@ -27,7 +27,8 @@ export default async function ClientBillingPage() {
             {payments.map((payment) => (
               <div key={payment.id} className="flex flex-wrap items-center justify-between gap-4 px-6 py-5">
                 <div>
-                  <p className="font-heading text-base font-bold text-foundation-navy">&pound;{payment.amountGbp}</p>
+                  <p className="font-heading text-base font-bold text-foundation-navy">&pound;{payment.totalAmountGbp.toFixed(2)} inc. VAT</p>
+                  <p className="mt-1 text-sm text-concrete-grey">Fee: &pound;{payment.amountGbp.toFixed(2)} excl. VAT &middot; VAT: &pound;{payment.vatGbp.toFixed(2)} ({payment.vatPercentage}%)</p>
                   <p className="mt-1 text-sm text-concrete-grey">
                     Accepted Quote Release Fee &middot; {payment.createdAt.toLocaleDateString('en-GB')}
                   </p>

@@ -18,6 +18,7 @@ type TenderSummary = {
   location: string;
   urgency: string;
   closingDate: string;
+  supplyDate?: string | null;
   status: string;
   unlockFeeGbp?: number;
   items: { id: string; category: string; subcategory: string; item: string | null; quantity: string }[];
@@ -26,7 +27,7 @@ type TenderSummary = {
 type TenderFull = Omit<TenderSummary, 'items'> & {
   subcategory: string;
   quantity: string;
-  budget: number | null;
+  supplyDate: string | null;
   requirements: string;
   description: string;
   items: { id: string; category: string; subcategory: string; item: string | null; quantity: string; description: string }[];
@@ -42,6 +43,9 @@ export default function RetailerTenderDetailPage() {
   const [unlocking, setUnlocking] = useState(false);
   const [simulating, setSimulating] = useState(false);
   const [submittingQuote, setSubmittingQuote] = useState(false);
+  const [linePrices, setLinePrices] = useState<Record<string, string>>({});
+  const [unavailableItemIds, setUnavailableItemIds] = useState<string[]>([]);
+  const [charges, setCharges] = useState<{ id: string; description: string; priceGbp: string }[]>([]);
 
   async function load() {
     const response = await fetch(`/api/tenders/${params.id}`);
@@ -52,6 +56,9 @@ export default function RetailerTenderDetailPage() {
     const data = await response.json();
     setTender(data.tender);
     setUnlocked(data.unlocked);
+    setLinePrices({});
+    setUnavailableItemIds([]);
+    setCharges([]);
   }
 
   useEffect(() => {
@@ -120,18 +127,22 @@ export default function RetailerTenderDetailPage() {
     setSubmittingQuote(true);
     setMessage(null);
     const form = new FormData(event.currentTarget);
+    const tenderItems = (tender as TenderFull).items;
 
     const response = await fetch(`/api/tenders/${params.id}/quotes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        priceGbp: form.get('priceGbp'),
+        lineItems: tenderItems.map((item) => ({
+          tenderItemId: item.id,
+          available: !unavailableItemIds.includes(item.id),
+          priceGbp: unavailableItemIds.includes(item.id) ? undefined : form.get(`line-price-${item.id}`),
+        })),
+        charges: charges.map((charge) => ({ description: charge.description, priceGbp: charge.priceGbp })),
         leadTimeDays: form.get('leadTimeDays'),
+        deliveryDateConfirmed: form.get('deliveryDateConfirmed') === 'on',
         deliveryInfo: form.get('deliveryInfo'),
-        accreditations: form.get('accreditations'),
-        supportingDocumentName: form.get('supportingDocumentName') || undefined,
         validityDays: form.get('validityDays'),
-        notes: form.get('notes'),
       }),
     });
     setSubmittingQuote(false);
@@ -152,6 +163,11 @@ export default function RetailerTenderDetailPage() {
   }
 
   const full = unlocked ? (tender as TenderFull) : null;
+  const itemsTotal = full?.items.reduce((total, item) => (
+    unavailableItemIds.includes(item.id) ? total : total + Number(linePrices[item.id] || 0)
+  ), 0) ?? 0;
+  const chargesTotal = charges.reduce((total, charge) => total + Number(charge.priceGbp || 0), 0);
+  const quoteTotal = itemsTotal + chargesTotal;
 
   return (
     <AppShell role="retailer" title={tender.reference}>
@@ -183,7 +199,7 @@ export default function RetailerTenderDetailPage() {
                 Client contact details remain private until a quote is accepted and the release fee is paid.
               </p>
               <p className="mt-3 text-sm font-semibold text-steel-blue">
-                Cost: £{tender.unlockFeeGbp ?? 0}, unless you have a launch credit available.
+                Cost: £{tender.unlockFeeGbp ?? 0} excl. VAT, unless you have a launch credit available.
               </p>
               {tender.items.length > 0 && (
                 <div className="mt-4">
@@ -206,7 +222,7 @@ export default function RetailerTenderDetailPage() {
                 </Button>
               ) : (
                 <Button onClick={handleUnlock} loading={unlocking} size="lg">
-                  {`Unlock full details — £${tender.unlockFeeGbp ?? 0}`}
+                  {`Unlock full details — £${tender.unlockFeeGbp ?? 0} excl. VAT`}
                 </Button>
               )}
             </Card>
@@ -222,10 +238,10 @@ export default function RetailerTenderDetailPage() {
                     <TenderItemDetail key={item.id} subcategory={item.subcategory} item={item.item} quantity={item.quantity} description={item.description} />
                   ))}
                 </div>
-                {full.budget != null && <p className="mt-1 text-sm text-concrete-grey">Budget: £{full.budget}</p>}
                 {full.requirements && (
                   <p className="mt-1 text-sm text-concrete-grey">Requirements: {full.requirements}</p>
                 )}
+                {full.supplyDate && <p className="mt-1 text-sm text-concrete-grey">Requested supply date: {new Date(full.supplyDate).toLocaleDateString('en-GB')}</p>}
               </Card>
 
               {quoteSubmitted ? (
@@ -236,34 +252,117 @@ export default function RetailerTenderDetailPage() {
                 <Card>
                   <h2 className="mb-4 font-heading text-lg font-bold text-foundation-navy">Submit a quote</h2>
                   <form onSubmit={handleSubmitQuote} className="flex flex-col gap-4">
-                    <FieldGroup>
-                      <Label htmlFor="priceGbp">Price (GBP)</Label>
-                      <Input id="priceGbp" name="priceGbp" type="number" min="1" required />
-                    </FieldGroup>
+                    <fieldset className="flex flex-col gap-4">
+                      <legend className="text-sm font-semibold text-foundation-navy">Quoted tender lines</legend>
+                      {full.items.map((item, index) => (
+                        <FieldGroup key={item.id}>
+                          <Label htmlFor={`line-price-${item.id}`}>{`Item ${index + 1}: ${item.item ?? item.subcategory} (excl. VAT)`}</Label>
+                          <p className="text-xs text-concrete-grey">{item.category} / {item.subcategory} / {item.quantity}</p>
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                            <Input
+                              id={`line-price-${item.id}`}
+                              name={`line-price-${item.id}`}
+                              type="number"
+                              min="1"
+                              step="1"
+                              required={!unavailableItemIds.includes(item.id)}
+                              disabled={unavailableItemIds.includes(item.id)}
+                              placeholder="Price in GBP excl. VAT"
+                              value={linePrices[item.id] ?? ''}
+                              onChange={(event) => setLinePrices((current) => ({ ...current, [item.id]: event.target.value }))}
+                            />
+                            <label className="flex shrink-0 items-center gap-2 text-sm font-semibold text-concrete-grey">
+                              <input
+                                type="checkbox"
+                                checked={unavailableItemIds.includes(item.id)}
+                                onChange={() => setUnavailableItemIds((current) => (
+                                  current.includes(item.id) ? current.filter((itemId) => itemId !== item.id) : [...current, item.id]
+                                ))}
+                                className="h-4 w-4 accent-safety-amber"
+                              />
+                              Cannot supply
+                            </label>
+                          </div>
+                        </FieldGroup>
+                      ))}
+                    </fieldset>
+                    <fieldset className="flex flex-col gap-4 border-t border-slate-200 pt-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <legend className="text-sm font-semibold text-foundation-navy">Additional quote items</legend>
+                          <p className="mt-1 text-xs text-concrete-grey">Add delivery, supply of a driver, offloading, or any other priced item. Each one adds to the quote total.</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => setCharges((current) => [...current, { id: `${Date.now()}-${current.length}`, description: '', priceGbp: '' }])}
+                        >
+                          Add quote item
+                        </Button>
+                      </div>
+                      {charges.map((charge, index) => (
+                        <div key={charge.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <p className="text-sm font-semibold text-foundation-navy">Quote item {index + 1}</p>
+                            <button
+                              type="button"
+                              onClick={() => setCharges((current) => current.filter((entry) => entry.id !== charge.id))}
+                              className="text-xs font-semibold text-attention hover:underline"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <FieldGroup>
+                              <Label htmlFor={`charge-description-${charge.id}`}>Description</Label>
+                              <Input
+                                id={`charge-description-${charge.id}`}
+                                required
+                                maxLength={120}
+                                placeholder="e.g. Delivery to site"
+                                value={charge.description}
+                                onChange={(event) => setCharges((current) => current.map((entry) => entry.id === charge.id ? { ...entry, description: event.target.value } : entry))}
+                              />
+                            </FieldGroup>
+                            <FieldGroup>
+                              <Label htmlFor={`charge-price-${charge.id}`}>Price (excl. VAT)</Label>
+                              <Input
+                                id={`charge-price-${charge.id}`}
+                                type="number"
+                                min="1"
+                                step="1"
+                                required
+                                placeholder="Price in GBP excl. VAT"
+                                value={charge.priceGbp}
+                                onChange={(event) => setCharges((current) => current.map((entry) => entry.id === charge.id ? { ...entry, priceGbp: event.target.value } : entry))}
+                              />
+                            </FieldGroup>
+                          </div>
+                        </div>
+                      ))}
+                    </fieldset>
+                    <div aria-live="polite" className="rounded-md bg-slate-50 px-4 py-3 text-sm text-foundation-navy">
+                      <p>Tender items: £{itemsTotal} excl. VAT</p>
+                      <p className="mt-1">Additional quote items: £{chargesTotal} excl. VAT</p>
+                      <p className="mt-2 font-heading text-lg font-bold">Quote total: £{quoteTotal} excl. VAT</p>
+                    </div>
                     <FieldGroup>
                       <Label htmlFor="leadTimeDays">Lead time (days)</Label>
                       <Input id="leadTimeDays" name="leadTimeDays" type="number" min="0" required />
                     </FieldGroup>
+                    {full.supplyDate && (
+                      <label className="flex items-center gap-3 rounded-md bg-slate-50 px-4 py-3 text-sm font-semibold text-foundation-navy">
+                        <input id="deliveryDateConfirmed" name="deliveryDateConfirmed" type="checkbox" required className="h-4 w-4 accent-safety-amber" />
+                        {`I can deliver or supply on ${new Date(full.supplyDate).toLocaleDateString('en-GB')}`}
+                      </label>
+                    )}
                     <FieldGroup>
                       <Label htmlFor="deliveryInfo">Delivery information</Label>
                       <Textarea id="deliveryInfo" name="deliveryInfo" rows={3} placeholder="Delivery window, charges, and access requirements" required />
                     </FieldGroup>
                     <FieldGroup>
-                      <Label htmlFor="accreditations">Accreditations</Label>
-                      <Input id="accreditations" name="accreditations" placeholder="e.g. CHAS, Constructionline Gold" required />
-                    </FieldGroup>
-                    <FieldGroup>
                       <Label htmlFor="validityDays">Quote valid for (days)</Label>
                       <Input id="validityDays" name="validityDays" type="number" min="1" required defaultValue={30} />
-                    </FieldGroup>
-                    <FieldGroup>
-                      <Label htmlFor="notes">Notes and assumptions</Label>
-                      <Textarea id="notes" name="notes" rows={4} required />
-                    </FieldGroup>
-                    <FieldGroup>
-                      <Label htmlFor="supportingDocument">Supporting document name (optional)</Label>
-                      <Input id="supportingDocument" name="supportingDocumentName" placeholder="PDF or document filename" />
-                      <p className="text-xs text-concrete-grey">Secure document upload will be enabled when file storage is connected.</p>
                     </FieldGroup>
                     {message && <p className="text-sm font-semibold text-attention">{message}</p>}
                     <Button type="submit" loading={submittingQuote} className="self-start">

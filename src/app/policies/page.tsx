@@ -40,7 +40,7 @@ const policies = [
   {
     id: 'payments',
     title: 'Payment and Refund Policy',
-    text: 'Current fees are a £10 Retailer tender unlock fee and a £10 Client Accepted Quote Release Fee. Access and contact release depend on server-confirmed payment or an approved waiver; redirects alone do not confirm payment.',
+    text: 'Current fees are a £10 Retailer tender unlock fee and a £10 Client Accepted Quote Release Fee, both excluding VAT. All quoted line prices and totals are displayed excluding VAT. VAT is added at the prevailing rate set by Trade Tender and is charged with the fee at checkout; the fee, VAT amount, and total paid are recorded against each payment. Access and contact release depend on server-confirmed payment or an approved waiver; redirects alone do not confirm payment.',
   },
   {
     id: 'contact-release',

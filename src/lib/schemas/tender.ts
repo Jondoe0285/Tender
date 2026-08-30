@@ -17,7 +17,7 @@ export function createTenderSchemaForCatalog(catalog: CategoryCatalog = CATEGORI
     subcategory: z.string().trim().min(1),
     item: z.string().trim().min(1).optional(),
     quantity: z.string().trim().min(1).max(120),
-    description: z.string().trim().min(10).max(4000),
+    description: z.string().trim().max(4000),
   });
   const hasValidSubcategory = (service: string, category: string, item?: string) => {
     const serviceName = Object.keys(catalog).find((value) => value.toLowerCase() === service.toLowerCase());
@@ -38,9 +38,9 @@ export function createTenderSchemaForCatalog(catalog: CategoryCatalog = CATEGORI
     quantity: z.string().trim().min(1).max(120),
     urgency: z.enum(URGENCY_OPTIONS),
     closingDate: z.coerce.date(),
-    budget: z.coerce.number().int().nonnegative().optional(),
+    supplyDate: z.coerce.date().optional(),
     requirements: z.array(z.enum(REQUIREMENT_OPTIONS)).optional().default([]),
-    description: z.string().trim().min(10).max(4000),
+    description: z.string().trim().max(4000),
     items: z.array(tenderItemSchema).max(50).optional(),
     attachments: z.array(tenderAttachmentSchema).max(10).optional().default([]),
   })
@@ -55,6 +55,10 @@ export function createTenderSchemaForCatalog(catalog: CategoryCatalog = CATEGORI
     .refine((value) => value.closingDate.getTime() > Date.now(), {
       message: 'Closing date must be in the future',
       path: ['closingDate'],
+    })
+    .refine((value) => !value.supplyDate || value.supplyDate.getTime() > Date.now(), {
+      message: 'Supply date must be in the future',
+      path: ['supplyDate'],
     })
     .superRefine((value, context) => {
       value.items?.forEach((item, index) => {

@@ -41,7 +41,8 @@ export default async function AccountingSpacePage({ searchParams }: { searchPara
                     <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">
                       {payment.type === 'RETAILER_UNLOCK' ? 'Retailer Unlock Fee' : payment.type === 'CLIENT_RELEASE' ? 'Client Release Fee' : payment.type === 'SPONSORED_PLACEMENT' ? 'Sponsored Placement Fee' : 'Membership Tier Fee'}
                     </p>
-                    <h3 className="font-heading text-base font-bold text-foundation-navy">&pound;{payment.amountGbp.toFixed(2)}</h3>
+                    <h3 className="font-heading text-base font-bold text-foundation-navy">&pound;{payment.totalAmountGbp.toFixed(2)} inc. VAT</h3>
+                    <p className="mt-1 text-sm text-concrete-grey">Fee: &pound;{payment.amountGbp.toFixed(2)} excl. VAT &middot; VAT: &pound;{payment.vatGbp.toFixed(2)} ({payment.vatPercentage}%)</p>
                     <p className="mt-1 text-sm text-concrete-grey">
                       {payment.user.contactName} ({payment.user.email}) &middot; {payment.createdAt.toLocaleDateString('en-GB')}
                     </p>

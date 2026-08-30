@@ -32,7 +32,7 @@ export default async function QuotesReceivedPage() {
                     <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-steel-blue">
                       {quote.reference} &middot; {quote.tender.subcategory}
                     </p>
-                    <h3 className="font-heading text-lg font-bold text-foundation-navy">&pound;{quote.priceGbp}</h3>
+                    <h3 className="font-heading text-lg font-bold text-foundation-navy">&pound;{quote.priceGbp} excl. VAT</h3>
                     <p className="mt-1 text-sm text-concrete-grey">Valid for {quote.validityDays} days</p>
                   </div>
                   <StatusBadge status={quote.status === 'ACCEPTED' ? 'approved' : 'neutral'}>{quote.status}</StatusBadge>

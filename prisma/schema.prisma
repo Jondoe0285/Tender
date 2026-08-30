@@ -299,7 +299,7 @@ model Tender {
   quantity      String
   urgency       String
   closingDate   DateTime
-  budget        Int?
+  supplyDate    DateTime?
   requirements  String       // comma-separated tick-box requirements
   description   String
   status        TenderStatus @default(OPEN)
@@ -353,6 +353,7 @@ model TenderItem {
   description String
   createdAt   DateTime @default(now())
   matches     TenderItemMatch[]
+  quoteLines  QuoteLine[]
 }
 
 model TenderItemMatch {
@@ -400,23 +401,49 @@ model Quote {
   retailer     User        @relation("RetailerQuotes", fields: [retailerId], references: [id])
   priceGbp     Int
   leadTimeDays Int
+  deliveryDateConfirmed Boolean @default(false)
   deliveryInfo String
-  accreditations String
-  supportingDocumentName String?
   validityDays Int
-  notes        String
   status       QuoteStatus @default(SUBMITTED)
   submittedAt  DateTime    @default(now())
   retentionLockedUntil DateTime?
 
   releases     ContactRelease[]
   releasePayment Payment? @relation("QuoteReleasePayment")
+  lines        QuoteLine[]
+  charges      QuoteCharge[]
+}
+
+model QuoteCharge {
+  id          String @id @default(cuid())
+  quoteId     String
+  quote       Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  description String
+  priceGbp    Int
+
+  @@index([quoteId])
+}
+
+model QuoteLine {
+  id           String     @id @default(cuid())
+  quoteId      String
+  quote        Quote      @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  tenderItemId String
+  tenderItem   TenderItem @relation(fields: [tenderItemId], references: [id])
+  priceGbp     Int?
+  available    Boolean    @default(true)
+
+  @@unique([quoteId, tenderItemId])
+  @@index([tenderItemId])
 }
 
 model Payment {
   id                    String        @id @default(cuid())
   type                  PaymentType
   amountGbp             Float
+  vatPercentage         Float                 @default(0)
+  vatGbp                Float                 @default(0)
+  totalAmountGbp        Float                 @default(0)
   status                PaymentStatus @default(PENDING)
   userId                String
   user                  User          @relation(fields: [userId], references: [id])

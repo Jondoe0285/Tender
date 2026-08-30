@@ -36,6 +36,15 @@ function monthKey(date: Date): string {
   return date.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
 }
 
+export function getFinancialQuarter(date = new Date()) {
+  const year = date.getUTCFullYear();
+  const quarterIndex = Math.floor(((date.getUTCMonth() + 9) % 12) / 3);
+  const financialYearStart = date.getUTCMonth() < 3 ? year - 1 : year;
+  const start = new Date(Date.UTC(financialYearStart, 3 + quarterIndex * 3, 1));
+  const end = new Date(Date.UTC(financialYearStart, 3 + (quarterIndex + 1) * 3, 1));
+  return { start, end, label: `Q${quarterIndex + 1} ${financialYearStart}/${String(financialYearStart + 1).slice(-2)}` };
+}
+
 export async function getAnalytics(filters: AnalyticsFilters = {}) {
   const tenderWhere = dateWhere(filters);
   const tenders = (await prisma.tender.findMany({
@@ -48,7 +57,8 @@ export async function getAnalytics(filters: AnalyticsFilters = {}) {
   })) as AnalyticsTender[];
 
   const tenderIds = tenders.map((tender) => tender.id);
-  const [unlocks, quotes, payments] = await Promise.all([
+  const financialQuarter = getFinancialQuarter();
+  const [unlocks, quotes, payments, vatPayments] = await Promise.all([
     prisma.unlock.findMany({ where: { tenderId: { in: tenderIds } }, select: { tenderId: true } }),
     prisma.quote.findMany({ where: { tenderId: { in: tenderIds } }, select: { tenderId: true, status: true } }),
     prisma.payment.findMany({
@@ -60,6 +70,10 @@ export async function getAnalytics(filters: AnalyticsFilters = {}) {
         ],
       },
       select: { amountGbp: true, type: true },
+    }),
+    prisma.payment.findMany({
+      where: { status: 'CONFIRMED', confirmedAt: { gte: financialQuarter.start, lt: financialQuarter.end } },
+      select: { vatGbp: true },
     }),
   ]);
 
@@ -91,6 +105,7 @@ export async function getAnalytics(filters: AnalyticsFilters = {}) {
   const quoteCount = quotes.length;
   const acceptedCount = quotes.filter((quote) => quote.status === 'ACCEPTED').length;
   const revenue = payments.reduce((sum, payment) => sum + payment.amountGbp, 0);
+  const vatCollectedGbp = vatPayments.reduce((sum, payment) => sum + payment.vatGbp, 0);
 
   return {
     filters,
@@ -101,12 +116,14 @@ export async function getAnalytics(filters: AnalyticsFilters = {}) {
       quotesSubmitted: quoteCount,
       acceptedQuotes: acceptedCount,
       revenue,
+      vatCollectedGbp,
     },
     rates: {
       matchRate: tenderCount ? Math.round((unlockCount / tenderCount) * 100) : 0,
       quoteRate: unlockCount ? Math.round((quoteCount / unlockCount) * 100) : 0,
       acceptanceRate: quoteCount ? Math.round((acceptedCount / quoteCount) * 100) : 0,
     },
+    financialQuarter: { label: financialQuarter.label, vatCollectedGbp },
     monthly: Array.from(monthMap, ([month, tenders]) => ({ month, tenders })),
     categories: Array.from(categoryMap, ([category, values]) => ({ category, ...values, acceptanceRate: values.quotes ? Math.round((values.accepted / values.quotes) * 100) : 0 })).sort((a, b) => b.tenders - a.tenders),
     regions: Array.from(regionMap, ([region, values]) => ({ region, ...values })).sort((a, b) => b.tenders - a.tenders).slice(0, 8),

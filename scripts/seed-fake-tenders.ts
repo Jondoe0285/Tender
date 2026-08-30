@@ -1,4 +1,4 @@
-// Generates fake OPEN tenders for local demo/testing — varied services, budgets, and UK
+// Generates fake OPEN tenders for local demo/testing — varied services and UK
 // locations. Requires the demo Client account from `npm run db:seed` to already exist.
 import { prisma } from '../src/server/data/prisma';
 import { createTender } from '../src/server/domain/tenderService';
@@ -39,18 +39,6 @@ function pick<T>(values: readonly T[]): T {
 
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function randomBudgetGbp(): number {
-  // Weighted toward realistic construction spend while still covering every value band.
-  const bands = [
-    () => randomInt(150, 499),
-    () => randomInt(500, 1999),
-    () => randomInt(2000, 9999),
-    () => randomInt(10000, 49999),
-    () => randomInt(50000, 250000),
-  ];
-  return pick(bands)();
 }
 
 function randomQuantity(): string {
@@ -98,7 +86,6 @@ function buildTenderInput() {
     quantity: randomQuantity(),
     urgency: pick(URGENCY_OPTIONS),
     closingDate: randomClosingDate(),
-    budget: randomBudgetGbp(),
     requirements: randomRequirements(),
     description: pick(DESCRIPTION_TEMPLATES)(primary.item),
     items: extraItems.length > 0 ? extraItems : undefined,

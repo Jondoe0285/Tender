@@ -1,25 +1,25 @@
-import { Archivo, Inter } from 'next/font/google';
+import { Montserrat, Source_Sans_3 } from 'next/font/google';
 import { AuthSessionProvider } from '@/components/providers/AuthSessionProvider';
 import './globals.css';
 
-const archivo = Archivo({
+const montserrat = Montserrat({
   subsets: ['latin'],
   weight: ['600', '700'],
-  variable: '--font-archivo',
+  variable: '--font-montserrat',
   display: 'swap',
 });
 
-const inter = Inter({
+const sourceSans = Source_Sans_3({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
-  variable: '--font-inter',
+  variable: '--font-source-sans',
   display: 'swap',
 });
 
 export const metadata = {
   title: 'Trade Tender | The tender platform for construction supply',
   description:
-    'Trade Tender connects construction Clients with registered Retailers, running a competitive tender on every requirement to secure better pricing.',
+    'Connect. Compare. Construct. Trade Tender connects construction Clients with Retailers through a clear tender and quotation process.',
 };
 
 export default function RootLayout({
@@ -28,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en-GB" className={`${archivo.variable} ${inter.variable}`}>
+    <html lang="en-GB" className={`${montserrat.variable} ${sourceSans.variable}`}>
       <body className="min-h-screen bg-site-white font-sans text-foundation-navy antialiased">
         <AuthSessionProvider>{children}</AuthSessionProvider>
       </body>

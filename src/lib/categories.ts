@@ -95,6 +95,20 @@ export function isValidSubcategory(service: string, category: string, item?: str
 }
 
 export const URGENCY_OPTIONS = ['standard', 'urgent', 'flexible'] as const;
-export const REQUIREMENT_OPTIONS = ['Delivery to site required', 'Waste transfer note required', 'Risk assessment (RAMS) required', 'Out-of-hours access'] as const;
+export const REQUIREMENT_OPTIONS = [
+  'Delivery to site required',
+  'Driver or operator required',
+  'Timed delivery required',
+  'Delivery booking required',
+  'Offloading required',
+  'Lifting equipment required',
+  'Site induction required',
+  'PPE required',
+  'CSCS-certified operative required',
+  'Risk assessment (RAMS) required',
+  'Proof of insurance required',
+  'Waste transfer note required',
+  'Out-of-hours access',
+] as const;
 export const RETAILER_UNLOCK_FEE_GBP = 10;
 export const CLIENT_RELEASE_FEE_GBP = 10;

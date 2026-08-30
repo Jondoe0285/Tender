@@ -10,11 +10,11 @@ type Quote = {
   reference: string;
   priceGbp: number;
   leadTimeDays: number;
+  deliveryDateConfirmed: boolean;
   deliveryInfo: string;
-  accreditations: string;
-  supportingDocumentName: string | null;
   validityDays: number;
-  notes: string;
+  lines: { tenderItemId: string; priceGbp: number | null; available: boolean; tenderItem: { category: string; subcategory: string; item: string | null; quantity: string } }[];
+  charges: { id: string; description: string; priceGbp: number }[];
   status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
   submittedAt: string;
   sponsoredPlacementActive?: boolean;
@@ -48,7 +48,8 @@ export function QuoteComparison({
   const [sortAscending, setSortAscending] = useState(true);
 
   const submittedQuotes = quotes.filter((quote) => quote.status === 'SUBMITTED');
-  const bestPrice = submittedQuotes.length ? Math.min(...submittedQuotes.map((quote) => quote.priceGbp)) : null;
+  const fullySuppliedQuotes = submittedQuotes.filter((quote) => quote.lines.length > 0 && quote.lines.every((quoteLine) => quoteLine.available));
+  const bestPrice = fullySuppliedQuotes.length ? Math.min(...fullySuppliedQuotes.map((quote) => quote.priceGbp)) : null;
   const bestLeadTime = submittedQuotes.length ? Math.min(...submittedQuotes.map((quote) => quote.leadTimeDays)) : null;
   const sponsoredQuotes = quotes.filter((quote) => quote.sponsoredPlacementActive);
 
@@ -78,7 +79,7 @@ export function QuoteComparison({
             {sponsoredQuotes.map((quote) => (
               <div key={quote.id} className="rounded-lg bg-white px-4 py-3 shadow-soft">
                 <p className="font-semibold text-foundation-navy">{quote.reference}</p>
-                <p className="mt-1 text-sm text-concrete-grey">£{quote.priceGbp} · {quote.leadTimeDays} days</p>
+                <p className="mt-1 text-sm text-concrete-grey">£{quote.priceGbp} excl. VAT · {quote.leadTimeDays} days</p>
               </div>
             ))}
           </div>
@@ -94,11 +95,11 @@ export function QuoteComparison({
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-concrete-grey">
             <tr>
               <th className="w-40 px-5 py-4 font-semibold">Quote</th>
-              <SortableHeader label="Price" sortKey="priceGbp" activeKey={sortKey} ascending={sortAscending} onSort={sortBy} />
+              <SortableHeader label="Price excl. VAT" sortKey="priceGbp" activeKey={sortKey} ascending={sortAscending} onSort={sortBy} />
               <SortableHeader label="Lead time" sortKey="leadTimeDays" activeKey={sortKey} ascending={sortAscending} onSort={sortBy} />
+              <th className="px-5 py-4 font-semibold">Supply date</th>
+              <th className="px-5 py-4 font-semibold">Quote breakdown</th>
               <th className="px-5 py-4 font-semibold">Delivery</th>
-              <th className="px-5 py-4 font-semibold">Accreditations</th>
-              <th className="px-5 py-4 font-semibold">Notes / documents</th>
               <th className="px-5 py-4 font-semibold">Decision</th>
             </tr>
           </thead>
@@ -185,21 +186,18 @@ function QuoteRow({
         <StatusBadge status={quote.status === 'ACCEPTED' ? 'approved' : 'neutral'}>{quote.status}</StatusBadge>
       </td>
       <td className="px-5 py-5">
-        <p className="font-heading text-xl font-bold text-foundation-navy">£{quote.priceGbp}</p>
+        <p className="font-heading text-xl font-bold text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
         {quote.status === 'SUBMITTED' && quote.priceGbp === bestPrice && <StatusBadge status="approved">Best price</StatusBadge>}
       </td>
       <td className="px-5 py-5">
         <p className="font-semibold text-foundation-navy">{quote.leadTimeDays} days</p>
         {quote.status === 'SUBMITTED' && quote.leadTimeDays === bestLeadTime && <StatusBadge status="approved">Fastest</StatusBadge>}
       </td>
-      <td className="max-w-[180px] whitespace-pre-line px-5 py-5 text-concrete-grey">{quote.deliveryInfo}</td>
-      <td className="max-w-[180px] px-5 py-5 text-concrete-grey">{quote.accreditations}</td>
-      <td className="max-w-[190px] px-5 py-5 text-concrete-grey">
-        <p>{quote.notes}</p>
-        {quote.supportingDocumentName && (
-          <p className="mt-2 font-semibold text-steel-blue">Document: {quote.supportingDocumentName}</p>
-        )}
+      <td className={`px-5 py-5 text-sm font-semibold ${quote.deliveryDateConfirmed ? 'text-approved' : 'text-concrete-grey'}`}>
+        {quote.deliveryDateConfirmed ? 'Confirmed' : 'No supply date requested'}
       </td>
+      <td className="max-w-[260px] px-5 py-5"><QuoteBreakdown quote={quote} /></td>
+      <td className="max-w-[180px] whitespace-pre-line px-5 py-5 text-concrete-grey">{quote.deliveryInfo}</td>
       <td className="min-w-[170px] px-5 py-5">
         <DecisionActions
           quote={quote}
@@ -233,18 +231,17 @@ function QuoteCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">{quote.reference}</p>
-          <p className="mt-1 font-heading text-2xl font-bold text-foundation-navy">£{quote.priceGbp}</p>
+          <p className="mt-1 font-heading text-2xl font-bold text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
         </div>
         <StatusBadge status={quote.status === 'ACCEPTED' ? 'approved' : 'neutral'}>{quote.status}</StatusBadge>
       </div>
       <div className="mt-5 grid grid-cols-2 gap-4 border-y border-slate-100 py-4 text-sm">
         <Detail label="Lead time" value={`${quote.leadTimeDays} days`} highlight={quote.status === 'SUBMITTED' && quote.leadTimeDays === bestLeadTime} />
+        <Detail label="Supply date" value={quote.deliveryDateConfirmed ? 'Confirmed' : 'No supply date requested'} highlight={quote.deliveryDateConfirmed} />
         <Detail label="Validity" value={`${quote.validityDays} days`} />
         <Detail label="Delivery" value={quote.deliveryInfo} />
-        <Detail label="Accreditations" value={quote.accreditations} />
       </div>
-      <p className="mt-4 whitespace-pre-line text-sm text-concrete-grey">{quote.notes}</p>
-      {quote.supportingDocumentName && <p className="mt-2 text-sm font-semibold text-steel-blue">Document: {quote.supportingDocumentName}</p>}
+      <div className="mt-4"><QuoteBreakdown quote={quote} /></div>
       {quote.status === 'SUBMITTED' && quote.priceGbp === bestPrice && <div className="mt-3"><StatusBadge status="approved">Best price</StatusBadge></div>}
       <div className="mt-5">
         <DecisionActions
@@ -277,6 +274,33 @@ type QuoteRowProps = {
 
 type Contact = { contactName: string; contactPhone: string | null; email: string };
 
+function QuoteBreakdown({ quote }: { quote: Quote }) {
+  if (quote.lines.length === 0 && quote.charges.length === 0) return <p className="text-sm text-concrete-grey">Not itemized</p>;
+
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-concrete-grey">Quote breakdown</p>
+      <ul className="mt-2 flex flex-col gap-2 text-sm text-foundation-navy">
+        {quote.lines.map((quoteLine) => (
+          <li key={quoteLine.tenderItemId} className="flex items-start justify-between gap-3">
+            <span>{quoteLine.tenderItem.item ?? quoteLine.tenderItem.subcategory} ({quoteLine.tenderItem.quantity})</span>
+            <span className={`shrink-0 font-semibold ${quoteLine.available ? '' : 'text-attention'}`}>
+              {quoteLine.available ? `£${quoteLine.priceGbp}` : 'Cannot supply'}
+            </span>
+          </li>
+        ))}
+        {quote.charges.map((charge) => (
+          <li key={charge.id} className="flex items-start justify-between gap-3">
+            <span>{charge.description}</span>
+            <span className="shrink-0 font-semibold">£{charge.priceGbp}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 border-t border-slate-200 pt-2 text-sm font-semibold text-foundation-navy">Total: £{quote.priceGbp} excl. VAT</p>
+    </div>
+  );
+}
+
 function Detail({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div>
@@ -306,7 +330,7 @@ function DecisionActions({
   pendingCheckoutUrl?: string | null;
 }) {
   if (quote.status === 'SUBMITTED') {
-    return <Button onClick={() => onAccept(quote.id)} loading={busy}>Accept quote · £{quote.releaseFeeGbp} release fee</Button>;
+    return <Button onClick={() => onAccept(quote.id)} loading={busy}>Accept quote · £{quote.releaseFeeGbp} excl. VAT release fee</Button>;
   }
   if (quote.status === 'ACCEPTED' && isPendingPayment) {
     if (pendingCheckoutUrl) {

@@ -1,7 +1,7 @@
 import { prisma } from '@/server/data/prisma';
 import { buildQuoteReference } from '@/lib/identifiers';
 import { recordAuditEvent } from '@/server/audit/auditLog';
-import { ForbiddenError } from '@/server/auth/session';
+import { ForbiddenError, ValidationError } from '@/server/auth/session';
 import type { SubmitQuoteInput } from '@/lib/schemas/quote';
 import { quoteReceivedTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
@@ -30,15 +30,27 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
 
   await enforceContentModeration(retailerId, 'QUOTE_SUBMISSION', [
     { name: 'delivery information', value: input.deliveryInfo },
-    { name: 'accreditations', value: input.accreditations },
-    { name: 'supporting document name', value: input.supportingDocumentName },
-    { name: 'notes', value: input.notes },
+    ...input.charges.map((charge, index) => ({ name: `quote item ${index + 1} description`, value: charge.description })),
   ]);
 
   const tender = await prisma.tender.findUniqueOrThrow({
     where: { id: tenderId },
-    include: { client: { select: { email: true } } },
+    include: { client: { select: { email: true } }, items: { select: { id: true } } },
   });
+  if (tender.supplyDate && !input.deliveryDateConfirmed) {
+    throw new ValidationError('Confirm you can deliver on the requested supply date');
+  }
+  const submittedItemIds = input.lineItems.map((line) => line.tenderItemId);
+  const expectedItemIds = new Set(tender.items.map((item) => item.id));
+  if (
+    submittedItemIds.length !== tender.items.length
+    || new Set(submittedItemIds).size !== submittedItemIds.length
+    || submittedItemIds.some((itemId) => !expectedItemIds.has(itemId))
+  ) {
+    throw new ValidationError('Provide a price or mark each tender item unavailable');
+  }
+  const priceGbp = input.lineItems.reduce((total, line) => total + (line.available ? line.priceGbp : 0), 0)
+    + input.charges.reduce((total, charge) => total + charge.priceGbp, 0);
   const existingQuoteCount = await prisma.quote.count({ where: { tenderId } });
   const reference = buildQuoteReference(tender.reference, existingQuoteCount + 1);
 
@@ -47,14 +59,14 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
       reference,
       tenderId,
       retailerId,
-      priceGbp: input.priceGbp,
+      priceGbp,
       leadTimeDays: input.leadTimeDays,
+      deliveryDateConfirmed: input.deliveryDateConfirmed,
       deliveryInfo: input.deliveryInfo,
-      accreditations: input.accreditations,
-      supportingDocumentName: input.supportingDocumentName ?? null,
       validityDays: input.validityDays,
-      notes: input.notes,
       status: 'SUBMITTED',
+      lines: { create: input.lineItems },
+      charges: { create: input.charges },
     },
   });
 
@@ -102,11 +114,18 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
       reference: true,
       priceGbp: true,
       leadTimeDays: true,
+      deliveryDateConfirmed: true,
       deliveryInfo: true,
-      accreditations: true,
-      supportingDocumentName: true,
       validityDays: true,
-      notes: true,
+      lines: {
+        select: {
+          tenderItemId: true,
+          priceGbp: true,
+          available: true,
+          tenderItem: { select: { category: true, subcategory: true, item: true, quantity: true } },
+        },
+      },
+      charges: { select: { id: true, description: true, priceGbp: true } },
       status: true,
       submittedAt: true,
     },

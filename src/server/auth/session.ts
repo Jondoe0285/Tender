@@ -31,6 +31,13 @@ export class ForbiddenError extends Error {
   }
 }
 
+export class ValidationError extends Error {
+  constructor(message = 'Invalid request') {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
 /** Throws if there is no authenticated session, or the session role is not permitted. Fails closed. */
 export async function requireRole(...roles: SessionUser['role'][]): Promise<SessionUser> {
   const user = await getCurrentUser();

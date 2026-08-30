@@ -15,6 +15,7 @@ type Tender = {
   subcategory: string;
   location: string;
   closingDate: string;
+  supplyDate: string | null;
   description: string;
   items: { id: string; category: string; subcategory: string; quantity: string; description: string }[];
 };
@@ -24,11 +25,11 @@ type Quote = {
   reference: string;
   priceGbp: number;
   leadTimeDays: number;
+  deliveryDateConfirmed: boolean;
   deliveryInfo: string;
-  accreditations: string;
-  supportingDocumentName: string | null;
   validityDays: number;
-  notes: string;
+  lines: { tenderItemId: string; priceGbp: number | null; available: boolean; tenderItem: { category: string; subcategory: string; item: string | null; quantity: string } }[];
+  charges: { id: string; description: string; priceGbp: number }[];
   status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
   submittedAt: string;
   sponsoredPlacementActive?: boolean;
@@ -69,7 +70,7 @@ export default function ClientTenderDetailPage() {
           const release = await releaseResponse.json();
           if (release.status === 'PENDING') {
             setPendingPayment({ quoteId: acceptedQuote.id, paymentId: release.paymentId, checkoutUrl: release.checkoutUrl });
-            setMessage(`Your quote is accepted. Complete the £${release.amountGbp} release fee to share contact details.`);
+            setMessage(`Your quote is accepted. Pay £${release.totalAmountGbp} including VAT (£${release.amountGbp} fee plus £${release.vatGbp} VAT) to share contact details.`);
           } else if (release.status === 'CONFIRMED') {
             await loadContact(acceptedQuote.id);
           }
@@ -109,7 +110,7 @@ export default function ClientTenderDetailPage() {
     if (data.devMode) {
       setPendingPayment({ quoteId, paymentId: data.paymentId, checkoutUrl: data.checkoutUrl });
       setMessage(
-        `Quote accepted. A £${data.feeGbp} release fee is now due — this environment has no Stripe keys configured, use the dev payment simulation below.`
+        `Quote accepted. Pay £${data.totalAmountGbp} including VAT (£${data.feeGbp} fee plus £${data.vatGbp} VAT) — this environment has no Stripe keys configured, use the dev payment simulation below.`
       );
       await load();
     }
@@ -165,6 +166,7 @@ export default function ClientTenderDetailPage() {
           {tender.category} &middot; {tender.location} &middot; Closes{' '}
           {new Date(tender.closingDate).toLocaleDateString('en-GB')}
         </p>
+        {tender.supplyDate && <p className="mt-1 text-sm text-concrete-grey">Requested supply date: {new Date(tender.supplyDate).toLocaleDateString('en-GB')}</p>}
         {tender.items.length > 0 && (
           <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
             <p className="text-xs font-semibold uppercase tracking-wide text-concrete-grey">Additional items</p>

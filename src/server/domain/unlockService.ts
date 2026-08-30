@@ -110,7 +110,7 @@ export async function getUnlockedTenderForRetailer(retailerId: string, tenderId:
       quantity: true,
       urgency: true,
       closingDate: true,
-      budget: true,
+      supplyDate: true,
       requirements: true,
       description: true,
       status: true,

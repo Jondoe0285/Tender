@@ -2,9 +2,11 @@ import { PrismaClient, Role } from '@prisma/client';
 import { hash } from 'bcryptjs';
 
 const prisma = new PrismaClient();
-const DEVELOPMENT_PASSWORD = 'TradeTenderDev!2026';
+const DEFAULT_SANDBOX_PASSWORD = 'TradeTenderDev!2026';
 const platformOwnerEmail = process.env.PLATFORM_OWNER_EMAIL?.trim().toLowerCase();
 const platformOwnerPassword = process.env.PLATFORM_OWNER_PASSWORD;
+const isDeployedSandbox = process.env.TRADE_TENDER_ENV === 'sandbox';
+const isSandboxSeedEnabled = process.env.SANDBOX_SEED_ENABLED === 'true';
 
 async function upsertRoleMembership(userId: string, role: Role) {
   await prisma.userRole.upsert({
@@ -15,14 +17,22 @@ async function upsertRoleMembership(userId: string, role: Role) {
 }
 
 async function main() {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('Development accounts must not be seeded in production.');
+  if (process.env.NODE_ENV === 'production' && !(isDeployedSandbox && isSandboxSeedEnabled)) {
+    throw new Error('Sandbox accounts may only be seeded locally or in an explicitly enabled sandbox environment.');
   }
   if (!platformOwnerEmail || !platformOwnerPassword) {
     throw new Error('PLATFORM_OWNER_EMAIL and PLATFORM_OWNER_PASSWORD are required to seed the platform owner.');
   }
 
-  const developmentPasswordHash = await hash(DEVELOPMENT_PASSWORD, 12);
+  const configuredSandboxPassword = process.env.SANDBOX_USER_PASSWORD?.trim();
+  const sandboxPassword = isDeployedSandbox
+    ? configuredSandboxPassword
+    : configuredSandboxPassword || DEFAULT_SANDBOX_PASSWORD;
+  if (!sandboxPassword) {
+    throw new Error('SANDBOX_USER_PASSWORD is required when seeding a deployed sandbox environment.');
+  }
+
+  const sandboxPasswordHash = await hash(sandboxPassword, 12);
   const platformOwnerPasswordHash = await hash(platformOwnerPassword, 12);
   const superUser = await prisma.user.upsert({
     where: { email: platformOwnerEmail },
@@ -52,7 +62,7 @@ async function main() {
   const client = await prisma.user.upsert({
     where: { email: 'client@example.test' },
     update: {
-      passwordHash: developmentPasswordHash,
+      passwordHash: sandboxPasswordHash,
       role: Role.CLIENT,
       contactName: 'Demo Client',
       contactPhone: '07123456789',
@@ -62,7 +72,7 @@ async function main() {
     },
     create: {
       email: 'client@example.test',
-      passwordHash: developmentPasswordHash,
+      passwordHash: sandboxPasswordHash,
       role: Role.CLIENT,
       contactName: 'Demo Client',
       contactPhone: '07123456789',
@@ -85,7 +95,7 @@ async function main() {
   const retailer = await prisma.user.upsert({
     where: { email: 'retailer@example.test' },
     update: {
-      passwordHash: developmentPasswordHash,
+      passwordHash: sandboxPasswordHash,
       role: Role.RETAILER,
       contactName: 'Demo Retailer',
       contactPhone: '07987654321',
@@ -95,7 +105,7 @@ async function main() {
     },
     create: {
       email: 'retailer@example.test',
-      passwordHash: developmentPasswordHash,
+      passwordHash: sandboxPasswordHash,
       role: Role.RETAILER,
       contactName: 'Demo Retailer',
       contactPhone: '07987654321',
@@ -123,7 +133,7 @@ async function main() {
     },
   });
 
-  console.log('Seeded local Super User, Client, and Retailer development accounts.');
+  console.log('Seeded persistent sandbox Client and Retailer accounts and the platform owner.');
 }
 
 main()

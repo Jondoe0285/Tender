@@ -94,6 +94,10 @@ The platform must preserve anonymity and staged disclosure:
 - **SEC-048:** Payment records shall store only necessary metadata and provider references; prohibited payment secrets must not be stored.
 - **SEC-049:** Refunds, disputes, failed payments, and chargebacks shall have explicit states and documented impact on access and release.
 - **SEC-050:** Every payment event and payment-driven access change shall produce an audit record.
+- **SEC-051:** VAT percentage, VAT amount, and the charged total shall be calculated server-side and shall never be accepted from the client.
+- **SEC-052:** The VAT amount, percentage, and total charged shall be stored immutably with the payment so historic records remain reconcilable after a rate change.
+- **SEC-053:** Webhook verification shall confirm the amount charged equals the stored VAT-inclusive total before a payment is treated as confirmed.
+- **SEC-054:** VAT percentage changes shall be restricted to the Owner and shall be audit logged.
 
 ## 8. Database and Data Access
 
@@ -141,6 +145,9 @@ The platform must preserve anonymity and staged disclosure:
 - **SEC-094:** Audit records shall be append-only or otherwise protected against unauthorized alteration.
 - **SEC-095:** Audit access shall be limited to authorized Super Users and operational systems.
 - **SEC-096:** Monitoring shall identify repeated parties, unusual payment patterns, duplicate or near-duplicate tenders, repeated cancellations, excessive access failures, and suspicious release activity.
+- **SEC-097:** Attempts to share contact details, business identifiers, or off-platform contact routes shall be blocked, recorded, and surfaced to the Super User for review.
+- **SEC-098:** Repeated confidentiality-bypass attempts by the same actor shall be raised as a high-severity flag.
+- **SEC-099:** Unlocking tender detail without submitting quotes shall be monitored as a possible project-data harvesting or off-platform contact pattern.
 - **SEC-097:** Alerts shall have defined ownership, severity, investigation, escalation, and retention procedures.
 
 ## 12. Data Retention and Privacy
@@ -161,6 +168,7 @@ The platform must preserve anonymity and staged disclosure:
 - **SEC-114:** Production releases shall pass type checks, relevant tests, and a production build before deployment.
 - **SEC-115:** Database backup and recovery readiness shall be verified before destructive migrations or releases.
 - **SEC-116:** Post-deployment health checks shall verify authentication, role isolation, payment controls, and contact-release privacy.
+- **SEC-117:** A scheduled maintenance pipeline shall run dependency vulnerability audits, schema-drift checks, and the full validation suite so degradation is detected without a code change.
 - **SEC-117:** Security-relevant configuration changes shall be reviewed and auditable.
 
 ## 14. Security Testing Requirements

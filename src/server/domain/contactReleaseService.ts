@@ -8,7 +8,7 @@ import { contactReleaseTemplate, quoteAcceptedTemplate } from '@/server/notifica
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { getPurchasedRetentionDeadline } from '@/server/domain/retentionService';
 
-type AcceptOutcome = { status: 'PAYMENT_REQUIRED' | 'RELEASED_WITH_CREDIT'; paymentId: string; checkoutUrl: string | null; devMode: boolean; feeGbp: number; creditsLeft?: number };
+type AcceptOutcome = { status: 'PAYMENT_REQUIRED' | 'RELEASED_WITH_CREDIT'; paymentId: string; checkoutUrl: string | null; devMode: boolean; feeGbp: number; vatGbp: number; totalAmountGbp: number; creditsLeft?: number };
 
 /** Accepting a quote enters a pending release-fee state — no contact data is exposed yet (SEC-035). */
 export async function acceptQuote(clientId: string, quoteId: string): Promise<AcceptOutcome> {
@@ -21,6 +21,8 @@ export async function acceptQuote(clientId: string, quoteId: string): Promise<Ac
       checkoutUrl: quote.releasePayment.stripeCheckoutUrl,
       devMode: !quote.releasePayment.stripeCheckoutUrl,
       feeGbp: quote.releasePayment.amountGbp,
+      vatGbp: quote.releasePayment.vatGbp,
+      totalAmountGbp: quote.releasePayment.totalAmountGbp,
     };
   }
   if (quote.status !== 'SUBMITTED' && quote.status !== 'ACCEPTED') throw new ForbiddenError('Quote is not in a state that can be accepted');
@@ -69,7 +71,7 @@ export async function acceptQuote(clientId: string, quoteId: string): Promise<Ac
         metadata: { tenderId: quote.tenderId, paymentId: creditPayment.id, waivedFeeGbp: releaseFeeGbp },
       });
       await finalizeContactRelease(clientId, quoteId, creditPayment.id);
-      return { status: 'RELEASED_WITH_CREDIT', paymentId: creditPayment.id, checkoutUrl: null, devMode: false, feeGbp: 0, creditsLeft: clientCompanyMembership!.company.releaseCreditsLeft - 1 };
+      return { status: 'RELEASED_WITH_CREDIT', paymentId: creditPayment.id, checkoutUrl: null, devMode: false, feeGbp: 0, vatGbp: 0, totalAmountGbp: 0, creditsLeft: clientCompanyMembership!.company.releaseCreditsLeft - 1 };
     }
   }
 
@@ -80,7 +82,7 @@ export async function acceptQuote(clientId: string, quoteId: string): Promise<Ac
     // A concurrent accept already created the release payment (Payment.quoteId is unique) — return it instead of failing.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       const concurrent = await prisma.payment.findUnique({ where: { quoteId } });
-      if (concurrent) return { status: 'PAYMENT_REQUIRED', paymentId: concurrent.id, checkoutUrl: concurrent.stripeCheckoutUrl, devMode: !concurrent.stripeCheckoutUrl, feeGbp: concurrent.amountGbp };
+      if (concurrent) return { status: 'PAYMENT_REQUIRED', paymentId: concurrent.id, checkoutUrl: concurrent.stripeCheckoutUrl, devMode: !concurrent.stripeCheckoutUrl, feeGbp: concurrent.amountGbp, vatGbp: concurrent.vatGbp, totalAmountGbp: concurrent.totalAmountGbp };
     }
     throw error;
   }

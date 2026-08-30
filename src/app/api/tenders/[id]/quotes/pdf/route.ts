@@ -15,6 +15,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       quotes: {
         where: { status: { not: 'REJECTED' } },
         orderBy: { priceGbp: 'asc' },
+        include: { lines: { include: { tenderItem: { select: { item: true, subcategory: true, quantity: true } } } }, charges: true },
       },
     },
   });
@@ -64,12 +65,16 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     y -= 28;
     addText(quote.reference, 40, 11, true);
     y -= 18;
-    addText(`Price: £${quote.priceGbp} · Lead time: ${quote.leadTimeDays} days · Valid: ${quote.validityDays} days`, 40, 10);
+    addText(`Price: £${quote.priceGbp} excl. VAT · Lead time: ${quote.leadTimeDays} days · Valid: ${quote.validityDays} days`, 40, 10);
     y -= 16;
+    if (tender.supplyDate) addWrapped(`Requested supply date: ${tender.supplyDate.toLocaleDateString('en-GB')} · Confirmed: ${quote.deliveryDateConfirmed ? 'Yes' : 'No'}`, 40);
+    for (const quoteLine of quote.lines) {
+      addWrapped(`${quoteLine.tenderItem.item ?? quoteLine.tenderItem.subcategory} (${quoteLine.tenderItem.quantity}): ${quoteLine.available ? `£${quoteLine.priceGbp} excl. VAT` : 'Cannot supply'}`, 40);
+    }
+    for (const charge of quote.charges) {
+      addWrapped(`${charge.description}: £${charge.priceGbp} excl. VAT`, 40);
+    }
     addWrapped(`Delivery: ${quote.deliveryInfo}`, 40);
-    addWrapped(`Accreditations: ${quote.accreditations}`, 40);
-    addWrapped(`Notes: ${quote.notes}`, 40);
-    addWrapped(`Supporting document: ${quote.supportingDocumentName ?? 'None listed'}`, 40);
     y -= 8;
   }
 

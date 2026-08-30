@@ -6,7 +6,7 @@ export function SiteFooter() {
     <footer className="mt-auto border-t-4 border-safety-amber bg-foundation-navy px-6 py-10 text-sm text-site-white/75 sm:px-10">
       <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.2fr_1fr_1fr]">
         <div>
-          <div className="w-56 bg-site-white p-2"><TradeTenderLogo /></div>
+          <div className="w-56"><TradeTenderLogo variant="dark" /></div>
           <p className="mt-5 max-w-xl leading-relaxed">
             Trade Tender is a connection and tender-management platform. We do not supply, contract,
             broker, or guarantee the final agreement between Clients and Retailers.

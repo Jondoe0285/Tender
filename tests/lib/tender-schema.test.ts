@@ -5,7 +5,8 @@ import { buildRetailerTenderSummary } from '../../src/server/domain/tenderServic
 import { getBroadLocation, retailerCoversTenderLocation } from '../../src/lib/geography';
 import { isQuoteRetentionLocked } from '../../src/server/domain/quoteService';
 import { getPurchasedRetentionDeadline, getUnpurchasedQuoteCutoff } from '../../src/server/domain/retentionService';
-import { calculatePercentageFee } from '../../src/server/domain/platformSettings';
+import { calculatePercentageFee, calculateVatGbp, buildPaymentAmounts } from '../../src/server/domain/platformSettings';
+import { getFinancialQuarter } from '../../src/server/domain/analyticsService';
 
 test('removes raw requirement detail from pre-unlock retailer summaries', () => {
   const summary = buildRetailerTenderSummary('Full specification: 40mm concrete, 3-week delivery window, site access required');
@@ -96,6 +97,29 @@ test('uses separate percentage bands at the £10,000 quote boundary', () => {
   assert.equal(calculatePercentageFee(9999, 1.234, 4), 123.38);
 });
 
+test('calculates VAT to the nearest penny', () => {
+  assert.equal(calculateVatGbp(10, 20), 2);
+  assert.equal(calculateVatGbp(12.34, 20), 2.47);
+});
+
+test('charges a gross total that matches the fee and VAT pence exactly', () => {
+  const standard = buildPaymentAmounts(10, 20);
+  assert.deepEqual([standard.amountGbp, standard.vatGbp, standard.totalAmountGbp], [10, 2, 12]);
+
+  // A percentage release fee can hold a value that floors incorrectly in floating point.
+  const percentageFee = buildPaymentAmounts(123.38, 20);
+  assert.equal(percentageFee.netPence, 12338);
+  assert.equal(percentageFee.netPence + percentageFee.vatPence, Math.round(percentageFee.totalAmountGbp * 100));
+
+  const zeroRated = buildPaymentAmounts(10, 0);
+  assert.deepEqual([zeroRated.vatGbp, zeroRated.totalAmountGbp], [0, 10]);
+});
+
+test('uses UK financial quarters for VAT reporting', () => {
+  assert.deepEqual(getFinancialQuarter(new Date('2026-04-01T00:00:00.000Z')).label, 'Q1 2026/27');
+  assert.deepEqual(getFinancialQuarter(new Date('2027-01-31T00:00:00.000Z')).label, 'Q4 2026/27');
+});
+
 test('accepts a valid structured construction tender', () => {
   const result = createTenderSchema.safeParse({
     projectName: 'Warehouse concrete supply',
@@ -105,9 +129,65 @@ test('accepts a valid structured construction tender', () => {
     quantity: '20 tonnes',
     urgency: 'standard',
     closingDate: '2099-08-27',
-    budget: '1200',
     requirements: ['Delivery to site required'],
     description: 'Twenty tonnes of aggregate with delivery to the project site.',
+  });
+
+  assert.equal(result.success, true);
+});
+
+test('accepts a tender without specification notes', () => {
+  const result = createTenderSchema.safeParse({
+    projectName: 'Ready mix concrete delivery',
+    category: 'Materials',
+    subcategory: 'Cement, Concrete and Mortar',
+    item: 'Ready-mix concrete',
+    location: 'Leeds LS10 2AB',
+    quantity: '10 m³',
+    urgency: 'standard',
+    closingDate: '2099-08-27',
+    description: '',
+    items: [{
+      category: 'Plant Hire',
+      subcategory: 'Excavators',
+      item: 'Mini excavators approx. 1.5-3 tonnes',
+      quantity: '1 unit',
+      description: '',
+    }],
+  });
+
+  assert.equal(result.success, true);
+});
+
+test('rejects a supply date in the past', () => {
+  const result = createTenderSchema.safeParse({
+    projectName: 'Ready mix concrete delivery',
+    category: 'Materials',
+    subcategory: 'Cement, Concrete and Mortar',
+    item: 'Ready-mix concrete',
+    location: 'Leeds LS10 2AB',
+    quantity: '10 m³',
+    urgency: 'standard',
+    closingDate: '2099-08-27',
+    supplyDate: '2020-01-01',
+    description: '',
+  });
+
+  assert.equal(result.success, false);
+});
+
+test('accepts selectable quote requirements', () => {
+  const result = createTenderSchema.safeParse({
+    projectName: 'Operated excavator hire',
+    category: 'Plant Hire',
+    subcategory: 'Excavators',
+    item: 'Mini excavators approx. 1.5-3 tonnes',
+    location: 'Leeds LS10 2AB',
+    quantity: '1 unit',
+    urgency: 'standard',
+    closingDate: '2099-08-27',
+    requirements: ['Driver or operator required', 'Timed delivery required', 'Site induction required'],
+    description: 'An operated mini excavator is required for a groundworks package.',
   });
 
   assert.equal(result.success, true);
