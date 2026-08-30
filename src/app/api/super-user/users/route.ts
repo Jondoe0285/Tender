@@ -6,6 +6,37 @@ import { isManagedAccountRole } from '@/lib/admin-permissions';
 import { hashPassword } from '@/server/auth/password';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { registerSchema } from '@/lib/schemas/register';
+import { createPasswordResetToken, PASSWORD_RESET_EXPIRY_LABEL } from '@/server/auth/passwordReset';
+import { sendTransactionalEmail } from '@/server/notifications/resend';
+import { accountCreatedByAdminTemplate, appUrl } from '@/server/notifications/emailTemplates';
+
+/**
+ * Invites the account holder to set their own password. Delivery failure must not roll back
+ * the account, so the outcome is recorded in the audit log and returned to the Super User.
+ */
+async function sendAccountInvitation(user: { id: string; email: string; contactName: string }, role: 'CLIENT' | 'RETAILER', companyName: string | undefined, actorId: string) {
+  const token = await createPasswordResetToken(user.id);
+  const result = await sendTransactionalEmail(
+    user.email,
+    accountCreatedByAdminTemplate({
+      role,
+      contactName: user.contactName,
+      companyName,
+      resetLink: appUrl(`/reset-password?token=${encodeURIComponent(token)}`),
+      expiresIn: PASSWORD_RESET_EXPIRY_LABEL,
+    })
+  ).catch((error: unknown) => ({ sent: false as const, reason: error instanceof Error ? error.message : 'Email delivery failed' }));
+
+  await recordAuditEvent({
+    actorId,
+    action: result.sent ? 'USER_INVITATION_SENT' : 'USER_INVITATION_FAILED',
+    targetType: 'User',
+    targetId: user.id,
+    metadata: { email: user.email, role },
+  });
+
+  return result.sent;
+}
 
 export async function POST(request: Request) {
   const originError = rejectCrossOrigin(request);
@@ -68,7 +99,9 @@ export async function POST(request: Request) {
       metadata: { role: input.role, email: input.email },
     });
 
-    return NextResponse.json({ status: 'role_added', accountId: existing.id }, { status: 200 });
+    const roleInvitationSent = await sendAccountInvitation(existing, input.role, input.companyName, admin.id);
+
+    return NextResponse.json({ status: 'role_added', accountId: existing.id, invitationSent: roleInvitationSent }, { status: 200 });
   }
 
   const passwordHash = await hashPassword(input.password);
@@ -103,5 +136,7 @@ export async function POST(request: Request) {
     metadata: { role: user.role, email: user.email },
   });
 
-  return NextResponse.json({ status: 'created', accountId: user.id }, { status: 201 });
+  const invitationSent = await sendAccountInvitation(user, input.role, input.companyName, admin.id);
+
+  return NextResponse.json({ status: 'created', accountId: user.id, invitationSent }, { status: 201 });
 }

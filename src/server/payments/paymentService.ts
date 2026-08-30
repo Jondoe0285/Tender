@@ -2,6 +2,7 @@ import { prisma } from '@/server/data/prisma';
 import { getStripeClient, isStripeConfigured } from '@/server/payments/stripeClient';
 import type { PaymentType } from '@prisma/client';
 import { buildPaymentAmounts, getClientReleaseFeeGbp, getPaymentFeeGbp, getVatPercentage } from '@/server/domain/platformSettings';
+import { appUrl } from '@/server/config/appUrl';
 
 type CreatePaymentResult = {
   paymentId: string;
@@ -75,8 +76,8 @@ export async function createPayment(params: {
         quantity: 1,
       }] : []),
     ],
-    success_url: `${process.env.NEXTAUTH_URL}/payment/success?payment_id=${payment.id}`,
-    cancel_url: `${process.env.NEXTAUTH_URL}/payment/cancelled?payment_id=${payment.id}`,
+    success_url: appUrl(`/payment/success?payment_id=${payment.id}`),
+    cancel_url: appUrl(`/payment/cancelled?payment_id=${payment.id}`),
     metadata: { paymentId: payment.id, vatPercentage: String(vatPercentage) },
   });
 

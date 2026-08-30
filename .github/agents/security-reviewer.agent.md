@@ -33,7 +33,7 @@ You review Trade Tender changes for exploitable security and privacy defects bef
 - Authentication and session handling on protected routes.
 - Server-side authorization and role checks for Super User, Client, and Retailer operations.
 - Input validation, output encoding, and protection against injection and insecure direct object references.
-- Azure SQL access through parameterised queries and least-privilege data access.
+- PostgreSQL access through parameterised queries and least-privilege data access.
 - Stripe payment verification, webhook signature validation, idempotency, and replay handling.
 - Payment-gated contact release: never expose Client or Retailer details before the required payment trigger is confirmed server-side.
 - Audit logging for payment and contact-release events without logging secrets or unnecessary personal data.

@@ -49,7 +49,7 @@ You are responsible for secure server-side behavior in Trade Tender, a construct
 
 ## Data And Payments
 
-- Use Azure SQL Database as the persistence boundary and create a migration for every schema change.
+- Use PostgreSQL as the persistence boundary and create a migration for every schema change.
 - Use transactions for operations that update payment state, release contacts, or write related audit records.
 - Integrate Stripe using server-side secrets and verify webhook signatures before processing events.
 - Make payment and webhook handling idempotent and reconcile state from trusted Stripe events.

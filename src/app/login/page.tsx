@@ -62,6 +62,7 @@ function LoginForm() {
       {searchParams.get('verification') === 'pending' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Check your email and use the verification link to activate your account.</p>}
       {searchParams.get('verification') === 'verified' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your email address is verified. You can now sign in.</p>}
       {searchParams.get('verification') === 'invalid' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">This verification link is invalid or has expired. Register again with the same details to request a new link.</p>}
+      {searchParams.get('password') === 'set' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your password is set. Sign in with your new password.</p>}
 
       <Card className="mt-8">
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">

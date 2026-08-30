@@ -236,7 +236,7 @@ Indicative monthly costs:
 | Cost area | Planning assumption | Indicative cost |
 | --- | --- | ---: |
 | GitHub Enterprise and GitHub Copilot | One owner/developer account | Approximately £50/month |
-| Azure hosting | App Service, managed database, Blob Storage, monitoring, backups, and load-test readiness | Approximately £125–£250/month |
+| Render hosting | Web service, managed PostgreSQL, object storage, monitoring, backups, and load-test readiness | Approximately £125–£250/month |
 | Resend email service | 50,000 transactional emails per month | Approximately £16/month |
 | **Indicative monthly total** | Excludes staff, development, marketing, insurance, legal, tax, and payment processing | **£190–£316/month** |
 

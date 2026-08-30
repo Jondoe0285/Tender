@@ -101,7 +101,7 @@ The platform must preserve anonymity and staged disclosure:
 
 ## 8. Database and Data Access
 
-- **SEC-060:** Azure SQL access shall use parameterised queries and least-privilege credentials.
+- **SEC-060:** PostgreSQL access shall use parameterised queries and least-privilege credentials.
 - **SEC-061:** Application roles and database permissions shall be separated where practical.
 - **SEC-062:** Schema changes shall use reviewed, versioned, repeatable migrations.
 - **SEC-063:** Migrations shall preserve authorization, uniqueness, referential integrity, payment consistency, and audit requirements.

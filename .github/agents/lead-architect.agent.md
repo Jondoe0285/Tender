@@ -30,7 +30,7 @@ You are the lead architect for Trade Tender, a mobile-first construction tenderi
 ## Technology Boundaries
 
 - Use Next.js, TypeScript, and Tailwind CSS.
-- Target Azure App Service and Azure SQL Database.
+- Target Render hosting and Render PostgreSQL.
 - Use Stripe for payments and GitHub Actions for CI/CD.
 - TypeScript only. Do not introduce JavaScript application files.
 

@@ -134,7 +134,7 @@ export async function POST(request: Request) {
   }
   await recordAuditEvent({ actorId: null, action: 'EMAIL_VERIFICATION_SENT', targetType: 'User', targetId: user.id });
 
-  const notificationRecipient = process.env.REGISTRATION_NOTIFICATION_EMAIL ?? 'info@sinclairsafetysolutions.co.uk';
+  const notificationRecipient = process.env.REGISTRATION_NOTIFICATION_EMAIL;
   if (notificationRecipient) {
     const emailResult = await sendTransactionalEmail(
       notificationRecipient,

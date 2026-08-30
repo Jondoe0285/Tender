@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ main, staging ]
   push:
-    branches: [ main ]
+    branches: [ main, staging ]
 
 jobs:
   validate:
@@ -15,14 +15,29 @@ jobs:
       contents: read
     env:
       NODE_ENV: test
-      DATABASE_URL: file:./dev.db
+      DATABASE_URL: postgresql://tender:tender@localhost:5432/tender_test?schema=public
       NEXTAUTH_SECRET: test-secret
       NEXTAUTH_URL: http://localhost:3000
       RESEND_API_KEY: test-key
-      RESEND_FROM_EMAIL: no-reply@example.com
+      EMAIL_FROM: no-reply@example.com
       STRIPE_SECRET_KEY: sk_test_dummy
       STRIPE_WEBHOOK_SECRET: whsec_dummy
       RETENTION_JOB_SECRET: test-secret
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tender
+          POSTGRES_PASSWORD: tender
+          POSTGRES_DB: tender_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout repository
@@ -37,6 +52,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+
       - name: Lint
         run: npm run lint
 
@@ -48,3 +66,6 @@ jobs:
 
       - name: Production build
         run: npm run build
+        env:
+          # Keeps CI builds off the source map upload path.
+          SENTRY_AUTH_TOKEN: ''

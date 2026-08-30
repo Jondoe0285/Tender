@@ -3,7 +3,7 @@
 ## Technology
 
 - Use Next.js, TypeScript, and Tailwind CSS for the application.
-- Target Azure App Service with Azure SQL Database for deployment and persistence.
+- Target Render for hosting with Render PostgreSQL for persistence.
 - Use Stripe for payments and GitHub Actions for CI/CD.
 - TypeScript only. Do not add JavaScript application files.
 

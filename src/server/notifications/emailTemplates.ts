@@ -1,3 +1,5 @@
+import { appUrl as resolveAppUrl } from '@/server/config/appUrl';
+
 const NAVY = '#0E1C2E';
 const AMBER = '#F5A524';
 const STEEL = '#1D3D5C';
@@ -26,7 +28,7 @@ function detailRows(rows: Array<[string, string]>): string {
 }
 
 export function appUrl(path: string): string {
-  return `${process.env.NEXTAUTH_URL ?? 'http://localhost:3000'}${path}`;
+  return resolveAppUrl(path);
 }
 
 export function retailerInvitationTemplate(input: { companyName: string; inviteLink: string }): EmailTemplate {
@@ -112,6 +114,38 @@ export function emailVerificationTemplate(input: { verificationLink: string }): 
       intro: 'Confirm your email address to activate your Trade Tender account.',
       body: '<p style="font-size:14px;line-height:1.6">This verification link expires in 24 hours. If you did not create this account, no action is required.</p>',
       action: { label: 'Verify email address', href: input.verificationLink },
+    }),
+  };
+}
+
+export function configurationTestTemplate(input: { environment: string; sentAt: Date }): EmailTemplate {
+  return {
+    subject: `Trade Tender email delivery test (${input.environment})`,
+    html: layout({
+      eyebrow: 'Delivery test',
+      title: 'Email delivery is working',
+      intro: 'This message confirms the Trade Tender email configuration for this environment.',
+      body: detailRows([
+        ['Environment', input.environment],
+        ['Sent at', input.sentAt.toISOString()],
+      ]) + '<p style="font-size:14px;line-height:1.6">No account, tender, quote, or contact information is included in this test.</p>',
+    }),
+  };
+}
+
+export function accountCreatedByAdminTemplate(input: { role: 'CLIENT' | 'RETAILER'; contactName: string; companyName?: string; resetLink: string; expiresIn: string }): EmailTemplate {
+  return {
+    subject: 'Your Trade Tender account is ready',
+    html: layout({
+      eyebrow: 'Account created',
+      title: 'Set a password to activate your account',
+      intro: `A Trade Tender ${input.role === 'CLIENT' ? 'Client' : 'Retailer'} account has been created for you by the Trade Tender team.`,
+      body: detailRows([
+        ['Account type', input.role === 'CLIENT' ? 'Client' : 'Retailer'],
+        ['Contact name', input.contactName],
+        ...(input.companyName ? [['Business', input.companyName] as [string, string]] : []),
+      ]) + `<p style="font-size:14px;line-height:1.6">Use the button below to choose your own password. The link expires in ${escapeHtml(input.expiresIn)}. No password is included in this message.</p>`,
+      action: { label: 'Set your password', href: input.resetLink },
     }),
   };
 }

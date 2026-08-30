@@ -1,5 +1,3 @@
-| `RESEND_API_KEY` | Server-only Resend API key. Never commit this value. |
-| `RESEND_FROM_EMAIL` | Sender using a verified Resend domain/address. |
 # Trade Tender
 
 A UK construction tendering marketplace connecting Clients with registered Retailers, built with
@@ -38,11 +36,15 @@ Retailer profile and team management is available from the Retailer workspace, i
 details, operational counties, service categories, master-user designation, and team permissions.
 Transactional email uses a central corporate template library for retailer invitations, matched
 tender alerts, quote events, payment events, contact release, account updates, password reset, and
-failed-payment recovery. Resend delivery is server-only and controlled by environment variables.
-New account registrations notify `info@sinclairsafetysolutions.co.uk` when Resend is configured;
-the notification contains role and contact details but never a password or authentication secret.
+failed-payment recovery. Resend delivery is server-only and controlled by environment variables:
+`RESEND_API_KEY` and `EMAIL_FROM` are set per environment, with no hardcoded sender fallback.
+New account registrations notify the address in `REGISTRATION_NOTIFICATION_EMAIL` when Resend is
+configured; the notification contains role and contact details but never a password or
+authentication secret.
 New Client and Retailer accounts receive a single-use email-verification link that expires after 24
-hours. Unverified accounts cannot sign in
+hours. Unverified accounts cannot sign in. Accounts created by a Super User instead receive a
+single-use password-reset link so the holder sets their own password — see
+[Account creation and password reset](#account-creation-and-password-reset).
 Super Users can edit categories, payment fees, Client acceptance fee mode, membership tiers,
 annual subscription plans, and Retailer assignments. Client acceptance fees support a fixed amount
 or separate percentage rules for quote values up to £10,000 and above £10,000. Retailers and Clients
@@ -52,7 +54,7 @@ unique Trade Tender ID for retailer quoting, and retention jobs delete unpurchas
 documents after 30 days while purchased records are retained for five years.
 Super Users can also activate a paid sponsored-placement product for Retailers; purchased placements
 appear in a separate labelled area on Client quote pages and do not change quote ranking or sorting.
-| `REGISTRATION_NOTIFICATION_EMAIL` | Internal recipient for new-account notifications; defaults to `info@sinclairsafetysolutions.co.uk` in `.env.example`. |
+| `REGISTRATION_NOTIFICATION_EMAIL` | Internal recipient for new-account notifications. No default — the notification is skipped when unset. |
 
 Within the Super User role, an **Owner** flag gates the most critical controls — fees, adspace,
 membership tiers, sponsored placement, and creating or managing other Super Userlogout button still does not go to landing accounts — from the
@@ -67,10 +69,101 @@ Settings.
 A structured production-readiness review (architecture, security, backend correctness, QA, brand/UI,
 and deployment) was completed on 2026-08-28; see
 [docs/PRODUCTION-READINESS-REVIEW.md](docs/PRODUCTION-READINESS-REVIEW.md) for fixed findings and
-remaining outstanding items, most notably the unresolved Azure SQL migration path and missing CI/CD
-deploy pipeline.
+remaining outstanding items. The Azure SQL migration path and missing deploy pipeline recorded there
+were superseded on 2026-08-30 by the move to Render with a single PostgreSQL datasource.
 
 See [Outstanding Tasks](#outstanding-tasks) for the remaining production-hardening work.
+
+## Action Required Before The Next Deploy
+
+Nothing in this list can be done from the repository — each needs a value or a decision from the
+platform owner. The first item will break a deploy if skipped.
+
+### 1. Set `NEXTAUTH_URL` on both Render services — blocking
+
+The application now throws when this is missing rather than guessing a default, so a service without
+it fails its build. That is deliberate: the previous silent fallback pointed verification and
+contact-release links at `localhost`. Values are in
+[Environment origins](#environment-origins).
+
+### 2. Set the remaining per-service variables in the Render dashboard
+
+Everything marked `sync: false` in [render.yaml](render.yaml) is unset by design.
+
+| Variable | Production | Staging |
+| --- | --- | --- |
+| `NEXTAUTH_URL` | `https://trade-tender.onrender.com` | `https://tender-m0xw.onrender.com` |
+| `DATABASE_URL` | its **own** database — see item 3 | linked to `tender-db` |
+| `STRIPE_SECRET_KEY` | live key | test key |
+| `STRIPE_WEBHOOK_SECRET` | from the production webhook | from a **separate** staging webhook |
+| `RESEND_API_KEY` / `EMAIL_FROM` | verified sending domain | separate key and sender |
+| `REGISTRATION_NOTIFICATION_EMAIL` | internal recipient | internal recipient |
+| `RETENTION_JOB_SECRET` | long random string | long random string |
+| `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_DSN` | project DSN | project DSN |
+| `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` | build-time, for source maps | optional |
+| `NEXT_PUBLIC_SUPPORT_EMAIL` | optional; links hide when unset | optional |
+
+### 3. Give production its own database
+
+[render.yaml](render.yaml) intentionally does **not** wire production to `tender-db`. Only one
+database is declared, and auto-linking production to it would point live traffic at the instance
+staging migrates and seeds. Provision a separate paid instance and set its connection string on the
+production service. The free plan also expires after 30 days, so it is not viable for production.
+
+### 4. Register two Stripe webhooks, not one
+
+Each environment needs its own endpoint at `https://<host>/api/webhooks/stripe`, producing a
+different signing secret. Sharing one secret makes signature verification fail on the other
+environment, and payments then stop confirming with no visible error.
+
+### 5. Verify the Resend sending domain
+
+Until the DNS records are in place, verification and contact-release emails will bounce or be
+filtered, which blocks registration entirely. `EMAIL_FROM` must use that verified domain; there is
+no fallback sender, so an unset value means nothing is sent.
+
+Confirm each environment with [Email delivery test](#email-delivery-test) once the keys are in
+place. It distinguishes an unset variable (`503`) from an unverified domain (`502`).
+
+If you previously set `RESEND_FROM_EMAIL` in Render, delete it — the application no longer reads it,
+and leaving it in place makes email look configured when it is not.
+
+### 6. Point the retention job at production
+
+The purge still runs from GitHub Actions. Update the `RETENTION_JOB_URL` repository secret to the
+production host's `/api/internal/retention`, and set `RETENTION_JOB_SECRET` to match the service.
+
+### 7. Confirm the Render blueprint adopts the existing services
+
+Both services were created by hand, so the first blueprint sync must *adopt* them. Check that Render
+offers to **update** `Trade Tender` and `Tender Staging` rather than create them — creating would
+give you duplicates.
+
+## Decisions Made On Your Behalf
+
+Points worth reviewing, each a deliberate trade-off rather than an oversight.
+
+- **`next build` no longer type-checks or lints.** With Sentry wired in, the in-build type-check
+  worker died and the build exited `0` with no output — a silent failure. `typescript.ignoreBuildErrors`
+  and `eslint.ignoreDuringBuilds` are set in [next.config.mjs](next.config.mjs), and `npm run type-check`
+  and `npm run lint` were added to the Render build command so the gate still runs on every deploy.
+  Revert if Render's build environment proves to have more memory than the dev container.
+- **Sentry runs with errors and tracing only.** Session Replay, logging, profiling and the
+  `dataCollection` option are all switched off, and `includeLocalVariables` is `false`. Each of them
+  would capture DOM content, HTTP bodies or server locals — exactly where pre-release Client and
+  Retailer contact details live. Enabling any of them needs a deliberate masking review first.
+- **Production and staging report to Sentry as separate environments** via `SENTRY_ENVIRONMENT`.
+- **Partner links in the footer stay hardcoded.** They are fixed third-party sites, identical in
+  every environment. Only the support address moved to configuration.
+
+## Known Gaps
+
+- **Attachments have nowhere durable to live.** Render's filesystem is ephemeral, so uploaded tender
+  documents are lost on every redeploy. This conflicts directly with the 30-day quote retention and
+  five-year accepted-quote retention rules, and needs external object storage (S3, R2 or similar)
+  before any real Client uploads a file. This is the largest remaining gap.
+- **No error has been confirmed in Sentry yet.** The SDK is wired but unverified end to end, because
+  it needs a DSN and a real triggered error.
 
 ## Roles
 
@@ -110,9 +203,14 @@ list from the latest structured production-readiness review, including a dedicat
 [Business Plan Alignment Assessment](docs/PRODUCTION-READINESS-REVIEW.md#business-plan-alignment-assessment-2026-08-28).
 Highlights:
 
-- [ ] **Critical:** verify/build a working Azure SQL migration path (current migrations are SQLite-only)
-- [x] **CI/CD baseline implemented:** GitHub Actions gates lint, type-check, tests, and production build on PRs and pushes to `main`; Azure deployment workflow is scaffolded and requires Azure secrets and live environment validation.
+- [x] **Database path resolved:** the app now uses one PostgreSQL datasource in every environment, with a single migration history applied by `prisma migrate deploy`.
+- [x] **CI/CD baseline implemented:** GitHub Actions gates lint, type-check, tests, and production build on PRs and pushes to `main` and `staging`; Render deploys from git using [render.yaml](render.yaml).
 - [x] **Auth abuse hardening in repo:** login and registration routes now enforce a simple in-app rate limit using source IP headers.
+- [x] **Error monitoring wired:** Sentry (`@sentry/nextjs`) covers the browser, Node and Edge runtimes with errors and tracing. Still needs a DSN and one confirmed event — see [Known Gaps](#known-gaps).
+- [x] **No hardcoded URLs:** every absolute URL resolves through `NEXTAUTH_URL` via [src/server/config/appUrl.ts](src/server/config/appUrl.ts), which throws rather than falling back.
+- [x] **Super-User-created accounts can sign in:** they now receive a single-use password-reset link, which also marks the address verified. Previously these accounts were permanently locked out.
+- [x] **Email configuration is fully environment-driven:** `EMAIL_FROM` replaced the hardcoded `notifications@example.com` fallback, and `POST /api/internal/test-email` verifies delivery per environment.
+- [ ] **Critical:** durable object storage for tender attachments — Render's filesystem is ephemeral and loses uploads on redeploy, breaking both retention rules
 - [ ] **Critical (business plan §4.9):** misuse/fraud monitoring — repeated parties, unusual payment
   behaviour, duplicate/near-duplicate tenders — is not implemented
 - [x] Super User management actions for users and waivers, plus Owner/Accountant governance tiers
@@ -138,9 +236,10 @@ Highlights:
 
 - **Framework**: Next.js 14 (App Router), TypeScript
 - **Styling**: Tailwind CSS, next/font (Archivo + Inter)
-- **Database**: Prisma ORM — SQLite for local development, Azure SQL (SQL Server) for production
+- **Database**: Prisma ORM — PostgreSQL in every environment (Docker locally, Render PostgreSQL when deployed)
 - **Auth**: NextAuth (Auth.js) credentials provider, bcrypt-hashed passwords, JWT sessions
 - **Payments**: Stripe (checkout sessions + signature-verified webhook)
+- **Monitoring**: Sentry (`@sentry/nextjs`) — errors and tracing across browser, Node and Edge runtimes
 - **Validation**: Zod
 
 ## Getting Started
@@ -149,6 +248,7 @@ Highlights:
 
 - Node.js 20.x (pinned via `engines` in `package.json`)
 - npm
+- Docker (for the local PostgreSQL database)
 
 ### Installation
 
@@ -168,34 +268,117 @@ cp .env.example .env
 
 | Variable | Notes |
 | --- | --- |
-| `DATABASE_URL` | `file:./dev.db` for local SQLite. Points at Azure SQL in production. |
+| `DATABASE_URL` | PostgreSQL connection string. Supplied automatically by Render from the linked database. |
 | `NEXTAUTH_SECRET` | Long random string. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. |
-| `NEXTAUTH_URL` | `http://localhost:3000` locally. |
+| `NEXTAUTH_URL` | **Required in every environment.** The full public origin of this deployment. Email links, Stripe redirect URLs, and the same-origin API check all derive from it; the app throws rather than guessing a default. |
+| `ADDITIONAL_ALLOWED_ORIGINS` | Optional, comma-separated. Extra origins this deployment also answers on, such as a custom domain beside the platform host. Without it the same-origin check rejects requests on the second hostname. |
+| `NEXT_PUBLIC_SUPPORT_EMAIL` | Public support address shown in the footer and policies page. The links are hidden when unset. |
 | `RESEND_API_KEY` | Required to deliver email-verification links to self-registered users. |
-| `RESEND_FROM_EMAIL` | Required verified Resend sender used for verification emails. |
+| `EMAIL_FROM` | Required sender, using a domain verified in Resend. There is no fallback — sends are skipped and reported when it is unset. |
+| `REGISTRATION_NOTIFICATION_EMAIL` | Address that receives new-account notifications. |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Leave blank locally — payment flows fall back to a dev-only confirmation endpoint when unset. Required in production. |
 | `RETENTION_JOB_SECRET` | Secret used by the scheduled retention endpoint and CLI job. Required in production. |
+| `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_DSN` | Browser and server Sentry DSNs. Leave blank to disable the SDK entirely — it initialises as a no-op. |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` / `SENTRY_ENVIRONMENT` | Separates production from staging in Sentry. |
+| `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` | Build-time only. Source map upload turns on automatically once the token is present; without it production stack traces stay minified. |
 
 ### Database setup
 
 ```bash
-npm run db:generate   # generate the Prisma client
-npm run db:migrate    # create/apply local SQLite migrations
-npm run db:seed       # create local development accounts
+docker compose up -d    # start local PostgreSQL on port 5432
+npm run db:generate     # generate the Prisma client
+npm run db:migrate      # create/apply migrations
+npm run db:seed         # create local development accounts
 ```
 
-### CI/CD and release status
+### Deployment (Render)
 
-The repository now includes GitHub Actions workflows for validation and Azure deployment:
+The app deploys to Render as a Node web service. [render.yaml](render.yaml) is the blueprint of
+record — it defines the web service, the managed PostgreSQL instance, and every environment variable.
+Values marked `sync: false` are per-environment or secret and must be set in the Render dashboard,
+never in git.
 
-- `.github/workflows/ci.yml` runs `npm run lint`, `npm run type-check`, `npm test`, and `npm run build` on PRs and pushes to `main`.
-- `.github/workflows/deploy-azure.yml` builds the app and deploys to Azure App Service when the required Azure secrets are present.
+- Build command: `npm ci && npm run type-check && npm run lint && npx prisma migrate deploy && npm run build`
+- Start command: `npm run start` (Next.js binds to the `PORT` Render provides)
+- Health check: `GET /api/health`
 
-This closes the missing pipeline scaffolding, but live Azure deployment still requires:
+#### Environment origins
 
-- Azure App Service app name and credentials stored as GitHub repository secrets
-- a verified Azure SQL migration path for production
-- post-deployment smoke checks for auth, payment, and privacy flows
+`NEXTAUTH_URL` is deliberately not committed, because a single value cannot be correct for both
+services. Set it per service to that service's own origin:
+
+| Environment | `NEXTAUTH_URL` |
+| --- | --- |
+| Production | `https://trade-tender.onrender.com` |
+| Staging | `https://tender-m0xw.onrender.com` |
+| Local | `http://localhost:3000` |
+
+`ADDITIONAL_ALLOWED_ORIGINS` stays empty until a custom domain is added. When one is introduced, set
+it on that service to the other origin the app answers on, comma-separated — otherwise the
+same-origin check rejects every request arriving on the second hostname.
+
+After the first deploy, confirm each of the following:
+
+- `NEXTAUTH_URL` exactly matches the public origin, or sign-in and the same-origin API checks will reject requests
+- the Stripe webhook endpoint points at `https://<your-render-host>/api/webhooks/stripe`, with the resulting signing secret stored as `STRIPE_WEBHOOK_SECRET`
+- the Resend sending domain is verified and `EMAIL_FROM` uses it
+- smoke checks pass for authentication, role isolation, payment state, and contact-release privacy
+
+### CI
+
+`.github/workflows/ci.yml` runs `npm run lint`, `npm run type-check`, `npm test`, and `npm run build`
+against a throwaway PostgreSQL service container on pushes and PRs to `main` and `staging`.
+
+### Email delivery test
+
+`POST /api/internal/test-email` verifies Resend for whichever environment serves the request. It
+requires a signed-in Super User and always sends to that Super User's own address, so it cannot be
+used to mail anyone else. It carries no account, tender, quote or contact data.
+
+Sign in to staging as a Super User, then from the browser console on that origin:
+
+```js
+await fetch('/api/internal/test-email', { method: 'POST' }).then((r) => r.json());
+```
+
+| Response | Meaning |
+| --- | --- |
+| `200 { status: 'sent', messageId }` | Resend accepted the message |
+| `503` | `RESEND_API_KEY` or `EMAIL_FROM` is not set on this service |
+| `502` | Resend rejected it — usually an unverified sending domain |
+| `403` | Not a Super User, or a cross-origin request |
+
+The same endpoint works in production; it is safe there because the recipient is always the caller.
+
+### Account creation and password reset
+
+When a Super User creates a Client or Retailer account, the holder is emailed a single-use link to
+set their own password. No password is ever included in the message.
+
+```mermaid
+flowchart LR
+    A[Super User creates account] --> B[PasswordResetToken issued]
+    B --> C[Email with /reset-password link]
+    C --> D[Holder sets their own password]
+    D --> E[Token consumed, email marked verified]
+    E --> F[Sign-in permitted]
+```
+
+- The link expires after 24 hours and works exactly once. Issuing a new one invalidates the previous.
+- Only the SHA-256 hash of the token is stored; the raw value exists solely in the email.
+- Missing, expired and already-used tokens return the same message, so the endpoint cannot be used
+  to probe which links exist.
+- Completing the reset sets `emailVerifiedAt`, because following the link proves control of the
+  mailbox. **This is required for sign-in** — see the note below.
+- If delivery fails, the Super User sees a warning and the account stays listed; use *Reset password*
+  on that account to issue a fresh link.
+
+> Prior to this flow, Super-User-created accounts could never sign in: `authorize()` requires
+> `emailVerifiedAt`, which account creation never set. Any accounts created before this change need a
+> reset link issuing before their holders can log in.
+
+The Super User form still asks for an initial password because it shares the self-registration
+schema. That password is superseded as soon as the holder completes the reset.
 
 ### Quote retention job
 
@@ -240,9 +423,13 @@ npm run build
 npm start
 ```
 
-### Azure deployment notes
+### Render deployment notes
 
-A production deployment is expected to run behind Azure Front Door, App Service, Azure SQL, and Blob Storage. The repository includes the deployment workflow scaffolding, but Azure secrets and a verified SQL Server migration strategy remain required before a live release is production-safe.
+The application runs as a Render Node web service with a managed Render PostgreSQL instance, described
+in [render.yaml](render.yaml). Attachments still require private object storage; Render disks are not a
+substitute, because the free plan has an ephemeral filesystem. Confirm `NEXTAUTH_URL`, the Stripe
+webhook secret, and the verified Resend sender for each environment before treating a release as
+production-safe.
 
 ## Payments
 
@@ -255,38 +442,50 @@ A production deployment is expected to run behind Azure Front Door, App Service,
 - The production webhook (`/api/webhooks/stripe`) verifies signatures against the raw payload and
   is the only path allowed to confirm payments in a real deployment.
 
-## Database: local SQLite vs. production Azure SQL
+## Database
 
-`prisma/schema.prisma` is the source of truth and targets SQLite for local development.
-`prisma/schema.sqlserver.prisma` is a generated copy targeting Azure SQL for production — do not
-edit it by hand. After changing `prisma/schema.prisma`, regenerate it:
+`prisma/schema.prisma` is the single source of truth and targets PostgreSQL in every environment, so
+local development and Render run identical migrations. After changing the schema, create a migration
+and commit it:
 
 ```bash
-npm run db:sync-prod-schema
+npm run db:migrate
 ```
+
+Render applies committed migrations with `prisma migrate deploy` during each build.
 
 ## Project Structure
 
 ```
+next.config.mjs             # Wrapped with withSentryConfig
+render.yaml                 # Render blueprint: both web services and the database
+docker-compose.yml          # Local PostgreSQL
+sentry.server.config.ts     # Sentry Node runtime
+sentry.edge.config.ts       # Sentry Edge runtime
 prisma/
-├── schema.prisma           # Local dev datasource (SQLite)
-├── schema.sqlserver.prisma # Generated production datasource (Azure SQL)
+├── schema.prisma           # PostgreSQL datasource for every environment
 ├── seed.ts                 # Creates local Super User, Client, and Retailer development accounts
 └── migrations/
 src/
+├── instrumentation.ts        # Registers the Sentry server/edge config
+├── instrumentation-client.ts # Sentry browser runtime
 ├── app/                    # Next.js routes and role portals
 │   ├── page.tsx            # Role selection landing page
 │   ├── login/, register/   # Auth pages
+│   ├── reset-password/     # Set-password page for emailed reset links
 │   ├── client/              # Client portal (dashboard, tender creation/detail)
 │   ├── retailer/            # Retailer portal (dashboard, tender detail/unlock/quote)
 │   ├── super-user/          # Super User dashboard (read-only)
 │   └── api/                 # Route handlers (auth, tenders, quotes, payments, webhooks)
+│       ├── health/                  # Render health check
+│       └── internal/test-email/     # Per-environment Resend delivery test
 ├── components/
 │   ├── ui/                  # Reusable UI primitives (Button, Card, StatusBadge)
 │   ├── layout/              # Shared header, footer, account controls
 │   └── providers/           # Client-side context providers (NextAuth session)
 ├── server/
-│   ├── auth/                 # NextAuth config, session helpers, password hashing
+│   ├── auth/                 # NextAuth config, session helpers, password hashing, reset tokens
+│   ├── config/                # Application origin resolution (appUrl)
 │   ├── data/                  # Prisma client singleton
 │   ├── domain/                 # Business rules: tenders, matching, unlock, quotes, contact release
 │   ├── payments/                # Stripe client and payment service

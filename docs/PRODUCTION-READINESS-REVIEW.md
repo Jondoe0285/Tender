@@ -1,7 +1,7 @@
 # Trade Tender — Production Readiness Review (2026-08-28)
 
 Structured full-system review performed by the Lead Architect, Security Reviewer, Secure Backend Developer,
-QA Engineer, Corporate Frontend Developer, and Azure Release Engineer agents. This document tracks findings
+QA Engineer, Corporate Frontend Developer, and Release Engineer agents. This document tracks findings
 that were **fixed** in this pass and items that remain **outstanding** and require a human/product decision
 before the platform can be considered production ready.
 
@@ -110,26 +110,21 @@ prioritized alongside the technical outstanding items below.
 
 ### Critical
 
-1. **Azure SQL migration story is unverified.** All 27 migrations under `prisma/migrations/` contain
-   SQLite-dialect SQL (`PRAGMA`, `BOOLEAN`, `DATETIME`, `CURRENT_TIMESTAMP`). `prisma/schema.sqlserver.prisma`
-   exists for the production datasource, but there is no SQL Server-flavoured migration history and no CI/CD
-   step runs `prisma migrate deploy` against Azure SQL. **Running the current migrations as-is against Azure
-   SQL will fail.** Decide and implement one of: (a) a parallel SQL Server migration set generated from the
-   SQL Server schema, or (b) a single authoritative migration pipeline that targets Azure SQL directly with
-   `prisma db push`/`migrate deploy` before first production deploy.
-2. **No CI/CD pipeline to Azure App Service.** Only `.github/workflows/quote-retention.yml` (a scheduled purge
-   job) exists. There is no workflow gating PRs on lint/type-check/tests/build, and no deploy workflow.
-   Requires provisioning Azure publish credentials/service principal and authoring the pipeline.
-3. **Two differently-timestamped migrations share the name `link_unlock_payment_to_tender`**
-   (`20260828055907_...` and `20260828120000_...`), and 14+ migration folders are untracked in git
-   (`git status --porcelain`). Confirm intended replay order, commit all migration folders, and verify a fresh
-   database created from a clean checkout produces the same schema as the current dev database.
+1. ~~**Azure SQL migration story is unverified.**~~ **Resolved 2026-08-30 by the move to Render.**
+   The application now uses a single PostgreSQL datasource in every environment. `prisma/schema.prisma`
+   targets `postgresql`, `prisma/schema.sqlserver.prisma` and its generator script were deleted, and the
+   SQLite-dialect migration history was replaced by one `0_init` PostgreSQL migration that has been
+   applied and seeded successfully. Render runs `prisma migrate deploy` during every build.
+2. ~~**No CI/CD pipeline to Azure App Service.**~~ **Resolved 2026-08-30.** `.github/workflows/ci.yml`
+   gates lint, type-check, tests, and build against a PostgreSQL service container on `main` and
+   `staging`. Deployment is handled by Render from the connected branch, described in `render.yaml`.
+3. ~~**Two differently-timestamped migrations share the name `link_unlock_payment_to_tender`**~~
+   **Resolved 2026-08-30.** The ambiguous history was collapsed into the single `0_init` migration.
 
 ### High
 
 4. **No rate limiting / brute-force protection** on `/api/auth/*` (login via NextAuth `authorize()`, and
-   registration). Needs an app-level limiter (e.g. per-IP/per-email counter) or an infra-level control
-   (Azure Front Door / API Management).
+   registration). Needs an app-level limiter (e.g. per-IP/per-email counter) or an infra-level control.
 5. **`isOwner`/`isAccountant` sub-tiers and their Owner Console / Accounting Space pages are not documented**
    in `docs/TradeTender-Business-Plan.md`, `docs/Architecture.md`, or `docs/Product-Requirements.md`, even
    though the code correctly stays within the 3-role model (both are flags on the Super User role, not new
@@ -161,9 +156,8 @@ prioritized alongside the technical outstanding items below.
     `super-user/users`, `super-user/users/[id]`, `super-user/analytics/export`, `tenders/[id]/quotes/pdf`.
     Lower risk (Next.js does not leak stack traces in production by default) but inconsistent with the app's
     own error-response contract. Recommend a follow-up pass once the above business-logic fixes are verified.
-12. **No CI check that `prisma/schema.sqlserver.prisma` stays in sync** with `prisma/schema.prisma` — currently
-    correct, but nothing prevents drift if someone edits the generated file directly or forgets
-    `npm run db:sync-prod-schema`.
+12. ~~**No CI check that `prisma/schema.sqlserver.prisma` stays in sync**~~ **Resolved 2026-08-30** — there is
+    now only one schema file, so the drift risk no longer exists.
 13. **No documented Stripe production webhook registration steps** (URL, secret rotation) — signature
     verification code is correct, but the operational runbook is missing from deployment docs.
 14. **Membership monthly-allowance check in `unlockService`** (`monthlyUnlockCount < freeTenderOpportunitiesPerMonth`)
