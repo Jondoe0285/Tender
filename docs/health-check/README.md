@@ -290,6 +290,8 @@ boundaries documented here must be preserved.
 ## Workflow maintenance
 
 - `npm run health:validate-workflows` enforces the invariants and runs inside the audit
+- The audit and fix workflows additionally parse every workflow with a real YAML parser, because
+  the Node validator is a heuristic and cannot fully replace one. Both gates run together
 - Exactly one authoritative scheduled audit is permitted; the validator fails if a second appears
 - `deploy-azure.yml` is advisory-only in the validator because this system must not modify
   production release configuration

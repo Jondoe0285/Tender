@@ -198,19 +198,23 @@ jobs:
         run: |
           if [ "${{ needs.verify.outputs.eligible }}" = "true" ] && [ "${{ needs.merge.result }}" = "success" ]; then
             SUBJECT="Approved merge completed"
-            BODY="Pull request #${{ github.event.inputs.pull_request_number }} was merged to main.
-          Approved commit: ${{ github.event.inputs.approved_commit_sha }}
-          Authorising actor: ${{ github.actor }}
-
-          Merging to main is not permission to deploy. Production deployment remains separately controlled."
+            {
+              echo "Pull request #${{ github.event.inputs.pull_request_number }} was merged to main."
+              echo "Approved commit: ${{ github.event.inputs.approved_commit_sha }}"
+              echo "Authorising actor: ${{ github.actor }}"
+              echo ""
+              echo "Merging to main is not permission to deploy. Production deployment remains separately controlled."
+            } > "$RUNNER_TEMP/merge-email.txt"
           else
             SUBJECT="RELEASE BLOCKED"
-            BODY="Pull request #${{ github.event.inputs.pull_request_number }} was NOT merged.
-          Authorising actor: ${{ github.actor }}
-
-          Failed conditions:
-          ${{ needs.verify.outputs.blocked_reasons }}
-
-          Fresh approval is required after further changes."
+            {
+              echo "Pull request #${{ github.event.inputs.pull_request_number }} was NOT merged."
+              echo "Authorising actor: ${{ github.actor }}"
+              echo ""
+              echo "Failed conditions:"
+              echo "${{ needs.verify.outputs.blocked_reasons }}"
+              echo ""
+              echo "Fresh approval is required after further changes."
+            } > "$RUNNER_TEMP/merge-email.txt"
           fi
-          npx tsx scripts/health-check/send-workflow-email.ts "$SUBJECT" "$BODY"
+          npx tsx scripts/health-check/send-workflow-email.ts "$SUBJECT" "$(cat "$RUNNER_TEMP/merge-email.txt")"

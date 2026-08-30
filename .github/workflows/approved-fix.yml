@@ -162,7 +162,9 @@ jobs:
         run: npm run build
 
       - name: Validate — workflow invariants
-        run: node scripts/health-check/validate-workflows.mjs
+        run: |
+          python3 -c "import yaml,glob;[yaml.safe_load(open(f)) for f in glob.glob('.github/workflows/*.yml')]"
+          node scripts/health-check/validate-workflows.mjs
 
       - name: Commit and open draft pull request
         id: pr
@@ -175,35 +177,42 @@ jobs:
           fi
           git commit -m "fix(health-check): ${{ github.event.inputs.approved_finding_ids }}" --allow-empty
           git push origin "$FIX_BRANCH"
+          {
+            echo "## Approved fix"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Health-check run ID | \`${{ github.event.inputs.health_check_run_id }}\` |"
+            echo "| Approved finding IDs | \`${{ github.event.inputs.approved_finding_ids }}\` |"
+            echo "| Archived report | \`docs/health-check/archive/${{ needs.verify-authorisation.outputs.report_file }}\` |"
+            echo "| Authorising actor | @${{ github.actor }} |"
+            echo "| Branch | \`$FIX_BRANCH\` |"
+            echo ""
+            echo "### Approved scope"
+            echo "${{ github.event.inputs.approved_scope }}"
+            echo ""
+            echo "### Validation results"
+            echo "Type check, lint, unit tests, schema validation, production build and workflow invariant"
+            echo "checks ran in this workflow. See the run log for evidence."
+            echo ""
+            echo "### Regression tests"
+            echo "The approved finding requires a regression test. Confirm it is present before requesting review."
+            echo ""
+            echo "### Remaining risks"
+            echo "Integration, end-to-end and coverage checks are not available in this repository, so those"
+            echo "risks are unverified."
+            echo ""
+            echo "### Rollback procedure"
+            echo "Revert the merge commit for this pull request. No data migration is included unless"
+            echo "explicitly listed in the approved scope."
+            echo ""
+            echo "---"
+            echo "This pull request is a draft and must not be merged automatically. Use the *Approved Merge"
+            echo "to Main* workflow after human review."
+          } > "$RUNNER_TEMP/fix-pr-body.md"
           PR_URL=$(gh pr create --draft --base main --head "$FIX_BRANCH" \
             --title "[Health Fix] ${{ github.event.inputs.approved_finding_ids }}" \
-            --body "## Approved fix
-
-| Field | Value |
-| --- | --- |
-| Health-check run ID | \`${{ github.event.inputs.health_check_run_id }}\` |
-| Approved finding IDs | \`${{ github.event.inputs.approved_finding_ids }}\` |
-| Archived report | \`docs/health-check/archive/${{ needs.verify-authorisation.outputs.report_file }}\` |
-| Authorising actor | @${{ github.actor }} |
-| Branch | \`$FIX_BRANCH\` |
-
-### Approved scope
-${{ github.event.inputs.approved_scope }}
-
-### Validation results
-Type check, lint, unit tests, schema validation, production build and workflow invariant checks ran in this workflow. See the run log for evidence.
-
-### Regression tests
-The approved finding requires a regression test. Confirm it is present before requesting review.
-
-### Remaining risks
-Integration, end-to-end and coverage checks are not available in this repository, so those risks are unverified.
-
-### Rollback procedure
-Revert the merge commit for this pull request. No data migration is included unless explicitly listed in the approved scope.
-
----
-This pull request is a draft and must not be merged automatically. Use the *Approved Merge to Main* workflow after human review.")
+            --body-file "$RUNNER_TEMP/fix-pr-body.md")
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
           echo "Draft pull request: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
 
@@ -234,12 +243,15 @@ This pull request is a draft and must not be merged automatically. Use the *Appr
           HEALTH_REPORT_FROM: ${{ secrets.HEALTH_REPORT_FROM }}
           HEALTH_REPORT_TO: ${{ secrets.HEALTH_REPORT_TO }}
         run: |
+          {
+            echo "Findings: ${{ github.event.inputs.approved_finding_ids }}"
+            echo "Health-check run ID: ${{ github.event.inputs.health_check_run_id }}"
+            echo "Authorising actor: ${{ github.actor }}"
+            echo "Implementation result: ${{ needs.implement.result }}"
+            echo "Pull request: ${{ needs.implement.outputs.pr_url }}"
+            echo ""
+            echo "The pull request is a draft. It has not been merged and nothing has been deployed."
+          } > "$RUNNER_TEMP/fix-email.txt"
           npx tsx scripts/health-check/send-workflow-email.ts \
             "Approved fix pull request ready for review" \
-            "Findings: ${{ github.event.inputs.approved_finding_ids }}
-          Health-check run ID: ${{ github.event.inputs.health_check_run_id }}
-          Authorising actor: ${{ github.actor }}
-          Implementation result: ${{ needs.implement.result }}
-          Pull request: ${{ needs.implement.outputs.pr_url }}
-
-          The pull request is a draft. It has not been merged and nothing has been deployed."
+            "$(cat "$RUNNER_TEMP/fix-email.txt")"

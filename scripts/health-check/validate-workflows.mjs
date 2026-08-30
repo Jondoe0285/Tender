@@ -21,6 +21,26 @@ function validateYamlShape(file, content) {
   check(/^name:\s*\S/m.test(content), `${file} has no top-level name.`);
   check(/^on:/m.test(content), `${file} has no trigger block.`);
   check(/^jobs:/m.test(content), `${file} has no jobs block.`);
+
+  // A content line inside a block scalar that is indented less than the block terminates it,
+  // which turns shell text into YAML and produces a parse error.
+  let blockIndent = null;
+  lines.forEach((line, index) => {
+    const blockStart = line.match(/^(\s*)[\w-]+:\s*[|>][-+]?\s*$/);
+    if (blockStart) {
+      blockIndent = blockStart[1].length;
+      return;
+    }
+    if (blockIndent === null || line.trim() === '') return;
+    const indent = line.match(/^(\s*)/)[1].length;
+    if (indent <= blockIndent) {
+      // The block has ended; only re-open on the next block scalar.
+      blockIndent = /^(\s*)[\w-]+:\s*[|>][-+]?\s*$/.test(line) ? indent : null;
+      if (indent === 0 && !/^[\w-]+:/.test(line) && !/^\s*#/.test(line)) {
+        problems.push(`${file}:${index + 1} is an unindented continuation line inside a block scalar; it will break YAML parsing.`);
+      }
+    }
+  });
 }
 
 const files = readdirSync(WORKFLOW_DIR).filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'));

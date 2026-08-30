@@ -113,7 +113,10 @@ jobs:
         run: npx prisma migrate deploy
 
       - name: Validate workflow definitions
-        run: node scripts/health-check/validate-workflows.mjs
+        run: |
+          python3 -c "import yaml,glob,sys;[yaml.safe_load(open(f)) for f in glob.glob('.github/workflows/*.yml')]" \
+            || { echo '::error::A workflow file is not valid YAML.'; exit 1; }
+          node scripts/health-check/validate-workflows.mjs
 
       - name: Run audit
         id: audit
@@ -177,14 +180,18 @@ jobs:
             echo "::error::Report branch push failed. Reports remain available as workflow artifacts."
             exit 1
           fi
+          {
+            echo "Automated repository health check. Report only - no application code is changed by this pull request."
+            echo ""
+            echo "**Overall status:** $AUDIT_STATUS"
+            echo "**Release recommendation:** $AUDIT_RELEASE"
+            echo ""
+            echo "Do not merge this pull request as an approval to release. To authorise a fix, copy the"
+            echo "AUTHORISATION REQUEST block from the report and run the *Approved Fix Implementation* workflow."
+          } > "$RUNNER_TEMP/report-pr-body.md"
           PR_URL=$(gh pr create --base main --head "$REPORT_BRANCH" \
             --title "$REPORT_TITLE" \
-            --body "Automated repository health check. Report only — no application code is changed by this pull request.
-
-**Overall status:** $AUDIT_STATUS
-**Release recommendation:** $AUDIT_RELEASE
-
-Do not merge this pull request as an approval to release. To authorise a fix, copy the AUTHORISATION REQUEST block from the report and run the *Approved Fix Implementation* workflow.")
+            --body-file "$RUNNER_TEMP/report-pr-body.md")
           if [ -z "$PR_URL" ]; then
             echo "publish_status=FAILED" >> "$GITHUB_OUTPUT"
             echo "report_pr_url=Pull request creation failed; reports preserved as workflow artifacts." >> "$GITHUB_OUTPUT"

@@ -5,8 +5,8 @@
 
 ## 1. Executive summary
 
-The audit ran 19 discovered checks against `chore/health-check-system` at commit `131684c`.
-0 critical, 6 high, 3 medium, 8 low and 0 informational findings are currently open.
+The audit ran 19 discovered checks against `chore/health-check-system` at commit `8e1734c`.
+0 critical, 6 high, 3 medium, 9 low and 0 informational findings are currently open.
 One or more release-blocking conditions were met.
 This audit does not approve its own release and does not implement fixes.
 
@@ -16,11 +16,11 @@ This audit does not approve its own release and does not implement fixes.
 | --- | --- |
 | Repository | Jondoe0285/Tender |
 | Branch | chore/health-check-system |
-| Commit SHA | `131684c97d14a9d0ad8fa893812f56cde9c58423` |
+| Commit SHA | `8e1734c3f941cdec8370641448628fc46ce215c0` |
 | Trigger type | local |
-| Workflow run ID | local-1788077836293 |
-| Started | 2026-08-30T08:17:16.293Z |
-| Completed | 2026-08-30T08:18:19.088Z |
+| Workflow run ID | local-1788078143956 |
+| Started | 2026-08-30T08:22:23.956Z |
+| Completed | 2026-08-30T08:23:34.273Z |
 | Environment | Local workstation |
 | Audit scope | full |
 
@@ -28,9 +28,9 @@ This audit does not approve its own release and does not implement fixes.
 
 | Check | Command | Result | Duration |
 | --- | --- | --- | --- |
-| Production build | `npm run build` | PASSED | 39s |
+| Production build | `npm run build` | PASSED | 43s |
 | Type checking | `npm run type-check` | PASSED | 4s |
-| Linting | `npm run lint` | PASSED | 2s |
+| Linting | `npm run lint` | PASSED | 3s |
 | Unit tests | `npm run test` | PASSED | 4s |
 | Formatting validation | `(no command available)` | UNAVAILABLE | — |
 | Integration tests | `(no command available)` | UNAVAILABLE | — |
@@ -41,7 +41,7 @@ This audit does not approve its own release and does not implement fixes.
 | Dependency vulnerability scan | `npm audit --audit-level=high` | FAILED | 5s |
 | Secret scanning (external tool) | `(no command available)` | UNAVAILABLE | — |
 | Static security analysis | `(no command available)` | UNAVAILABLE | — |
-| Database schema validation | `npx prisma validate` | PASSED | 3s |
+| Database schema validation | `npx prisma validate` | PASSED | 4s |
 | Migration validation | `bash -lc set -e; DB="$PWD/health-check-migrate.db"; rm -f "$DB"; DATABASE_URL="file:$DB" npx prisma migrate deploy >/dev/null; set +e; DATABASE_URL="file:$DB" npx prisma migrate diff --from-url "file:$DB" --to-schema-datamodel prisma/schema.prisma --exit-code; STATUS=$?; rm -f "$DB"; exit $STATUS` | PASSED | 5s |
 | Production schema drift | `bash -lc npm run db:sync-prod-schema >/dev/null && git diff --exit-code -- prisma/schema.sqlserver.prisma` | FAILED | 0s |
 | Dead-code and unused-export detection | `(no command available)` | UNAVAILABLE | — |
@@ -65,7 +65,7 @@ This audit does not approve its own release and does not implement fixes.
 | CRITICAL | 0 |
 | HIGH | 6 |
 | MEDIUM | 3 |
-| LOW | 8 |
+| LOW | 9 |
 | INFORMATIONAL | 0 |
 
 ## 5. Detailed findings and authorisation blocks
@@ -179,7 +179,7 @@ index c24f4dd..b01ddea 100644
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-010
 Severity: HIGH
 Confidence: Confirmed
@@ -204,7 +204,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-010
@@ -267,7 +267,7 @@ Implementation exists at `src/app/api/webhooks/stripe/route.ts` but no test file
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-012
 Severity: HIGH
 Confidence: Confirmed
@@ -292,7 +292,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-012
@@ -355,7 +355,7 @@ Implementation exists at `src/server/payments/paymentService.ts` but no test fil
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-013
 Severity: HIGH
 Confidence: Confirmed
@@ -380,7 +380,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-013
@@ -443,7 +443,7 @@ Implementation exists at `src/server/domain/unlockService.ts` but no test file r
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-014
 Severity: HIGH
 Confidence: Confirmed
@@ -468,7 +468,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-014
@@ -531,7 +531,7 @@ Implementation exists at `src/server/domain/contactReleaseService.ts` but no tes
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-015
 Severity: HIGH
 Confidence: Confirmed
@@ -556,7 +556,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-015
@@ -585,7 +585,7 @@ Do not deploy.
 
 ---
 
-### HC-20260830-016 — Merging to main triggers a production deployment
+### HC-20260830-017 — Merging to main triggers a production deployment
 
 - **Severity:** HIGH
 - **Confidence:** Confirmed
@@ -619,8 +619,8 @@ Do not deploy.
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
-Finding ID: HC-20260830-016
+Health-check run: local-1788078143956
+Finding ID: HC-20260830-017
 Severity: HIGH
 Confidence: Confirmed
 Lifecycle state: New
@@ -644,10 +644,10 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
-HC-20260830-016
+HC-20260830-017
 
 APPROVED SCOPE:
 Repository settings change, or an explicitly approved change to deploy-azure.yml.
@@ -767,7 +767,7 @@ PostCSS has XSS via Unescaped </style> in
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-007
 Severity: MEDIUM
 Confidence: Confirmed
@@ -792,7 +792,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-007
@@ -855,7 +855,7 @@ Check id: `secret-scan`. Reason: gitleaks is not installed on the runner.
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-008
 Severity: MEDIUM
 Confidence: Confirmed
@@ -880,7 +880,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-008
@@ -909,7 +909,7 @@ Do not deploy.
 
 ---
 
-### HC-20260830-017 — Deployment job condition uses the unavailable secrets context
+### HC-20260830-018 — Deployment job condition uses the unavailable secrets context
 
 - **Severity:** MEDIUM
 - **Confidence:** Confirmed
@@ -943,8 +943,8 @@ Job-level `if: ${{ secrets.AZURE_WEBAPP_NAME != '' && secrets.AZURE_CREDENTIALS 
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
-Finding ID: HC-20260830-017
+Health-check run: local-1788078143956
+Finding ID: HC-20260830-018
 Severity: MEDIUM
 Confidence: Confirmed
 Lifecycle state: New
@@ -968,10 +968,10 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
-HC-20260830-017
+HC-20260830-018
 
 APPROVED SCOPE:
 .github/workflows/deploy-azure.yml only, with release-owner approval because it affects deployment.
@@ -1031,7 +1031,7 @@ Check id: `format`. Reason: No "format:check" script is defined in package.json.
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-001
 Severity: LOW
 Confidence: Confirmed
@@ -1056,7 +1056,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-001
@@ -1119,7 +1119,7 @@ Check id: `integration-tests`. Reason: No "test:integration" script is defined i
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-002
 Severity: LOW
 Confidence: Confirmed
@@ -1144,7 +1144,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-002
@@ -1207,7 +1207,7 @@ Check id: `regression-tests`. Reason: No "test:regression" script is defined in 
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-003
 Severity: LOW
 Confidence: Confirmed
@@ -1232,7 +1232,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-003
@@ -1295,7 +1295,7 @@ Check id: `e2e-tests`. Reason: No "test:e2e" script is defined in package.json.
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-004
 Severity: LOW
 Confidence: Confirmed
@@ -1320,7 +1320,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-004
@@ -1383,7 +1383,7 @@ Check id: `coverage`. Reason: No "test:coverage" script is defined in package.js
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-005
 Severity: LOW
 Confidence: Confirmed
@@ -1408,7 +1408,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-005
@@ -1471,7 +1471,7 @@ Check id: `accessibility`. Reason: No "test:a11y" script is defined in package.j
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-006
 Severity: LOW
 Confidence: Confirmed
@@ -1496,7 +1496,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-006
@@ -1559,7 +1559,7 @@ Check id: `sast`. Reason: semgrep is not installed on the runner.
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-009
 Severity: LOW
 Confidence: Confirmed
@@ -1584,7 +1584,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-009
@@ -1647,7 +1647,7 @@ Check id: `dead-code`. Reason: No "lint:dead-code" script is defined in package.
 --------------------------------------------------
 AUTHORISATION REQUEST
 
-Health-check run: local-1788077836293
+Health-check run: local-1788078143956
 Finding ID: HC-20260830-011
 Severity: LOW
 Confidence: Confirmed
@@ -1672,7 +1672,7 @@ COPY-READY APPROVAL PROMPT
 Run the Approved Fix Implementation workflow.
 
 HEALTH CHECK RUN ID:
-local-1788077836293
+local-1788078143956
 
 APPROVED FINDING IDS:
 HC-20260830-011
@@ -1699,9 +1699,97 @@ Do not deploy.
 --------------------------------------------------
 
 
+---
+
+### HC-20260830-016 — 1 unresolved TODO/FIXME marker
+
+- **Severity:** LOW
+- **Confidence:** Confirmed
+- **Lifecycle state:** New
+- **First seen:** 20260830
+
+**Summary.** Unresolved markers indicate known incomplete work in tracked source files.
+
+**Evidence.**
+
+scripts/health-check/lib/findings.mjs:234 — title: `${markers.length} unresolved TODO/FIXME marker${markers.length === 1 ? '' : 's'}`,
+
+**Affected files.** `scripts/health-check/lib/findings.mjs`
+**Line numbers.** Not applicable.
+
+**Reproduction steps.** Run the validation commands listed below on a clean checkout.
+**User impact.** None directly.
+**Business impact.** Accumulating technical debt.
+**Likely root cause.** See evidence.
+**Recommended fix.** Resolve the marker or convert it into a tracked issue with an owner.
+**Approved-scope recommendation.** Individual markers only, one finding at a time.
+**Expected files to change.** Within the approved scope above.
+**Regression test required.** Only where behaviour changes.
+**Acceptance criteria.** The marker is removed and the described work is either completed or tracked.
+**Validation commands.** `npm run type-check`, `npm test`, `npm run build`
+**Dependencies.** None.
+**Change risk.** Low
+**Rollback considerations.** Revert the fix commit; no data migration is involved.
+
+
+--------------------------------------------------
+AUTHORISATION REQUEST
+
+Health-check run: local-1788078143956
+Finding ID: HC-20260830-016
+Severity: LOW
+Confidence: Confirmed
+Lifecycle state: New
+
+Recommended decision:
+
+[ ] APPROVE FIX
+[ ] REJECT
+[ ] DEFER
+[ ] ACCEPT RISK
+
+Approved scope: Individual markers only, one finding at a time.
+Expected files: scripts/health-check/lib/findings.mjs
+Required regression test: Only where behaviour changes.
+Acceptance criteria: The marker is removed and the described work is either completed or tracked.
+Maximum permitted change risk: Low
+Additional restrictions: Do not modify unrelated files, weaken tests, or change deployment behaviour.
+
+COPY-READY APPROVAL PROMPT
+
+Run the Approved Fix Implementation workflow.
+
+HEALTH CHECK RUN ID:
+local-1788078143956
+
+APPROVED FINDING IDS:
+HC-20260830-016
+
+APPROVED SCOPE:
+Individual markers only, one finding at a time.
+
+APPROVAL STATEMENT:
+IMPLEMENT APPROVED FINDINGS
+
+Implement only the approved finding and remain strictly within the approved scope.
+
+Add the required regression test.
+Do not modify unrelated files.
+Do not weaken or delete existing tests.
+Do not suppress failures to obtain a passing result.
+Run all applicable validation checks.
+Create a draft pull request targeting main.
+Email the result through the configured Resend health-report channel.
+
+Do not push directly to main.
+Do not merge.
+Do not deploy.
+--------------------------------------------------
+
+
 ## 6. Finding lifecycle
 
-- **New:** HC-20260830-010, HC-20260830-012, HC-20260830-013, HC-20260830-014, HC-20260830-015, HC-20260830-016, HC-20260830-007, HC-20260830-008, HC-20260830-017, HC-20260830-001, HC-20260830-002, HC-20260830-003, HC-20260830-004, HC-20260830-005, HC-20260830-006, HC-20260830-009, HC-20260830-011
+- **New:** HC-20260830-010, HC-20260830-012, HC-20260830-013, HC-20260830-014, HC-20260830-015, HC-20260830-017, HC-20260830-007, HC-20260830-008, HC-20260830-018, HC-20260830-001, HC-20260830-002, HC-20260830-003, HC-20260830-004, HC-20260830-005, HC-20260830-006, HC-20260830-009, HC-20260830-011, HC-20260830-016
 - **Continuing:** None
 - **Resolved since previous audit:** None
 - **Reopened:** None
@@ -1716,6 +1804,7 @@ No previous archived audit was found; every finding is recorded as New.
 Commits since the previous audit:
 
 ```
+8e1734c chore(health-check): add repository health-check, approved-fix and approved-merge system
 131684c fix: correct retailer region/county matching and show tender items pre-purchase
 2745987 feat: add activity log and client release credit overrides
 50f305e Add Owner/Accountant governance, retailer analytics, and production readiness fixes
