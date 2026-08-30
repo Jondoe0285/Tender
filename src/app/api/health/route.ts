@@ -3,7 +3,7 @@ import { prisma } from '@/server/data/prisma';
 
 export const dynamic = 'force-dynamic';
 
-/** Unauthenticated liveness probe for uptime monitoring. Returns no business or account data. */
+/** Unauthenticated liveness probe for uptime monitoring and Render health check. Returns no business or account data. */
 export async function GET() {
   const startedAt = Date.now();
   try {

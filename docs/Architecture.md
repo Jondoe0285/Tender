@@ -13,12 +13,12 @@ This document describes the target production architecture. The existing reposit
 
 - **Web application:** Next.js with TypeScript.
 - **UI:** Tailwind CSS and reusable accessible components.
-- **Hosting:** Azure App Service.
-- **Database:** Azure SQL Database.
+- **Hosting:** Render.
+- **Database:** Render PostgreSQL.
 - **Payments:** Stripe through server-side integrations and verified webhooks.
-- **CI/CD:** GitHub Actions.
+- **CI/CD:** GitHub Actions for validation; Render deploys from the connected git branch.
 - **Transactional email:** Approved email provider, such as the service described in the business plan.
-- **Files:** Private object storage such as Azure Blob Storage, accessed through authorized server-controlled URLs.
+- **Files:** Private object storage accessed through authorized server-controlled URLs. The Render application filesystem is ephemeral and must not be used for durable attachments.
 
 No technology or service addition should expand the approved product scope without review against the business plan.
 
@@ -31,7 +31,7 @@ flowchart LR
     Admin[Super User browser] --> Web
     Web --> Auth[Authentication and authorization]
     Web --> Domain[Server workflows]
-    Domain --> SQL[(Azure SQL Database)]
+    Domain --> SQL[(Render PostgreSQL)]
     Domain --> Files[Private file storage]
     Domain --> Stripe[Stripe]
     Stripe --> Webhook[Verified webhook endpoint]
@@ -39,7 +39,7 @@ flowchart LR
     Webhook --> Domain
     Domain --> Audit[Audit and monitoring records]
     Web --> Actions[GitHub Actions]
-    Actions --> App[Azure App Service]
+    Actions --> App[Render web service]
 ```
 
 ## 4. Trust Boundaries
@@ -86,7 +86,7 @@ src/
     audit/             Append-only event recording
   lib/                 Shared types, configuration, and safe utilities
   tests/               Unit, integration, and journey tests
-migrations/            Versioned Azure SQL migrations
+migrations/            Versioned PostgreSQL migrations
 ```
 
 The exact folders may follow existing repository conventions, but browser components must not contain database credentials, Stripe secrets, authorization decisions, or unrestricted data-access logic.
@@ -185,7 +185,7 @@ sequenceDiagram
     participant R as Retailer
     participant App as Next.js server
     participant S as Stripe
-    participant DB as Azure SQL
+    participant DB as PostgreSQL
     participant C as Client
 
     R->>App: Request tender unlock
@@ -211,7 +211,7 @@ A redirect or client success message is never sufficient proof of payment. Webho
 
 ## 11. Data Architecture
 
-Azure SQL should contain normalized, access-controlled records for:
+Render PostgreSQL should contain normalized, access-controlled records for:
 
 - Users, roles, sessions, terms acceptance, and account status.
 - Retailer capabilities, categories, service areas, accreditations, and preferences.
@@ -248,9 +248,9 @@ Exports require the same authorization and privacy checks as the dashboard. Cont
 ## 15. Deployment Architecture
 
 - GitHub Actions runs type checking, relevant tests, security checks, and a production build.
-- Azure App Service hosts the Next.js application with environment-specific configuration.
-- Azure SQL migrations run through an approved, ordered deployment step.
-- Secrets are supplied through GitHub Actions secrets or approved Azure secret management.
+- Render hosts the Next.js application with environment-specific configuration.
+- Database migrations run through `prisma migrate deploy` as an approved, ordered deployment step.
+- Secrets are supplied through GitHub Actions secrets or Render environment variables marked as non-syncing.
 - Development, test, staging, and production settings and data remain separated.
 - Production releases require verified backups or recovery readiness before destructive migrations.
 - Post-deployment checks verify application health, authentication, role isolation, payment state, and contact-release privacy.
@@ -279,7 +279,7 @@ Monitoring should flag unusual payment behavior, duplicate or near-duplicate ten
 - Unsuccessful, expired, and non-accepted quotes are then deleted or anonymized unless a valid hold or investigation applies.
 - Successful or accepted quotes, related tender identifiers, payment records, contact-release events, and audit logs are retained for five years.
 - Retention jobs are authorized, repeatable, observable, and safe against legal holds.
-- Azure SQL backups and recovery procedures are protected and tested.
+- Database backups and recovery procedures are protected and tested.
 - Deletion and anonymization outcomes are auditable.
 
 ## 18. Architecture Decision Rules

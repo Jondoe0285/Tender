@@ -1,11 +1,10 @@
-// Local development datasource. Production targets Azure SQL via prisma/schema.sqlserver.prisma
-// — keep both schemas' models in sync when making changes (see package.json db:* scripts).
+// Single datasource for every environment: PostgreSQL locally and on Render.
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -75,6 +74,7 @@ model User {
   clientCompanyMembership ClientCompanyMember?
   roleMemberships   UserRole[]
   emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens PasswordResetToken[]
   masterOfRetailers RetailerProfile[] @relation("MasterUser")
   teamMember        RetailerTeamMember?
   tenders           Tender[]        @relation("ClientTenders")
@@ -119,6 +119,18 @@ model EmailVerificationToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokenHash String   @unique
   expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
   createdAt DateTime @default(now())
 
   @@index([userId, expiresAt])

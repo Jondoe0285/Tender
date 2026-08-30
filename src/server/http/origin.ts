@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { additionalAllowedOrigins } from '@/server/config/appUrl';
 
 function requestOrigin(request: Request): string {
   const forwardedHost = request.headers.get('x-forwarded-host');
@@ -25,6 +26,11 @@ function isConfiguredApplicationOrigin(origin: string): boolean {
   }
 }
 
+/** A deployment may answer on more than one hostname, such as a custom domain beside the platform host. */
+function isAdditionalAllowedOrigin(origin: string): boolean {
+  return additionalAllowedOrigins().includes(origin);
+}
+
 function isLocalDevelopmentOrigin(origin: string): boolean {
   if (process.env.NODE_ENV === 'production') return false;
 
@@ -41,6 +47,7 @@ export function isSameOriginRequest(request: Request): boolean {
   if (origin) {
     return permittedOrigins(request).includes(origin)
       || isConfiguredApplicationOrigin(origin)
+      || isAdditionalAllowedOrigin(origin)
       || isLocalDevelopmentOrigin(origin);
   }
 
@@ -49,6 +56,7 @@ export function isSameOriginRequest(request: Request): boolean {
     const refererOrigin = new URL(referer).origin;
     return permittedOrigins(request).includes(refererOrigin)
       || isConfiguredApplicationOrigin(refererOrigin)
+      || isAdditionalAllowedOrigin(refererOrigin)
       || isLocalDevelopmentOrigin(refererOrigin);
   }
 

@@ -1,5 +1,6 @@
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { SiteHeader } from '@/components/layout/SiteHeader';
+import { supportEmail } from '@/lib/contact';
 
 const policies = [
   {
@@ -70,6 +71,7 @@ const policies = [
 ];
 
 export default function PoliciesPage() {
+  const support = supportEmail();
   return (
     <div className="flex min-h-screen flex-col bg-site-white">
       <SiteHeader />
@@ -83,7 +85,7 @@ export default function PoliciesPage() {
               <article key={policy.id} id={policy.id} className="scroll-mt-8 px-1 py-7 sm:px-4">
                 <h2 className="font-heading text-xl font-bold text-foundation-navy">{policy.title}</h2>
                 <p className="mt-3 max-w-3xl text-sm leading-relaxed text-concrete-grey">{policy.text}</p>
-                {policy.id === 'support' && <a href="mailto:info@sinclairsafetysolutions.co.uk" className="mt-4 inline-block font-semibold text-steel-blue underline underline-offset-4 hover:text-foundation-navy">info@sinclairsafetysolutions.co.uk</a>}
+                {policy.id === 'support' && support && <a href={`mailto:${support}`} className="mt-4 inline-block font-semibold text-steel-blue underline underline-offset-4 hover:text-foundation-navy">{support}</a>}
               </article>
             ))}
           </div>

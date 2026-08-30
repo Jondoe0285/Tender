@@ -1,0 +1,111 @@
+# Render blueprint for Trade Tender.
+#
+# Service names must match the existing Render services exactly, or Render creates duplicates
+# instead of updating them. Review the plan Render shows before applying this blueprint.
+#
+# Values marked `sync: false` are secrets or per-environment settings: set them in the Render
+# dashboard, never in git. See README "Environment origins" for the NEXTAUTH_URL of each service.
+#
+# Free-plan Postgres instances expire after 30 days; move production to a paid plan before launch.
+databases:
+  - name: tender-db
+    databaseName: tender
+    user: tender
+    plan: free
+    region: frankfurt
+
+services:
+  - type: web
+    name: Trade Tender
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    healthCheckPath: /api/health
+    buildCommand: npm ci && npm run type-check && npm run lint && npx prisma migrate deploy && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      # Production must point at its own database, never the staging instance.
+      - key: DATABASE_URL
+        sync: false
+      - key: NEXTAUTH_URL
+        sync: false
+      # Empty until a custom domain serves the app alongside the .onrender.com host.
+      - key: ADDITIONAL_ALLOWED_ORIGINS
+        sync: false
+      - key: NEXT_PUBLIC_SUPPORT_EMAIL
+        sync: false
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: REGISTRATION_NOTIFICATION_EMAIL
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      # Each environment has its own Stripe webhook and therefore its own signing secret.
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # Sentry. Empty disables the SDK; the client DSN is public by design.
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: NEXT_PUBLIC_SENTRY_ENVIRONMENT
+        value: production
+      - key: SENTRY_ENVIRONMENT
+        value: production
+      # Build-time only: enables source map upload so production stack traces are readable.
+      - key: SENTRY_AUTH_TOKEN
+        sync: false
+      - key: SENTRY_ORG
+        sync: false
+      - key: SENTRY_PROJECT
+        sync: false
+      - key: RETENTION_JOB_SECRET
+        sync: false
+
+  - type: web
+    name: Tender Staging
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: staging
+    healthCheckPath: /api/health
+    buildCommand: npm ci && npm run type-check && npm run lint && npx prisma migrate deploy && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tender-db
+          property: connectionString
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: ADDITIONAL_ALLOWED_ORIGINS
+        sync: false
+      - key: NEXT_PUBLIC_SUPPORT_EMAIL
+        sync: false
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: REGISTRATION_NOTIFICATION_EMAIL
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: RETENTION_JOB_SECRET
+        sync: false

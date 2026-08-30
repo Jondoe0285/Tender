@@ -36,7 +36,8 @@ test('rejects a local origin through a proxy in production', () => {
   const previousNodeEnvironment = process.env.NODE_ENV;
   const previousApplicationUrl = process.env.NEXTAUTH_URL;
   process.env.NODE_ENV = 'production';
-  delete process.env.NEXTAUTH_URL;
+  // Pinned so the assertion cannot be masked by an ambient NEXTAUTH_URL that is itself localhost.
+  process.env.NEXTAUTH_URL = 'https://app.example';
   try {
     const request = new Request('https://preview.example/api/tenders', {
       headers: {
@@ -71,6 +72,26 @@ test('rejects a cross-origin browser request', () => {
     headers: { origin: 'https://malicious.example' },
   });
   assert.equal(isSameOriginRequest(request), false);
+});
+
+test('accepts a configured additional origin such as a custom domain', () => {
+  const previousAdditionalOrigins = process.env.ADDITIONAL_ALLOWED_ORIGINS;
+  process.env.ADDITIONAL_ALLOWED_ORIGINS = 'https://custom.example';
+  const request = new Request('https://app.example/api/tenders', {
+    headers: { origin: 'https://custom.example' },
+  });
+  assert.equal(isSameOriginRequest(request), true);
+  process.env.ADDITIONAL_ALLOWED_ORIGINS = previousAdditionalOrigins;
+});
+
+test('still rejects an unlisted origin when additional origins are configured', () => {
+  const previousAdditionalOrigins = process.env.ADDITIONAL_ALLOWED_ORIGINS;
+  process.env.ADDITIONAL_ALLOWED_ORIGINS = 'https://custom.example';
+  const request = new Request('https://app.example/api/tenders', {
+    headers: { origin: 'https://malicious.example' },
+  });
+  assert.equal(isSameOriginRequest(request), false);
+  process.env.ADDITIONAL_ALLOWED_ORIGINS = previousAdditionalOrigins;
 });
 
 test('maps only approved roles to workspaces', () => {
