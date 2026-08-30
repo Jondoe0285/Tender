@@ -36,7 +36,7 @@ export default function HomePage() {
             <div className="max-w-2xl border-l-4 border-safety-amber pl-6 sm:pl-8">
               <p className="mb-5 text-xs font-semibold uppercase tracking-widest text-hi-viz-tint">The tender platform for construction supply</p>
               <h1 className="font-heading text-4xl font-bold leading-tight text-site-white sm:text-6xl">Trade Tender</h1>
-              <p className="mt-4 font-heading text-2xl font-semibold text-safety-amber sm:text-3xl">Build materials. Better priced.</p>
+              <p className="mt-4 font-heading text-2xl font-semibold text-safety-amber sm:text-3xl">Connect. Compare. Construct.</p>
               <p className="mt-6 max-w-xl text-lg leading-relaxed text-site-white/80">
                 Run a competitive tender for every construction requirement, from materials and plant hire to waste services, then compare clear formal quotes in one place.
               </p>

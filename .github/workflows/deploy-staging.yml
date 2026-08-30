@@ -1,0 +1,223 @@
+name: Approved Deploy to Staging
+
+# Deploys a reviewed commit from main to the staging slot and records the result.
+# A successful record from this workflow is the only thing that unlocks a production deployment.
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Exact 40-character commit SHA on main to deploy'
+        type: string
+        required: true
+      staging_approval_statement:
+        description: 'Must be exactly: DEPLOY APPROVED COMMIT TO STAGING'
+        type: string
+        required: true
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify-authorisation:
+    name: Verify staging authorisation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      verified: ${{ steps.approval.outputs.verified }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify the approval, the commit and the outstanding findings
+        id: approval
+        run: |
+          node scripts/health-check/verify-deployment-approval.mjs \
+            --target staging \
+            --sha "${{ github.event.inputs.commit_sha }}" \
+            --statement "${{ github.event.inputs.staging_approval_statement }}"
+
+  deploy:
+    name: Deploy to staging slot
+    needs: verify-authorisation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    permissions:
+      contents: read
+    outputs:
+      base_url: ${{ steps.target.outputs.base_url }}
+    steps:
+      - name: Confirm staging credentials are configured
+        env:
+          STAGING_WEBAPP_NAME: ${{ secrets.AZURE_STAGING_WEBAPP_NAME }}
+          STAGING_CREDENTIALS: ${{ secrets.AZURE_STAGING_CREDENTIALS }}
+          STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+        run: |
+          set -euo pipefail
+          MISSING=""
+          [ -n "$STAGING_WEBAPP_NAME" ] || MISSING="${MISSING} AZURE_STAGING_WEBAPP_NAME"
+          [ -n "$STAGING_CREDENTIALS" ] || MISSING="${MISSING} AZURE_STAGING_CREDENTIALS"
+          [ -n "$STAGING_BASE_URL" ] || MISSING="${MISSING} STAGING_BASE_URL"
+          if [ -n "$MISSING" ]; then
+            echo "::error::Staging deployment is not configured. Missing secrets:${MISSING}"
+            exit 1
+          fi
+          echo "Staging credentials are present."
+
+      - name: Checkout the approved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.commit_sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Confirm migrations apply to a clean database
+        run: |
+          set -euo pipefail
+          rm -f "$PWD/staging-migration-check.db"
+          DATABASE_URL="file:$PWD/staging-migration-check.db" npx prisma migrate deploy
+          rm -f "$PWD/staging-migration-check.db"
+
+      - name: Production build
+        run: npm run build
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_STAGING_CREDENTIALS }}
+
+      - name: Deploy to the staging slot
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_STAGING_WEBAPP_NAME }}
+          package: .
+
+      - name: Publish the staging URL
+        id: target
+        run: echo "base_url=${{ secrets.STAGING_BASE_URL }}" >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: Verify staging deployment
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    outputs:
+      result: ${{ steps.checks.outputs.result }}
+      record_id: ${{ steps.checks.outputs.record_id }}
+    steps:
+      - name: Checkout the approved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.commit_sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run non-destructive verification
+        id: checks
+        continue-on-error: true
+        run: |
+          node scripts/health-check/verify-deployment.mjs \
+            --base-url "${{ needs.deploy.outputs.base_url }}" \
+            --target staging \
+            --sha "${{ github.event.inputs.commit_sha }}"
+
+      - name: Upload the staging record
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-deployment-record
+          path: docs/health-check/deployments/
+          retention-days: 90
+
+      - name: Commit the staging record
+        if: steps.checks.outputs.result == 'SUCCESSFUL'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BRANCH="staging-record/${{ steps.checks.outputs.record_id }}"
+          git config user.name "trade-tender-health-check"
+          git config user.email "health-check@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add docs/health-check/deployments/
+          git commit -m "chore(staging): record ${{ steps.checks.outputs.record_id }}"
+          git push origin "$BRANCH"
+          {
+            echo "A staging record branch was pushed: $BRANCH"
+            echo "Merge it before requesting a production deployment."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail when verification did not pass
+        if: steps.checks.outputs.result != 'SUCCESSFUL'
+        run: |
+          echo "::error::STAGING DEPLOYMENT FAILED. Production deployment remains blocked."
+          exit 1
+
+  notify:
+    name: Email the staging outcome
+    needs: [verify-authorisation, deploy, verify]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Send the result
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          HEALTH_REPORT_FROM: ${{ secrets.HEALTH_REPORT_FROM }}
+          HEALTH_REPORT_TO: ${{ secrets.HEALTH_REPORT_TO }}
+        run: |
+          set -euo pipefail
+          if [ "${{ needs.verify.outputs.result }}" = "SUCCESSFUL" ]; then
+            SUBJECT="Staging deployment successful"
+          else
+            SUBJECT="STAGING DEPLOYMENT FAILED"
+          fi
+          BODY=$(printf '%s\n' \
+            "Commit: ${{ github.event.inputs.commit_sha }}" \
+            "Authorising actor: @${{ github.actor }}" \
+            "Authorisation: ${{ needs.verify-authorisation.result }}" \
+            "Deployment: ${{ needs.deploy.result }}" \
+            "Verification: ${{ needs.verify.outputs.result }}" \
+            "Record: ${{ needs.verify.outputs.record_id }}" \
+            "" \
+            "Staging success does not authorise production. A separate production approval is required.")
+          npx tsx scripts/health-check/send-workflow-email.ts "$SUBJECT" "$BODY"

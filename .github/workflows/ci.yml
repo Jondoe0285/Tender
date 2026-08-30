@@ -10,6 +10,7 @@ jobs:
   validate:
     name: Lint, type-check, tests, build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     env:

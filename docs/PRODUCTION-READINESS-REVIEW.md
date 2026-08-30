@@ -14,7 +14,7 @@ This is a point-in-time gap analysis, not a repeat of the earlier technical revi
 
 - Roles, workflow order (Raise Tender → Retailers Tender → Compare Prices → Award Contract), and the
   £10 Retailer unlock fee / £10 Client Accepted Quote Release Fee model (§5, §5.1) match the implementation.
-- Retailer subscriptions (§5.2) and tiered Client release fees (§5.1) are built but correctly gated inactive
+- Retailer subscriptions (§5.3) and tiered Client release fees (§5.1) are built but correctly gated inactive
   behind Owner-controlled platform settings, matching "must not be included in the current revenue forecast."
 - Staged visibility rules (§4.7): pre-unlock summary only, full detail after unlock, contact identities hidden
   until the release fee is confirmed — verified server-side and in rendered markup in the earlier security review.

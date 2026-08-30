@@ -207,18 +207,23 @@ Documents linked to an accepted purchase remain locked for five years. The inclu
 
 ### Seeded users
 
-`npm run db:seed` creates or refreshes the following local-only accounts. It refuses to run when
-`NODE_ENV=production`.
+`npm run db:seed` creates or refreshes the platform owner and the following canonical sandbox
+accounts. The Client and Retailer accounts use idempotent upserts, so each seed run restores them
+to an active, verified sandbox state without creating duplicates.
 
 | Role | Email | Password |
 | --- | --- | --- |
 | Super User | `PLATFORM_OWNER_EMAIL` from `.env` | `PLATFORM_OWNER_PASSWORD` from `.env` |
-| Client | `client@example.test` | `TradeTenderDev!2026` |
-| Retailer | `retailer@example.test` | `TradeTenderDev!2026` |
+| Client | `client@example.test` | `SANDBOX_USER_PASSWORD`, or `TradeTenderDev!2026` locally when unset |
+| Retailer | `retailer@example.test` | `SANDBOX_USER_PASSWORD`, or `TradeTenderDev!2026` locally when unset |
 
 Set `PLATFORM_OWNER_EMAIL` and `PLATFORM_OWNER_PASSWORD` in the ignored `.env` file before
 running the seed. The Retailer account includes a basic company profile and launch credits. The
 seed command does not create tenders, quotes, payments, or production data.
+
+For a deployed sandbox, set `TRADE_TENDER_ENV=sandbox`, `SANDBOX_SEED_ENABLED=true`, and a unique
+`SANDBOX_USER_PASSWORD`; it is required and becomes the password for both permanent sandbox users.
+This is the only production-mode exception; sandbox seeding remains blocked for every other environment.
 
 ### Run the app
 

@@ -37,15 +37,16 @@
 
 ## Brand Rules
 
-- Treat [docs/branding/TradeTender-Brand-Rules.md](../docs/branding/TradeTender-Brand-Rules.md) as the Brand Authority and source of truth for Trade Tender positioning, messaging, tone, colours, typography, imagery, icons, and interface presentation.
-- Review [docs/branding/TradeTender-Brand-Rules.md](../docs/branding/TradeTender-Brand-Rules.md) before generating React components, layouts, forms, dashboards, emails, or marketing pages.
+- Treat [docs/branding/Trade_Tender_Brand_Guide.pdf](../docs/branding/Trade_Tender_Brand_Guide.pdf) as the Brand Authority and [docs/branding/TradeTender-Brand-Rules.md](../docs/branding/TradeTender-Brand-Rules.md) as its machine-readable implementation companion.
+- Review both brand documents before generating React components, layouts, forms, dashboards, emails, or marketing pages.
 - Follow the branding file's colour, typography, logo, and UX standards exactly.
 - If generated UI conflicts with the branding document, the branding document takes precedence.
 - Trade Tender branding is mandatory.
 - Do not invent colours, fonts, layouts, or styles outside the approved branding.
-- Use the approved Foundation Navy, Safety Amber, Steel Blue, Site White, functional colours, Archivo headlines, and Inter body text.
+- Use the approved Navy, Trade Blue, Sky Blue, Steel Grey, and Light Grey palette; Montserrat headlines; and Source Sans 3 body text.
+- Use only the approved logo files in `public/images/brand/`; choose the horizontal logo on light surfaces and the dark-background logo on Navy surfaces unless a layout requires another approved variant.
 - Preserve the neutral-intermediary position and the approved construction-focused tone; do not use exaggerated marketing language or imply Trade Tender sells materials directly.
-- Keep every workflow aligned with the UX principles: Raise Tender, Retailers Tender, Compare Prices, Award Contract.
+- Keep every workflow aligned with the UX principles: Connect, Compare, Construct.
 - Flag any visual or content change that conflicts with the brand rules before implementation.
 
 ## Engineering Standards

@@ -165,7 +165,15 @@ Clients create projects, issue tenders, receive quotes, and compare responses fo
 | Client Accepted Quote Release Fee | £10 fixed fee per accepted quote after the free launch period | Simple, predictable pricing while demand and accepted-quote behaviour are validated |
 | Future tiered Client release-fee functionality | Built but inactive | May be activated by the Super User if usage, quote values, and conversion data support it |
 
-### 5.2 Future Retailer Subscription Functionality
+### 5.2 VAT on Trade Tender Fees
+
+All Trade Tender fees, membership prices, and sponsored placement prices are set and displayed exclusive of VAT. VAT is added at the prevailing platform rate when the payment is taken through Stripe, and the net fee, VAT percentage, VAT amount, and total charged are recorded against each payment.
+
+The Super User controls the VAT percentage. A rate change applies only to new payments; VAT already recorded against an existing payment is unchanged so historic records stay reconcilable. The Super User dashboard reports VAT collected on confirmed payments for the current UK financial quarter (April to March).
+
+Retailer quote prices remain a matter between Client and Retailer. Trade Tender displays those prices exclusive of VAT and does not collect or account for VAT on the final Client-Retailer transaction.
+
+### 5.3 Future Retailer Subscription Functionality
 
 | Plan | Monthly price | Included tender unlocks | Intended user |
 | --- | ---: | --- | --- |
@@ -185,7 +193,7 @@ Disputes over quotes, purchases, delivery, services, workmanship, goods, or fina
 
 ## 7. Financial Plan
 
-The forecast uses £10 per Retailer tender unlock and £10 per accepted Client quote release. It excludes VAT, payment processing fees, tax, operating costs, development costs, and staff costs.
+The forecast uses £10 per Retailer tender unlock and £10 per accepted Client quote release. These are net fees excluding VAT; applicable VAT is charged separately at payment. The forecast excludes VAT, payment processing fees, tax, operating costs, development costs, and staff costs.
 
 ### 7.1 Forecast Assumptions
 

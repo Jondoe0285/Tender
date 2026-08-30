@@ -64,7 +64,7 @@ export function SponsoredPlacementCard({ enabled, active, feeGbp }: SponsoredPla
         <StatusBadge status={isActive ? 'approved' : enabled ? 'pending' : 'neutral'}>{isActive ? 'Active' : enabled ? 'Available' : 'Inactive'}</StatusBadge>
       </div>
       {message && <p className="mt-4 text-sm font-semibold text-steel-blue">{message}</p>}
-      {!isActive && enabled && <Button className="mt-5" onClick={purchase} loading={busy}>Purchase sponsored placement · £{feeGbp}</Button>}
+      {!isActive && enabled && <Button className="mt-5" onClick={purchase} loading={busy}>Purchase sponsored placement · £{feeGbp} excl. VAT</Button>}
       {!enabled && <p className="mt-4 text-sm text-concrete-grey">Sponsored placement is not currently active.</p>}
     </Card>
   );

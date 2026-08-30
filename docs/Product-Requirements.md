@@ -64,7 +64,7 @@ Only these three roles are approved. New roles or unrelated product areas requir
 
 1. The Client starts a new tender.
 2. The Client enters project information using guided fields, dropdowns, tick boxes, and structured categories.
-3. The form captures category, subcategory, location, quantity, delivery or start date, hire duration where relevant, urgency, response deadline, budget information where applicable, access conditions, required documentation, and supporting notes or attachments.
+3. The form captures category, subcategory, location, quantity, delivery or start date, hire duration where relevant, urgency, response deadline, access conditions, required documentation, and supporting notes or attachments.
 4. The server validates and normalises all submitted values.
 5. The platform assigns a unique tender identifier, such as `TND-YYYYMMDD-000001`.
 6. The platform stores the tender and its lifecycle state.
@@ -98,6 +98,7 @@ Only these three roles are approved. New roles or unrelated product areas requir
 4. The platform assigns a linked quote identifier, such as `TND-YYYYMMDD-000001-Q01`.
 5. The Client receives the quote in the Client portal.
 6. The quote lifecycle and submission event are auditable.
+7. All Retailer line prices, quote totals, additional charges, and platform fees are stated excluding VAT. Applicable VAT is calculated separately for Trade Tender platform payments and recorded with the payment.
 
 ### 4.6 Client Quote Comparison and Acceptance
 
@@ -181,6 +182,10 @@ The Super User can, subject to authorization and audit logging:
 - **FR-053:** Payment records shall include the relevant tender or quote identifier, user or account, amount, currency, status, provider reference, and timestamps without storing prohibited payment secrets.
 - **FR-054:** Failed payments, refunds, cancellations, and waivers shall have defined states and audit events.
 - **FR-055:** Contact release shall depend on a trusted confirmed payment or approved waiver, never a client-provided status.
+- **FR-056:** All Trade Tender fees shall be configured and displayed exclusive of VAT.
+- **FR-057:** The Super User shall be able to set the platform VAT percentage between 0 and 100 with up to two decimal places, subject to Owner control and audit logging.
+- **FR-058:** The server shall calculate VAT from the current VAT percentage, charge the VAT-inclusive total through Stripe, and store the net fee, VAT percentage, VAT amount, and total against each payment.
+- **FR-059:** A later VAT percentage change shall not alter VAT already recorded against an existing payment.
 
 ### 5.7 Audit and Monitoring
 
@@ -190,6 +195,10 @@ The Super User can, subject to authorization and audit logging:
 - **FR-063:** Audit logs shall not contain secrets or unnecessary personal data.
 - **FR-064:** The Super User shall be able to review authorised audit information.
 - **FR-065:** Monitoring shall support detection of repeated parties, unusual payment behaviour, duplicate tenders, repeated cancellations, and suspicious patterns.
+- **FR-066:** The platform shall record every blocked or held content decision with the actor, content type, risk score, and detection reasons, and shall never store the blocked content itself.
+- **FR-067:** The Super User shall have a tender monitoring view that flags confidentiality-bypass attempts, near-duplicate tenders, and Retailers unlocking tender detail without quoting.
+- **FR-068:** A full Super User shall be able to record a review outcome against a blocked or held content event, and that review shall be audit logged.
+- **FR-069:** The platform shall expose an unauthenticated health endpoint reporting application and database availability without disclosing business data.
 
 ### 5.8 Reporting and Analytics
 
@@ -197,6 +206,7 @@ The Super User can, subject to authorization and audit logging:
 - **FR-071:** Reports shall support filtering by Client, Retailer, tender identifier, quote identifier, category, geography, status, date range, value band, subscription state, and payment status.
 - **FR-072:** The Super User shall be able to export approved reports without exposing unauthorised restricted details.
 - **FR-073:** Analytics shall show conversion across tender submission, unlock, quote submission, Client acceptance, and Retailer confirmation.
+- **FR-074:** The Super User dashboard shall report VAT collected on confirmed Trade Tender payments for the current UK financial quarter.
 
 ### 5.9 Notifications
 

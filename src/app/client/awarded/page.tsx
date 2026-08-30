@@ -34,7 +34,7 @@ export default async function AwardedProjectsPage() {
                     </p>
                     <h3 className="font-heading text-lg font-bold text-foundation-navy">{quote.tender.subcategory}</h3>
                     <p className="mt-1 text-sm text-concrete-grey">
-                      {quote.tender.location} &middot; Awarded at &pound;{quote.priceGbp}
+                      {quote.tender.location} &middot; Awarded at &pound;{quote.priceGbp} excl. VAT
                     </p>
                   </div>
                   <StatusBadge status="approved">Awarded</StatusBadge>

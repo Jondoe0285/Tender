@@ -67,7 +67,7 @@ export default async function RetailerPage() {
         distanceMiles: estimateDistanceMiles(coverageAreas, tender.location),
         requirements: tender.requirements,
         closingDate: tender.closingDate,
-        unlockFeeLabel: unlocked ? 'Unlocked' : hasCredits ? 'Free (launch credit)' : `£${unlockFeeGbp}`,
+        unlockFeeLabel: unlocked ? 'Unlocked' : hasCredits ? 'Free (launch credit)' : `£${unlockFeeGbp} excl. VAT`,
         unlocked,
         isNew: !viewedAt,
         strongMatch,

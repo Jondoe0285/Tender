@@ -26,7 +26,6 @@ const STEPS: WizardStep[] = [
 
 type FormState = {
   projectName: string;
-  budget: string;
   category: ServiceName | '';
   subcategory: string;
   item: string;
@@ -37,6 +36,7 @@ type FormState = {
   description: string;
   urgency: string;
   closingDate: string;
+  supplyDate: string;
   items: TenderItem[];
 };
 
@@ -52,7 +52,6 @@ type TenderItem = {
 
 const EMPTY_FORM: FormState = {
   projectName: '',
-  budget: '',
   category: '',
   subcategory: '',
   item: '',
@@ -63,6 +62,7 @@ const EMPTY_FORM: FormState = {
   description: '',
   urgency: '',
   closingDate: '',
+  supplyDate: '',
   items: [],
 };
 
@@ -172,11 +172,9 @@ export default function NewTenderPage() {
     if (targetStep === 4) {
       if (!form.quantityValue.trim()) next.quantityValue = 'Enter a quantity.';
       if (!form.quantityUnit) next.quantityUnit = 'Select a unit.';
-      if (form.description.trim().length < 10) next.description = 'Add a short specification (at least 10 characters).';
       form.items.forEach((item, index) => {
         if (!item.quantityValue.trim()) next[`item-${index}-quantity`] = 'Enter a quantity.';
         if (!item.quantityUnit) next[`item-${index}-unit`] = 'Select a unit.';
-        if (item.description.trim().length < 10) next[`item-${index}-description`] = 'Add a specification (at least 10 characters).';
       });
     }
     if (targetStep === 5) {
@@ -251,7 +249,7 @@ export default function NewTenderPage() {
           quantity: `${form.quantityValue} ${form.quantityUnit}`.trim(),
           urgency: form.urgency,
           closingDate: form.closingDate,
-          budget: form.budget || undefined,
+          supplyDate: form.supplyDate || undefined,
           requirements: form.requirements,
           description: form.description,
           items: form.items.map((item) => ({
@@ -328,17 +326,6 @@ export default function NewTenderPage() {
               />
               {errors.projectName && <p className="text-sm font-semibold text-attention">{errors.projectName}</p>}
             </FieldGroup>
-            <FieldGroup>
-              <Label htmlFor="budget">Estimated budget (optional)</Label>
-              <Input
-                id="budget"
-                type="number"
-                min="0"
-                placeholder="GBP"
-                value={form.budget}
-                onChange={(event) => update('budget', event.target.value)}
-              />
-            </FieldGroup>
           </Card>
         )}
 
@@ -365,6 +352,16 @@ export default function NewTenderPage() {
                 ))}
               </Select>
               {errors.category && <p className="text-sm font-semibold text-attention">{errors.category}</p>}
+            </FieldGroup>
+            <FieldGroup>
+              <Label htmlFor="supply-date">Delivery or supply date (optional)</Label>
+              <Input
+                id="supply-date"
+                type="date"
+                value={form.supplyDate}
+                onChange={(event) => update('supplyDate', event.target.value)}
+              />
+              {errors.supplyDate && <p className="text-sm font-semibold text-attention">{errors.supplyDate}</p>}
             </FieldGroup>
             <FieldGroup>
               <Label htmlFor="subcategory">Category</Label>
@@ -513,7 +510,7 @@ export default function NewTenderPage() {
               </FieldGroup>
             </div>
             <FieldGroup>
-              <Label htmlFor="description">Specification and notes</Label>
+              <Label htmlFor="description">Specification and notes (optional)</Label>
               <Textarea
                 id="description"
                 rows={6}
@@ -546,7 +543,7 @@ export default function NewTenderPage() {
                         </FieldGroup>
                       </div>
                       <FieldGroup>
-                        <Label htmlFor={`item-${index}-description`}>Item specification</Label>
+                        <Label htmlFor={`item-${index}-description`}>Item specification (optional)</Label>
                         <Textarea id={`item-${index}-description`} rows={3} value={item.description} placeholder="Add the specification or delivery requirement for this item." onChange={(event) => updateItem(index, 'description', event.target.value)} />
                         {errors[`item-${index}-description`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-description`]}</p>}
                       </FieldGroup>
@@ -640,13 +637,13 @@ export default function NewTenderPage() {
             <h2 className="font-heading text-lg font-bold text-foundation-navy">Review &amp; Submit</h2>
             <dl className="grid gap-4 sm:grid-cols-2">
               <ReviewItem label="Tender name" value={form.projectName} />
-              <ReviewItem label="Budget" value={form.budget ? `£${form.budget}` : 'Not specified'} />
               <ReviewItem label="Category" value={`${form.category} / ${form.subcategory}`} />
               <ReviewItem label="Delivery postcode" value={form.location} />
               <ReviewItem label="Requirements" value={form.requirements.join(', ') || 'None'} />
               <ReviewItem label="Quantity" value={`${form.quantityValue} ${form.quantityUnit}`.trim()} />
               <ReviewItem label="Urgency" value={form.urgency} />
               <ReviewItem label="Closing date" value={form.closingDate} />
+              <ReviewItem label="Delivery or supply date" value={form.supplyDate || 'Not specified'} />
               <ReviewItem label="Tender items" value={`${form.items.length + 1} item(s)`} />
               <ReviewItem
                 label="Attachments"

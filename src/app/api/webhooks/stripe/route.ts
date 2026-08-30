@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       const confirmed = event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded';
       const paymentBeforeUpdate = await prisma.payment.findUnique({ where: { id: paymentId } });
       if (!paymentBeforeUpdate || paymentBeforeUpdate.stripeEventId) return NextResponse.json({ received: true });
-      if (confirmed && event.type !== 'payment_intent.payment_failed' && session.amount_total !== null && session.amount_total !== Math.floor(paymentBeforeUpdate.amountGbp * 100)) {
+      if (confirmed && event.type !== 'payment_intent.payment_failed' && session.amount_total !== null && session.amount_total !== Math.round(paymentBeforeUpdate.totalAmountGbp * 100)) {
         return NextResponse.json({ error: 'Payment amount mismatch' }, { status: 400 });
       }
       const receiptUrl = confirmed ? await getReceiptUrl(stripe, session).catch(() => null) : null;
@@ -82,8 +82,8 @@ export async function POST(request: Request) {
         const reference = payment.quote?.reference ?? payment.unlock?.tender.reference ?? paymentId;
         const accountPath = payment.type === 'CLIENT_RELEASE' ? '/client/billing' : '/retailer/billing';
         const template = confirmed
-          ? paymentConfirmationTemplate({ paymentType: payment.type === 'RETAILER_UNLOCK' ? 'Retailer tender unlock fee' : payment.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : payment.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : 'Client Accepted Quote Release Fee', amountGbp: payment.amountGbp, reference, accountPath })
-          : failedPaymentTemplate({ paymentType: payment.type === 'RETAILER_UNLOCK' ? 'Retailer tender unlock fee' : payment.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : payment.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : 'Client Accepted Quote Release Fee', amountGbp: payment.amountGbp, reference, retryPath: accountPath });
+          ? paymentConfirmationTemplate({ paymentType: payment.type === 'RETAILER_UNLOCK' ? 'Retailer tender unlock fee' : payment.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : payment.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : 'Client Accepted Quote Release Fee', amountGbp: payment.amountGbp, vatGbp: payment.vatGbp, totalAmountGbp: payment.totalAmountGbp, reference, accountPath })
+          : failedPaymentTemplate({ paymentType: payment.type === 'RETAILER_UNLOCK' ? 'Retailer tender unlock fee' : payment.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : payment.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : 'Client Accepted Quote Release Fee', amountGbp: payment.amountGbp, vatGbp: payment.vatGbp, totalAmountGbp: payment.totalAmountGbp, reference, retryPath: accountPath });
         await sendTransactionalEmail(payment.user.email, template).catch(() => undefined);
       }
     }

@@ -1,0 +1,272 @@
+name: Weekly Repository Health Check
+
+# Human-controlled repository audit. This workflow never modifies application code,
+# never merges and never deploys. It produces evidence for a human decision.
+#
+# Timezone: GitHub Actions cron is UTC only. Europe/London is UTC in winter (GMT) and
+# UTC+1 in summer (BST). Both candidate times are scheduled and a guard step allows exactly
+# one run per week at 00:00 Europe/London. UTC midnight does NOT always equal UK midnight.
+on:
+  schedule:
+    - cron: '0 23 * * 5'   # 23:00 UTC Friday  = 00:00 Saturday Europe/London during BST
+    - cron: '0 0 * * 6'    # 00:00 UTC Saturday = 00:00 Saturday Europe/London during GMT
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Audit scope'
+        type: choice
+        options: [full, fast, security]
+        default: full
+        required: true
+      reason:
+        description: 'Reason for the manual audit (recorded in the report)'
+        type: string
+        required: false
+  repository_dispatch:
+    # Authorised Super User control. The application requests the run through a token that
+    # can only dispatch this event; it never receives repository write credentials.
+    types: [super-user-health-check]
+
+concurrency:
+  group: repository-health-check
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  AUDIT_SCOPE: ${{ github.event.inputs.scope || github.event.client_payload.scope || 'full' }}
+
+jobs:
+  schedule-guard:
+    name: Confirm this run is due
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      proceed: ${{ steps.guard.outputs.proceed }}
+    steps:
+      - name: Evaluate Europe/London local time
+        id: guard
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "Manual or dispatched run — proceeding."
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          LOCAL_DOW=$(TZ=Europe/London date +%u)
+          LOCAL_HOUR=$(TZ=Europe/London date +%H)
+          echo "Europe/London now: $(TZ=Europe/London date --iso-8601=seconds) (day $LOCAL_DOW hour $LOCAL_HOUR)"
+          if [ "$LOCAL_DOW" = "6" ] && [ "$LOCAL_HOUR" = "00" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Not 00:00 Saturday Europe/London — this cron entry is the other seasonal slot."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  audit:
+    name: Read-only repository audit
+    needs: schedule-guard
+    if: needs.schedule-guard.outputs.proceed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Read-only. This job runs repository test commands and must never hold write or
+    # production credentials.
+    permissions:
+      contents: read
+    env:
+      NODE_ENV: test
+      DATABASE_URL: file:./health-check.db
+      NEXTAUTH_SECRET: health-check-placeholder-secret
+      NEXTAUTH_URL: http://localhost:3000
+      RESEND_API_KEY: ''
+      RESEND_FROM_EMAIL: Trade Tender <no-reply@example.test>
+      STRIPE_SECRET_KEY: sk_test_health_check_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_health_check_placeholder
+      RETENTION_JOB_SECRET: health-check-placeholder-secret
+    outputs:
+      status: ${{ steps.audit.outputs.status }}
+      release: ${{ steps.audit.outputs.release }}
+      report_branch: ${{ steps.audit.outputs.report_branch }}
+      report_title: ${{ steps.audit.outputs.report_title }}
+      archive_markdown: ${{ steps.audit.outputs.archive_markdown }}
+      critical: ${{ steps.audit.outputs.critical }}
+      high: ${{ steps.audit.outputs.high }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Prepare synthetic audit database
+        run: npx prisma migrate deploy
+
+      - name: Validate workflow definitions
+        run: |
+          python3 -c "import yaml,glob,sys;[yaml.safe_load(open(f)) for f in glob.glob('.github/workflows/*.yml')]" \
+            || { echo '::error::A workflow file is not valid YAML.'; exit 1; }
+          node scripts/health-check/validate-workflows.mjs
+
+      - name: Run audit
+        id: audit
+        timeout-minutes: 35
+        run: node scripts/health-check/run-audit.mjs
+
+      - name: Upload reports and sanitised logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: health-check-reports
+          path: |
+            docs/health-check/latest.md
+            docs/health-check/latest.json
+            docs/health-check/run-summary.json
+            docs/health-check/archive/
+          retention-days: 90
+          if-no-files-found: error
+
+  publish-report:
+    name: Publish report branch and pull request
+    needs: audit
+    if: always() && needs.audit.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Write access is isolated to this job and is limited to a report-only branch and PR.
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      report_pr_url: ${{ steps.publish.outputs.report_pr_url }}
+      publish_status: ${{ steps.publish.outputs.publish_status }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download reports
+        uses: actions/download-artifact@v4
+        with:
+          name: health-check-reports
+          path: docs/health-check
+
+      - name: Create report branch and pull request
+        id: publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPORT_BRANCH: ${{ needs.audit.outputs.report_branch }}
+          REPORT_TITLE: ${{ needs.audit.outputs.report_title }}
+          AUDIT_STATUS: ${{ needs.audit.outputs.status }}
+          AUDIT_RELEASE: ${{ needs.audit.outputs.release }}
+        run: |
+          set +e
+          git config user.name "trade-tender-health-check[bot]"
+          git config user.email "health-check@users.noreply.github.com"
+          git checkout -b "$REPORT_BRANCH"
+          git add docs/health-check/latest.md docs/health-check/latest.json docs/health-check/archive
+          git commit -m "$REPORT_TITLE"
+          if ! git push origin "$REPORT_BRANCH"; then
+            echo "publish_status=FAILED" >> "$GITHUB_OUTPUT"
+            echo "report_pr_url=Branch push failed; reports preserved as workflow artifacts." >> "$GITHUB_OUTPUT"
+            echo "::error::Report branch push failed. Reports remain available as workflow artifacts."
+            exit 1
+          fi
+          {
+            echo "Automated repository health check. Report only - no application code is changed by this pull request."
+            echo ""
+            echo "**Overall status:** $AUDIT_STATUS"
+            echo "**Release recommendation:** $AUDIT_RELEASE"
+            echo ""
+            echo "Do not merge this pull request as an approval to release. To authorise a fix, copy the"
+            echo "AUTHORISATION REQUEST block from the report and run the *Approved Fix Implementation* workflow."
+          } > "$RUNNER_TEMP/report-pr-body.md"
+          PR_URL=$(gh pr create --base main --head "$REPORT_BRANCH" \
+            --title "$REPORT_TITLE" \
+            --body-file "$RUNNER_TEMP/report-pr-body.md")
+          if [ -z "$PR_URL" ]; then
+            echo "publish_status=FAILED" >> "$GITHUB_OUTPUT"
+            echo "report_pr_url=Pull request creation failed; reports preserved as workflow artifacts." >> "$GITHUB_OUTPUT"
+            echo "::error::Report pull request creation failed."
+            exit 1
+          fi
+          echo "publish_status=CREATED" >> "$GITHUB_OUTPUT"
+          echo "report_pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+
+  notify:
+    name: Send Resend health report
+    needs: [audit, publish-report]
+    if: always() && needs.audit.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Download reports
+        uses: actions/download-artifact@v4
+        with:
+          name: health-check-reports
+          path: docs/health-check
+
+      - name: Send report
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          HEALTH_REPORT_FROM: ${{ secrets.HEALTH_REPORT_FROM }}
+          HEALTH_REPORT_TO: ${{ secrets.HEALTH_REPORT_TO }}
+          REPORT_PR_URL: ${{ needs.publish-report.outputs.report_pr_url }}
+        run: npx tsx scripts/health-check/send-report-email.ts
+
+  summary:
+    name: Record audit outcome
+    needs: [audit, publish-report, notify]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Write summary
+        run: |
+          {
+            echo "## Weekly repository health check"
+            echo ""
+            echo "| Item | Result |"
+            echo "| --- | --- |"
+            echo "| Audit | ${{ needs.audit.result }} |"
+            echo "| Overall status | ${{ needs.audit.outputs.status }} |"
+            echo "| Release recommendation | ${{ needs.audit.outputs.release }} |"
+            echo "| Critical findings | ${{ needs.audit.outputs.critical }} |"
+            echo "| High findings | ${{ needs.audit.outputs.high }} |"
+            echo "| Report publication | ${{ needs.publish-report.result }} |"
+            echo "| Email delivery | ${{ needs.notify.result }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ needs.notify.result }}" = "failure" ]; then
+            echo "::error::EMAIL DELIVERY FAILED. The technical report was still generated and preserved."
+          fi
+          if [ "${{ needs.publish-report.result }}" = "failure" ]; then
+            echo "::error::Report publication failed. Reports remain available as workflow artifacts."
+          fi
+          if [ "${{ needs.audit.outputs.status }}" = "FAIL" ] || [ "${{ needs.audit.outputs.status }}" = "INCOMPLETE" ]; then
+            echo "::error::Audit result ${{ needs.audit.outputs.status }} — release is blocked until findings are addressed."
+            exit 1
+          fi

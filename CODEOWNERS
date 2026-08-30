@@ -1,0 +1,13 @@
+# Every change to main requires review by the platform owners.
+# Required for the Approved Merge workflow's review-approval condition.
+*                           @Jondoe0285
+
+# Release, security and data controls require explicit owner review.
+/.github/workflows/         @Jondoe0285
+/prisma/                    @Jondoe0285
+/src/server/payments/       @Jondoe0285
+/src/server/auth/           @Jondoe0285
+/src/server/moderation/     @Jondoe0285
+/src/app/api/webhooks/      @Jondoe0285
+/docs/health-check/         @Jondoe0285
+/CODEOWNERS                 @Jondoe0285

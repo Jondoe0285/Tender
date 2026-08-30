@@ -1,0 +1,119 @@
+name: Approved Promote to Staging Branch
+
+# Moves the permanent staging branch to an approved commit on main.
+# It does not deploy and does not modify main.
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Exact 40-character commit SHA on main to promote to staging'
+        type: string
+        required: true
+      promotion_approval_statement:
+        description: 'Must be exactly: PROMOTE APPROVED COMMIT TO STAGING BRANCH'
+        type: string
+        required: true
+
+concurrency:
+  group: promote-staging-branch
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify staging branch promotion
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify the promotion approval and commit
+        run: |
+          node scripts/health-check/verify-deployment-approval.mjs \
+            --target staging-branch \
+            --sha "${{ github.event.inputs.commit_sha }}" \
+            --statement "${{ github.event.inputs.promotion_approval_statement }}"
+
+  promote:
+    name: Promote commit to staging branch
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout the approved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.commit_sha }}
+          fetch-depth: 0
+
+      - name: Move staging branch to the approved commit
+        run: |
+          set -euo pipefail
+          git push origin "${{ github.event.inputs.commit_sha }}:refs/heads/staging"
+          {
+            echo "## Staging branch promoted"
+            echo ""
+            echo "- Branch: staging"
+            echo "- Commit: \`${{ github.event.inputs.commit_sha }}\`"
+            echo "- Authorising actor: @${{ github.actor }}"
+            echo ""
+            echo "This promotion does not deploy. Run Approved Deploy to Staging after promotion."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  notify:
+    name: Email the staging branch promotion outcome
+    needs: [verify, promote]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Send the result
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          HEALTH_REPORT_FROM: ${{ secrets.HEALTH_REPORT_FROM }}
+          HEALTH_REPORT_TO: ${{ secrets.HEALTH_REPORT_TO }}
+        run: |
+          set -euo pipefail
+          if [ "${{ needs.promote.result }}" = "success" ]; then
+            SUBJECT="Staging branch promotion completed"
+          else
+            SUBJECT="STAGING BRANCH PROMOTION BLOCKED"
+          fi
+          BODY=$(printf '%s\n' \
+            "Commit: ${{ github.event.inputs.commit_sha }}" \
+            "Authorising actor: @${{ github.actor }}" \
+            "Verification: ${{ needs.verify.result }}" \
+            "Promotion: ${{ needs.promote.result }}" \
+            "" \
+            "Promotion to staging does not authorise deployment.")
+          npx tsx scripts/health-check/send-workflow-email.ts "$SUBJECT" "$BODY"

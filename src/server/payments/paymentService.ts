@@ -1,10 +1,14 @@
 import { prisma } from '@/server/data/prisma';
 import { getStripeClient, isStripeConfigured } from '@/server/payments/stripeClient';
 import type { PaymentType } from '@prisma/client';
-import { getClientReleaseFeeGbp, getPaymentFeeGbp } from '@/server/domain/platformSettings';
+import { buildPaymentAmounts, getClientReleaseFeeGbp, getPaymentFeeGbp, getVatPercentage } from '@/server/domain/platformSettings';
 
 type CreatePaymentResult = {
   paymentId: string;
+  amountGbp: number;
+  vatPercentage: number;
+  vatGbp: number;
+  totalAmountGbp: number;
   /** Present only when Stripe is configured — the client must redirect here to pay. */
   checkoutUrl: string | null;
   /** True when running without Stripe keys: the caller may use the dev-only confirm endpoint. */
@@ -25,13 +29,18 @@ export async function createPayment(params: {
   quoteId?: string;
   quotePriceGbp?: number;
 }): Promise<CreatePaymentResult> {
-  const amountGbp = params.type === 'CLIENT_RELEASE' && params.quotePriceGbp !== undefined
+  const netFeeGbp = params.type === 'CLIENT_RELEASE' && params.quotePriceGbp !== undefined
     ? await getClientReleaseFeeGbp(params.quotePriceGbp)
     : await getPaymentFeeGbp(params.type);
+  const vatPercentage = await getVatPercentage();
+  const { amountGbp, vatGbp, totalAmountGbp, netPence, vatPence } = buildPaymentAmounts(netFeeGbp, vatPercentage);
   const payment = await prisma.payment.create({
     data: {
       type: params.type,
       amountGbp,
+      vatPercentage,
+      vatGbp,
+      totalAmountGbp,
       userId: params.userId,
       tenderId: params.tenderId,
       tierId: params.tierId,
@@ -42,7 +51,7 @@ export async function createPayment(params: {
 
   const stripe = getStripeClient();
   if (!stripe) {
-    return { paymentId: payment.id, checkoutUrl: null, devMode: true };
+    return { paymentId: payment.id, amountGbp, vatPercentage, vatGbp, totalAmountGbp, checkoutUrl: null, devMode: true };
   }
 
   const checkoutSession = await stripe.checkout.sessions.create({
@@ -52,15 +61,23 @@ export async function createPayment(params: {
       {
         price_data: {
           currency: 'gbp',
-          unit_amount: Math.floor(amountGbp * 100),
-          product_data: { name: params.type === 'RETAILER_UNLOCK' ? 'Tender unlock fee' : params.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : params.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : 'Accepted quote release fee' },
+          unit_amount: netPence,
+          product_data: { name: `${params.type === 'RETAILER_UNLOCK' ? 'Tender unlock fee' : params.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : params.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : 'Accepted quote release fee'} (excl. VAT)` },
         },
         quantity: 1,
       },
+      ...(vatPence > 0 ? [{
+        price_data: {
+          currency: 'gbp',
+          unit_amount: vatPence,
+          product_data: { name: `VAT (${vatPercentage}%)` },
+        },
+        quantity: 1,
+      }] : []),
     ],
     success_url: `${process.env.NEXTAUTH_URL}/payment/success?payment_id=${payment.id}`,
     cancel_url: `${process.env.NEXTAUTH_URL}/payment/cancelled?payment_id=${payment.id}`,
-    metadata: { paymentId: payment.id },
+    metadata: { paymentId: payment.id, vatPercentage: String(vatPercentage) },
   });
 
   await prisma.payment.update({
@@ -68,7 +85,7 @@ export async function createPayment(params: {
     data: { stripePaymentIntentId: checkoutSession.id, stripeCheckoutUrl: checkoutSession.url },
   });
 
-  return { paymentId: payment.id, checkoutUrl: checkoutSession.url, devMode: false };
+  return { paymentId: payment.id, amountGbp, vatPercentage, vatGbp, totalAmountGbp, checkoutUrl: checkoutSession.url, devMode: false };
 }
 
 /**

@@ -64,13 +64,14 @@ export function ExecutiveDashboard({ data }: Props) {
         </div>
       </form>
 
-      <div className="mb-8 grid gap-5 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="mb-8 grid gap-5 sm:grid-cols-3 lg:grid-cols-7">
         <Metric label="New tenders" value={data.totals.newTenders} hint="Last 30 days" />
         <Metric label="Tender volume" value={data.totals.tenderVolume} hint="Filtered period" />
         <Metric label="Retailer unlocks" value={data.totals.retailerUnlocks} hint={`${data.rates.matchRate}% of tenders`} />
         <Metric label="Quotes submitted" value={data.totals.quotesSubmitted} hint={`${data.rates.quoteRate}% after unlock`} />
         <Metric label="Accepted quotes" value={data.totals.acceptedQuotes} hint={`${data.rates.acceptanceRate}% acceptance`} />
-        <Metric label="Revenue" value={money.format(data.totals.revenue)} hint="Confirmed fees" />
+        <Metric label="Fee revenue" value={`${money.format(data.totals.revenue)} excl. VAT`} hint="Confirmed fees" />
+        <Metric label="VAT collected" value={money.format(data.financialQuarter.vatCollectedGbp)} hint={data.financialQuarter.label} />
       </div>
 
       <Card className="mb-8 border-l-4 border-l-safety-amber bg-amber-50/40">

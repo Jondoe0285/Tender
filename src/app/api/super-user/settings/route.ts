@@ -10,7 +10,7 @@ import { requireOwner } from '@/server/auth/session';
 const settingSchema = z.object({
   action: z.enum(['fee', 'tier', 'subscription']),
   id: z.string().optional(),
-  key: z.enum(['RETAILER_UNLOCK_FEE_GBP', 'CLIENT_RELEASE_FEE_GBP', 'CLIENT_RELEASE_FEE_MODE', 'CLIENT_RELEASE_PERCENTAGE_LOW', 'CLIENT_RELEASE_PERCENTAGE_HIGH', 'SPONSORED_PLACEMENT_ACTIVE', 'SPONSORED_PLACEMENT_FEE_GBP', 'MEMBERSHIP_TIERS_ACTIVE', 'ADSPACE_ACTIVE']).optional(),
+  key: z.enum(['RETAILER_UNLOCK_FEE_GBP', 'CLIENT_RELEASE_FEE_GBP', 'CLIENT_RELEASE_FEE_MODE', 'CLIENT_RELEASE_PERCENTAGE_LOW', 'CLIENT_RELEASE_PERCENTAGE_HIGH', 'VAT_PERCENTAGE', 'SPONSORED_PLACEMENT_ACTIVE', 'SPONSORED_PLACEMENT_FEE_GBP', 'MEMBERSHIP_TIERS_ACTIVE', 'ADSPACE_ACTIVE']).optional(),
   value: z.union([z.number().nonnegative(), z.enum(['FIXED', 'PERCENTAGE']), z.boolean()]).optional(),
   name: z.string().trim().min(2).max(80).optional(),
   description: z.string().trim().max(500).optional(),
@@ -44,7 +44,7 @@ export async function PATCH(request: Request) {
     if (input.key === 'CLIENT_RELEASE_FEE_MODE' && typeof input.value !== 'string') return NextResponse.json({ error: 'A fee mode is required' }, { status: 400 });
     if (['SPONSORED_PLACEMENT_ACTIVE', 'MEMBERSHIP_TIERS_ACTIVE', 'ADSPACE_ACTIVE'].includes(input.key) && typeof input.value !== 'boolean') return NextResponse.json({ error: 'An active flag is required' }, { status: 400 });
     if (!['CLIENT_RELEASE_FEE_MODE', 'SPONSORED_PLACEMENT_ACTIVE', 'MEMBERSHIP_TIERS_ACTIVE', 'ADSPACE_ACTIVE'].includes(input.key) && typeof input.value !== 'number') return NextResponse.json({ error: 'A numeric fee value is required' }, { status: 400 });
-    if (input.key.includes('PERCENTAGE') && typeof input.value === 'number' && (input.value > 100 || Math.round(input.value * 100) !== input.value * 100)) return NextResponse.json({ error: 'Percentage must be between 0 and 100 with up to two decimal places' }, { status: 400 });
+    if ((input.key.includes('PERCENTAGE') || input.key === 'VAT_PERCENTAGE') && typeof input.value === 'number' && (input.value > 100 || Math.round(input.value * 100) !== input.value * 100)) return NextResponse.json({ error: 'Percentage must be between 0 and 100 with up to two decimal places' }, { status: 400 });
     await prisma.platformSetting.upsert({ where: { key: input.key }, update: { value: String(input.value) }, create: { key: input.key, value: String(input.value) } });
     await recordAuditEvent({ actorId: admin.id, action: 'PLATFORM_FEE_UPDATED', targetType: 'PlatformSetting', targetId: input.key, metadata: { value: input.value } });
     return NextResponse.json({ status: 'updated' });

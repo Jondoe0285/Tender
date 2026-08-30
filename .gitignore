@@ -39,3 +39,7 @@ prisma/dev.db-journal
 *.swp
 *.swo
 *~
+
+# Health-check disposable databases
+health-check*.db
+prisma/health-check*.db

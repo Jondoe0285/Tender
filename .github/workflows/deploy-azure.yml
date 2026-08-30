@@ -1,20 +1,32 @@
 name: Deploy to Azure App Service
 
+# Break-glass manual deployment, retained for emergency use only.
+# The routine, gated release path is deploy-production.yml. The push trigger was removed so that
+# merging to main is no longer the same action as releasing to production.
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 jobs:
   deploy:
     name: Azure deployment
-    if: ${{ secrets.AZURE_WEBAPP_NAME != '' && secrets.AZURE_CREDENTIALS != '' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: production
     permissions:
       contents: read
 
     steps:
+      - name: Confirm credentials are configured
+        env:
+          WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
+          CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        run: |
+          set -euo pipefail
+          if [ -z "$WEBAPP_NAME" ] || [ -z "$CREDENTIALS" ]; then
+            echo "::error::Deployment is not configured. AZURE_WEBAPP_NAME and AZURE_CREDENTIALS are required."
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
 

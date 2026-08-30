@@ -34,16 +34,26 @@ test('accepts the direct local origin when a development proxy adds forwarded he
 
 test('rejects a local origin through a proxy in production', () => {
   const previousNodeEnvironment = process.env.NODE_ENV;
+  const previousApplicationUrl = process.env.NEXTAUTH_URL;
   process.env.NODE_ENV = 'production';
-  const request = new Request('https://preview.example/api/tenders', {
-    headers: {
-      origin: 'http://localhost:3000',
-      'x-forwarded-host': 'preview.example',
-      'x-forwarded-proto': 'https',
-    },
-  });
-  assert.equal(isSameOriginRequest(request), false);
-  process.env.NODE_ENV = previousNodeEnvironment;
+  delete process.env.NEXTAUTH_URL;
+  try {
+    const request = new Request('https://preview.example/api/tenders', {
+      headers: {
+        origin: 'http://localhost:3000',
+        'x-forwarded-host': 'preview.example',
+        'x-forwarded-proto': 'https',
+      },
+    });
+    assert.equal(isSameOriginRequest(request), false);
+  } finally {
+    process.env.NODE_ENV = previousNodeEnvironment;
+    if (previousApplicationUrl === undefined) {
+      delete process.env.NEXTAUTH_URL;
+    } else {
+      process.env.NEXTAUTH_URL = previousApplicationUrl;
+    }
+  }
 });
 
 test('accepts the configured application origin through a development proxy', () => {

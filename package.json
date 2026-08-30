@@ -18,7 +18,13 @@
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
     "db:seed-fake-tenders": "tsx --env-file=.env scripts/seed-fake-tenders.ts",
     "db:sync-prod-schema": "node scripts/generate-sqlserver-schema.js",
-    "retention:purge": "tsx --env-file=.env scripts/purge-retention.ts"
+    "retention:purge": "tsx --env-file=.env scripts/purge-retention.ts",
+    "health:audit": "node scripts/health-check/run-audit.mjs",
+    "health:validate-workflows": "node scripts/health-check/validate-workflows.mjs",
+    "health:verify-approval": "node scripts/health-check/verify-approval.mjs",
+    "health:verify-deploy-approval": "node scripts/health-check/verify-deployment-approval.mjs",
+    "health:verify-deployment": "node scripts/health-check/verify-deployment.mjs",
+    "health:email": "tsx scripts/health-check/send-report-email.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

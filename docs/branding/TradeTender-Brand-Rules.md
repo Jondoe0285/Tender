@@ -1,19 +1,22 @@
 # Trade Tender Brand Rules
 
-**Source authority:** Trade Tender Brand Guidelines v1.0  
+**Source authority:** [Trade Tender Brand Guide PDF](Trade_Tender_Brand_Guide.pdf)
 **Date:** August 2026
+**Approved artwork:** `Trade_Tender_*_Logo.png` files in this directory. The application copies the approved serving variants to `public/images/brand/`.
 
 ## Brand Positioning
 
-Trade Tender is **the neutral intermediary of the construction supply chain**.
+Trade Tender connects construction buyers and retailers through a clear tender and quotation process.
 
 Construction buying is often opaque, slow, and relationship-driven. Trade Tender exists to make the process transparent, fast, and fair.
 
 The platform is:
 
-- Trusted by buyers.
-- Valued by merchants.
-- Neutral to both sides.
+- Trust.
+- Simplicity.
+- Collaboration.
+- Efficiency.
+- Professionalism.
 
 ## Core Brand Personality
 
@@ -60,11 +63,10 @@ Never use excessive marketing language or imply that Trade Tender sells material
 
 | Message | Approved wording |
 | --- | --- |
-| Primary tagline | **Build materials. Better priced.** |
+| Primary tagline | **Connect. Compare. Construct.** |
 | Short descriptor | **The tender platform for construction supply.** |
-| Boilerplate | Trade Tender is a SaaS platform that connects construction clients with verified retailers, running a competitive tender on every requirement to secure better pricing. |
-| Client message | **One requirement in. Competing trade prices back.** |
-| Retailer message | **Qualified demand, clearly specified.** |
+| Client message | Clear requirements. Comparable formal quotes. |
+| Retailer message | Qualified construction demand, clearly specified. |
 
 ## Visual Direction
 
@@ -80,22 +82,17 @@ Never use excessive marketing language or imply that Trade Tender sells material
 
 | Colour | Hex | Approved use |
 | --- | --- | --- |
-| Foundation Navy | `#0E1C2E` | Primary brand and structural elements |
-| Safety Amber | `#F5A524` | Primary action accent |
-| Steel Blue | `#1D3D5C` | Secondary actions and supporting structure |
-| Site White | `#F4F6F8` | Primary background |
-| Hi-Viz Tint | `#FFD166` | Supporting highlight |
-| Concrete Grey | `#8A94A0` | Muted text and neutral UI |
-| Ink | `#0A0F16` | High-contrast text |
-| Approved | `#2E7D32` | Approved and successful states |
-| Attention | `#B23B3B` | Attention and error states |
-| Pending | `#C77D11` | Pending states |
+| Navy | `#0D1B2A` | Primary brand and structural elements |
+| Trade Blue | `#1D6FB8` | Primary actions and emphasis |
+| Sky Blue | `#6EB1E4` | Supporting accent and hover states |
+| Steel Grey | `#6B7280` | Muted text and neutral UI |
+| Light Grey | `#F2F4F7` | Primary background |
 
 ### 4.1 Colour Rules
 
-- Use 60% Site White or Foundation Navy, 25% Steel Blue, 10% Safety Amber, and 5% functional colours.
-- Use Safety Amber only as an accent colour and never for body text.
-- Use Concrete Grey and Site White to keep long forms and dashboards readable.
+- Use Navy for structure and high-contrast surfaces, Trade Blue for primary actions, and Light Grey for application backgrounds.
+- Use Sky Blue for supporting emphasis and interaction states, never as a substitute for readable body text.
+- Use Steel Grey for secondary copy and neutral UI.
 - Use functional colours consistently for status messaging.
 - Maintain sufficient contrast for text, controls, focus states, disabled states, and status indicators.
 - Do not use colour alone to communicate a status or required action.
@@ -104,12 +101,12 @@ Never use excessive marketing language or imply that Trade Tender sells material
 
 ### Headlines
 
-- Font: Archivo.
+- Font: Montserrat.
 - Allowed weights: Bold and SemiBold.
 
 ### Body
 
-- Font: Inter.
+- Font: Source Sans 3.
 - Allowed weights: Regular, Medium, and SemiBold.
 
 ### Fallback
@@ -128,12 +125,12 @@ Never use excessive marketing language or imply that Trade Tender sells material
 
 ### Interface Application
 
-- **Dashboard sidebar:** Foundation Navy.
-- **Primary buttons:** Safety Amber.
-- **Secondary buttons:** Steel Blue.
-- **Background:** Site White.
-- **Primary text:** Foundation Navy.
-- **Muted text:** Concrete Grey.
+- **Dashboard sidebar:** Navy.
+- **Primary buttons:** Trade Blue.
+- **Secondary buttons:** Sky Blue or outlined Navy.
+- **Background:** Light Grey.
+- **Primary text:** Navy.
+- **Muted text:** Steel Grey.
 
 All visual states must remain understandable when viewed without colour and must not expose protected information prematurely.
 
@@ -154,7 +151,7 @@ All visual states must remain understandable when viewed without colour and must
 
 Never recolour, stretch, rotate, add shadows to, change spacing around, or recreate the logo.
 
-Always use approved artwork, respect clear space, and use SVG when possible.
+Use `Trade_Tender_Horizontal_Logo.png` on light navigation and header surfaces. Use `Trade_Tender_Dark_Background_Logo.png` on Navy surfaces. Use the stacked, primary, icon, blue-background, or monochrome variants only where their approved context fits. Always use approved artwork and respect clear space.
 
 ## Icon Rules
 
@@ -172,10 +169,9 @@ Never show handshake stock photography, generic offices, heavy filters, or incor
 
 Every workflow should support and reinforce these steps:
 
-1. Raise Tender
-2. Retailers Tender
-3. Compare Prices
-4. Award Contract
+1. Connect
+2. Compare
+3. Construct
 
 ## Trust and Privacy Presentation
 

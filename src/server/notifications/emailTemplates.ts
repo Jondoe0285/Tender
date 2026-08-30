@@ -46,7 +46,7 @@ export function tenderOpportunityTemplate(input: { id: string; reference: string
 export function quoteReceivedTemplate(input: { tenderReference: string; quoteReference: string; category: string; priceGbp: number; leadTimeDays: number; reviewPath: string }): EmailTemplate {
   return {
     subject: `Quote received for ${input.tenderReference}`,
-    html: layout({ eyebrow: 'Quote received', title: 'A Retailer has submitted a quote', intro: 'A new formal quote is ready for review in your Client workspace.', body: detailRows([['Tender ID', input.tenderReference], ['Quote ID', input.quoteReference], ['Category', input.category], ['Quoted price', `£${input.priceGbp}`], ['Lead time', `${input.leadTimeDays} days`]]) + '<p style="font-size:14px;line-height:1.6">Retailer contact details remain private until you accept a quote and the Accepted Quote Release Fee is confirmed.</p>', action: { label: 'Compare quote', href: appUrl(input.reviewPath) } }),
+    html: layout({ eyebrow: 'Quote received', title: 'A Retailer has submitted a quote', intro: 'A new formal quote is ready for review in your Client workspace.', body: detailRows([['Tender ID', input.tenderReference], ['Quote ID', input.quoteReference], ['Category', input.category], ['Quoted price', `£${input.priceGbp} excl. VAT`], ['Lead time', `${input.leadTimeDays} days`]]) + '<p style="font-size:14px;line-height:1.6">Retailer contact details remain private until you accept a quote and the Accepted Quote Release Fee is confirmed.</p>', action: { label: 'Compare quote', href: appUrl(input.reviewPath) } }),
   };
 }
 
@@ -57,17 +57,17 @@ export function quoteReminderTemplate(input: { quoteReference: string; tenderRef
   };
 }
 
-export function paymentConfirmationTemplate(input: { paymentType: string; amountGbp: number; reference: string; accountPath: string }): EmailTemplate {
+export function paymentConfirmationTemplate(input: { paymentType: string; amountGbp: number; vatGbp: number; totalAmountGbp: number; reference: string; accountPath: string }): EmailTemplate {
   return {
     subject: `Payment confirmed: ${input.reference}`,
-    html: layout({ eyebrow: 'Payment confirmation', title: 'Payment confirmed', intro: 'Your Trade Tender payment has been confirmed.', body: detailRows([['Reference', input.reference], ['Payment type', input.paymentType], ['Amount', `£${input.amountGbp}`], ['Status', 'Confirmed']]) + '<p style="font-size:14px;line-height:1.6">Access is updated only after trusted payment confirmation. Keep this message for your records.</p>', action: { label: 'View account activity', href: appUrl(input.accountPath) } }),
+    html: layout({ eyebrow: 'Payment confirmation', title: 'Payment confirmed', intro: 'Your Trade Tender payment has been confirmed.', body: detailRows([['Reference', input.reference], ['Payment type', input.paymentType], ['Fee', `£${input.amountGbp} excl. VAT`], ['VAT', `£${input.vatGbp}`], ['Total paid', `£${input.totalAmountGbp} incl. VAT`], ['Status', 'Confirmed']]) + '<p style="font-size:14px;line-height:1.6">Access is updated only after trusted payment confirmation. Keep this message for your records.</p>', action: { label: 'View account activity', href: appUrl(input.accountPath) } }),
   };
 }
 
 export function quoteAcceptedTemplate(input: { quoteReference: string; tenderReference: string; feeGbp: number; paymentPath: string }): EmailTemplate {
   return {
     subject: `Quote accepted: action required for ${input.tenderReference}`,
-    html: layout({ eyebrow: 'Quote accepted', title: 'Your quote has been accepted', intro: 'The Client has selected your quote. Contact details will be released after the Accepted Quote Release Fee is confirmed.', body: detailRows([['Tender ID', input.tenderReference], ['Quote ID', input.quoteReference], ['Release fee', `£${input.feeGbp}`], ['Next step', 'The Client will complete the release payment in their workspace']]), action: { label: 'Continue in workspace', href: appUrl(input.paymentPath) } }),
+    html: layout({ eyebrow: 'Quote accepted', title: 'Your quote has been accepted', intro: 'The Client has selected your quote. Contact details will be released after the Accepted Quote Release Fee is confirmed.', body: detailRows([['Tender ID', input.tenderReference], ['Quote ID', input.quoteReference], ['Release fee', `£${input.feeGbp} excl. VAT`], ['Next step', 'The Client will complete the release payment in their workspace']]), action: { label: 'Continue in workspace', href: appUrl(input.paymentPath) } }),
   };
 }
 
@@ -123,10 +123,10 @@ export function passwordResetTemplate(input: { resetLink: string; expiresIn: str
   };
 }
 
-export function failedPaymentTemplate(input: { paymentType: string; amountGbp: number; reference: string; retryPath: string }): EmailTemplate {
+export function failedPaymentTemplate(input: { paymentType: string; amountGbp: number; vatGbp: number; totalAmountGbp: number; reference: string; retryPath: string }): EmailTemplate {
   return {
     subject: `Payment action required: ${input.reference}`,
-    html: layout({ eyebrow: 'Payment action required', title: 'Payment was not confirmed', intro: 'The payment required for this Trade Tender action was not confirmed.', body: detailRows([['Reference', input.reference], ['Payment type', input.paymentType], ['Amount', `£${input.amountGbp}`], ['Status', 'Not confirmed']]) + '<p style="font-size:14px;line-height:1.6">Protected information and contact details remain unreleased until a trusted payment confirmation or approved waiver is recorded.</p>', action: { label: 'Review payment', href: appUrl(input.retryPath) } }),
+    html: layout({ eyebrow: 'Payment action required', title: 'Payment was not confirmed', intro: 'The payment required for this Trade Tender action was not confirmed.', body: detailRows([['Reference', input.reference], ['Payment type', input.paymentType], ['Fee', `£${input.amountGbp} excl. VAT`], ['VAT', `£${input.vatGbp}`], ['Total due', `£${input.totalAmountGbp} incl. VAT`], ['Status', 'Not confirmed']]) + '<p style="font-size:14px;line-height:1.6">Protected information and contact details remain unreleased until a trusted payment confirmation or approved waiver is recorded.</p>', action: { label: 'Review payment', href: appUrl(input.retryPath) } }),
   };
 }
 

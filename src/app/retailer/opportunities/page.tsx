@@ -55,7 +55,7 @@ export default async function NewOpportunitiesPage() {
         distanceMiles: estimateDistanceMiles(coverageAreas, tender.location),
         requirements: tender.requirements,
         closingDate: tender.closingDate,
-        unlockFeeLabel: hasCredits ? 'Free (launch credit)' : `£${unlockFeeGbp}`,
+        unlockFeeLabel: hasCredits ? 'Free (launch credit)' : `£${unlockFeeGbp} excl. VAT`,
         unlocked: false,
         isNew: !viewedAt,
         strongMatch,

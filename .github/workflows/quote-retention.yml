@@ -5,9 +5,16 @@ on:
     - cron: '17 2 * * *'
   workflow_dispatch:
 
+concurrency:
+  group: quote-retention
+  cancel-in-progress: false
+
 jobs:
   purge-expired-quotes:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Purge expired unpurchased quotes
         env:

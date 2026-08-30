@@ -8,6 +8,7 @@ const defaultSettings: Record<string, string> = {
   CLIENT_RELEASE_FEE_MODE: 'FIXED',
   CLIENT_RELEASE_PERCENTAGE_LOW: '1',
   CLIENT_RELEASE_PERCENTAGE_HIGH: '1',
+  VAT_PERCENTAGE: '20',
   SPONSORED_PLACEMENT_ACTIVE: 'false',
   SPONSORED_PLACEMENT_FEE_GBP: '25',
   MEMBERSHIP_TIERS_ACTIVE: 'false',
@@ -54,6 +55,28 @@ export async function getPaymentFeeGbp(type: PaymentType): Promise<number> {
   return Number.isInteger(value) && value >= 0 ? value : Number(defaultSettings[key]);
 }
 
+export async function getVatPercentage(): Promise<number> {
+  const percentage = Number(await getPlatformSetting('VAT_PERCENTAGE'));
+  return Number.isFinite(percentage) && percentage >= 0 && percentage <= 100 ? percentage : Number(defaultSettings.VAT_PERCENTAGE);
+}
+
+export function calculateVatGbp(netAmountGbp: number, percentage: number): number {
+  return Math.round(netAmountGbp * (percentage / 100) * 100) / 100;
+}
+
+/** Resolves fee, VAT, and gross to whole pence so the Stripe charge always equals the stored total. */
+export function buildPaymentAmounts(netAmountGbp: number, vatPercentage: number) {
+  const netPence = Math.round(netAmountGbp * 100);
+  const vatPence = Math.round(calculateVatGbp(netPence / 100, vatPercentage) * 100);
+  return {
+    amountGbp: netPence / 100,
+    vatGbp: vatPence / 100,
+    totalAmountGbp: (netPence + vatPence) / 100,
+    netPence,
+    vatPence,
+  };
+}
+
 export function calculatePercentageFee(quotePriceGbp: number, lowPercentage: number, highPercentage: number): number {
   const percentage = quotePriceGbp <= 10000 ? lowPercentage : highPercentage;
   return Math.floor(quotePriceGbp * percentage) / 100;
@@ -86,6 +109,7 @@ export async function getAdminSettings() {
       clientReleaseMode: settings.find((setting) => setting.key === 'CLIENT_RELEASE_FEE_MODE')?.value ?? defaultSettings.CLIENT_RELEASE_FEE_MODE,
       clientReleasePercentageLow: Number(settings.find((setting) => setting.key === 'CLIENT_RELEASE_PERCENTAGE_LOW')?.value ?? defaultSettings.CLIENT_RELEASE_PERCENTAGE_LOW),
       clientReleasePercentageHigh: Number(settings.find((setting) => setting.key === 'CLIENT_RELEASE_PERCENTAGE_HIGH')?.value ?? defaultSettings.CLIENT_RELEASE_PERCENTAGE_HIGH),
+      vatPercentage: Number(settings.find((setting) => setting.key === 'VAT_PERCENTAGE')?.value ?? defaultSettings.VAT_PERCENTAGE),
       sponsoredPlacementActive: (settings.find((setting) => setting.key === 'SPONSORED_PLACEMENT_ACTIVE')?.value ?? defaultSettings.SPONSORED_PLACEMENT_ACTIVE) === 'true',
       sponsoredPlacementFeeGbp: Number(settings.find((setting) => setting.key === 'SPONSORED_PLACEMENT_FEE_GBP')?.value ?? defaultSettings.SPONSORED_PLACEMENT_FEE_GBP),
       membershipTiersActive: (settings.find((setting) => setting.key === 'MEMBERSHIP_TIERS_ACTIVE')?.value ?? defaultSettings.MEMBERSHIP_TIERS_ACTIVE) === 'true',

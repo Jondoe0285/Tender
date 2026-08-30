@@ -43,7 +43,7 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
       quantity: input.quantity,
       urgency: input.urgency,
       closingDate: input.closingDate,
-      budget: input.budget ?? null,
+      supplyDate: input.supplyDate ?? null,
       requirements: input.requirements.join(','),
       description: input.description,
       status: 'OPEN',
@@ -218,7 +218,7 @@ export function buildRetailerTenderSummary(requirements: string | null | undefin
 }
 
 /** Approved non-sensitive summary fields only (SEC-030/031) — the full free-text description
- *  and precise budget figure remain hidden until unlock; only a coarse value band is exposed. */
+ *  remains hidden until unlock. */
 export async function listMatchedSummariesForRetailer(retailerId: string) {
   const matches = await prisma.tenderMatch.findMany({
     where: { retailerId },
@@ -232,7 +232,6 @@ export async function listMatchedSummariesForRetailer(retailerId: string) {
           urgency: true,
           closingDate: true,
           status: true,
-          budget: true,
           requirements: true,
           client: { select: { clientCompanyMembership: { select: { company: { select: { tradeTenderId: true } } } } } },
         },
