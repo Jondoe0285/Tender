@@ -1,0 +1,216 @@
+name: Approved Merge to Main
+
+# Requests a merge through the protected pull-request process only.
+# It never bypasses branch protection, never force-pushes and never deploys.
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request_number:
+        description: 'Pull request number to merge'
+        type: string
+        required: true
+      approved_commit_sha:
+        description: 'Exact head commit SHA that was reviewed and approved'
+        type: string
+        required: true
+      merge_approval_statement:
+        description: 'Must be exactly: MERGE APPROVED FIXES TO MAIN'
+        type: string
+        required: true
+
+concurrency:
+  group: approved-merge-${{ github.event.inputs.pull_request_number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify every release condition
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+      statuses: read
+    outputs:
+      blocked_reasons: ${{ steps.gate.outputs.blocked_reasons }}
+      eligible: ${{ steps.gate.outputs.eligible }}
+    steps:
+      - name: Reject an inexact approval statement
+        if: github.event.inputs.merge_approval_statement != 'MERGE APPROVED FIXES TO MAIN'
+        run: |
+          echo "::error::The approval statement must be exactly: MERGE APPROVED FIXES TO MAIN"
+          exit 1
+
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Evaluate release conditions
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.inputs.pull_request_number }}
+          APPROVED_SHA: ${{ github.event.inputs.approved_commit_sha }}
+        run: |
+          set -euo pipefail
+          BLOCKED=""
+          block() { echo "  ✗ $1"; BLOCKED="${BLOCKED}- $1"$'\n'; }
+          pass()  { echo "  ✓ $1"; }
+
+          PR_JSON=$(gh pr view "$PR_NUMBER" --json number,baseRefName,headRefName,headRefOid,mergeable,mergeStateStatus,reviewDecision,files,title,body,reviews,statusCheckRollup,isDraft)
+
+          [ "$(echo "$PR_JSON" | jq -r .baseRefName)" = "main" ] && pass "Pull request targets main" || block "Pull request does not target main."
+          echo "$PR_JSON" | jq -r .headRefName | grep -q '^health-fix/' && pass "Originates from an authorised health-fix branch" || block "Pull request does not originate from a health-fix/* branch."
+          [ "$(echo "$PR_JSON" | jq -r .headRefOid)" = "$APPROVED_SHA" ] && pass "Head commit equals the approved SHA (no commits added after approval)" || block "The latest commit does not equal approved_commit_sha; approval is stale."
+          [ "$(echo "$PR_JSON" | jq -r .isDraft)" = "false" ] && pass "Pull request is ready for review" || block "Pull request is still a draft."
+          echo "$PR_JSON" | jq -r .body | grep -qE 'HC-[0-9]{8}-[0-9]{3}' && pass "References approved finding IDs" || block "Pull request body does not reference approved finding IDs."
+          echo "$PR_JSON" | jq -r .body | grep -q 'docs/health-check/archive/' && pass "References an archived health report" || block "Pull request body does not reference an archived health report."
+          echo "$PR_JSON" | jq -r .body | grep -qi 'rollback' && pass "Records a rollback procedure" || block "Pull request body does not record a rollback procedure."
+          [ "$(echo "$PR_JSON" | jq -r .reviewDecision)" = "APPROVED" ] && pass "Required review approval exists" || block "Pull request does not have an approving review."
+
+          # Approval must apply to the latest commit.
+          STALE=$(echo "$PR_JSON" | jq -r --arg sha "$APPROVED_SHA" '[.reviews[]? | select(.state=="APPROVED") | select(.commit.oid != null and .commit.oid != $sha)] | length')
+          if [ "${STALE:-0}" != "0" ]; then
+            echo "  ! Some approvals predate the approved SHA; GitHub dismissal rules must enforce freshness."
+          fi
+
+          UNRESOLVED=$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER/comments" --jq '[.[] | select(.in_reply_to_id == null)] | length' 2>/dev/null || echo 0)
+          echo "  i Review comment threads: ${UNRESOLVED:-0} (resolve conversations before merging)"
+
+          FAILED_CHECKS=$(echo "$PR_JSON" | jq -r '[.statusCheckRollup[]? | select(.conclusion != null and .conclusion != "SUCCESS" and .conclusion != "NEUTRAL" and .conclusion != "SKIPPED")] | length')
+          [ "${FAILED_CHECKS:-0}" = "0" ] && pass "All reported status checks passed" || block "One or more required status checks have not passed."
+
+          MERGE_STATE=$(echo "$PR_JSON" | jq -r .mergeStateStatus)
+          case "$MERGE_STATE" in
+            CLEAN) pass "Branch is current with main and mergeable" ;;
+            BEHIND) block "Branch is behind main; update it and obtain fresh approval." ;;
+            BLOCKED) block "Branch protection reports the merge as blocked." ;;
+            DIRTY) block "Pull request has merge conflicts." ;;
+            *) block "Merge state is $MERGE_STATE; a clean state is required." ;;
+          esac
+
+          # Fixes must not weaken tests or touch deployment behaviour without explicit approval.
+          CHANGED=$(echo "$PR_JSON" | jq -r '.files[].path')
+          echo "$CHANGED" | grep -q '^tests/' && pass "Includes test changes (regression test expected)" || block "No test file was added or changed; a regression test is required."
+          if echo "$CHANGED" | grep -qE '^\.github/workflows/deploy-azure\.yml$'; then
+            block "Pull request modifies deployment configuration; this requires separate release-owner approval."
+          fi
+
+          DELETED_TESTS=$(git diff --diff-filter=D --name-only "origin/main...origin/$(echo "$PR_JSON" | jq -r .headRefName)" -- tests/ | wc -l)
+          [ "$DELETED_TESTS" = "0" ] && pass "No test files were deleted" || block "The pull request deletes $DELETED_TESTS test file(s); existing coverage must not be weakened."
+
+          # No confirmed Critical finding may remain open in the latest audit.
+          if [ -f docs/health-check/latest.json ]; then
+            OPEN_CRITICAL=$(jq '[.findings[] | select(.severity=="CRITICAL" and .confidence=="Confirmed" and .lifecycle!="Resolved")] | length' docs/health-check/latest.json)
+            [ "$OPEN_CRITICAL" = "0" ] && pass "No confirmed Critical finding remains open" || block "$OPEN_CRITICAL confirmed Critical finding(s) remain open in the latest audit."
+          else
+            block "No latest health report is available to confirm outstanding findings."
+          fi
+
+          if [ -n "$BLOCKED" ]; then
+            { echo "blocked_reasons<<EOF"; echo "$BLOCKED"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "blocked_reasons=" >> "$GITHUB_OUTPUT"
+            echo "eligible=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Record gate outcome
+        run: |
+          if [ "${{ steps.gate.outputs.eligible }}" = "true" ]; then
+            echo "## Release conditions met" >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "## RELEASE BLOCKED"
+              echo ""
+              echo "${{ steps.gate.outputs.blocked_reasons }}"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Block the release
+        if: steps.gate.outputs.eligible != 'true'
+        run: |
+          echo "::error::RELEASE BLOCKED. Fresh approval is required after further changes."
+          exit 1
+
+  merge:
+    name: Request protected merge
+    needs: verify
+    if: needs.verify.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: health-check-merge
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Request merge through the protected process
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # No --admin: branch protection is authoritative and must not be bypassed.
+          gh pr merge "${{ github.event.inputs.pull_request_number }}" \
+            --repo "${{ github.repository }}" \
+            --squash \
+            --match-head-commit "${{ github.event.inputs.approved_commit_sha }}"
+          {
+            echo "## Merge requested"
+            echo ""
+            echo "- Pull request: #${{ github.event.inputs.pull_request_number }}"
+            echo "- Approved commit: \`${{ github.event.inputs.approved_commit_sha }}\`"
+            echo "- Authorising actor: @${{ github.actor }}"
+            echo ""
+            echo "Merging to main is not permission to deploy. Production deployment remains separately controlled."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  notify:
+    name: Email the merge outcome
+    needs: [verify, merge]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Send result
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          HEALTH_REPORT_FROM: ${{ secrets.HEALTH_REPORT_FROM }}
+          HEALTH_REPORT_TO: ${{ secrets.HEALTH_REPORT_TO }}
+        run: |
+          if [ "${{ needs.verify.outputs.eligible }}" = "true" ] && [ "${{ needs.merge.result }}" = "success" ]; then
+            SUBJECT="Approved merge completed"
+            BODY="Pull request #${{ github.event.inputs.pull_request_number }} was merged to main.
+          Approved commit: ${{ github.event.inputs.approved_commit_sha }}
+          Authorising actor: ${{ github.actor }}
+
+          Merging to main is not permission to deploy. Production deployment remains separately controlled."
+          else
+            SUBJECT="RELEASE BLOCKED"
+            BODY="Pull request #${{ github.event.inputs.pull_request_number }} was NOT merged.
+          Authorising actor: ${{ github.actor }}
+
+          Failed conditions:
+          ${{ needs.verify.outputs.blocked_reasons }}
+
+          Fresh approval is required after further changes."
+          fi
+          npx tsx scripts/health-check/send-workflow-email.ts "$SUBJECT" "$BODY"

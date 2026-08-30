@@ -39,6 +39,36 @@ export async function sendTransactionalEmail(to: string, template: EmailTemplate
   return { sent: true, id: result.data?.id ?? null } as const;
 }
 
+export type HealthReportEmail = { subject: string; html: string; text?: string };
+export type HealthReportAttachment = { filename: string; content: string };
+
+/**
+ * Repository health reports reuse the single Resend client but have their own sender and
+ * recipient so operational reporting never borrows the customer notification identity.
+ */
+export async function sendHealthReportEmail(template: HealthReportEmail, attachments: HealthReportAttachment[] = []) {
+  const resend = getResendClient();
+  if (!resend) return { sent: false, reason: 'RESEND_API_KEY is not configured' } as const;
+
+  const from = process.env.HEALTH_REPORT_FROM;
+  const to = process.env.HEALTH_REPORT_TO;
+  if (!from) return { sent: false, reason: 'HEALTH_REPORT_FROM is not configured' } as const;
+  if (!to) return { sent: false, reason: 'HEALTH_REPORT_TO is not configured' } as const;
+
+  const result = await resend.emails.send({
+    from,
+    to: to.split(',').map((address) => address.trim()).filter(Boolean),
+    subject: template.subject,
+    html: template.html,
+    ...(template.text ? { text: template.text } : {}),
+    ...(attachments.length > 0 ? { attachments: attachments.map((attachment) => ({ filename: attachment.filename, content: attachment.content })) } : {}),
+    tags: [{ name: 'category', value: 'repository-health-check' }],
+  });
+
+  if (result.error) return { sent: false, reason: result.error.message } as const;
+  return { sent: true, id: result.data?.id ?? null } as const;
+}
+
 /** Sends only the approved pre-unlock summary; Client identity, precise site data and full specification stay private. */
 export async function sendTenderOpportunityEmail(to: string, tender: TenderNotification) {
   return sendTransactionalEmail(to, tenderOpportunityTemplate(tender));

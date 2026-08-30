@@ -1,0 +1,19 @@
+{
+  "status": "FAIL",
+  "release": "RELEASE BLOCKED",
+  "counts": {
+    "CRITICAL": 0,
+    "HIGH": 6,
+    "MEDIUM": 3,
+    "LOW": 8,
+    "INFORMATIONAL": 0
+  },
+  "archiveMarkdown": "docs/health-check/archive/health-check-2026-08-30-0817-UTC.md",
+  "archiveJson": "docs/health-check/archive/health-check-2026-08-30-0817-UTC.json",
+  "reportBranch": "health-report/2026-08-30-0817",
+  "title": "[Health Check] 2026-08-30 - FAIL",
+  "failedChecks": [
+    "Dependency vulnerability scan",
+    "Production schema drift"
+  ]
+}

@@ -1,0 +1,245 @@
+name: Approved Fix Implementation
+
+# Implements ONLY findings a human has explicitly approved from an archived health report.
+# This workflow never merges and never deploys.
+on:
+  workflow_dispatch:
+    inputs:
+      health_check_run_id:
+        description: 'Health-check workflow run ID from the archived report'
+        type: string
+        required: true
+      approved_finding_ids:
+        description: 'Comma-separated finding IDs, e.g. HC-20260830-001'
+        type: string
+        required: true
+      approved_scope:
+        description: 'Approved scope, copied from the authorisation block'
+        type: string
+        required: true
+      approval_statement:
+        description: 'Must be exactly: IMPLEMENT APPROVED FINDINGS'
+        type: string
+        required: true
+
+concurrency:
+  group: approved-fix-${{ github.event.inputs.approved_finding_ids }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify-authorisation:
+    name: Verify human authorisation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      branch_suffix: ${{ steps.verify.outputs.branch_suffix }}
+      report_file: ${{ steps.verify.outputs.report_file }}
+    steps:
+      - name: Reject an inexact approval statement
+        if: github.event.inputs.approval_statement != 'IMPLEMENT APPROVED FINDINGS'
+        run: |
+          echo "::error::The approval statement must be exactly: IMPLEMENT APPROVED FINDINGS"
+          exit 1
+
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify findings against the archived report
+        id: verify
+        run: |
+          node scripts/health-check/verify-approval.mjs \
+            --run-id "${{ github.event.inputs.health_check_run_id }}" \
+            --findings "${{ github.event.inputs.approved_finding_ids }}" \
+            --scope "${{ github.event.inputs.approved_scope }}" \
+            --statement "${{ github.event.inputs.approval_statement }}" \
+            --expect-statement "IMPLEMENT APPROVED FINDINGS"
+
+      - name: Confirm no open fix pull request already covers these findings
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING=$(gh pr list --state open --search "${{ github.event.inputs.approved_finding_ids }} in:title" --json number --jq 'length')
+          if [ "$EXISTING" != "0" ]; then
+            echo "::error::An open pull request already addresses these findings. Close it or approve a different finding."
+            exit 1
+          fi
+
+      - name: Record authorisation
+        run: |
+          {
+            echo "## Authorisation verified"
+            echo ""
+            echo "- Authorising actor: \`${{ github.actor }}\`"
+            echo "- Health-check run ID: \`${{ github.event.inputs.health_check_run_id }}\`"
+            echo "- Approved findings: \`${{ github.event.inputs.approved_finding_ids }}\`"
+            echo "- Archived report: \`${{ steps.verify.outputs.report_file }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  implement:
+    name: Implement approved fix and open a draft pull request
+    needs: verify-authorisation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: health-check-fix
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      NODE_ENV: test
+      DATABASE_URL: file:./health-check.db
+      NEXTAUTH_SECRET: health-check-placeholder-secret
+      NEXTAUTH_URL: http://localhost:3000
+      STRIPE_SECRET_KEY: sk_test_health_check_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_health_check_placeholder
+      RETENTION_JOB_SECRET: health-check-placeholder-secret
+    outputs:
+      pr_url: ${{ steps.pr.outputs.pr_url }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Create fix branch
+        run: |
+          BRANCH="health-fix/$(date -u +%Y-%m-%d)-${{ needs.verify-authorisation.outputs.branch_suffix }}"
+          echo "FIX_BRANCH=$BRANCH" >> "$GITHUB_ENV"
+          git config user.name "trade-tender-health-check[bot]"
+          git config user.email "health-check@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+
+      # The implementation step is intentionally a human/agent hand-off point. This repository
+      # has no configured autonomous code-writing provider, so the workflow prepares the
+      # verified branch, scope and validation gates rather than inventing a change.
+      - name: Prepare implementation brief
+        run: |
+          mkdir -p docs/health-check
+          cp docs/health-check/approval-verification.json docs/health-check/approval-verification.json 2>/dev/null || true
+          {
+            echo "# Approved fix brief"
+            echo ""
+            echo "- Health-check run ID: ${{ github.event.inputs.health_check_run_id }}"
+            echo "- Approved findings: ${{ github.event.inputs.approved_finding_ids }}"
+            echo "- Approved scope: ${{ github.event.inputs.approved_scope }}"
+            echo "- Authorising actor: ${{ github.actor }}"
+            echo "- Branch: $FIX_BRANCH"
+            echo ""
+            echo "Implement only the approved findings within the approved scope, add the required"
+            echo "regression test, and do not weaken existing tests or security controls."
+          } > docs/health-check/current-fix-brief.md
+
+      - name: Validate — type check
+        run: npm run type-check
+
+      - name: Validate — lint
+        run: npm run lint
+
+      - name: Validate — unit tests
+        run: npm test
+
+      - name: Validate — schema
+        run: npx prisma validate
+
+      - name: Validate — production build
+        run: npm run build
+
+      - name: Validate — workflow invariants
+        run: node scripts/health-check/validate-workflows.mjs
+
+      - name: Commit and open draft pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "::warning::No changes were produced. The branch records the verified authorisation only."
+          fi
+          git commit -m "fix(health-check): ${{ github.event.inputs.approved_finding_ids }}" --allow-empty
+          git push origin "$FIX_BRANCH"
+          PR_URL=$(gh pr create --draft --base main --head "$FIX_BRANCH" \
+            --title "[Health Fix] ${{ github.event.inputs.approved_finding_ids }}" \
+            --body "## Approved fix
+
+| Field | Value |
+| --- | --- |
+| Health-check run ID | \`${{ github.event.inputs.health_check_run_id }}\` |
+| Approved finding IDs | \`${{ github.event.inputs.approved_finding_ids }}\` |
+| Archived report | \`docs/health-check/archive/${{ needs.verify-authorisation.outputs.report_file }}\` |
+| Authorising actor | @${{ github.actor }} |
+| Branch | \`$FIX_BRANCH\` |
+
+### Approved scope
+${{ github.event.inputs.approved_scope }}
+
+### Validation results
+Type check, lint, unit tests, schema validation, production build and workflow invariant checks ran in this workflow. See the run log for evidence.
+
+### Regression tests
+The approved finding requires a regression test. Confirm it is present before requesting review.
+
+### Remaining risks
+Integration, end-to-end and coverage checks are not available in this repository, so those risks are unverified.
+
+### Rollback procedure
+Revert the merge commit for this pull request. No data migration is included unless explicitly listed in the approved scope.
+
+---
+This pull request is a draft and must not be merged automatically. Use the *Approved Merge to Main* workflow after human review.")
+          echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "Draft pull request: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
+
+  notify:
+    name: Email the fix outcome
+    needs: [verify-authorisation, implement]
+    if: always() && needs.verify-authorisation.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Send notification
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          HEALTH_REPORT_FROM: ${{ secrets.HEALTH_REPORT_FROM }}
+          HEALTH_REPORT_TO: ${{ secrets.HEALTH_REPORT_TO }}
+        run: |
+          npx tsx scripts/health-check/send-workflow-email.ts \
+            "Approved fix pull request ready for review" \
+            "Findings: ${{ github.event.inputs.approved_finding_ids }}
+          Health-check run ID: ${{ github.event.inputs.health_check_run_id }}
+          Authorising actor: ${{ github.actor }}
+          Implementation result: ${{ needs.implement.result }}
+          Pull request: ${{ needs.implement.outputs.pr_url }}
+
+          The pull request is a draft. It has not been merged and nothing has been deployed."
