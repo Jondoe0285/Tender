@@ -1,20 +1,26 @@
 # Repository health-check, fix and release-gating system
 
 A human-controlled system that audits this repository weekly, produces evidence for a person to
-decide on, implements only explicitly approved fixes, and requests merges through the protected
-pull-request process.
+decide on, implements only explicitly approved fixes, requests merges through the protected
+pull-request process, and deploys only through explicit staging and production approval gates.
 
-The system never merges without approval and never deploys.
+The audit, fix and merge workflows never deploy. Deployment approvals are workflow inputs, not
+chat messages, and every approval is verified against repository evidence before any deployment
+step can run.
 
 ## Architecture
 
-Three separate workflows, each with a single responsibility and its own permission boundary.
+Seven workflows, each with a single responsibility and its own permission boundary.
 
 | Workflow | File | Trigger | May write? | May merge? | May deploy? |
 | --- | --- | --- | --- | --- | --- |
 | Weekly Repository Health Check | `.github/workflows/health-check.yml` | Schedule, manual, `repository_dispatch` | Report branch and PR only | No | No |
 | Approved Fix Implementation | `.github/workflows/approved-fix.yml` | Manual only | Fix branch and draft PR only | No | No |
 | Approved Merge to Main | `.github/workflows/approved-merge.yml` | Manual only | Merge request only | Yes, through branch protection | No |
+| Approved Promote to Staging Branch | `.github/workflows/promote-staging-branch.yml` | Manual only | Moves `staging` branch only | No | No |
+| Approved Deploy to Staging | `.github/workflows/deploy-staging.yml` | Manual only | Staging record branch only | No | Staging only |
+| Approved Deploy to Production | `.github/workflows/deploy-production.yml` | Manual only | Deployment record artifact only | No | Production only |
+| Break-glass Azure Deployment | `.github/workflows/deploy-azure.yml` | Manual only | No repository writes | No | Production only |
 
 Supporting code lives in `scripts/health-check/`:
 
@@ -25,9 +31,11 @@ Supporting code lives in `scripts/health-check/`:
 | `lib/report.mjs` | Renders Markdown and JSON reports including authorisation blocks |
 | `run-audit.mjs` | Audit entry point |
 | `verify-approval.mjs` | Verifies a fix or merge request against an immutable archived report |
+| `verify-deployment-approval.mjs` | Verifies staging and production deployment approvals against repository evidence |
+| `verify-deployment.mjs` | Runs non-destructive staging and production post-deployment probes |
 | `validate-workflows.mjs` | Enforces workflow security invariants |
 | `send-report-email.ts` | Sends the health report through the existing Resend integration |
-| `send-workflow-email.ts` | Sends short fix and merge notices |
+| `send-workflow-email.ts` | Sends short fix, merge and deployment notices |
 
 ### Existing components reused
 
@@ -186,17 +194,71 @@ a blocked-release email is sent, and fresh approval is required after further ch
 Merging uses `gh pr merge` **without** `--admin`. Branch protection is authoritative and is never
 bypassed. There is no force-push path.
 
-## Production separation
+## Staging branch promotion
 
-**Merging to main is not permission to deploy.**
+Actions -> **Approved Promote to Staging Branch** -> Run workflow.
 
-`.github/workflows/deploy-azure.yml` currently runs on `push` to `main`, so a merge also starts a
-production deployment. This system deliberately does **not** change that behaviour. It is reported
-by the audit as a HIGH finding (`main-auto-deploys`) and listed under manual actions below.
+| Input | Value |
+| --- | --- |
+| `commit_sha` | Exact 40-character commit SHA on `main` |
+| `promotion_approval_statement` | `PROMOTE APPROVED COMMIT TO STAGING BRANCH` |
 
-A future production deployment should require successful post-merge CI, a staging deployment,
-staging smoke tests, migration compatibility, explicit production approval, a deployment record,
-health verification and rollback capability. No automatic production approval is configured.
+The promotion workflow verifies the approval statement, confirms the commit exists on `main`,
+confirms `main` has not advanced beyond that commit, and then moves the permanent `staging`
+branch to that exact commit. It does not deploy.
+
+## Deployment workflows
+
+**Merging to main is not permission to deploy.** `deploy-azure.yml` no longer runs on push to
+`main`; it is retained as a manual break-glass workflow only. Routine releases must use the
+staging and production deployment workflows below.
+
+Deployment approvals are workflow inputs, not chat messages. Every condition is verified against
+the repository, so an unfilled placeholder or an unprovable claim stops the release.
+
+### Approved Deploy to Staging
+
+Actions -> **Approved Deploy to Staging** -> Run workflow.
+
+| Input | Value |
+| --- | --- |
+| `commit_sha` | Exact 40-character commit SHA on `main` |
+| `staging_approval_statement` | `DEPLOY APPROVED COMMIT TO STAGING` |
+
+Verified before anything is deployed: the statement is exact, the SHA is real and present on
+`main`, `main` has not advanced past it, and no confirmed Critical finding is open. It then
+applies migrations to a clean database, builds, deploys to the staging slot, runs the
+non-destructive verification and writes a staging record.
+
+The staging record is uploaded as an artifact and, when verification succeeds, pushed to a
+`staging-record/<record-id>` branch. Merge that record before requesting production deployment so
+the production workflow can verify the exact staging evidence.
+
+### Approved Deploy to Production
+
+Actions -> **Approved Deploy to Production** -> Run workflow.
+
+| Input | Value |
+| --- | --- |
+| `commit_sha` | Exact 40-character SHA that passed staging |
+| `staging_report` | Staging record identifier, e.g. `deploy-staging-2026-08-30-09-00-UTC` |
+| `production_approval_statement` | `DEPLOY APPROVED COMMIT TO PRODUCTION` |
+
+Adds to the staging checks: the staging record must exist, be successful, contain no failing
+check and reference the identical commit; all check runs on the commit must have succeeded; the
+commit must have arrived through a merged pull request; migrations must be backward compatible;
+and point-in-time restore retention must be at least seven days. Production secrets are exposed
+only to the `production` environment job.
+
+If post-deployment verification fails, the rollback job redeploys the previous production commit
+and re-verifies. The outcome is always emailed and never concealed.
+
+### What verification does and does not prove
+
+The post-deployment checks are read-only. No tender, quote, payment or account is created. Health
+and database connectivity are read from `/api/health`; every portal and business endpoint is
+probed unauthenticated and must refuse. Resend delivery, audit logging and error rates are
+reported as `UNVERIFIED` because they cannot be proven by an external probe.
 
 ## Required secrets
 
@@ -207,10 +269,20 @@ Configure as repository secrets. Values are never printed or committed.
 | `RESEND_API_KEY` | notify jobs | Existing Resend key |
 | `HEALTH_REPORT_FROM` | notify jobs | Verified sender for health reports |
 | `HEALTH_REPORT_TO` | notify jobs | Recipient(s), comma-separated |
-| `GITHUB_TOKEN` | publish, fix, merge | Provided automatically by GitHub |
+| `AZURE_STAGING_WEBAPP_NAME` | `deploy-staging.yml` | Azure App Service staging target |
+| `AZURE_STAGING_CREDENTIALS` | `deploy-staging.yml` | Azure credentials scoped to staging only |
+| `STAGING_BASE_URL` | `deploy-staging.yml` | Base URL for non-destructive staging verification |
+| `AZURE_WEBAPP_NAME` | `deploy-production.yml`, `deploy-azure.yml` | Azure App Service production target |
+| `AZURE_CREDENTIALS` | `deploy-production.yml`, `deploy-azure.yml` | Azure credentials scoped to production deployment |
+| `PRODUCTION_BASE_URL` | `deploy-production.yml` | Base URL for non-destructive production verification |
+| `AZURE_SQL_SERVER_NAME` | `deploy-production.yml` | Azure SQL server used for backup verification |
+| `AZURE_RESOURCE_GROUP` | `deploy-production.yml` | Resource group used for backup verification |
+| `AZURE_SQL_DATABASE_NAME` | `deploy-production.yml` | Azure SQL database used for backup verification |
+| `GITHUB_TOKEN` | publish, fix, merge, staging record, deployment metadata | Provided automatically by GitHub |
 
 The audit job runs with **no** production credentials. Its database, auth and Stripe values are
-non-functional placeholders and its `RESEND_API_KEY` is empty.
+non-functional placeholders and its `RESEND_API_KEY` is empty. Staging must use non-production
+credentials and synthetic data only.
 
 ## Required GitHub environments
 
@@ -218,7 +290,8 @@ non-functional placeholders and its `RESEND_API_KEY` is empty.
 | --- | --- | --- |
 | `health-check-fix` | `approved-fix.yml` implement job | Required reviewers |
 | `health-check-merge` | `approved-merge.yml` merge job | Required reviewers |
-| `production` | `deploy-azure.yml` | Required reviewers — **not yet confirmed** |
+| `staging` | `promote-staging-branch.yml` promote job and `deploy-staging.yml` deploy job | Required reviewers |
+| `production` | `deploy-production.yml`, `deploy-azure.yml` deploy and rollback jobs | Required reviewers |
 
 ## Required branch rules for `main`
 
@@ -293,22 +366,26 @@ boundaries documented here must be preserved.
 - The audit and fix workflows additionally parse every workflow with a real YAML parser, because
   the Node validator is a heuristic and cannot fully replace one. Both gates run together
 - Exactly one authoritative scheduled audit is permitted; the validator fails if a second appears
-- `deploy-azure.yml` is advisory-only in the validator because this system must not modify
-  production release configuration
+- `promote-staging-branch.yml` must update only `refs/heads/staging` and must not deploy
+- Deployment workflows must be manually dispatched, must not deploy on push to `main`, and must
+  keep production secrets inside protected deployment jobs
+- `deploy-staging.yml` and `deploy-production.yml` must retain exact approval statements,
+  deployment-approval verification and post-deployment verification
 
 ## Safe disablement
 
 1. Disable **Weekly Repository Health Check** in the Actions tab (preserves history), or
 2. Remove the `schedule:` block to keep manual runs only, or
-3. Delete the three workflow files. `scripts/health-check/` and existing reports can remain.
+3. Disable individual fix, merge or deployment workflows from the Actions tab if that control is
+  being replaced by an equal or stronger process.
 
 Disabling the audit does not affect CI, retention or deployment.
 
 ## Rollback
 
-Revert the setup pull request. The system adds workflows, scripts, documentation and two additive
-exports in `resend.ts`/`emailTemplates.ts`. It changes no application behaviour, so reverting has
-no runtime effect beyond removing the health-report sender.
+Revert the setup pull request. The system adds workflows, scripts, documentation and additive
+exports in `src/server/notifications/resend.ts`. It changes no application behaviour, so reverting
+has no runtime effect beyond removing the health-report sender and release-gating workflows.
 
 ## Manual actions still required
 
@@ -316,13 +393,18 @@ See `docs/health-check/implementation-review.md` for the full matrix. The outsta
 
 1. **Create repository secrets** `HEALTH_REPORT_FROM` and `HEALTH_REPORT_TO`, and confirm
    `RESEND_API_KEY` exists. Without them the audit still runs and reports, but email fails.
-2. **Create GitHub environments** `health-check-fix` and `health-check-merge` with required
-   reviewers.
+2. **Create GitHub environments** `health-check-fix`, `health-check-merge`, `staging` and
+   `production` with required reviewers.
 3. **Configure branch protection on `main`** as listed above, with no administrator bypass.
-4. **Decide the production deployment gate.** `deploy-azure.yml` deploys on push to `main`.
-   Either add required reviewers to the `production` environment or split deployment into a
-   separately dispatched workflow.
+4. **Provision staging.** Create an Azure staging App Service target and a staging database with
+   synthetic data only, then configure `AZURE_STAGING_WEBAPP_NAME`, `AZURE_STAGING_CREDENTIALS`
+   and `STAGING_BASE_URL` on the `staging` environment.
 5. **Update `CODEOWNERS`** if review should sit with a team rather than an individual.
 6. **Decide on the Super User dispatch token** and store it in the application secret store.
 7. **Consider enabling GitHub secret scanning and CodeQL**, since `gitleaks` and `semgrep` are not
    installed on the runner and the built-in pattern scan is weaker.
+8. **Configure production release secrets** `AZURE_WEBAPP_NAME`, `AZURE_CREDENTIALS`,
+   `PRODUCTION_BASE_URL`, `AZURE_SQL_SERVER_NAME`, `AZURE_RESOURCE_GROUP` and
+   `AZURE_SQL_DATABASE_NAME` on the `production` environment.
+9. **Confirm Azure SQL point-in-time restore retention is at least seven days.** Production
+   deployment fails closed if backup verification cannot prove this.

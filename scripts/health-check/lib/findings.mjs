@@ -273,7 +273,7 @@ export function collectFindings(results, { runDate }) {
         summary: 'deploy-azure.yml runs on push to main, so a merge is also a production release unless the "production" GitHub environment enforces required reviewers.',
         evidence: '`.github/workflows/deploy-azure.yml` declares `on: push: branches: [ main ]` with `environment: production`.',
         affectedFiles: ['.github/workflows/deploy-azure.yml'],
-        recommendedFix: 'Configure required reviewers on the "production" GitHub environment, or split deployment into a separately dispatched workflow. This audit deliberately does not change deployment behaviour.',
+        recommendedFix: 'Remove the push trigger or require deployment through a separately dispatched production workflow with required reviewers.',
         approvedScopeRecommendation: 'Repository settings change, or an explicitly approved change to deploy-azure.yml.',
         acceptanceCriteria: 'A merge to main cannot reach production without a recorded human approval.',
         regressionTestRequired: 'No — verified by repository settings evidence.',

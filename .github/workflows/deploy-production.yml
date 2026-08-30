@@ -1,0 +1,359 @@
+name: Approved Deploy to Production
+
+# The only sanctioned route to production. It requires a reviewed commit on main, a successful
+# staging record for that exact commit, an exact approval statement and a protected environment
+# approval. It never bypasses branch protection and never deploys unverified code.
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Exact 40-character commit SHA validated in staging'
+        type: string
+        required: true
+      staging_report:
+        description: 'Staging record identifier, e.g. deploy-staging-2026-08-30-09-00-UTC'
+        type: string
+        required: true
+      production_approval_statement:
+        description: 'Must be exactly: DEPLOY APPROVED COMMIT TO PRODUCTION'
+        type: string
+        required: true
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify-authorisation:
+    name: Verify production authorisation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      checks: read
+      statuses: read
+    outputs:
+      actor: ${{ steps.approval.outputs.actor }}
+      approval_time: ${{ steps.approval.outputs.approval_time }}
+      previous_sha: ${{ steps.rollback.outputs.previous_sha }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify approval, commit, staging record and findings
+        id: approval
+        run: |
+          node scripts/health-check/verify-deployment-approval.mjs \
+            --target production \
+            --sha "${{ github.event.inputs.commit_sha }}" \
+            --statement "${{ github.event.inputs.production_approval_statement }}" \
+            --staging-report "${{ github.event.inputs.staging_report }}"
+
+      - name: Verify required checks passed on the commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SHA="${{ github.event.inputs.commit_sha }}"
+          CONCLUSION=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs" \
+            --jq '[.check_runs[] | select(.conclusion != null and .conclusion != "success" and .conclusion != "neutral" and .conclusion != "skipped")] | length')
+          if [ "${CONCLUSION:-0}" != "0" ]; then
+            echo "::error::$CONCLUSION check run(s) did not succeed on $SHA."
+            exit 1
+          fi
+          echo "All check runs succeeded on $SHA."
+
+      - name: Verify the commit was merged through a reviewed pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SHA="${{ github.event.inputs.commit_sha }}"
+          PRS=$(gh api "repos/${{ github.repository }}/commits/$SHA/pulls" --jq '[.[] | select(.merged_at != null)] | length')
+          if [ "${PRS:-0}" = "0" ]; then
+            echo "::error::$SHA was not merged through a pull request. Direct pushes may not be deployed."
+            exit 1
+          fi
+          echo "Commit originates from a merged pull request."
+
+      - name: Confirm migrations are backward compatible
+        run: |
+          set -euo pipefail
+          # A destructive migration cannot be rolled back by redeploying the previous build,
+          # so it must be applied under a separate, explicitly approved change.
+          RANGE=$(git rev-list --max-count=50 "${{ github.event.inputs.commit_sha }}")
+          CHANGED=$(git diff --name-only "${{ github.event.inputs.commit_sha }}~1" "${{ github.event.inputs.commit_sha }}" -- prisma/migrations/ || true)
+          if [ -z "$CHANGED" ]; then
+            echo "No migration changed in this commit."
+            exit 0
+          fi
+          DESTRUCTIVE=0
+          for FILE in $CHANGED; do
+            [ -f "$FILE" ] || continue
+            if grep -qiE 'DROP (TABLE|COLUMN)|ALTER COLUMN .* NOT NULL|RENAME (TABLE|COLUMN)' "$FILE"; then
+              echo "::warning::$FILE contains a potentially destructive statement."
+              DESTRUCTIVE=1
+            fi
+          done
+          if [ "$DESTRUCTIVE" = "1" ]; then
+            echo "::error::A migration in this commit is not backward compatible. It requires a separate approved change window."
+            exit 1
+          fi
+          echo "Migrations appear backward compatible."
+
+      - name: Record the current production commit for rollback
+        id: rollback
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PREVIOUS=$(gh api "repos/${{ github.repository }}/deployments?environment=production&per_page=1" --jq '.[0].sha // ""' 2>/dev/null || echo "")
+          if [ -z "$PREVIOUS" ]; then
+            echo "::warning::No previous production deployment is recorded; automated rollback will not be available."
+            PREVIOUS="none"
+          fi
+          echo "previous_sha=$PREVIOUS" >> "$GITHUB_OUTPUT"
+          echo "Rollback target: $PREVIOUS"
+
+  deploy:
+    name: Production deployment
+    needs: verify-authorisation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Production secrets are exposed only to this job, through the protected environment.
+    environment: production
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Confirm production credentials are configured
+        env:
+          WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
+          CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        run: |
+          set -euo pipefail
+          if [ -z "$WEBAPP_NAME" ] || [ -z "$CREDENTIALS" ]; then
+            echo "::error::Production deployment is not configured. AZURE_WEBAPP_NAME and AZURE_CREDENTIALS are required."
+            exit 1
+          fi
+          echo "Production credentials are present."
+
+      - name: Checkout the approved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.commit_sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Production build
+        run: npm run build
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Confirm a database backup exists
+        run: |
+          set -euo pipefail
+          SERVER="${{ secrets.AZURE_SQL_SERVER_NAME }}"
+          GROUP="${{ secrets.AZURE_RESOURCE_GROUP }}"
+          DATABASE="${{ secrets.AZURE_SQL_DATABASE_NAME }}"
+          if [ -z "$SERVER" ] || [ -z "$GROUP" ] || [ -z "$DATABASE" ]; then
+            echo "::error::Backup verification is not configured. Set AZURE_SQL_SERVER_NAME, AZURE_RESOURCE_GROUP and AZURE_SQL_DATABASE_NAME."
+            exit 1
+          fi
+          RETENTION=$(az sql db str-policy show --resource-group "$GROUP" --server "$SERVER" --name "$DATABASE" --query "retentionDays" -o tsv 2>/dev/null || echo "0")
+          if [ "${RETENTION:-0}" -lt 7 ]; then
+            echo "::error::Point-in-time restore retention is ${RETENTION} days. At least 7 days are required before a production release."
+            exit 1
+          fi
+          echo "Point-in-time restore retention: ${RETENTION} days."
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          package: .
+
+  verify:
+    name: Verify production deployment
+    needs: [verify-authorisation, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      result: ${{ steps.checks.outputs.result }}
+      record_id: ${{ steps.checks.outputs.record_id }}
+    steps:
+      - name: Checkout the approved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.commit_sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run non-destructive verification
+        id: checks
+        continue-on-error: true
+        env:
+          PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$PRODUCTION_BASE_URL" ]; then
+            echo "::error::PRODUCTION_BASE_URL is not configured; the deployment cannot be verified."
+            exit 1
+          fi
+          node scripts/health-check/verify-deployment.mjs \
+            --base-url "$PRODUCTION_BASE_URL" \
+            --target production \
+            --sha "${{ github.event.inputs.commit_sha }}"
+
+      - name: Upload the deployment record
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-deployment-record
+          path: docs/health-check/deployments/
+          retention-days: 90
+
+  rollback:
+    name: Roll back a failed production deployment
+    needs: [verify-authorisation, deploy, verify]
+    if: always() && needs.deploy.result == 'success' && needs.verify.outputs.result != 'SUCCESSFUL'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Report the failure before acting
+        run: |
+          {
+            echo "## PRODUCTION DEPLOYMENT FAILED"
+            echo ""
+            echo "Verification did not pass after deployment. A partial deployment may be live."
+            echo ""
+            echo "- Attempted commit: \`${{ github.event.inputs.commit_sha }}\`"
+            echo "- Rollback target: \`${{ needs.verify-authorisation.outputs.previous_sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop when no rollback target is known
+        if: needs.verify-authorisation.outputs.previous_sha == 'none' || needs.verify-authorisation.outputs.previous_sha == ''
+        run: |
+          echo "::error::No previous production commit is recorded. Automated rollback is unsafe; manual intervention is required."
+          exit 1
+
+      - name: Checkout the previous production commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.verify-authorisation.outputs.previous_sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Rebuild the previous release
+        run: npm run build
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Redeploy the previous release
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          package: .
+
+      - name: Confirm the rollback restored service
+        env:
+          PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
+        run: |
+          node scripts/health-check/verify-deployment.mjs \
+            --base-url "$PRODUCTION_BASE_URL" \
+            --target production \
+            --sha "${{ needs.verify-authorisation.outputs.previous_sha }}"
+
+  report:
+    name: Record and email the production result
+    needs: [verify-authorisation, deploy, verify, rollback]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Send the production result
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          HEALTH_REPORT_FROM: ${{ secrets.HEALTH_REPORT_FROM }}
+          HEALTH_REPORT_TO: ${{ secrets.HEALTH_REPORT_TO }}
+        run: |
+          set -euo pipefail
+          if [ "${{ needs.verify.outputs.result }}" = "SUCCESSFUL" ]; then
+            SUBJECT="PRODUCTION DEPLOYMENT SUCCESSFUL"
+          elif [ "${{ needs.deploy.result }}" = "skipped" ] || [ "${{ needs.verify-authorisation.result }}" != "success" ]; then
+            SUBJECT="URGENT: production deployment blocked before release"
+          else
+            SUBJECT="URGENT: PRODUCTION DEPLOYMENT FAILED"
+          fi
+          BODY=$(printf '%s\n' \
+            "Commit: ${{ github.event.inputs.commit_sha }}" \
+            "Staging record: ${{ github.event.inputs.staging_report }}" \
+            "Authorising actor: @${{ github.actor }}" \
+            "Approval time: ${{ needs.verify-authorisation.outputs.approval_time }}" \
+            "" \
+            "Authorisation: ${{ needs.verify-authorisation.result }}" \
+            "Deployment: ${{ needs.deploy.result }}" \
+            "Verification: ${{ needs.verify.outputs.result }}" \
+            "Rollback: ${{ needs.rollback.result }}" \
+            "Record: ${{ needs.verify.outputs.record_id }}" \
+            "" \
+            "Full evidence is attached to the workflow run.")
+          npx tsx scripts/health-check/send-workflow-email.ts "$SUBJECT" "$BODY"
+
+      - name: Fail the run when production is not healthy
+        if: needs.verify.outputs.result != 'SUCCESSFUL'
+        run: |
+          echo "::error::PRODUCTION DEPLOYMENT FAILED. See the rollback job and the emailed report."
+          exit 1

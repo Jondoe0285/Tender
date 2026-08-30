@@ -22,6 +22,8 @@
     "health:audit": "node scripts/health-check/run-audit.mjs",
     "health:validate-workflows": "node scripts/health-check/validate-workflows.mjs",
     "health:verify-approval": "node scripts/health-check/verify-approval.mjs",
+    "health:verify-deploy-approval": "node scripts/health-check/verify-deployment-approval.mjs",
+    "health:verify-deployment": "node scripts/health-check/verify-deployment.mjs",
     "health:email": "tsx scripts/health-check/send-report-email.ts"
   },
   "dependencies": {
