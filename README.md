@@ -1,4 +1,5 @@
-# Trade Tender
+export DATABASE_URL='actual staging pooled Neon URL'
+export DATABASE_URL_UNPOOLED='actual staging direct Neon URL'# Trade Tender
 
 A UK construction tendering marketplace connecting Clients with registered Retailers, built with
 Next.js, TypeScript, Tailwind CSS, Prisma, and NextAuth. See [docs/TradeTender-Business-Plan.md](docs/TradeTender-Business-Plan.md)
@@ -70,7 +71,9 @@ A structured production-readiness review (architecture, security, backend correc
 and deployment) was completed on 2026-08-28; see
 [docs/PRODUCTION-READINESS-REVIEW.md](docs/PRODUCTION-READINESS-REVIEW.md) for fixed findings and
 remaining outstanding items. The Azure SQL migration path and missing deploy pipeline recorded there
-were superseded on 2026-08-30 by the move to Render with a single PostgreSQL datasource.
+were superseded on 2026-08-30 by the move to Render hosting with a single PostgreSQL datasource.
+The database provider is being moved from Render PostgreSQL to Neon Lakebase Postgres; runtime
+traffic uses the pooled Neon URL and Prisma migrations use the direct Neon URL.
 
 See [Outstanding Tasks](#outstanding-tasks) for the remaining production-hardening work.
 
@@ -79,21 +82,37 @@ See [Outstanding Tasks](#outstanding-tasks) for the remaining production-hardeni
 Nothing in this list can be done from the repository — each needs a value or a decision from the
 platform owner. The first item will break a deploy if skipped.
 
-### 1. Set `NEXTAUTH_URL` on both Render services — blocking
+### 1. Rotate the shared Neon database password — blocking
+
+The staging and production Neon connection strings were shared during setup. Treat both passwords as
+exposed and rotate the Neon role password before production use. Update every dependent environment
+variable immediately after rotation.
+
+### 2. Set Neon database URLs on both Render services — blocking
+
+Both Render web services must use Neon rather than the old local or Render-managed database. Set
+`DATABASE_URL` to the pooled Neon connection string and `DATABASE_URL_UNPOOLED` to the direct,
+non-pooler Neon connection string. Prisma uses `DATABASE_URL_UNPOOLED` for migrations so schema
+deploys do not run through PgBouncer.
+
+Do not commit these values. Set them in the Render dashboard or via a secret manager only.
+
+### 3. Set `NEXTAUTH_URL` on both Render services — blocking
 
 The application now throws when this is missing rather than guessing a default, so a service without
 it fails its build. That is deliberate: the previous silent fallback pointed verification and
 contact-release links at `localhost`. Values are in
 [Environment origins](#environment-origins).
 
-### 2. Set the remaining per-service variables in the Render dashboard
+### 4. Set the remaining per-service variables in the Render dashboard
 
 Everything marked `sync: false` in [render.yaml](render.yaml) is unset by design.
 
 | Variable | Production | Staging |
 | --- | --- | --- |
 | `NEXTAUTH_URL` | `https://trade-tender.onrender.com` | `https://tender-m0xw.onrender.com` |
-| `DATABASE_URL` | its **own** database — see item 3 | linked to `tender-db` |
+| `DATABASE_URL` | pooled Neon application database URL | pooled Neon application database URL |
+| `DATABASE_URL_UNPOOLED` | direct database URL for Prisma migrations | direct database URL for Prisma migrations |
 | `STRIPE_SECRET_KEY` | live key | test key |
 | `STRIPE_WEBHOOK_SECRET` | from the production webhook | from a **separate** staging webhook |
 | `RESEND_API_KEY` / `EMAIL_FROM` | verified sending domain | separate key and sender |
@@ -103,20 +122,26 @@ Everything marked `sync: false` in [render.yaml](render.yaml) is unset by design
 | `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` | build-time, for source maps | optional |
 | `NEXT_PUBLIC_SUPPORT_EMAIL` | optional; links hide when unset | optional |
 
-### 3. Give production its own database
+### 5. Keep production and staging on separate Neon databases or branches
 
-[render.yaml](render.yaml) intentionally does **not** wire production to `tender-db`. Only one
-database is declared, and auto-linking production to it would point live traffic at the instance
-staging migrates and seeds. Provision a separate paid instance and set its connection string on the
-production service. The free plan also expires after 30 days, so it is not viable for production.
+Production must not share the same writable database target as staging. Use separate Neon projects,
+or at minimum separate Neon branches with distinct pooled and direct connection strings. Run
+production migrations only against the production direct URL.
 
-### 4. Register two Stripe webhooks, not one
+### 6. Seed the platform owner in the intended Neon environment
+
+`npm run db:seed` refuses to run when `NODE_ENV=production`, but it will seed whichever database the
+current `DATABASE_URL` points at. Before running it for staging, confirm the active host is Neon and
+not `localhost`, then seed the owner account from `PLATFORM_OWNER_EMAIL` and
+`PLATFORM_OWNER_PASSWORD`.
+
+### 7. Register two Stripe webhooks, not one
 
 Each environment needs its own endpoint at `https://<host>/api/webhooks/stripe`, producing a
 different signing secret. Sharing one secret makes signature verification fail on the other
 environment, and payments then stop confirming with no visible error.
 
-### 5. Verify the Resend sending domain
+### 8. Verify the Resend sending domain
 
 Until the DNS records are in place, verification and contact-release emails will bounce or be
 filtered, which blocks registration entirely. `EMAIL_FROM` must use that verified domain; there is
@@ -128,12 +153,12 @@ place. It distinguishes an unset variable (`503`) from an unverified domain (`50
 If you previously set `RESEND_FROM_EMAIL` in Render, delete it — the application no longer reads it,
 and leaving it in place makes email look configured when it is not.
 
-### 6. Point the retention job at production
+### 9. Point the retention job at production
 
 The purge still runs from GitHub Actions. Update the `RETENTION_JOB_URL` repository secret to the
 production host's `/api/internal/retention`, and set `RETENTION_JOB_SECRET` to match the service.
 
-### 7. Confirm the Render blueprint adopts the existing services
+### 10. Confirm the Render blueprint adopts the existing services
 
 Both services were created by hand, so the first blueprint sync must *adopt* them. Check that Render
 offers to **update** `Trade Tender` and `Tender Staging` rather than create them — creating would
@@ -408,6 +433,10 @@ For a deployed sandbox, set `TRADE_TENDER_ENV=sandbox`, `SANDBOX_SEED_ENABLED=tr
 `SANDBOX_USER_PASSWORD`; it is required and becomes the password for both permanent sandbox users.
 This is the only production-mode exception; sandbox seeding remains blocked for every other environment.
 
+Before seeding Neon, confirm the active database host ends in `.neon.tech` and is not `localhost`.
+Use the pooled Neon URL for `DATABASE_URL` and the matching non-pooler URL for
+`DATABASE_URL_UNPOOLED`.
+
 ### Run the app
 
 ```bash
@@ -425,8 +454,9 @@ npm start
 
 ### Render deployment notes
 
-The application runs as a Render Node web service with a managed Render PostgreSQL instance, described
-in [render.yaml](render.yaml). Attachments still require private object storage; Render disks are not a
+The application runs as a Render Node web service with Neon Lakebase Postgres for persistence.
+[render.yaml](render.yaml) describes the web services, while database credentials are set per
+environment as secrets. Attachments still require private object storage; Render disks are not a
 substitute, because the free plan has an ephemeral filesystem. Confirm `NEXTAUTH_URL`, the Stripe
 webhook secret, and the verified Resend sender for each environment before treating a release as
 production-safe.
