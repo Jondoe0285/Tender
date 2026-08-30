@@ -25,8 +25,8 @@ These requirements translate the approved business plan into an implementation r
 - Next.js application.
 - TypeScript only for application code.
 - Tailwind CSS for styling.
-- Azure App Service for hosting.
-- Azure SQL Database for persistence.
+- Render for hosting.
+- Render PostgreSQL for persistence.
 - Stripe for payments.
 - GitHub Actions for CI/CD.
 
@@ -247,7 +247,7 @@ The Super User can, subject to authorization and audit logging:
 ### 6.4 Reliability and Operations
 
 - **NFR-030:** GitHub Actions shall run type checks, tests, and production builds before deployment.
-- **NFR-031:** Azure SQL backups and recovery options shall be verified before destructive migrations or releases.
+- **NFR-031:** Database backups and recovery options shall be verified before destructive migrations or releases.
 - **NFR-032:** Deployments shall have observable health checks and documented rollback preparation.
 - **NFR-033:** Payment and webhook handling shall tolerate retries without creating duplicate releases, charges, quotes, or audit events.
 

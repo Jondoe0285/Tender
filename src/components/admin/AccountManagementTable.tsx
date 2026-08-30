@@ -58,9 +58,14 @@ export function AccountManagementTable({ role, rows }: { role: 'CLIENT' | 'RETAI
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error ?? 'Unable to create this account');
-      setMessage(`Account created for ${form.email}.`);
       setForm({ email: '', password: '', contactName: '', contactPhone: '', companyName: '', categories: '', coverageAreas: '' });
       setShowCreate(false);
+      if (data.invitationSent === false) {
+        // Keep the page in place: the account exists but the holder has no way to sign in yet.
+        setMessage(`Account created for ${form.email}, but the invitation email could not be sent. Use Reset password to issue a new link.`);
+        return;
+      }
+      setMessage(`Account created for ${form.email}. An email has been sent inviting them to set a password.`);
       window.location.reload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to create this account');

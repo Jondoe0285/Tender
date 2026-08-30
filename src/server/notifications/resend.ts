@@ -10,8 +10,14 @@ function getResendClient(): Resend | null {
   return resendClient;
 }
 
-function getFromAddress(): string {
-  return process.env.RESEND_FROM_EMAIL ?? 'Trade Tender <notifications@example.com>';
+/** No fallback: an unroutable default would silently send from an invalid domain. */
+function getFromAddress(): string | null {
+  return process.env.EMAIL_FROM?.trim() || null;
+}
+
+/** True once both the key and sender are configured for this environment. */
+export function isEmailConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY && getFromAddress());
 }
 
 export type TenderNotification = {
@@ -28,8 +34,11 @@ export async function sendTransactionalEmail(to: string, template: EmailTemplate
   const resend = getResendClient();
   if (!resend) return { sent: false, reason: 'RESEND_API_KEY is not configured' } as const;
 
+  const from = getFromAddress();
+  if (!from) return { sent: false, reason: 'EMAIL_FROM is not configured' } as const;
+
   const result = await resend.emails.send({
-    from: getFromAddress(),
+    from,
     to,
     subject: template.subject,
     html: template.html,

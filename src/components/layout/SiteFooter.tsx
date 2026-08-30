@@ -1,7 +1,9 @@
 import Image from 'next/image';
 import { TradeTenderLogo } from '@/components/layout/TradeTenderLogo';
+import { supportEmail } from '@/lib/contact';
 
 export function SiteFooter() {
+  const support = supportEmail();
   return (
     <footer className="mt-auto border-t-4 border-safety-amber bg-foundation-navy px-6 py-10 text-sm text-site-white/75 sm:px-10">
       <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.2fr_1fr_1fr]">
@@ -45,7 +47,7 @@ export function SiteFooter() {
           <div className="mt-5 border-t border-site-white/15 pt-4">
             <p className="text-xs font-semibold uppercase tracking-widest text-safety-amber">Contact us</p>
             <p className="mt-2 text-xs leading-relaxed text-site-white/70">Support for account access, platform use, payments, and technical issues.</p>
-            <a href="mailto:info@sinclairsafetysolutions.co.uk" className="mt-2 inline-block text-xs font-semibold text-site-white underline underline-offset-4 hover:text-hi-viz-tint">Email support</a>
+            {support && <a href={`mailto:${support}`} className="mt-2 inline-block text-xs font-semibold text-site-white underline underline-offset-4 hover:text-hi-viz-tint">Email support</a>}
             <a href="/policies#support" className="ml-4 text-xs font-semibold text-site-white underline underline-offset-4 hover:text-hi-viz-tint">Support policy</a>
           </div>
         </div>
