@@ -8,10 +8,15 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { CATEGORY_NAMES } from '@/lib/categories';
 import { FieldGroup, Input, Label, PasswordInput } from '@/components/ui/Field';
+import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
+import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 
 export default function RegisterPage() {
   const router = useRouter();
   const [role, setRole] = useState<'CLIENT' | 'RETAILER'>('CLIENT');
+  const [coverageScope, setCoverageScope] = useState<'COUNTY' | 'REGION' | 'UK'>('COUNTY');
+  const [counties, setCounties] = useState<string[]>([]);
+  const [regions, setRegions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,6 +43,9 @@ export default function RegisterPage() {
         companyName: form.get('companyName') || undefined,
         categories: role === 'RETAILER' ? categories : undefined,
         coverageAreas: form.get('coverageAreas') || undefined,
+        coverageScope: role === 'RETAILER' ? coverageScope : undefined,
+        counties: role === 'RETAILER' && coverageScope === 'COUNTY' ? counties : undefined,
+        regions: role === 'RETAILER' && coverageScope === 'REGION' ? regions : undefined,
       }),
     });
 
@@ -128,9 +136,49 @@ export default function RegisterPage() {
                     ))}
                   </fieldset>
                   <FieldGroup>
-                    <Label htmlFor="coverageAreas">Coverage areas</Label>
+                    <Label htmlFor="coverageScope">Operating area</Label>
+                    <div className="flex flex-wrap gap-4">
+                      {(['COUNTY', 'REGION', 'UK'] as const).map((scope) => (
+                        <label key={scope} className="flex items-center gap-2 text-sm text-concrete-grey">
+                          <input
+                            type="radio"
+                            name="coverageScope"
+                            checked={coverageScope === scope}
+                            onChange={() => setCoverageScope(scope)}
+                            className="h-4 w-4 accent-safety-amber"
+                          />
+                          {scope === 'COUNTY' ? 'Select counties' : scope === 'REGION' ? 'Select regions' : 'UK-wide (all regions)'}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-concrete-grey">A tender is matched to you only when its location falls inside the service areas you select here.</p>
+                  </FieldGroup>
+                  {coverageScope === 'COUNTY' && (
+                    <FieldGroup>
+                      <Label htmlFor="counties">Service areas (counties)</Label>
+                      <MultiSelectDropdown
+                        options={UK_COUNTIES.map((county) => ({ label: county, value: county }))}
+                        selected={counties}
+                        onChange={setCounties}
+                        placeholder="Select one or more counties"
+                      />
+                    </FieldGroup>
+                  )}
+                  {coverageScope === 'REGION' && (
+                    <FieldGroup>
+                      <Label htmlFor="regions">Service areas (regions)</Label>
+                      <MultiSelectDropdown
+                        options={UK_REGIONS.map((region) => ({ label: region, value: region }))}
+                        selected={regions}
+                        onChange={setRegions}
+                        placeholder="Select one or more regions"
+                      />
+                    </FieldGroup>
+                  )}
+                  <FieldGroup>
+                    <Label htmlFor="coverageAreas">Coverage towns (optional)</Label>
                     <Input id="coverageAreas" name="coverageAreas" placeholder="e.g. Leeds, Manchester, Sheffield" />
-                    <p className="text-xs text-concrete-grey">Use towns, cities, or postcode areas separated by commas.</p>
+                    <p className="text-xs text-concrete-grey">Used only to estimate distance on opportunity listings, in addition to the service areas above.</p>
                   </FieldGroup>
                 </>
               )}

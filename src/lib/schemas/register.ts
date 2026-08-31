@@ -12,6 +12,9 @@ export const registerSchema = z.object({
   companyName: z.string().trim().min(2).max(160).optional(),
   categories: z.array(z.string()).optional(),
   coverageAreas: z.string().trim().max(400).optional(),
+  coverageScope: z.enum(['COUNTY', 'REGION', 'UK']).optional(),
+  counties: z.array(z.string()).max(60).optional(),
+  regions: z.array(z.string()).max(20).optional(),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

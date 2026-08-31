@@ -344,6 +344,12 @@ export function AccountManagementTable({ role, rows }: { role: 'CLIENT' | 'RETAI
                 <StatusBadge status={account.suspended ? 'attention' : 'approved'}>
                   {account.suspended ? 'Suspended' : 'Active'}
                 </StatusBadge>
+                <a
+                  href={`/super-user/users/${account.id}`}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-foundation-navy transition hover:border-steel-blue hover:text-foundation-navy"
+                >
+                  View profile
+                </a>
                 <button
                   type="button"
                   onClick={() => handleAction(account.id, account.suspended ? 'activate' : 'suspend')}

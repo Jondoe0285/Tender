@@ -102,6 +102,17 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
     else menuButtonRef.current?.focus();
   }, [mobileOpen]);
 
+  // Records the in-app pages a signed-in user visits, for the Super User analytics profile view.
+  useEffect(() => {
+    if (!pathname || !session?.user?.id) return;
+    fetch('/api/track/page-view', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: pathname }),
+      keepalive: true,
+    }).catch(() => null);
+  }, [pathname, session?.user?.id]);
+
   return (
     <div className="flex min-h-screen bg-site-white">
       {/* Desktop sidebar */}
