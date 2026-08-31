@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { passwordResetRequestSchema } from '../../src/lib/schemas/passwordReset';
 import { hashResetToken } from '../../src/server/auth/passwordReset';
-import { accountCreatedByAdminTemplate } from '../../src/server/notifications/emailTemplates';
+import { accountCreatedByAdminTemplate, passwordResetTemplate } from '../../src/server/notifications/emailTemplates';
 
 test('hashes reset tokens without retaining the raw token', () => {
   const token = 'a-raw-reset-token';
@@ -42,4 +43,23 @@ test('escapes account details rendered into the invitation', () => {
 
   assert.ok(!template.html.includes('<script>'));
   assert.ok(template.html.includes('&lt;script&gt;'));
+});
+
+test('builds a forgotten-password reset email without embedding account secrets', () => {
+  const template = passwordResetTemplate({
+    resetLink: 'https://app.example/reset-password?token=abc123',
+    expiresIn: '24 hours',
+  });
+
+  assert.equal(template.subject, 'Reset your Trade Tender password');
+  assert.ok(template.html.includes('https://app.example/reset-password?token=abc123'));
+  assert.ok(template.html.includes('24 hours'));
+  assert.ok(!template.html.includes('passwordHash'));
+});
+
+test('normalises forgotten-password request email input', () => {
+  const parsed = passwordResetRequestSchema.parse({ email: '  USER@Example.TEST  ' });
+
+  assert.equal(parsed.email, 'user@example.test');
+  assert.equal(passwordResetRequestSchema.safeParse({ email: 'not-an-email' }).success, false);
 });

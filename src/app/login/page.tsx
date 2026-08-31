@@ -24,7 +24,10 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,6 +47,29 @@ function LoginForm() {
       return;
     }
     router.replace('/api/auth/workspace');
+  }
+
+  async function handlePasswordResetRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setResetSubmitting(true);
+    setResetError(null);
+    setResetEmailSent(false);
+
+    const form = new FormData(event.currentTarget);
+    const response = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: form.get('resetEmail') }),
+    });
+
+    setResetSubmitting(false);
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      setResetError(data?.error ?? 'Unable to request a reset link. Please try again.');
+      return;
+    }
+
+    setResetEmailSent(true);
   }
 
   return (
@@ -83,6 +109,32 @@ function LoginForm() {
           Create an account
         </a>
       </p>
+
+      <Card className="mt-8">
+        <form onSubmit={handlePasswordResetRequest} className="flex flex-col gap-4">
+          <div>
+            <h2 className="font-heading text-lg font-bold text-foundation-navy">Forgotten password?</h2>
+            <p className="mt-2 text-sm text-concrete-grey">Enter your email address and we will send a reset link if the account exists.</p>
+          </div>
+          <FieldGroup>
+            <Label htmlFor="resetEmail">Email</Label>
+            <Input id="resetEmail" name="resetEmail" type="email" required autoComplete="email" />
+          </FieldGroup>
+          {resetEmailSent && (
+            <p role="status" className="text-sm font-semibold text-approved">
+              If an account exists for that email, a reset link has been sent.
+            </p>
+          )}
+          {resetError && (
+            <p role="alert" className="text-sm font-semibold text-attention">
+              {resetError}
+            </p>
+          )}
+          <Button type="submit" loading={resetSubmitting} variant="secondary" className="mt-1">
+            Send reset link
+          </Button>
+        </form>
+      </Card>
     </section>
   );
 }
