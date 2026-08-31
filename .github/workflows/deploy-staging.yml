@@ -60,6 +60,20 @@ jobs:
       contents: read
     outputs:
       base_url: ${{ steps.target.outputs.base_url }}
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tender
+          POSTGRES_PASSWORD: tender
+          POSTGRES_DB: tender_staging_check
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Confirm staging credentials are configured
         env:
@@ -93,11 +107,16 @@ jobs:
         run: npm ci
 
       - name: Confirm migrations apply to a clean database
+        env:
+          DATABASE_URL: postgresql://tender:tender@localhost:5432/tender_staging_check?schema=public
+          DATABASE_URL_UNPOOLED: postgresql://tender:tender@localhost:5432/tender_staging_check?schema=public
         run: |
           set -euo pipefail
-          rm -f "$PWD/staging-migration-check.db"
-          DATABASE_URL="file:$PWD/staging-migration-check.db" npx prisma migrate deploy
-          rm -f "$PWD/staging-migration-check.db"
+          npx prisma migrate deploy
+          npx prisma migrate diff \
+            --from-url "$DATABASE_URL" \
+            --to-schema-datamodel prisma/schema.prisma \
+            --exit-code
 
       - name: Production build
         run: npm run build

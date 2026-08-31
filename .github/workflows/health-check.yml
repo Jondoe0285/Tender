@@ -75,14 +75,29 @@ jobs:
       contents: read
     env:
       NODE_ENV: test
-      DATABASE_URL: file:./health-check.db
+      DATABASE_URL: postgresql://tender:tender@localhost:5432/tender_health_check?schema=public
+      DATABASE_URL_UNPOOLED: postgresql://tender:tender@localhost:5432/tender_health_check?schema=public
       NEXTAUTH_SECRET: health-check-placeholder-secret
       NEXTAUTH_URL: http://localhost:3000
       RESEND_API_KEY: ''
-      RESEND_FROM_EMAIL: Trade Tender <no-reply@example.test>
+      EMAIL_FROM: Trade Tender <no-reply@example.test>
       STRIPE_SECRET_KEY: sk_test_health_check_placeholder
       STRIPE_WEBHOOK_SECRET: whsec_health_check_placeholder
       RETENTION_JOB_SECRET: health-check-placeholder-secret
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tender
+          POSTGRES_PASSWORD: tender
+          POSTGRES_DB: tender_health_check
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     outputs:
       status: ${{ steps.audit.outputs.status }}
       release: ${{ steps.audit.outputs.release }}
