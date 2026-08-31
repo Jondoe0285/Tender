@@ -1,91 +1,65 @@
-# Trade Tender
+# Trade Tender: Action List
 
-Trade Tender is a UK construction tendering platform. Clients create tenders, matched Retailers
-unlock opportunities and submit quotes, and Clients compare quotes before releasing contact
-details through the required payment flow.
+Detailed product scope: [business plan](docs/TradeTender-Business-Plan.md). Technical and release
+procedures: [docs](docs/).
 
-The product scope and rules are defined in the [business plan](docs/TradeTender-Business-Plan.md).
-Architecture, security requirements, and the brand rules are documented in [docs](docs/).
+## Do Now
 
-## Stack
+- [ ] **Verify staging after the database migration.** Reload `/super-user` on `Tender Staging` and
+  confirm `Tender.supplyDate` no longer raises `P2022`. The database configured in local `.env` has
+  been migrated; confirm the Render service uses that same Neon database.
+- [ ] **Confirm `Tender Staging` has successfully deployed the latest `staging` commit.** Inspect the
+  Render build log. It must show `prisma migrate deploy` completing before the build. Trigger a
+  manual deploy if no successful deploy has run.
+- [ ] **Confirm staging environment variables in Render.** Set `DATABASE_URL` (pooled Neon URL),
+  `DATABASE_URL_UNPOOLED` (direct Neon URL), `NEXTAUTH_SECRET`, and `NEXTAUTH_URL` to the exact
+  staging public origin. A wrong `NEXTAUTH_URL` can redirect users to `localhost:10000`.
+- [ ] **Rotate the Neon database password.** The current credential has been used locally and must be
+  treated as exposed. Update both database URL variables immediately after rotation.
+- [ ] **Separate staging and production databases.** Use distinct Neon projects or branches and
+  distinct pooled/direct connection URLs. Do not permit staging to modify the production database.
 
-- Next.js, TypeScript, Tailwind CSS, Prisma, and PostgreSQL
-- NextAuth credentials authentication with Client, Retailer, and Super User roles
-- Stripe payments, Resend email, Sentry monitoring
-- Render web services with Neon PostgreSQL
+## Before Production
 
-## Local Setup
+- [ ] **Review and merge [PR #4](https://github.com/Jondoe0285/Tender/pull/4) into `main`.** It carries
+  PostgreSQL-valid migrations, the Render redirect fix, and security fixes. `Trade Tender` deploys
+  from `main`; `Tender Staging` deploys from `staging`.
+- [ ] **Deploy `main` in Render and verify migrations.** The build log must list all outstanding
+  Prisma migrations as applied. If the production database differs from staging, run
+  `npx prisma migrate deploy` with its direct URL after taking a backup. Never run `prisma db push`
+  against production.
+- [ ] **Set production environment variables.** Configure all `sync: false` values in
+  [render.yaml](render.yaml), including separate Stripe, Resend, Sentry, and retention secrets.
+- [ ] **Configure Stripe.** Add live keys, register a production webhook at
+  `/api/webhooks/stripe`, store its signing secret, then test payment confirmation, refund, and
+  chargeback handling.
+- [ ] **Verify Resend.** Verify the sending domain, set `EMAIL_FROM`, and send an email-verification
+  and contact-release test from each environment.
+- [ ] **Set `RETENTION_JOB_SECRET` and schedule the retention job** against the production
+  `/api/internal/retention` endpoint.
+- [ ] **Configure Sentry and confirm one test event.** Set browser/server DSNs and verify that the
+  production environment receives a scrubbed error event.
 
-Requirements: Node.js 20 and Docker.
+## Engineering Work
 
-```bash
-git clone https://github.com/Jondoe0285/Tender.git
-cd Tender
-cp .env.example .env
-npm ci
-docker compose up -d
-npm run db:generate
-npm run db:migrate
-npm run db:seed
-npm run dev
-```
+- [ ] **Add durable object storage for attachments.** Render's filesystem is ephemeral, which breaks
+  30-day quote retention and five-year accepted-quote retention.
+- [ ] **Revalidate session claims and shorten session lifetime.** Suspended accounts and revoked Owner
+  flags currently remain effective in a JWT until the default NextAuth expiry.
+- [ ] **Move rate limiting to shared storage and add per-account lockout.** The current in-process,
+  IP-only limiter does not protect across Render instances or deployment restarts.
+- [ ] **Plan a tested Next.js 16 upgrade.** `npm audit` still reports high-severity advisories that
+  cannot be fixed on the currently installed Next.js 14 line.
+- [ ] **Implement misuse and fraud monitoring** for repeated parties, unusual payment activity, and
+  duplicate or near-duplicate tenders.
+- [ ] **Add integration/E2E tests** for tender unlock, payment, webhook, contact release, and
+  pre-payment privacy invariants.
+- [ ] **Complete accessibility and real-device QA**, including the mobile sidebar and first-time
+  Client/Retailer journeys.
 
-Open `http://localhost:3000`. Do not commit `.env` or production credentials.
+## Routine Checks
 
-## Configuration
-
-Copy [.env.example](.env.example) and set the values appropriate to the environment.
-
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | Pooled PostgreSQL connection used by the application. |
-| `DATABASE_URL_UNPOOLED` | Direct PostgreSQL connection used by Prisma migrations. |
-| `NEXTAUTH_SECRET` | Long, random authentication secret. |
-| `NEXTAUTH_URL` | Required public origin for this deployment. It controls email links and server redirects. |
-| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Required for production payments and Stripe webhooks. |
-| `RESEND_API_KEY` / `EMAIL_FROM` | Required for verification and transactional email. `EMAIL_FROM` needs a verified Resend domain. |
-| `RETENTION_JOB_SECRET` | Required by the scheduled retention endpoint. |
-
-For Neon, use the pooled URL for `DATABASE_URL` and the non-pooler URL for
-`DATABASE_URL_UNPOOLED`. Staging and production must have separate writable databases or Neon
-branches.
-
-## Deploying To Render
-
-[render.yaml](render.yaml) defines two services:
-
-| Service | Branch | Purpose |
-| --- | --- | --- |
-| `Tender Staging` | `staging` | Staging environment |
-| `Trade Tender` | `main` | Production environment |
-
-Render runs this build command for both services:
-
-```bash
-npm ci && npm run type-check && npm run lint && npx prisma migrate deploy && npm run build
-```
-
-Set every `sync: false` variable in the Render dashboard. In particular, set `NEXTAUTH_URL` to
-the exact public URL of that service; resolving redirects from Render's internal request host can
-otherwise send a browser to `localhost:10000`.
-
-Each environment needs its own Stripe webhook at `/api/webhooks/stripe` and its own signing secret.
-
-## Migration Recovery
-
-If Prisma reports a missing column such as `Tender.supplyDate`, the database is behind the Prisma
-schema. Confirm the service has deployed the branch containing the migration, then run this only
-against that environment's direct database URL:
-
-```bash
-npx prisma migrate deploy
-```
-
-Check the deployment build log. A successful run lists each applied migration. If Prisma reports a
-failed migration, inspect `_prisma_migrations` and use `prisma migrate resolve` only after reviewing
-the failure and taking a backup. Never use `db push` against production.
-
-## Checks
+Run before opening a pull request or deploying:
 
 ```bash
 npm run lint
@@ -96,23 +70,13 @@ npm run health:audit
 npm run health:validate-workflows
 ```
 
-The health audit runs the migration history against PostgreSQL and writes its report to
-`docs/health-check/`. The workflow details and release process are in
-[docs/health-check/README.md](docs/health-check/README.md).
+`health:audit` writes its report to `docs/health-check/` and validates migrations against PostgreSQL.
 
-## Important Constraints
+## Reference
 
-- All protected routes require server-side authentication and authorization.
-- Client and Retailer contact details must not be released until the required payment is confirmed.
-- The current revenue model is a £10 Retailer tender unlock and a £10 Client Accepted Quote Release.
-- Tender attachments need durable object storage before real documents are accepted; Render's local
-  filesystem is ephemeral.
-
-## Documentation
-
+- [Render blueprint](render.yaml)
+- [Environment template](.env.example)
 - [Business plan](docs/TradeTender-Business-Plan.md)
 - [Architecture](docs/Architecture.md)
 - [Security requirements](docs/Security-Requirements.md)
-- [Product requirements](docs/Product-Requirements.md)
-- [Brand rules](docs/branding/TradeTender-Brand-Rules.md)
 - [Health-check and release workflow](docs/health-check/README.md)
