@@ -208,6 +208,15 @@ Points worth reviewing, each a deliberate trade-off rather than an oversight.
   before any real Client uploads a file. This is the largest remaining gap.
 - **No error has been confirmed in Sentry yet.** The SDK is wired but unverified end to end, because
   it needs a DSN and a real triggered error.
+- **Next.js 14 carries 8 high-severity advisories with no patch on the 14.x line.** The project is
+  already on the latest `14.2.35`, and the top-level `postcss` is patched; the remaining advisories
+  sit in Next's bundled copy. `npm audit` only clears on Next 16, which is a major upgrade and needs
+  its own tested change. Until then the dependency scan will keep failing.
+- **Session claims are not revalidated.** `role`, `isOwner`, `isAccountant` and `suspended` are
+  stamped into the JWT at sign-in and no `session.maxAge` is set, so NextAuth's 30-day default
+  applies. Suspending a user or revoking Owner therefore has no effect until the token expires.
+- **Rate limiting is per-instance and IP-keyed from the leftmost `X-Forwarded-For` value.** It resets
+  on every deploy, is not shared across Render instances, and there is no per-account lockout.
 
 ## Roles
 
@@ -250,6 +259,11 @@ Highlights:
 - [x] **Database path resolved:** the app now uses one PostgreSQL datasource in every environment, with a single migration history applied by `prisma migrate deploy`.
 - [x] **Migrations are PostgreSQL-valid:** the 2026-08-30 migrations were generated against SQLite (`PRAGMA` table rebuilds, `DATETIME`, `REAL`) and failed on Render, leaving `Tender.supplyDate` missing and production raising `P2022`. The history now applies to a clean PostgreSQL database with no drift against [prisma/schema.prisma](prisma/schema.prisma).
 - [x] **Migration gates run on PostgreSQL:** the health check and the staging deploy previously replayed the history into a SQLite `file:` database, so both reported PASSED while the migrations were invalid for PostgreSQL. Both now use a PostgreSQL service container, and [scripts/health-check/validate-migrations.mjs](scripts/health-check/validate-migrations.mjs) fails rather than passes if it is ever pointed at a non-PostgreSQL database.
+- [x] **Accountant privilege escalation closed:** `super-user/users`, `super-user/users/[id]`, `super-user/categories` and the `super-user/settings` read gated on `requireRole('SUPER_USER')`, which admits Accountant sub-accounts because they hold that role. An Accountant could reset any Client or Retailer password and grant release-fee credits, bypassing the £10 payment gate. All now use `requireFullSuperUser()`, with a regression test over every Super User route.
+- [x] **Admin temporary passwords use a CSPRNG:** three admin routes derived reset passwords from `Math.random()`. They now use `randomBytes` via [src/server/auth/temporaryPassword.ts](src/server/auth/temporaryPassword.ts).
+- [ ] Revalidate session claims against the database, and set a session lifetime, so suspension and Owner revocation take effect immediately
+- [ ] Move rate limiting to shared storage and add per-account login/reset lockout
+- [ ] Plan the Next.js 16 upgrade to clear the outstanding high-severity advisories
 - [ ] Redeploy staging and production so the corrected migrations actually apply (see [Action Required item 11](#11-redeploy-so-the-corrected-migrations-apply))
 - [x] **CI/CD baseline implemented:** GitHub Actions gates lint, type-check, tests, and production build on PRs and pushes to `main` and `staging`; Render deploys from git using [render.yaml](render.yaml).
 - [x] **Auth abuse hardening in repo:** login and registration routes now enforce a simple in-app rate limit using source IP headers.
