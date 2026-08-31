@@ -65,6 +65,9 @@ export async function POST(request: Request) {
                 companyName: input.companyName ?? '',
                 categories: (input.categories ?? []).join(','),
                 coverageAreas: input.coverageAreas ?? '',
+                coverageScope: input.coverageScope ?? 'COUNTY',
+                counties: (input.counties ?? []).join(','),
+                regions: (input.regions ?? []).join(','),
               },
             });
       }
@@ -105,6 +108,9 @@ export async function POST(request: Request) {
                 companyName: input.companyName ?? '',
                 categories: (input.categories ?? []).join(','),
                 coverageAreas: input.coverageAreas ?? '',
+                coverageScope: input.coverageScope ?? 'COUNTY',
+                counties: (input.counties ?? []).join(','),
+                regions: (input.regions ?? []).join(','),
               },
             },
           }

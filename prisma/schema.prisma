@@ -69,6 +69,11 @@ model User {
   emailVerifiedAt   DateTime?
   termsAcceptedAt   DateTime?
   createdAt         DateTime @default(now())
+  lastLoginAt       DateTime?
+  lastLogoutAt      DateTime?
+  totalTimeOnlineSeconds Int @default(0)
+
+  pageViews         PageView[]
 
   retailerProfile   RetailerProfile?
   primaryClientCompany ClientCompany? @relation("ClientCompanyPrimary")
@@ -92,6 +97,17 @@ model User {
   clientMessages TenderMessage[] @relation("TenderMessageClient")
   moderationEvents  ModerationEvent[] @relation("ModerationActor")
   reviewedModerationEvents ModerationEvent[] @relation("ModerationReviewer")
+}
+
+/** In-app route visits, used only to show a Super User which areas an account has been using. */
+model PageView {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  path      String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model ModerationEvent {
@@ -495,7 +511,7 @@ model ContactRelease {
 model AuditLog {
   id         String   @id @default(cuid())
   actorId    String?
-  actor      User?    @relation(fields: [actorId], references: [id])
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
   action     String
   targetType String
   targetId   String

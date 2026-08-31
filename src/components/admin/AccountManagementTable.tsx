@@ -85,10 +85,28 @@ export function AccountManagementTable({ role, rows }: { role: 'CLIENT' | 'RETAI
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error ?? 'Action failed');
-      setMessage(action === 'reset-password' ? `Temporary password: ${data.temporaryPassword}` : `Account ${action === 'suspend' ? 'suspended' : 'reactivated'} successfully.`);
+      setMessage(action === 'reset-password' ? 'A password reset link has been sent to the account email address.' : `Account ${action === 'suspend' ? 'suspended' : 'reactivated'} successfully.`);
       window.location.reload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Action failed');
+    } finally {
+      setIsBusy(null);
+    }
+  }
+
+  async function deleteAccount(account: AccountRow) {
+    if (!window.confirm(`Delete ${account.email}? Accounts with retained tender, quote, payment, communication, or compliance records cannot be deleted.`)) return;
+
+    setIsBusy(`delete-${account.id}`);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/super-user/users/${account.id}`, { method: 'DELETE' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? 'Unable to delete this account');
+      setMessage('Account deleted successfully.');
+      window.location.reload();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to delete this account');
     } finally {
       setIsBusy(null);
     }
@@ -326,6 +344,12 @@ export function AccountManagementTable({ role, rows }: { role: 'CLIENT' | 'RETAI
                 <StatusBadge status={account.suspended ? 'attention' : 'approved'}>
                   {account.suspended ? 'Suspended' : 'Active'}
                 </StatusBadge>
+                <a
+                  href={`/super-user/users/${account.id}`}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-foundation-navy transition hover:border-steel-blue hover:text-foundation-navy"
+                >
+                  View profile
+                </a>
                 <button
                   type="button"
                   onClick={() => handleAction(account.id, account.suspended ? 'activate' : 'suspend')}
@@ -341,6 +365,14 @@ export function AccountManagementTable({ role, rows }: { role: 'CLIENT' | 'RETAI
                   className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-foundation-navy transition hover:border-steel-blue hover:text-foundation-navy disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isBusy === `reset-password-${account.id}` ? 'Resetting...' : 'Reset password'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteAccount(account)}
+                  disabled={isBusy === `delete-${account.id}`}
+                  className="rounded-md border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isBusy === `delete-${account.id}` ? 'Deleting...' : 'Delete account'}
                 </button>
               </div>
             </div>

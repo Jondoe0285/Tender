@@ -3,9 +3,10 @@ import { prisma } from '@/server/data/prisma';
 import { requireFullSuperUser } from '@/server/auth/session';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { isManagedAccountRole } from '@/lib/admin-permissions';
-import { hashPassword } from '@/server/auth/password';
-import { generateTemporaryPassword } from '@/server/auth/temporaryPassword';
 import { recordAuditEvent } from '@/server/audit/auditLog';
+import { createPasswordResetToken, PASSWORD_RESET_EXPIRY_LABEL } from '@/server/auth/passwordReset';
+import { appUrl, passwordResetTemplate } from '@/server/notifications/emailTemplates';
+import { sendTransactionalEmail } from '@/server/notifications/resend';
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const originError = rejectCrossOrigin(request);
@@ -67,19 +68,25 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   if (action === 'reset-password') {
-    const temporaryPassword = generateTemporaryPassword();
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash: await hashPassword(temporaryPassword) },
-    });
+    const token = await createPasswordResetToken(user.id);
+    const result = await sendTransactionalEmail(
+      user.email,
+      passwordResetTemplate({
+        resetLink: appUrl(`/reset-password?token=${encodeURIComponent(token)}`),
+        expiresIn: PASSWORD_RESET_EXPIRY_LABEL,
+      })
+    ).catch((error: unknown) => ({ sent: false as const, reason: error instanceof Error ? error.message : 'Email delivery failed' }));
     await recordAuditEvent({
       actorId: admin.id,
-      action: 'USER_PASSWORD_RESET',
+      action: result.sent ? 'USER_PASSWORD_RESET_LINK_SENT' : 'USER_PASSWORD_RESET_LINK_DELIVERY_FAILED',
       targetType: 'User',
       targetId: user.id,
-      metadata: { email: user.email },
+      metadata: { email: user.email, ...(result.sent ? {} : { reason: result.reason }) },
     });
-    return NextResponse.json({ status: 'password-reset', temporaryPassword });
+    if (!result.sent) {
+      return NextResponse.json({ error: `Password reset link could not be delivered: ${result.reason}` }, { status: 502 });
+    }
+    return NextResponse.json({ status: 'password-reset-link-sent' });
   }
 
   if (action === 'set-release-credits') {
@@ -139,4 +146,71 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });
+}
+
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  const originError = rejectCrossOrigin(request);
+  if (originError) return originError;
+
+  const admin = await requireFullSuperUser().catch(() => null);
+  if (!admin) {
+    return NextResponse.json({ error: 'Super User access required' }, { status: 403 });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: params.id },
+    include: {
+      primaryClientCompany: { select: { id: true, _count: { select: { members: true } } } },
+      _count: {
+        select: {
+          tenders: true,
+          quotes: true,
+          unlocks: true,
+          payments: true,
+          itemMatches: true,
+          sentTenderMessages: true,
+          retailerMessages: true,
+          clientMessages: true,
+          moderationEvents: true,
+          reviewedModerationEvents: true,
+        },
+      },
+    },
+  });
+
+  if (!user) {
+    return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+  }
+  if (!isManagedAccountRole(user.role)) {
+    return NextResponse.json({ error: 'Only Client and Retailer accounts can be deleted through this endpoint' }, { status: 400 });
+  }
+
+  const hasRetainedActivity = Object.values(user._count).some((count) => count > 0);
+  if (hasRetainedActivity || (user.primaryClientCompany?._count.members ?? 0) > 1) {
+    return NextResponse.json({
+      error: 'This account has retained tender, quote, payment, communication, moderation, or shared company records and cannot be deleted.',
+    }, { status: 409 });
+  }
+
+  await prisma.$transaction(async (transaction) => {
+    if (user.primaryClientCompany) {
+      await transaction.clientCompany.delete({ where: { id: user.primaryClientCompany.id } });
+    } else {
+      await transaction.clientCompanyMember.deleteMany({ where: { userId: user.id } });
+    }
+    await transaction.retailerTeamMember.deleteMany({ where: { userId: user.id } });
+    await transaction.retailerProfile.deleteMany({ where: { userId: user.id } });
+    await transaction.user.delete({ where: { id: user.id } });
+    await transaction.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: 'USER_DELETED',
+        targetType: 'User',
+        targetId: user.id,
+        metadata: JSON.stringify({ email: user.email, role: user.role }),
+      },
+    });
+  });
+
+  return NextResponse.json({ status: 'deleted' });
 }

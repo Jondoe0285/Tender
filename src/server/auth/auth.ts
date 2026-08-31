@@ -2,6 +2,7 @@ import type { AuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma } from '@/server/data/prisma';
 import { verifyPassword } from '@/server/auth/password';
+import { recordAuditEvent } from '@/server/audit/auditLog';
 
 export const authOptions: AuthOptions = {
   session: { strategy: 'jwt' },
@@ -78,6 +79,30 @@ export const authOptions: AuthOptions = {
         // Malformed URL — fall through to the safe default below.
       }
       return baseUrl;
+    },
+  },
+  events: {
+    // Records the last-login timestamp shown in the Super User analytics profile view.
+    async signIn({ user }) {
+      const userId = (user as { id: string }).id;
+      if (!userId) return;
+      await prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } }).catch(() => null);
+      await recordAuditEvent({ actorId: userId, action: 'USER_LOGIN', targetType: 'User', targetId: userId });
+    },
+    // Approximates "time online" from the login/logout pair — no continuous activity tracking.
+    async signOut({ token }) {
+      const userId = (token as { id?: string })?.id;
+      if (!userId) return;
+      const now = new Date();
+      const current = await prisma.user.findUnique({ where: { id: userId }, select: { lastLoginAt: true, totalTimeOnlineSeconds: true } }).catch(() => null);
+      const sessionSeconds = current?.lastLoginAt ? Math.max(0, Math.round((now.getTime() - current.lastLoginAt.getTime()) / 1000)) : 0;
+      await prisma.user
+        .update({
+          where: { id: userId },
+          data: { lastLogoutAt: now, totalTimeOnlineSeconds: (current?.totalTimeOnlineSeconds ?? 0) + sessionSeconds },
+        })
+        .catch(() => null);
+      await recordAuditEvent({ actorId: userId, action: 'USER_LOGOUT', targetType: 'User', targetId: userId, metadata: { sessionSeconds } });
     },
   },
 };
