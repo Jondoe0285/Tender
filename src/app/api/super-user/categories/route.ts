@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/server/data/prisma';
-import { requireRole } from '@/server/auth/session';
+import { requireFullSuperUser } from '@/server/auth/session';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { CATEGORIES } from '@/lib/categories';
@@ -15,7 +15,7 @@ const categorySchema = z.object({
 
 export async function GET() {
   try {
-    await requireRole('SUPER_USER');
+    await requireFullSuperUser();
     const saved = await prisma.categoryDefinition.findMany({ orderBy: [{ service: 'asc' }, { name: 'asc' }] });
     const savedByKey = new Map(saved.map((category) => [`${category.service}:${category.name}`, category]));
     const categories = Object.entries(CATEGORIES).flatMap(([service, categoryMap]) => Object.entries(categoryMap).map(([name, items]) => {
@@ -31,7 +31,7 @@ export async function GET() {
 export async function PATCH(request: Request) {
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
-  const admin = await requireRole('SUPER_USER').catch(() => null);
+  const admin = await requireFullSuperUser().catch(() => null);
   if (!admin) return NextResponse.json({ error: 'Super User access required' }, { status: 403 });
   const parsed = categorySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Invalid category details' }, { status: 400 });

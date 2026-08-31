@@ -3,13 +3,10 @@ import { prisma } from '@/server/data/prisma';
 import { requireFullSuperUser } from '@/server/auth/session';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { hashPassword } from '@/server/auth/password';
+import { generateTemporaryPassword } from '@/server/auth/temporaryPassword';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { accountantActionSchema } from '@/lib/schemas/accountant';
 import { toErrorResponse } from '@/server/http/errors';
-
-function generateTemporaryPassword(): string {
-  return `TT-${Math.random().toString(36).slice(2, 10).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-}
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const originError = rejectCrossOrigin(request);

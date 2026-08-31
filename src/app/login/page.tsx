@@ -1,14 +1,13 @@
 'use client';
 
 import { Suspense, useState, type FormEvent } from 'react';
-import { getSession, signIn } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { FieldGroup, Input, Label, PasswordInput } from '@/components/ui/Field';
-import { workspaceForRole } from '@/lib/navigation';
 
 export default function LoginPage() {
   return (
@@ -25,7 +24,10 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,15 +46,30 @@ function LoginForm() {
       setError('Incorrect email or password.');
       return;
     }
-    const session = await getSession();
-    const workspace = workspaceForRole(session?.user?.role);
-    if (!workspace) {
-      setSubmitting(false);
-      setError('Your account is not assigned to an approved workspace.');
+    router.replace('/api/auth/workspace');
+  }
+
+  async function handlePasswordResetRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setResetSubmitting(true);
+    setResetError(null);
+    setResetEmailSent(false);
+
+    const form = new FormData(event.currentTarget);
+    const response = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: form.get('resetEmail') }),
+    });
+
+    setResetSubmitting(false);
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      setResetError(data?.error ?? 'Unable to request a reset link. Please try again.');
       return;
     }
-    router.replace(workspace);
-    router.refresh();
+
+    setResetEmailSent(true);
   }
 
   return (
@@ -63,6 +80,7 @@ function LoginForm() {
       {searchParams.get('verification') === 'verified' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your email address is verified. You can now sign in.</p>}
       {searchParams.get('verification') === 'invalid' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">This verification link is invalid or has expired. Register again with the same details to request a new link.</p>}
       {searchParams.get('password') === 'set' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your password is set. Sign in with your new password.</p>}
+      {searchParams.get('error') === 'workspace' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">Your account is not assigned to an approved workspace.</p>}
 
       <Card className="mt-8">
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
@@ -91,6 +109,32 @@ function LoginForm() {
           Create an account
         </a>
       </p>
+
+      <Card className="mt-8">
+        <form onSubmit={handlePasswordResetRequest} className="flex flex-col gap-4">
+          <div>
+            <h2 className="font-heading text-lg font-bold text-foundation-navy">Forgotten password?</h2>
+            <p className="mt-2 text-sm text-concrete-grey">Enter your email address and we will send a reset link if the account exists.</p>
+          </div>
+          <FieldGroup>
+            <Label htmlFor="resetEmail">Email</Label>
+            <Input id="resetEmail" name="resetEmail" type="email" required autoComplete="email" />
+          </FieldGroup>
+          {resetEmailSent && (
+            <p role="status" className="text-sm font-semibold text-approved">
+              If an account exists for that email, a reset link has been sent.
+            </p>
+          )}
+          {resetError && (
+            <p role="alert" className="text-sm font-semibold text-attention">
+              {resetError}
+            </p>
+          )}
+          <Button type="submit" loading={resetSubmitting} variant="secondary" className="mt-1">
+            Send reset link
+          </Button>
+        </form>
+      </Card>
     </section>
   );
 }

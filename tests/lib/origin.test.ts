@@ -10,6 +10,13 @@ test('accepts a same-origin browser request', () => {
   assert.equal(isSameOriginRequest(request), true);
 });
 
+test('rejects a malformed referer instead of throwing', () => {
+  const request = new Request('https://app.example/api/tenders', {
+    headers: { referer: 'not a url' },
+  });
+  assert.equal(isSameOriginRequest(request), false);
+});
+
 test('accepts a request through a trusted proxy', () => {
   const request = new Request('https://preview.example/api/tenders', {
     headers: {

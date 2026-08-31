@@ -5,14 +5,7 @@
 #
 # Values marked `sync: false` are secrets or per-environment settings: set them in the Render
 # dashboard, never in git. See README "Environment origins" for the NEXTAUTH_URL of each service.
-#
-# Free-plan Postgres instances expire after 30 days; move production to a paid plan before launch.
-databases:
-  - name: tender-db
-    databaseName: tender
-    user: tender
-    plan: free
-    region: frankfurt
+# Database persistence is provided by Neon Lakebase Postgres, not a Render-managed database.
 
 services:
   - type: web
@@ -31,6 +24,9 @@ services:
         value: production
       # Production must point at its own database, never the staging instance.
       - key: DATABASE_URL
+        sync: false
+      # Direct PostgreSQL connection for Prisma migrations; Neon uses the non-pooler URL here.
+      - key: DATABASE_URL_UNPOOLED
         sync: false
       - key: NEXTAUTH_URL
         sync: false
@@ -85,10 +81,12 @@ services:
         value: "20"
       - key: NODE_ENV
         value: production
+      # Staging must point at its Neon staging database or branch.
       - key: DATABASE_URL
-        fromDatabase:
-          name: tender-db
-          property: connectionString
+        sync: false
+      # Direct PostgreSQL connection for Prisma migrations; Neon uses the non-pooler URL here.
+      - key: DATABASE_URL_UNPOOLED
+        sync: false
       - key: NEXTAUTH_URL
         sync: false
       - key: ADDITIONAL_ALLOWED_ORIGINS

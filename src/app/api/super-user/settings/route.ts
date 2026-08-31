@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/server/data/prisma';
-import { requireRole } from '@/server/auth/session';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { getAdminSettings } from '@/server/domain/platformSettings';
-import { requireOwner } from '@/server/auth/session';
+import { requireFullSuperUser, requireOwner } from '@/server/auth/session';
 
 const settingSchema = z.object({
   action: z.enum(['fee', 'tier', 'subscription']),
@@ -22,7 +21,7 @@ const settingSchema = z.object({
 
 export async function GET() {
   try {
-    await requireRole('SUPER_USER');
+    await requireFullSuperUser();
     return NextResponse.json(await getAdminSettings());
   } catch {
     return NextResponse.json({ error: 'Super User access required' }, { status: 403 });

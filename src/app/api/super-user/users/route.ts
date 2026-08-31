@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/server/data/prisma';
-import { requireRole } from '@/server/auth/session';
+import { requireFullSuperUser } from '@/server/auth/session';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { isManagedAccountRole } from '@/lib/admin-permissions';
 import { hashPassword } from '@/server/auth/password';
@@ -42,7 +42,8 @@ export async function POST(request: Request) {
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
 
-  const admin = await requireRole('SUPER_USER').catch(() => null);
+  // Accountant sub-accounts are Super Users but must never create accounts.
+  const admin = await requireFullSuperUser().catch(() => null);
   if (!admin) {
     return NextResponse.json({ error: 'Super User access required' }, { status: 403 });
   }

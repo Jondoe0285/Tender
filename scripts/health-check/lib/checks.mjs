@@ -121,12 +121,11 @@ export function discoverChecks({ scope = 'full' } = {}) {
 
   if (existsSync('prisma/schema.prisma')) {
     add({ id: 'schema-validation', name: 'Database schema validation', command: ['npx', 'prisma', 'validate'], category: 'database', critical: true });
-    // Replays the committed migration history into a disposable database and confirms the
-    // result matches the schema. Exit code 2 from `--exit-code` means drift, so it must fail.
+    // Must replay against PostgreSQL: a SQLite replay passes migrations written in SQLite dialect.
     add({
       id: 'migration-validation',
       name: 'Migration validation',
-      command: ['bash', '-lc', 'set -e; DB="$PWD/health-check-migrate.db"; rm -f "$DB"; DATABASE_URL="file:$DB" npx prisma migrate deploy >/dev/null; set +e; DATABASE_URL="file:$DB" npx prisma migrate diff --from-url "file:$DB" --to-schema-datamodel prisma/schema.prisma --exit-code; STATUS=$?; rm -f "$DB"; exit $STATUS'],
+      command: ['node', 'scripts/health-check/validate-migrations.mjs'],
       category: 'database',
       critical: true,
       timeoutMs: 5 * 60 * 1000,

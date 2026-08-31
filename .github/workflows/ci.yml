@@ -16,6 +16,7 @@ jobs:
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://tender:tender@localhost:5432/tender_test?schema=public
+      DATABASE_URL_UNPOOLED: postgresql://tender:tender@localhost:5432/tender_test?schema=public
       NEXTAUTH_SECRET: test-secret
       NEXTAUTH_URL: http://localhost:3000
       RESEND_API_KEY: test-key

@@ -53,7 +53,12 @@ export function isSameOriginRequest(request: Request): boolean {
 
   const referer = request.headers.get('referer');
   if (referer) {
-    const refererOrigin = new URL(referer).origin;
+    let refererOrigin: string;
+    try {
+      refererOrigin = new URL(referer).origin;
+    } catch {
+      return false;
+    }
     return permittedOrigins(request).includes(refererOrigin)
       || isConfiguredApplicationOrigin(refererOrigin)
       || isAdditionalAllowedOrigin(refererOrigin)

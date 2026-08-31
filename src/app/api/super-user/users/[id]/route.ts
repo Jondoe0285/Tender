@@ -1,20 +1,18 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/server/data/prisma';
-import { requireRole } from '@/server/auth/session';
+import { requireFullSuperUser } from '@/server/auth/session';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { isManagedAccountRole } from '@/lib/admin-permissions';
 import { hashPassword } from '@/server/auth/password';
+import { generateTemporaryPassword } from '@/server/auth/temporaryPassword';
 import { recordAuditEvent } from '@/server/audit/auditLog';
-
-function generateTemporaryPassword(): string {
-  return `TT-${Math.random().toString(36).slice(2, 10).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-}
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
 
-  const admin = await requireRole('SUPER_USER').catch(() => null);
+  // Accountant sub-accounts are Super Users but must never reach account management.
+  const admin = await requireFullSuperUser().catch(() => null);
   if (!admin) {
     return NextResponse.json({ error: 'Super User access required' }, { status: 403 });
   }

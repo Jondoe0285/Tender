@@ -54,10 +54,9 @@ unique Trade Tender ID for retailer quoting, and retention jobs delete unpurchas
 documents after 30 days while purchased records are retained for five years.
 Super Users can also activate a paid sponsored-placement product for Retailers; purchased placements
 appear in a separate labelled area on Client quote pages and do not change quote ranking or sorting.
-| `REGISTRATION_NOTIFICATION_EMAIL` | Internal recipient for new-account notifications. No default — the notification is skipped when unset. |
 
 Within the Super User role, an **Owner** flag gates the most critical controls — fees, adspace,
-membership tiers, sponsored placement, and creating or managing other Super Userlogout button still does not go to landing accounts — from the
+membership tiers, sponsored placement, and creating or managing other Super User accounts — from the
 Owner Console at `/super-user/owner`. An **Accountant** flag restricts a Super User sub-account to a
 read-only Accounting Space (`/super-user/accounting`) with receipts, invoices, and performance
 reporting only, with no access to Super User settings or user management. Both are attributes on the
@@ -70,7 +69,9 @@ A structured production-readiness review (architecture, security, backend correc
 and deployment) was completed on 2026-08-28; see
 [docs/PRODUCTION-READINESS-REVIEW.md](docs/PRODUCTION-READINESS-REVIEW.md) for fixed findings and
 remaining outstanding items. The Azure SQL migration path and missing deploy pipeline recorded there
-were superseded on 2026-08-30 by the move to Render with a single PostgreSQL datasource.
+were superseded on 2026-08-30 by the move to Render hosting with a single PostgreSQL datasource.
+The database provider is being moved from Render PostgreSQL to Neon Lakebase Postgres; runtime
+traffic uses the pooled Neon URL and Prisma migrations use the direct Neon URL.
 
 See [Outstanding Tasks](#outstanding-tasks) for the remaining production-hardening work.
 
@@ -79,21 +80,46 @@ See [Outstanding Tasks](#outstanding-tasks) for the remaining production-hardeni
 Nothing in this list can be done from the repository — each needs a value or a decision from the
 platform owner. The first item will break a deploy if skipped.
 
-### 1. Set `NEXTAUTH_URL` on both Render services — blocking
+### 1. Rotate the shared Neon database password — blocking
+
+The staging and production Neon connection strings were shared during setup. Treat both passwords as
+exposed and rotate the Neon role password before production use. Update every dependent environment
+variable immediately after rotation.
+
+### 2. Set Neon database URLs on both Render services — blocking
+
+Both Render web services must use Neon rather than the old local or Render-managed database. Set
+`DATABASE_URL` to the pooled Neon connection string and `DATABASE_URL_UNPOOLED` to the direct,
+non-pooler Neon connection string. Prisma uses `DATABASE_URL_UNPOOLED` for migrations so schema
+deploys do not run through PgBouncer.
+
+Do not commit these values. Set them in the Render dashboard or via a secret manager only.
+
+### 3. Set `NEXTAUTH_URL` on both Render services — blocking
 
 The application now throws when this is missing rather than guessing a default, so a service without
 it fails its build. That is deliberate: the previous silent fallback pointed verification and
 contact-release links at `localhost`. Values are in
 [Environment origins](#environment-origins).
 
-### 2. Set the remaining per-service variables in the Render dashboard
+This variable also governs every server-issued redirect — post-login workspace routing, the
+middleware role guards, and email verification. Behind Render's proxy the incoming request host is
+the internal listener (`localhost:10000`), so a redirect derived from the request instead of
+`NEXTAUTH_URL` sends the browser to an unreachable host. That was the cause of the
+`https://localhost:10000/super-user` failure after sign-in on staging.
+
+**Still to verify:** sign in on each deployed service and confirm the post-login URL is that
+service's own public origin.
+
+### 4. Set the remaining per-service variables in the Render dashboard
 
 Everything marked `sync: false` in [render.yaml](render.yaml) is unset by design.
 
 | Variable | Production | Staging |
 | --- | --- | --- |
 | `NEXTAUTH_URL` | `https://trade-tender.onrender.com` | `https://tender-m0xw.onrender.com` |
-| `DATABASE_URL` | its **own** database — see item 3 | linked to `tender-db` |
+| `DATABASE_URL` | pooled Neon application database URL | pooled Neon application database URL |
+| `DATABASE_URL_UNPOOLED` | direct database URL for Prisma migrations | direct database URL for Prisma migrations |
 | `STRIPE_SECRET_KEY` | live key | test key |
 | `STRIPE_WEBHOOK_SECRET` | from the production webhook | from a **separate** staging webhook |
 | `RESEND_API_KEY` / `EMAIL_FROM` | verified sending domain | separate key and sender |
@@ -103,20 +129,26 @@ Everything marked `sync: false` in [render.yaml](render.yaml) is unset by design
 | `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` | build-time, for source maps | optional |
 | `NEXT_PUBLIC_SUPPORT_EMAIL` | optional; links hide when unset | optional |
 
-### 3. Give production its own database
+### 5. Keep production and staging on separate Neon databases or branches
 
-[render.yaml](render.yaml) intentionally does **not** wire production to `tender-db`. Only one
-database is declared, and auto-linking production to it would point live traffic at the instance
-staging migrates and seeds. Provision a separate paid instance and set its connection string on the
-production service. The free plan also expires after 30 days, so it is not viable for production.
+Production must not share the same writable database target as staging. Use separate Neon projects,
+or at minimum separate Neon branches with distinct pooled and direct connection strings. Run
+production migrations only against the production direct URL.
 
-### 4. Register two Stripe webhooks, not one
+### 6. Seed the platform owner in the intended Neon environment
+
+`npm run db:seed` refuses to run when `NODE_ENV=production`, but it will seed whichever database the
+current `DATABASE_URL` points at. Before running it for staging, confirm the active host is Neon and
+not `localhost`, then seed the owner account from `PLATFORM_OWNER_EMAIL` and
+`PLATFORM_OWNER_PASSWORD`.
+
+### 7. Register two Stripe webhooks, not one
 
 Each environment needs its own endpoint at `https://<host>/api/webhooks/stripe`, producing a
 different signing secret. Sharing one secret makes signature verification fail on the other
 environment, and payments then stop confirming with no visible error.
 
-### 5. Verify the Resend sending domain
+### 8. Verify the Resend sending domain
 
 Until the DNS records are in place, verification and contact-release emails will bounce or be
 filtered, which blocks registration entirely. `EMAIL_FROM` must use that verified domain; there is
@@ -128,16 +160,28 @@ place. It distinguishes an unset variable (`503`) from an unverified domain (`50
 If you previously set `RESEND_FROM_EMAIL` in Render, delete it — the application no longer reads it,
 and leaving it in place makes email look configured when it is not.
 
-### 6. Point the retention job at production
+### 9. Point the retention job at production
 
 The purge still runs from GitHub Actions. Update the `RETENTION_JOB_URL` repository secret to the
 production host's `/api/internal/retention`, and set `RETENTION_JOB_SECRET` to match the service.
 
-### 7. Confirm the Render blueprint adopts the existing services
+### 10. Confirm the Render blueprint adopts the existing services
 
 Both services were created by hand, so the first blueprint sync must *adopt* them. Check that Render
 offers to **update** `Trade Tender` and `Tender Staging` rather than create them — creating would
 give you duplicates.
+
+### 11. Redeploy so the corrected migrations apply
+
+The 2026-08-30 migrations were committed in SQLite dialect and PostgreSQL rejected them, so
+`prisma migrate deploy` failed during the Render build and `Tender.supplyDate` was never created —
+production then raised `P2022` on every tender query. The migrations are now PostgreSQL and verified
+against a clean database, but the fix only reaches an environment on its next deploy.
+
+Redeploy staging and production, confirm the build log shows the migrations applying rather than
+erroring, and re-run a tender query. If a database was left partially migrated, check
+`SELECT * FROM "_prisma_migrations" WHERE finished_at IS NULL;` and resolve any failed entry with
+`npx prisma migrate resolve` before deploying again.
 
 ## Decisions Made On Your Behalf
 
@@ -164,6 +208,15 @@ Points worth reviewing, each a deliberate trade-off rather than an oversight.
   before any real Client uploads a file. This is the largest remaining gap.
 - **No error has been confirmed in Sentry yet.** The SDK is wired but unverified end to end, because
   it needs a DSN and a real triggered error.
+- **Next.js 14 carries 8 high-severity advisories with no patch on the 14.x line.** The project is
+  already on the latest `14.2.35`, and the top-level `postcss` is patched; the remaining advisories
+  sit in Next's bundled copy. `npm audit` only clears on Next 16, which is a major upgrade and needs
+  its own tested change. Until then the dependency scan will keep failing.
+- **Session claims are not revalidated.** `role`, `isOwner`, `isAccountant` and `suspended` are
+  stamped into the JWT at sign-in and no `session.maxAge` is set, so NextAuth's 30-day default
+  applies. Suspending a user or revoking Owner therefore has no effect until the token expires.
+- **Rate limiting is per-instance and IP-keyed from the leftmost `X-Forwarded-For` value.** It resets
+  on every deploy, is not shared across Render instances, and there is no per-account lockout.
 
 ## Roles
 
@@ -204,10 +257,20 @@ list from the latest structured production-readiness review, including a dedicat
 Highlights:
 
 - [x] **Database path resolved:** the app now uses one PostgreSQL datasource in every environment, with a single migration history applied by `prisma migrate deploy`.
+- [x] **Migrations are PostgreSQL-valid:** the 2026-08-30 migrations were generated against SQLite (`PRAGMA` table rebuilds, `DATETIME`, `REAL`) and failed on Render, leaving `Tender.supplyDate` missing and production raising `P2022`. The history now applies to a clean PostgreSQL database with no drift against [prisma/schema.prisma](prisma/schema.prisma).
+- [x] **Migration gates run on PostgreSQL:** the health check and the staging deploy previously replayed the history into a SQLite `file:` database, so both reported PASSED while the migrations were invalid for PostgreSQL. Both now use a PostgreSQL service container, and [scripts/health-check/validate-migrations.mjs](scripts/health-check/validate-migrations.mjs) fails rather than passes if it is ever pointed at a non-PostgreSQL database.
+- [x] **Accountant privilege escalation closed:** `super-user/users`, `super-user/users/[id]`, `super-user/categories` and the `super-user/settings` read gated on `requireRole('SUPER_USER')`, which admits Accountant sub-accounts because they hold that role. An Accountant could reset any Client or Retailer password and grant release-fee credits, bypassing the £10 payment gate. All now use `requireFullSuperUser()`, with a regression test over every Super User route.
+- [x] **Admin temporary passwords use a CSPRNG:** three admin routes derived reset passwords from `Math.random()`. They now use `randomBytes` via [src/server/auth/temporaryPassword.ts](src/server/auth/temporaryPassword.ts).
+- [ ] Revalidate session claims against the database, and set a session lifetime, so suspension and Owner revocation take effect immediately
+- [ ] Move rate limiting to shared storage and add per-account login/reset lockout
+- [ ] Plan the Next.js 16 upgrade to clear the outstanding high-severity advisories
+- [ ] Redeploy staging and production so the corrected migrations actually apply (see [Action Required item 11](#11-redeploy-so-the-corrected-migrations-apply))
 - [x] **CI/CD baseline implemented:** GitHub Actions gates lint, type-check, tests, and production build on PRs and pushes to `main` and `staging`; Render deploys from git using [render.yaml](render.yaml).
 - [x] **Auth abuse hardening in repo:** login and registration routes now enforce a simple in-app rate limit using source IP headers.
 - [x] **Error monitoring wired:** Sentry (`@sentry/nextjs`) covers the browser, Node and Edge runtimes with errors and tracing. Still needs a DSN and one confirmed event — see [Known Gaps](#known-gaps).
 - [x] **No hardcoded URLs:** every absolute URL resolves through `NEXTAUTH_URL` via [src/server/config/appUrl.ts](src/server/config/appUrl.ts), which throws rather than falling back.
+- [x] **Post-login redirects fixed:** the workspace router, middleware role guards, and email verification build absolute redirects from `NEXTAUTH_URL` instead of the proxied request host, which behind Render resolved to `localhost:10000`.
+- [ ] Confirm on each deployed service that sign-in lands on that service's public origin (see [Action Required item 3](#3-set-nextauth_url-on-both-render-services--blocking))
 - [x] **Super-User-created accounts can sign in:** they now receive a single-use password-reset link, which also marks the address verified. Previously these accounts were permanently locked out.
 - [x] **Email configuration is fully environment-driven:** `EMAIL_FROM` replaced the hardcoded `notifications@example.com` fallback, and `POST /api/internal/test-email` verifies delivery per environment.
 - [ ] **Critical:** durable object storage for tender attachments — Render's filesystem is ephemeral and loses uploads on redeploy, breaking both retention rules
@@ -253,7 +316,7 @@ Highlights:
 ### Installation
 
 ```bash
-git clone https://github.com/TenantSpace/Tender.git
+git clone https://github.com/Jondoe0285/Tender.git
 cd Tender
 npm install
 ```
@@ -268,9 +331,10 @@ cp .env.example .env
 
 | Variable | Notes |
 | --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string. Supplied automatically by Render from the linked database. |
+| `DATABASE_URL` | PostgreSQL connection string used by the running application. On Neon this must be the **pooled** URL. Set it per service; it is not supplied automatically. |
+| `DATABASE_URL_UNPOOLED` | Direct, non-pooler PostgreSQL URL. Prisma uses it for migrations so schema deploys do not run through PgBouncer. Locally this can match `DATABASE_URL`. |
 | `NEXTAUTH_SECRET` | Long random string. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. |
-| `NEXTAUTH_URL` | **Required in every environment.** The full public origin of this deployment. Email links, Stripe redirect URLs, and the same-origin API check all derive from it; the app throws rather than guessing a default. |
+| `NEXTAUTH_URL` | **Required in every environment.** The full public origin of this deployment. Email links, Stripe redirect URLs, server-issued redirects, and the same-origin API check all derive from it; the app throws rather than guessing a default. |
 | `ADDITIONAL_ALLOWED_ORIGINS` | Optional, comma-separated. Extra origins this deployment also answers on, such as a custom domain beside the platform host. Without it the same-origin check rejects requests on the second hostname. |
 | `NEXT_PUBLIC_SUPPORT_EMAIL` | Public support address shown in the footer and policies page. The links are hidden when unset. |
 | `RESEND_API_KEY` | Required to deliver email-verification links to self-registered users. |
@@ -281,6 +345,8 @@ cp .env.example .env
 | `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_DSN` | Browser and server Sentry DSNs. Leave blank to disable the SDK entirely — it initialises as a no-op. |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT` / `SENTRY_ENVIRONMENT` | Separates production from staging in Sentry. |
 | `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` | Build-time only. Source map upload turns on automatically once the token is present; without it production stack traces stay minified. |
+| `PLATFORM_OWNER_EMAIL` / `PLATFORM_OWNER_PASSWORD` | Read by `npm run db:seed` to create the platform owner account. Never commit the password. |
+| `TRADE_TENDER_ENV` / `SANDBOX_SEED_ENABLED` / `SANDBOX_USER_PASSWORD` | Deployed-sandbox demo seeding only. `db:seed` creates demo accounts solely when `TRADE_TENDER_ENV=sandbox` and `SANDBOX_SEED_ENABLED=true`. Leave unset in production. |
 
 ### Database setup
 
@@ -319,7 +385,7 @@ same-origin check rejects every request arriving on the second hostname.
 
 After the first deploy, confirm each of the following:
 
-- `NEXTAUTH_URL` exactly matches the public origin, or sign-in and the same-origin API checks will reject requests
+- `NEXTAUTH_URL` exactly matches the public origin, or sign-in, server-issued redirects, and the same-origin API checks will send users to the wrong host or reject requests
 - the Stripe webhook endpoint points at `https://<your-render-host>/api/webhooks/stripe`, with the resulting signing secret stored as `STRIPE_WEBHOOK_SECRET`
 - the Resend sending domain is verified and `EMAIL_FROM` uses it
 - smoke checks pass for authentication, role isolation, payment state, and contact-release privacy
@@ -408,6 +474,10 @@ For a deployed sandbox, set `TRADE_TENDER_ENV=sandbox`, `SANDBOX_SEED_ENABLED=tr
 `SANDBOX_USER_PASSWORD`; it is required and becomes the password for both permanent sandbox users.
 This is the only production-mode exception; sandbox seeding remains blocked for every other environment.
 
+Before seeding Neon, confirm the active database host ends in `.neon.tech` and is not `localhost`.
+Use the pooled Neon URL for `DATABASE_URL` and the matching non-pooler URL for
+`DATABASE_URL_UNPOOLED`.
+
 ### Run the app
 
 ```bash
@@ -425,8 +495,9 @@ npm start
 
 ### Render deployment notes
 
-The application runs as a Render Node web service with a managed Render PostgreSQL instance, described
-in [render.yaml](render.yaml). Attachments still require private object storage; Render disks are not a
+The application runs as a Render Node web service with Neon Lakebase Postgres for persistence.
+[render.yaml](render.yaml) describes the web services, while database credentials are set per
+environment as secrets. Attachments still require private object storage; Render disks are not a
 substitute, because the free plan has an ephemeral filesystem. Confirm `NEXTAUTH_URL`, the Stripe
 webhook secret, and the verified Resend sender for each environment before treating a release as
 production-safe.
