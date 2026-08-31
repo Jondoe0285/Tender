@@ -54,10 +54,9 @@ unique Trade Tender ID for retailer quoting, and retention jobs delete unpurchas
 documents after 30 days while purchased records are retained for five years.
 Super Users can also activate a paid sponsored-placement product for Retailers; purchased placements
 appear in a separate labelled area on Client quote pages and do not change quote ranking or sorting.
-| `REGISTRATION_NOTIFICATION_EMAIL` | Internal recipient for new-account notifications. No default — the notification is skipped when unset. |
 
 Within the Super User role, an **Owner** flag gates the most critical controls — fees, adspace,
-membership tiers, sponsored placement, and creating or managing other Super Userlogout button still does not go to landing accounts — from the
+membership tiers, sponsored placement, and creating or managing other Super User accounts — from the
 Owner Console at `/super-user/owner`. An **Accountant** flag restricts a Super User sub-account to a
 read-only Accounting Space (`/super-user/accounting`) with receipts, invoices, and performance
 reporting only, with no access to Super User settings or user management. Both are attributes on the
@@ -288,7 +287,7 @@ Highlights:
 ### Installation
 
 ```bash
-git clone https://github.com/TenantSpace/Tender.git
+git clone https://github.com/Jondoe0285/Tender.git
 cd Tender
 npm install
 ```
@@ -303,9 +302,10 @@ cp .env.example .env
 
 | Variable | Notes |
 | --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string. Supplied automatically by Render from the linked database. |
+| `DATABASE_URL` | PostgreSQL connection string used by the running application. On Neon this must be the **pooled** URL. Set it per service; it is not supplied automatically. |
+| `DATABASE_URL_UNPOOLED` | Direct, non-pooler PostgreSQL URL. Prisma uses it for migrations so schema deploys do not run through PgBouncer. Locally this can match `DATABASE_URL`. |
 | `NEXTAUTH_SECRET` | Long random string. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. |
-| `NEXTAUTH_URL` | **Required in every environment.** The full public origin of this deployment. Email links, Stripe redirect URLs, and the same-origin API check all derive from it; the app throws rather than guessing a default. |
+| `NEXTAUTH_URL` | **Required in every environment.** The full public origin of this deployment. Email links, Stripe redirect URLs, server-issued redirects, and the same-origin API check all derive from it; the app throws rather than guessing a default. |
 | `ADDITIONAL_ALLOWED_ORIGINS` | Optional, comma-separated. Extra origins this deployment also answers on, such as a custom domain beside the platform host. Without it the same-origin check rejects requests on the second hostname. |
 | `NEXT_PUBLIC_SUPPORT_EMAIL` | Public support address shown in the footer and policies page. The links are hidden when unset. |
 | `RESEND_API_KEY` | Required to deliver email-verification links to self-registered users. |
@@ -316,6 +316,8 @@ cp .env.example .env
 | `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_DSN` | Browser and server Sentry DSNs. Leave blank to disable the SDK entirely — it initialises as a no-op. |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT` / `SENTRY_ENVIRONMENT` | Separates production from staging in Sentry. |
 | `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` | Build-time only. Source map upload turns on automatically once the token is present; without it production stack traces stay minified. |
+| `PLATFORM_OWNER_EMAIL` / `PLATFORM_OWNER_PASSWORD` | Read by `npm run db:seed` to create the platform owner account. Never commit the password. |
+| `TRADE_TENDER_ENV` / `SANDBOX_SEED_ENABLED` / `SANDBOX_USER_PASSWORD` | Deployed-sandbox demo seeding only. `db:seed` creates demo accounts solely when `TRADE_TENDER_ENV=sandbox` and `SANDBOX_SEED_ENABLED=true`. Leave unset in production. |
 
 ### Database setup
 
