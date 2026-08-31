@@ -171,6 +171,18 @@ Both services were created by hand, so the first blueprint sync must *adopt* the
 offers to **update** `Trade Tender` and `Tender Staging` rather than create them — creating would
 give you duplicates.
 
+### 11. Redeploy so the corrected migrations apply
+
+The 2026-08-30 migrations were committed in SQLite dialect and PostgreSQL rejected them, so
+`prisma migrate deploy` failed during the Render build and `Tender.supplyDate` was never created —
+production then raised `P2022` on every tender query. The migrations are now PostgreSQL and verified
+against a clean database, but the fix only reaches an environment on its next deploy.
+
+Redeploy staging and production, confirm the build log shows the migrations applying rather than
+erroring, and re-run a tender query. If a database was left partially migrated, check
+`SELECT * FROM "_prisma_migrations" WHERE finished_at IS NULL;` and resolve any failed entry with
+`npx prisma migrate resolve` before deploying again.
+
 ## Decisions Made On Your Behalf
 
 Points worth reviewing, each a deliberate trade-off rather than an oversight.
@@ -196,6 +208,12 @@ Points worth reviewing, each a deliberate trade-off rather than an oversight.
   before any real Client uploads a file. This is the largest remaining gap.
 - **No error has been confirmed in Sentry yet.** The SDK is wired but unverified end to end, because
   it needs a DSN and a real triggered error.
+- **The health check validates migrations against SQLite, not PostgreSQL.** The `migration-validation`
+  check in [scripts/health-check/lib/checks.mjs](scripts/health-check/lib/checks.mjs) replays the
+  history into a `file:` database, so it reported PASSED while the committed migrations used
+  SQLite-only syntax that PostgreSQL rejects. It cannot catch a dialect error. CI does replay the
+  history against a real PostgreSQL service container, so the gate exists — but the health-check
+  report should not be read as evidence that migrations deploy.
 
 ## Roles
 
@@ -236,6 +254,8 @@ list from the latest structured production-readiness review, including a dedicat
 Highlights:
 
 - [x] **Database path resolved:** the app now uses one PostgreSQL datasource in every environment, with a single migration history applied by `prisma migrate deploy`.
+- [x] **Migrations are PostgreSQL-valid:** the 2026-08-30 migrations were generated against SQLite (`PRAGMA` table rebuilds, `DATETIME`, `REAL`) and failed on Render, leaving `Tender.supplyDate` missing and production raising `P2022`. The history now applies to a clean PostgreSQL database with no drift against [prisma/schema.prisma](prisma/schema.prisma).
+- [ ] Redeploy staging and production so the corrected migrations actually apply (see [Action Required item 11](#11-redeploy-so-the-corrected-migrations-apply))
 - [x] **CI/CD baseline implemented:** GitHub Actions gates lint, type-check, tests, and production build on PRs and pushes to `main` and `staging`; Render deploys from git using [render.yaml](render.yaml).
 - [x] **Auth abuse hardening in repo:** login and registration routes now enforce a simple in-app rate limit using source IP headers.
 - [x] **Error monitoring wired:** Sentry (`@sentry/nextjs`) covers the browser, Node and Edge runtimes with errors and tracing. Still needs a DSN and one confirmed event — see [Known Gaps](#known-gaps).
