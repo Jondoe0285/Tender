@@ -103,6 +103,15 @@ it fails its build. That is deliberate: the previous silent fallback pointed ver
 contact-release links at `localhost`. Values are in
 [Environment origins](#environment-origins).
 
+This variable also governs every server-issued redirect — post-login workspace routing, the
+middleware role guards, and email verification. Behind Render's proxy the incoming request host is
+the internal listener (`localhost:10000`), so a redirect derived from the request instead of
+`NEXTAUTH_URL` sends the browser to an unreachable host. That was the cause of the
+`https://localhost:10000/super-user` failure after sign-in on staging.
+
+**Still to verify:** sign in on each deployed service and confirm the post-login URL is that
+service's own public origin.
+
 ### 4. Set the remaining per-service variables in the Render dashboard
 
 Everything marked `sync: false` in [render.yaml](render.yaml) is unset by design.
@@ -232,6 +241,8 @@ Highlights:
 - [x] **Auth abuse hardening in repo:** login and registration routes now enforce a simple in-app rate limit using source IP headers.
 - [x] **Error monitoring wired:** Sentry (`@sentry/nextjs`) covers the browser, Node and Edge runtimes with errors and tracing. Still needs a DSN and one confirmed event — see [Known Gaps](#known-gaps).
 - [x] **No hardcoded URLs:** every absolute URL resolves through `NEXTAUTH_URL` via [src/server/config/appUrl.ts](src/server/config/appUrl.ts), which throws rather than falling back.
+- [x] **Post-login redirects fixed:** the workspace router, middleware role guards, and email verification build absolute redirects from `NEXTAUTH_URL` instead of the proxied request host, which behind Render resolved to `localhost:10000`.
+- [ ] Confirm on each deployed service that sign-in lands on that service's public origin (see [Action Required item 3](#3-set-nextauth_url-on-both-render-services--blocking))
 - [x] **Super-User-created accounts can sign in:** they now receive a single-use password-reset link, which also marks the address verified. Previously these accounts were permanently locked out.
 - [x] **Email configuration is fully environment-driven:** `EMAIL_FROM` replaced the hardcoded `notifications@example.com` fallback, and `POST /api/internal/test-email` verifies delivery per environment.
 - [ ] **Critical:** durable object storage for tender attachments — Render's filesystem is ephemeral and loses uploads on redeploy, breaking both retention rules
@@ -343,7 +354,7 @@ same-origin check rejects every request arriving on the second hostname.
 
 After the first deploy, confirm each of the following:
 
-- `NEXTAUTH_URL` exactly matches the public origin, or sign-in and the same-origin API checks will reject requests
+- `NEXTAUTH_URL` exactly matches the public origin, or sign-in, server-issued redirects, and the same-origin API checks will send users to the wrong host or reject requests
 - the Stripe webhook endpoint points at `https://<your-render-host>/api/webhooks/stripe`, with the resulting signing secret stored as `STRIPE_WEBHOOK_SECRET`
 - the Resend sending domain is verified and `EMAIL_FROM` uses it
 - smoke checks pass for authentication, role isolation, payment state, and contact-release privacy
