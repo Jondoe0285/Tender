@@ -6,7 +6,7 @@ import { createTenderSchema } from '../src/lib/schemas/tender';
 import { SERVICE_CATALOG, URGENCY_OPTIONS, REQUIREMENT_OPTIONS, type ServiceName } from '../src/lib/categories';
 import { ContentModerationError } from '../src/server/moderation/contentModeration';
 
-const TENDER_COUNT = 100;
+const TENDER_COUNT = 400;
 const DEMO_CLIENT_EMAIL = 'client@example.test';
 
 // Real town + postcode pairs spanning England, Scotland, Wales, and Northern Ireland, so
