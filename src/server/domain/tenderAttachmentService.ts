@@ -5,7 +5,7 @@ import { prisma } from '@/server/data/prisma';
 type AttachmentActor = { id: string; role: 'CLIENT' | 'RETAILER' };
 
 /** Returns attachment bytes only for the owning Client or a matched Retailer with a persisted unlock. */
-export async function getTenderAttachmentForDownload(tenderId: string, attachmentId: string, actor: AttachmentActor) {
+export async function getTenderAttachmentForDownload(tenderId: string, attachmentId: string, actor: AttachmentActor): Promise<{ id: string; fileName: string; mimeType: string; content: Buffer }> {
   const attachment = await prisma.tenderAttachment.findFirst({
     where: {
       id: attachmentId,
@@ -29,5 +29,6 @@ export async function getTenderAttachmentForDownload(tenderId: string, attachmen
     metadata: { tenderId, role: actor.role },
   });
 
-  return attachment;
+  // The query engine may return Bytes as a plain Uint8Array; normalize so .toString() decodes text.
+  return { ...attachment, content: Buffer.from(attachment.content) };
 }

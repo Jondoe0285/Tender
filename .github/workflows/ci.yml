@@ -21,7 +21,8 @@ jobs:
       NEXTAUTH_URL: http://localhost:3000
       RESEND_API_KEY: test-key
       EMAIL_FROM: no-reply@example.com
-      STRIPE_SECRET_KEY: sk_test_dummy
+      # Blank so tests exercise the dev-mode payment confirmation fallback instead of calling Stripe.
+      STRIPE_SECRET_KEY: ""
       STRIPE_WEBHOOK_SECRET: whsec_dummy
       RETENTION_JOB_SECRET: test-secret
 

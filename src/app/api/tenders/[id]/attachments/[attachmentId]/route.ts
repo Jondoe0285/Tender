@@ -23,7 +23,7 @@ export async function GET(_request: Request, { params }: { params: { id: string;
     const attachment = await getTenderAttachmentForDownload(params.id, params.attachmentId, actor);
     const fileName = safeDownloadFileName(attachment.fileName);
 
-    return new NextResponse(attachment.content, {
+    return new NextResponse(new Uint8Array(attachment.content), {
       headers: {
         'Content-Type': safeMimeType(attachment.mimeType),
         'Content-Disposition': `attachment; filename="${fileName}"`,
