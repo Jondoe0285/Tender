@@ -12,7 +12,7 @@ import { configurationTestTemplate } from '@/server/notifications/emailTemplates
  * signed-in Super User's own address, so this can never be used to mail a third party.
  */
 export async function POST(request: Request) {
-  const rateLimitError = createRateLimitResponse(request, 'test-email', { maxRequests: 3, windowMs: 60_000 });
+  const rateLimitError = await createRateLimitResponse(request, 'test-email', { maxRequests: 3, windowMs: 60_000 });
   if (rateLimitError) return rateLimitError;
 
   const originError = rejectCrossOrigin(request);

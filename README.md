@@ -5,7 +5,8 @@ procedures: [docs](docs/).
 
 ## Outstanding Actions
 
-Nothing here is done yet. Work top to bottom — production config first, then engineering debt.
+Work top to bottom — production config first, then engineering debt. Items that state
+"implementation complete" remain open until their listed validation evidence is recorded.
 
 ### Before Production
 
@@ -20,33 +21,35 @@ Nothing here is done yet. Work top to bottom — production config first, then e
   `/api/internal/retention` endpoint.
 - [ ] **Configure Sentry for production and confirm one test event.** Set browser/server DSNs and
   verify a scrubbed error event arrives. Staging is already verified.
-- [ ] **Repair Stripe webhook finalisation before production.** The webhook marks payments confirmed
-  and records the Stripe event before unlock/contact-release finalisation and audit logging. A
-  transient failure strands the entitlement because retries are discarded. Make payment,
-  entitlement, and audit transitions recoverable and idempotent; test retry and partial-failure
-  recovery.
-- [ ] **Handle Stripe refunds and disputes.** Persist reversal events, revoke any applicable unlock
-  or contact-release entitlement, create an audit event, and notify the affected parties. Test
-  refunds, chargebacks, duplicate events, and out-of-order webhook delivery.
-- [ ] **Block pre-release Client-Retailer messaging.** Messaging currently requires only a Retailer
-  unlock, allowing contact details to be exchanged before the Client has accepted a quote and paid
-  the release fee. Require a confirmed ContactRelease at the server boundary; keep moderation as
-  defence in depth and test obfuscated contact details.
-- [ ] **Prevent expired or closed tender activity.** Recheck tender status and closing date inside
-  the unlock and quote domain services immediately before creating a payment, unlock, or quote.
-  Test attempts after both the deadline and closure.
-- [ ] **Make deployment gates govern Render, not Azure.** The workflows target Azure while
-  `render.yaml` deploys directly from `staging` and `main`, bypassing documented approval,
-  rollback, and verification controls. Replace or remove the Azure workflows and establish a
-  single Render-based gated promotion path.
+- [ ] **Repair Stripe webhook finalisation before production.** Implementation complete in
+  `6377097`: retries of the same signed event resume idempotent entitlement finalisation and avoid
+  duplicate payment/unlock audit records. Outstanding: add and run retry and partial-failure
+  recovery tests against PostgreSQL.
+- [ ] **Handle Stripe refunds and disputes.** Implementation complete in `6377097`: a migration-backed
+  reversal ledger records signed Stripe refund/dispute events, marks the payment reversed, removes
+  paid unlock/contact-release entitlements, audits the change, and notifies affected parties.
+  Outstanding: apply the migration in staging and test refunds, chargebacks, duplicate events, and
+  out-of-order delivery.
+- [ ] **Block pre-release Client-Retailer messaging.** Implementation complete in `6377097`: message
+  reads and sends now require a matching confirmed `ContactRelease` at the server boundary.
+  Outstanding: add and run release-state and obfuscated-contact regression tests.
+- [ ] **Prevent expired or closed tender activity.** Implementation complete in `6377097`: unlock
+  requests, paid-unlock finalisation, and quote submission now recheck `OPEN` status and deadline
+  server-side. Outstanding: add and run expiry and closure regression tests.
+- [ ] **Make deployment gates govern Render, not Azure.** Implementation and hook configuration
+  complete in `e676e12`: Render auto-deploy is disabled and protected staging/production workflows
+  invoke separate Render deploy hooks for the approved SHA. Outstanding: run one approved staging
+  deployment and verify that the recorded deployment matches the requested commit.
 - [ ] **Re-run release validation against the deployed staging SHA.** The current health-check record
   predates the staging tip. Re-run CI, PostgreSQL migration replay, workflow checks, and staging
   verification for the exact deployed commit; require the recorded SHA as release evidence.
 
 ### Engineering Work
 
-- [ ] **Revalidate session claims and shorten session lifetime.** Suspended accounts and revoked Owner
-  flags currently remain effective in a JWT until the default NextAuth expiry.
+- [ ] **Revalidate session claims and shorten session lifetime.** Implementation complete in
+  `5429973`: each server session lookup reloads suspension, active role membership, Owner, and
+  Accountant state; JWT lifetime is capped at eight hours. Outstanding: add and run session
+  revocation and multi-role regression tests.
 - [ ] **Move rate limiting to shared storage and add per-account lockout.** The current in-process,
   IP-only limiter does not protect across Render instances or deployment restarts.
 - [ ] **Plan a tested Next.js 16 upgrade.** `npm audit` still reports high-severity advisories that

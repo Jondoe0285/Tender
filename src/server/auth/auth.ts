@@ -4,6 +4,9 @@ import { prisma } from '@/server/data/prisma';
 import { verifyPassword } from '@/server/auth/password';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 
+const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
+
 export const authOptions: AuthOptions = {
   session: { strategy: 'jwt', maxAge: 8 * 60 * 60, updateAge: 60 * 60 },
   secret: process.env.NEXTAUTH_SECRET,
@@ -29,8 +32,36 @@ export const authOptions: AuthOptions = {
         });
         if (!user || user.suspended || !user.emailVerifiedAt) return null;
 
+        const now = new Date();
+        if (user.loginLockedUntil && user.loginLockedUntil > now) return null;
+
+        if (user.loginLockedUntil) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { failedLoginAttempts: 0, loginLockedUntil: null },
+          });
+        }
+
         const validPassword = await verifyPassword(password, user.passwordHash);
-        if (!validPassword) return null;
+        if (!validPassword) {
+          const updatedUser = await prisma.user.update({
+            where: { id: user.id },
+            data: { failedLoginAttempts: { increment: 1 } },
+            select: { failedLoginAttempts: true },
+          });
+          if (updatedUser.failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { loginLockedUntil: new Date(Date.now() + LOGIN_LOCKOUT_MS) },
+            });
+          }
+          return null;
+        }
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { failedLoginAttempts: 0, loginLockedUntil: null },
+        });
 
         const roles = user.roleMemberships.length > 0
           ? user.roleMemberships.map((membership) => membership.role)

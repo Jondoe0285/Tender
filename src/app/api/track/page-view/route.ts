@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
 
-  const rateLimitError = createRateLimitResponse(request, 'page-view', { maxRequests: 120, windowMs: 60_000 });
+  const rateLimitError = await createRateLimitResponse(request, 'page-view', { maxRequests: 120, windowMs: 60_000 });
   if (rateLimitError) return rateLimitError;
 
   const user = await getCurrentUser();

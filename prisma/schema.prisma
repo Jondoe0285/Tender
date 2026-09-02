@@ -64,6 +64,8 @@ model User {
   id                String   @id @default(cuid())
   email             String   @unique
   passwordHash      String
+  failedLoginAttempts Int    @default(0)
+  loginLockedUntil  DateTime?
   role              Role
   isOwner           Boolean  @default(false)
   isAccountant      Boolean  @default(false)
@@ -103,6 +105,18 @@ model User {
   clientMessages TenderMessage[] @relation("TenderMessageClient")
   moderationEvents  ModerationEvent[] @relation("ModerationActor")
   reviewedModerationEvents ModerationEvent[] @relation("ModerationReviewer")
+}
+
+model RateLimitEntry {
+  identifierHash String   @id
+  scope          String
+  windowStartedAt DateTime
+  requestCount   Int      @default(0)
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([expiresAt])
 }
 
 /** In-app route visits, used only to show a Super User which areas an account has been using. */

@@ -10,7 +10,7 @@ async function limitedHandler(request: Request, context?: { params?: Record<stri
   // that previously broke sign-out once the shared budget was used up by normal session polling).
   const isCredentialsLogin = request.method === 'POST' && new URL(request.url).pathname.endsWith('/callback/credentials');
   if (isCredentialsLogin) {
-    const rateLimitError = createRateLimitResponse(request, 'login', { maxRequests: 10, windowMs: 60_000 });
+    const rateLimitError = await createRateLimitResponse(request, 'login', { maxRequests: 10, windowMs: 60_000 });
     if (rateLimitError) return rateLimitError;
   }
 
