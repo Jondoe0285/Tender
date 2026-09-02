@@ -199,7 +199,7 @@ Explain fees, visibility, responsibilities, and next actions near the relevant w
 
 ## 9. Partner Branding and Advertising
 
-Partner branding and advertising links for Sinclair Safety Solutions Ltd and Smart Works Civils Ltd must be clearly labelled as advertising, sponsorship, or partner information.
+Partner branding and advertising links for Sinclair Safety Solutions Ltd, Smart Works Civils Ltd, and HSQE Consult Hub must be clearly labelled as advertising, sponsorship, or partner information. HSQE Consult Hub has no website yet, so its logo is shown without a link until one is provided.
 
 Partner visibility must remain separate from:
 

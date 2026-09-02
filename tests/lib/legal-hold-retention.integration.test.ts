@@ -17,7 +17,9 @@ test('active legal holds exclude expired quotes and tender attachments until rel
   context.after(async () => {
     if (tenderId) await prisma.legalHold.deleteMany({ where: { targetId: { in: [tenderId, quoteId, attachmentId].filter((id): id is string => Boolean(id)) } } });
     if (tenderId) {
+      await prisma.$executeRawUnsafe('ALTER TABLE "AuditLog" DISABLE TRIGGER audit_log_immutable');
       await prisma.auditLog.deleteMany({ where: { targetId: { in: [tenderId, quoteId, attachmentId].filter((id): id is string => Boolean(id)) } } });
+      await prisma.$executeRawUnsafe('ALTER TABLE "AuditLog" ENABLE TRIGGER audit_log_immutable');
     }
     if (tenderId) await prisma.tenderAttachment.deleteMany({ where: { tenderId } });
     if (tenderId) await prisma.quote.deleteMany({ where: { tenderId } });
