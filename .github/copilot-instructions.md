@@ -53,6 +53,7 @@
 
 - Build reusable components and follow existing project patterns before introducing new abstractions.
 - Keep changes focused and preserve the existing role-based portal structure.
+- Treat [docs/Implementation-Change-Register.md](../docs/Implementation-Change-Register.md) as the operational source of truth for adapting repository changes to app environments. Update it in the same change set for every applicable implementation, migration, configuration, workflow, or environment requirement; never record secrets.
 - Write tests for every new feature and update affected tests when behavior changes.
 - Keep interfaces accessible, including keyboard navigation and meaningful labels.
 - Run `npm run type-check` after TypeScript changes and `npm run build` for routing or production behavior changes.
