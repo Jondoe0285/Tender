@@ -16,6 +16,7 @@ test('an active membership allowance cannot unlock a tender while membership tie
     if (tenderId) await prisma.payment.deleteMany({ where: { tenderId } });
     if (tenderId) await prisma.unlock.deleteMany({ where: { tenderId } });
     if (tenderId) await prisma.tenderMatch.deleteMany({ where: { tenderId } });
+    if (tenderId) await prisma.tenderItem.deleteMany({ where: { tenderId } });
     if (tenderId) await prisma.tender.deleteMany({ where: { id: tenderId } });
     const userIds = [clientId, retailerId].filter((id): id is string => Boolean(id));
     if (userIds.length > 0) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
