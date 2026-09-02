@@ -255,6 +255,9 @@ Exports require the same authorization and privacy checks as the dashboard. Cont
 - Production releases require verified backups or recovery readiness before destructive migrations.
 - Post-deployment checks verify application health, authentication, role isolation, payment state, and contact-release privacy.
 - Releases must have rollback preparation and observable logs and metrics.
+- Development and feature branches use local databases and local-only sandbox credentials for every supporting app and integration.
+- Staging and production/main each have explicit, dedicated environment resources and branch-specific security permissions that must be preserved: databases, Stripe, Resend, Sentry, Cloudflare/DNS/WAF, authentication providers, analytics/product telemetry, object/file storage, monitoring and alerting, webhook endpoints, API credentials and service tokens, service URLs, access policies, role assignments, and deployment configuration.
+- A destructive change to a staging or production/main environment resource, integration setting, or security permission requires recorded approval, affected resource names (never secret values), backup/rollback evidence, a change plan, and post-change validation evidence before it is applied.
 
 A green build alone is not evidence that production payment, privacy, or authorization behavior is safe.
 

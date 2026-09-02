@@ -234,6 +234,32 @@ which deploy the approved commit through protected Render deploy hooks.
 Deployment approvals are workflow inputs, not chat messages. Every condition is verified against
 the repository, so an unfilled placeholder or an unprovable claim stops the release.
 
+### Protected environment resources
+
+Development and feature branches use local databases and local-only sandbox credentials for every
+supporting app and integration. Staging and production/main each have explicit, dedicated
+environment resources and branch-specific security permissions that must be preserved, including
+but not limited to databases, Stripe, Resend, Sentry, Cloudflare/DNS/WAF, authentication
+providers, analytics/product telemetry, object/file storage, monitoring and alerting, webhook
+endpoints, API credentials and service tokens, service URLs, access policies, role assignments,
+and deployment configuration.
+
+A staging or production/main environment resource, integration setting, or security permission
+must never be reset, reseeded, overwritten, repointed, rotated, disabled, downgraded, deleted,
+replaced, weakened, or otherwise destructively changed as part of a routine deployment or
+documentation change. A destructive change requires, and must record in
+[Implementation-Change-Register.md](../Implementation-Change-Register.md):
+
+- explicit Founder/product-owner/release-owner approval
+- the affected environment and resource names, without secret values
+- backup, restore, rollback, or recovery evidence
+- a migration or change plan
+- post-change validation evidence
+- a named release or rollback owner
+
+Secret values are never printed, logged, or committed; records reference only
+environment-variable names, provider names, service names, or configuration categories.
+
 ### Approved Deploy to Staging
 
 Actions -> **Approved Deploy to Staging** -> Run workflow.
