@@ -115,7 +115,9 @@ test('contact release writes a minimal immutable audit event', async (context) =
 
   context.after(async () => {
     if (quoteId) {
+      await prisma.$executeRawUnsafe('ALTER TABLE "AuditLog" DISABLE TRIGGER audit_log_immutable');
       await prisma.auditLog.deleteMany({ where: { targetId: quoteId } });
+      await prisma.$executeRawUnsafe('ALTER TABLE "AuditLog" ENABLE TRIGGER audit_log_immutable');
       await prisma.$executeRawUnsafe('ALTER TABLE "ContactReleaseAuditEvent" DISABLE TRIGGER contact_release_audit_event_immutable');
       await prisma.contactReleaseAuditEvent.deleteMany({ where: { quoteId } });
       await prisma.$executeRawUnsafe('ALTER TABLE "ContactReleaseAuditEvent" ENABLE TRIGGER contact_release_audit_event_immutable');

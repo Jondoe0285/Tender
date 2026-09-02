@@ -15,7 +15,9 @@ test('only the owning Client or a matched unlocked Retailer can retrieve a tende
 
   context.after(async () => {
     if (tenderId) {
+      await prisma.$executeRawUnsafe('ALTER TABLE "AuditLog" DISABLE TRIGGER audit_log_immutable');
       await prisma.auditLog.deleteMany({ where: { targetType: 'TenderAttachment', metadata: { contains: tenderId } } });
+      await prisma.$executeRawUnsafe('ALTER TABLE "AuditLog" ENABLE TRIGGER audit_log_immutable');
     }
     if (tenderId) await prisma.unlock.deleteMany({ where: { tenderId } });
     if (tenderId) await prisma.tenderMatch.deleteMany({ where: { tenderId } });
