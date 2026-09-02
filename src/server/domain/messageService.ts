@@ -20,8 +20,11 @@ async function resolveThread(tenderId: string, actor: MessageActor, quoteId?: st
     retailerId = actor.id;
   }
 
-  const unlock = await prisma.unlock.findUnique({ where: { tenderId_retailerId: { tenderId, retailerId } } });
-  if (!unlock) throw new ForbiddenError('Purchase the tender opportunity before messaging');
+  const release = await prisma.contactRelease.findFirst({
+    where: { tenderId, clientId: tender.clientId, retailerId },
+    select: { id: true },
+  });
+  if (!release) throw new ForbiddenError('Contact details must be released before messaging');
   return { clientId: tender.clientId, retailerId };
 }
 

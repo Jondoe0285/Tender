@@ -5,6 +5,16 @@ import { sendTenderOpportunityEmail } from '@/server/notifications/resend';
 import type { CreateTenderInput } from '@/lib/schemas/tender';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
 import { retailerCoversTenderLocation, getBroadLocation, getPostcodeDistrict } from '@/lib/geography';
+import { ForbiddenError } from '@/server/auth/session';
+
+/** Rejects new tender activity once the tender is closed or its response deadline has passed. */
+export async function assertTenderOpenForActivity(tenderId: string): Promise<void> {
+  const tender = await prisma.tender.findFirst({
+    where: { id: tenderId, status: 'OPEN', closingDate: { gt: new Date() } },
+    select: { id: true },
+  });
+  if (!tender) throw new ForbiddenError('Tender is no longer open for new activity');
+}
 
 /** Creates a tender, assigns its reference, and matches it to eligible Retailers. Ownership is the caller's job. */
 export async function createTender(clientId: string, input: CreateTenderInput) {

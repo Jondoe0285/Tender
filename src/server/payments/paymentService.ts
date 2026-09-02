@@ -83,7 +83,11 @@ export async function createPayment(params: {
 
   await prisma.payment.update({
     where: { id: payment.id },
-    data: { stripePaymentIntentId: checkoutSession.id, stripeCheckoutUrl: checkoutSession.url },
+    data: {
+      stripeCheckoutSessionId: checkoutSession.id,
+      stripePaymentIntentId: typeof checkoutSession.payment_intent === 'string' ? checkoutSession.payment_intent : null,
+      stripeCheckoutUrl: checkoutSession.url,
+    },
   });
 
   return { paymentId: payment.id, amountGbp, vatPercentage, vatGbp, totalAmountGbp, checkoutUrl: checkoutSession.url, devMode: false };

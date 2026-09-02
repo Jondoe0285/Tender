@@ -45,6 +45,12 @@ enum PaymentStatus {
   CONFIRMED
   FAILED
   REFUNDED
+  REVERSED
+}
+
+enum PaymentReversalType {
+  REFUND
+  DISPUTE
 }
 
 enum ModerationDecision {
@@ -481,6 +487,7 @@ model Payment {
   tierId                String?
   tier                  MembershipTier? @relation("MembershipTierPayments", fields: [tierId], references: [id])
   stripePaymentIntentId String?       @unique
+  stripeCheckoutSessionId String?     @unique
   stripeCheckoutUrl     String?
   stripeEventId         String?       @unique
   stripeReceiptUrl      String?
@@ -494,6 +501,19 @@ model Payment {
   releases              ContactRelease[]
   sponsoredPlacement    RetailerSponsoredPlacement?
   retailerMembership    RetailerMembership?
+  reversals             PaymentReversal[]
+}
+
+model PaymentReversal {
+  id              String              @id @default(cuid())
+  paymentId       String
+  payment         Payment             @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  type            PaymentReversalType
+  stripeEventId   String              @unique
+  providerObjectId String?
+  reversedAt      DateTime            @default(now())
+
+  @@index([paymentId, reversedAt])
 }
 
 model ContactRelease {

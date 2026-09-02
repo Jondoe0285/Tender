@@ -1,7 +1,9 @@
 import { prisma } from '@/server/data/prisma';
+import { Prisma } from '@prisma/client';
 import { createPayment } from '@/server/payments/paymentService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { ForbiddenError } from '@/server/auth/session';
+import { assertTenderOpenForActivity } from '@/server/domain/tenderService';
 
 async function assertMatched(tenderId: string, retailerId: string) {
   const match = await prisma.tenderMatch.findUnique({
@@ -18,6 +20,7 @@ type UnlockOutcome =
 /** Sole entry point for changing tender visibility for a Retailer (SEC-032/033). */
 export async function requestUnlock(retailerId: string, tenderId: string): Promise<UnlockOutcome> {
   await assertMatched(tenderId, retailerId);
+  await assertTenderOpenForActivity(tenderId);
 
   const existing = await prisma.unlock.findUnique({
     where: { tenderId_retailerId: { tenderId, retailerId } },
@@ -68,17 +71,26 @@ export async function requestUnlock(retailerId: string, tenderId: string): Promi
 /** Called only after the payment is CONFIRMED (via webhook or the dev-only confirm route). */
 export async function finalizeUnlockWithPayment(retailerId: string, tenderId: string, paymentId: string) {
   await assertMatched(tenderId, retailerId);
+  await assertTenderOpenForActivity(tenderId);
 
   const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
   if (!payment || payment.userId !== retailerId || payment.tenderId !== tenderId || payment.type !== 'RETAILER_UNLOCK' || payment.status !== 'CONFIRMED') {
     throw new ForbiddenError('Payment is not a confirmed unlock payment for this Retailer');
   }
 
-  const unlock = await prisma.unlock.upsert({
-    where: { tenderId_retailerId: { tenderId, retailerId } },
-    create: { tenderId, retailerId, method: 'PAID', paymentId },
-    update: {},
-  });
+  const existingUnlock = await prisma.unlock.findUnique({ where: { tenderId_retailerId: { tenderId, retailerId } } });
+  if (existingUnlock) return existingUnlock;
+
+  let unlock;
+  try {
+    unlock = await prisma.unlock.create({ data: { tenderId, retailerId, method: 'PAID', paymentId } });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const concurrentUnlock = await prisma.unlock.findUnique({ where: { tenderId_retailerId: { tenderId, retailerId } } });
+      if (concurrentUnlock) return concurrentUnlock;
+    }
+    throw error;
+  }
 
   await recordAuditEvent({
     actorId: retailerId,

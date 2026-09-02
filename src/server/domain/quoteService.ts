@@ -8,6 +8,7 @@ import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
 import { sponsoredPlacementEnabled } from '@/server/domain/sponsoredPlacementService';
 import { getClientReleaseFeeGbp } from '@/server/domain/platformSettings';
+import { assertTenderOpenForActivity } from '@/server/domain/tenderService';
 
 export function isQuoteRetentionLocked(retentionLockedUntil: Date | null | undefined, now = new Date()): boolean {
   return retentionLockedUntil !== null && retentionLockedUntil !== undefined && retentionLockedUntil > now;
@@ -27,6 +28,7 @@ export async function deleteQuote(quoteId: string) {
 export async function submitQuote(retailerId: string, tenderId: string, input: SubmitQuoteInput) {
   const unlock = await prisma.unlock.findUnique({ where: { tenderId_retailerId: { tenderId, retailerId } } });
   if (!unlock) throw new ForbiddenError('Tender has not been unlocked by this Retailer');
+  await assertTenderOpenForActivity(tenderId);
 
   await enforceContentModeration(retailerId, 'QUOTE_SUBMISSION', [
     { name: 'delivery information', value: input.deliveryInfo },
