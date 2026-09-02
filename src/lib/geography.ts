@@ -85,6 +85,13 @@ export function extractPostcode(location: string): string | null {
   return postcode ? postcode.toUpperCase().replace(/\s+/g, ' ').trim() : null;
 }
 
+/** Returns the outward postcode district (e.g. "LS10"), safe for pre-unlock delivery estimates. */
+export function getPostcodeDistrict(location: string): string | null {
+  const postcode = extractPostcode(location);
+  // The inward code is always a fixed 3 characters (digit + 2 letters); everything before it is the district.
+  return postcode ? postcode.replace(/\s+/g, '').slice(0, -3) : null;
+}
+
 export function locationHasPostcode(location: string): boolean {
   return extractPostcode(location) !== null;
 }

@@ -22,6 +22,14 @@
 - Never expose Client or Retailer details before the required payment trigger.
 - Never bypass authentication, authorization, validation, payment, or other security controls.
 
+## Environment Resource Preservation
+
+- Use local databases and local-only sandbox credentials and settings only on development and feature branches.
+- Staging and production/main branches each have explicit, dedicated environment resources and branch-specific security permissions that must be preserved, including but not limited to: databases, payment providers such as Stripe, email providers such as Resend, error monitoring such as Sentry, DNS/CDN/WAF providers such as Cloudflare, authentication providers, analytics/product telemetry, object/file storage, monitoring and alerting, webhook endpoints, API credentials and service tokens, service URLs, access policies, role assignments, branch/environment deployment configuration, and any future supporting app, supplier, integration, or managed service setting.
+- Never reset, reseed, overwrite, repoint, rotate, disable, downgrade, delete, replace, weaken, or otherwise destructively change a staging or production/main environment resource, integration setting, or security permission unless the change records: explicit Founder/product-owner/release-owner approval; the affected environment and resource names, without secret values; backup, restore, rollback, or recovery evidence; a migration or change plan; post-change validation evidence; and a named release or rollback owner. Log the record in [docs/Implementation-Change-Register.md](../docs/Implementation-Change-Register.md).
+- Never print or commit secret values. Refer only to environment-variable names, provider names, service names, or configuration categories.
+- See [docs/Security-Requirements.md](../docs/Security-Requirements.md) SEC-118 to SEC-122 for the full requirement.
+
 ## Business Plan
 
 - Treat [docs/TradeTender-Business-Plan.md](../docs/TradeTender-Business-Plan.md) as the primary project documentation and source of truth for product scope, workflows, pricing, launch assumptions, risks, and future options.
@@ -53,6 +61,7 @@
 
 - Build reusable components and follow existing project patterns before introducing new abstractions.
 - Keep changes focused and preserve the existing role-based portal structure.
+- Treat [docs/Implementation-Change-Register.md](../docs/Implementation-Change-Register.md) as the operational source of truth for adapting repository changes to app environments. Update it in the same change set for every applicable implementation, migration, configuration, workflow, or environment requirement; never record secrets.
 - Write tests for every new feature and update affected tests when behavior changes.
 - Keep interfaces accessible, including keyboard navigation and meaningful labels.
 - Run `npm run type-check` after TypeScript changes and `npm run build` for routing or production behavior changes.

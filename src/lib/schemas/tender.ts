@@ -2,12 +2,24 @@ import { z } from 'zod';
 import { CATEGORIES, isValidSubcategory, URGENCY_OPTIONS, REQUIREMENT_OPTIONS } from '@/lib/categories';
 import type { CategoryCatalog } from '@/server/domain/categoryService';
 import { locationHasPostcode } from '@/lib/geography';
+import { MAX_TENDER_ATTACHMENT_TOTAL_BYTES, verifyTenderAttachment } from '@/lib/attachment-utils';
 
 const tenderAttachmentSchema = z.object({
   name: z.string().trim().min(1).max(255),
   mimeType: z.string().trim().min(1).max(128),
-  sizeBytes: z.number().int().nonnegative().max(10 * 1024 * 1024),
-  dataBase64: z.string().min(1).max(10 * 1024 * 1024 * 4),
+  sizeBytes: z.number().int().nonnegative(),
+  dataBase64: z.string().min(1).max(Math.ceil((10 * 1024 * 1024) * 4 / 3) + 4),
+}).transform((attachment, context) => {
+  try {
+    return { ...attachment, ...verifyTenderAttachment(attachment) };
+  } catch (error) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: error instanceof Error ? error.message : 'Attachment is invalid',
+      path: ['dataBase64'],
+    });
+    return z.NEVER;
+  }
 });
 
 export function createTenderSchemaForCatalog(catalog: CategoryCatalog = CATEGORIES) {
@@ -66,6 +78,10 @@ export function createTenderSchemaForCatalog(catalog: CategoryCatalog = CATEGORI
           context.addIssue({ code: z.ZodIssueCode.custom, message: 'Subcategory does not belong to the selected category', path: ['items', index, 'subcategory'] });
         }
       });
+      const attachmentBytes = value.attachments.reduce((total, attachment) => total + attachment.sizeBytes, 0);
+      if (attachmentBytes > MAX_TENDER_ATTACHMENT_TOTAL_BYTES) {
+        context.addIssue({ code: z.ZodIssueCode.custom, message: 'Tender attachments exceed the 25 MiB total limit', path: ['attachments'] });
+      }
     });
 }
 

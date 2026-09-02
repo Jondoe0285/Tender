@@ -164,6 +164,14 @@ export function failedPaymentTemplate(input: { paymentType: string; amountGbp: n
   };
 }
 
+export function paymentReversedTemplate(input: { paymentType: string; reference: string; reversalType: 'REFUND' | 'DISPUTE'; accountPath: string }): EmailTemplate {
+  const reason = input.reversalType === 'REFUND' ? 'refunded' : 'placed into dispute';
+  return {
+    subject: `Payment access update: ${input.reference}`,
+    html: layout({ eyebrow: 'Payment access update', title: 'Payment access has changed', intro: `A Trade Tender payment was ${reason}.`, body: detailRows([['Reference', input.reference], ['Payment type', input.paymentType], ['Status', input.reversalType === 'REFUND' ? 'Refunded' : 'Disputed']]) + '<p style="font-size:14px;line-height:1.6">Any platform access or contact release authorised by this payment has been removed while the payment reversal is processed.</p>', action: { label: 'Review account activity', href: appUrl(input.accountPath) } }),
+  };
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] ?? character);
 }

@@ -14,12 +14,14 @@ export type AccountRow = {
   tenders?: number;
   quotes?: number;
   unlocks?: number;
+  openTenderRequests?: number;
   launchCreditsLeft?: number | null;
   releaseCreditsLeft?: number | null;
 };
 
 export function AccountManagementTable({ role, rows }: { role: 'CLIENT' | 'RETAILER'; rows: AccountRow[] }) {
   const [showCreate, setShowCreate] = useState(false);
+  const [openTenderRequestsOnly, setOpenTenderRequestsOnly] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState<string | null>(null);
   const [creditInputs, setCreditInputs] = useState<Record<string, string>>(
@@ -36,6 +38,9 @@ export function AccountManagementTable({ role, rows }: { role: 'CLIENT' | 'RETAI
   });
 
   const isRetailer = role === 'RETAILER';
+  const visibleRows = openTenderRequestsOnly
+    ? rows.filter((row) => (row.openTenderRequests ?? 0) > 0)
+    : rows;
 
   async function createAccount(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -181,6 +186,18 @@ export function AccountManagementTable({ role, rows }: { role: 'CLIENT' | 'RETAI
           </button>
         </div>
 
+        {isRetailer && (
+          <label className="mt-4 flex items-center gap-2 text-sm font-medium text-foundation-navy">
+            <input
+              type="checkbox"
+              checked={openTenderRequestsOnly}
+              onChange={(event) => setOpenTenderRequestsOnly(event.target.checked)}
+              className="h-4 w-4 accent-safety-amber"
+            />
+            Show Retailers with open tender requests only
+          </label>
+        )}
+
         {showCreate && (
           <form onSubmit={createAccount} className="mt-6 grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
             <label className="text-sm text-concrete-grey md:col-span-1">
@@ -268,11 +285,11 @@ export function AccountManagementTable({ role, rows }: { role: 'CLIENT' | 'RETAI
         {message && <p className="mt-4 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-foundation-navy">{message}</p>}
       </Card>
 
-      {rows.length === 0 ? (
+      {visibleRows.length === 0 ? (
         <Card className="py-16 text-center text-sm text-concrete-grey">No {role.toLowerCase()} accounts are registered.</Card>
       ) : (
         <Card className="divide-y divide-slate-100 p-0">
-          {rows.map((account) => (
+          {visibleRows.map((account) => (
             <div key={account.id} className="flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h3 className="font-heading text-base font-bold text-foundation-navy">
@@ -287,6 +304,7 @@ export function AccountManagementTable({ role, rows }: { role: 'CLIENT' | 'RETAI
                 ) : (
                   <p className="mt-1 text-sm text-concrete-grey">
                     {(account.unlocks ?? 0)} unlock(s) &middot; {(account.quotes ?? 0)} quote(s)
+                    {typeof account.openTenderRequests === 'number' ? ` &middot; ${account.openTenderRequests} open tender request(s)` : ''}
                     {typeof account.launchCreditsLeft === 'number' ? ` &middot; ${account.launchCreditsLeft} credits left` : ''}
                   </p>
                 )}

@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { getCurrentUser } from '@/server/auth/session';
 import { listMatchedSummariesForRetailer } from '@/server/domain/tenderService';
 import { prisma } from '@/server/data/prisma';
-import { retailerCoversTenderLocation, estimateDistanceMiles } from '@/lib/geography';
+import { estimateDistanceMiles } from '@/lib/geography';
 import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
 import { TenderOpportunityCard, type OpportunityCardData } from '@/components/retailer/TenderOpportunityCard';
 
@@ -39,10 +39,6 @@ export default async function RetailerPage() {
   const hasCredits = (profile?.launchCreditsLeft ?? 0) > 0;
   const coverageAreas = profile?.coverageAreas ?? '';
 
-  const retailerCategories = profile?.categories
-    ? profile.categories.split(',').map((c) => c.trim().toLowerCase()).filter(Boolean)
-    : [];
-
   const metrics = [
     { label: 'New opportunities', value: newOpportunities.length },
     { label: 'Unlocked tenders', value: unlockCount },
@@ -53,9 +49,8 @@ export default async function RetailerPage() {
   const latest: OpportunityCardData[] = matches
     .map(({ tender, viewedAt }) => {
       const unlocked = unlockedIds.has(tender.id);
-      const categoryMatch =
-        retailerCategories.length === 0 || retailerCategories.includes(tender.category.trim().toLowerCase());
-      const locationMatch = profile != null && retailerCoversTenderLocation(profile, tender.location);
+      const categoryMatch = tender.categoryMatch;
+      const locationMatch = tender.locationMatch;
       const strongMatch = categoryMatch && locationMatch;
 
       return {

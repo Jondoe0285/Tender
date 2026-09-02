@@ -1,12 +1,25 @@
 import { PrismaClient, Role } from '@prisma/client';
 import { hash } from 'bcryptjs';
+import { SERVICE_NAMES } from '../src/lib/categories';
+import { UK_COUNTIES, UK_REGIONS } from '../src/lib/geography';
 
 const prisma = new PrismaClient();
 const DEFAULT_SANDBOX_PASSWORD = 'TradeTenderDev!2026';
+const TRIAL_RETAILER_COUNT = 300;
 const platformOwnerEmail = process.env.PLATFORM_OWNER_EMAIL?.trim().toLowerCase();
 const platformOwnerPassword = process.env.PLATFORM_OWNER_PASSWORD;
 const isDeployedSandbox = process.env.TRADE_TENDER_ENV === 'sandbox';
 const isSandboxSeedEnabled = process.env.SANDBOX_SEED_ENABLED === 'true';
+
+const TRIAL_RETAILER_LOCATIONS = [
+  'Leeds', 'Manchester', 'Birmingham', 'Bristol', 'London', 'Liverpool', 'Newcastle', 'Nottingham',
+  'Leicester', 'Hull', 'Preston', 'Milton Keynes', 'Oxford', 'Cambridge', 'Reading', 'Southampton',
+  'Cardiff', 'Edinburgh', 'Glasgow', 'Belfast',
+];
+
+const TRIAL_RETAILER_COMPANY_TYPES = [
+  'Building Supplies', 'Plant Hire', 'Waste Services', 'Construction Solutions', 'Site Support',
+];
 
 async function upsertRoleMembership(userId: string, role: Role) {
   await prisma.userRole.upsert({
@@ -14,6 +27,69 @@ async function upsertRoleMembership(userId: string, role: Role) {
     update: {},
     create: { userId, role },
   });
+}
+
+function trialRetailerCoverage(index: number) {
+  const coverageScope = index % 10 === 0 ? 'UK' : index % 3 === 0 ? 'REGION' : 'COUNTY';
+  const location = TRIAL_RETAILER_LOCATIONS[index % TRIAL_RETAILER_LOCATIONS.length];
+  const county = UK_COUNTIES[index % UK_COUNTIES.length];
+  const region = UK_REGIONS[index % UK_REGIONS.length];
+
+  return {
+    coverageScope,
+    coverageAreas: location,
+    counties: coverageScope === 'COUNTY' ? [county, UK_COUNTIES[(index + 7) % UK_COUNTIES.length]].join(',') : '',
+    regions: coverageScope === 'REGION' ? [region, UK_REGIONS[(index + 4) % UK_REGIONS.length]].join(',') : '',
+  };
+}
+
+async function seedTrialRetailers(passwordHash: string) {
+  for (let index = 1; index <= TRIAL_RETAILER_COUNT; index += 1) {
+    const paddedIndex = String(index).padStart(3, '0');
+    const services = Array.from({ length: (index % SERVICE_NAMES.length) + 1 }, (_, offset) =>
+      SERVICE_NAMES[(index + offset) % SERVICE_NAMES.length]
+    );
+    const coverage = trialRetailerCoverage(index - 1);
+    const retailer = await prisma.user.upsert({
+      where: { email: `trial-retailer-${paddedIndex}@example.test` },
+      update: {
+        passwordHash,
+        role: Role.RETAILER,
+        contactName: `Trial Retailer ${paddedIndex}`,
+        contactPhone: `07700${String(index).padStart(6, '0')}`,
+        suspended: false,
+        emailVerifiedAt: new Date(),
+        termsAcceptedAt: new Date(),
+      },
+      create: {
+        email: `trial-retailer-${paddedIndex}@example.test`,
+        passwordHash,
+        role: Role.RETAILER,
+        contactName: `Trial Retailer ${paddedIndex}`,
+        contactPhone: `07700${String(index).padStart(6, '0')}`,
+        emailVerifiedAt: new Date(),
+        termsAcceptedAt: new Date(),
+      },
+    });
+    await upsertRoleMembership(retailer.id, Role.RETAILER);
+    await prisma.retailerProfile.upsert({
+      where: { userId: retailer.id },
+      update: {
+        companyName: `${coverage.coverageAreas} ${TRIAL_RETAILER_COMPANY_TYPES[index % TRIAL_RETAILER_COMPANY_TYPES.length]} ${paddedIndex}`,
+        categories: services.join(','),
+        launchCreditsLeft: 3,
+        ...coverage,
+      },
+      create: {
+        userId: retailer.id,
+        masterUserId: retailer.id,
+        companyName: `${coverage.coverageAreas} ${TRIAL_RETAILER_COMPANY_TYPES[index % TRIAL_RETAILER_COMPANY_TYPES.length]} ${paddedIndex}`,
+        categories: services.join(','),
+        launchCreditsLeft: 3,
+        ...coverage,
+      },
+    });
+  }
 }
 
 async function main() {
@@ -133,7 +209,9 @@ async function main() {
     },
   });
 
-  console.log('Seeded persistent sandbox Client and Retailer accounts and the platform owner.');
+  await seedTrialRetailers(sandboxPasswordHash);
+
+  console.log(`Seeded persistent sandbox accounts, the platform owner, and ${TRIAL_RETAILER_COUNT} trial Retailers.`);
 }
 
 main()

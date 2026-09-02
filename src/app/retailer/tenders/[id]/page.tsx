@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { AppShell } from '@/components/layout/AppShell';
 import { Label, Input, Textarea, FieldGroup } from '@/components/ui/Field';
 import { TenderMessages } from '@/components/quotes/TenderMessages';
+import { extractPostcode } from '@/lib/geography';
 
 type TenderSummary = {
   id: string;
@@ -30,6 +31,7 @@ type TenderFull = Omit<TenderSummary, 'items'> & {
   supplyDate: string | null;
   requirements: string;
   description: string;
+  attachments: { id: string; fileName: string; mimeType: string; sizeBytes: number }[];
   items: { id: string; category: string; subcategory: string; item: string | null; quantity: string; description: string }[];
 };
 
@@ -168,6 +170,7 @@ export default function RetailerTenderDetailPage() {
   ), 0) ?? 0;
   const chargesTotal = charges.reduce((total, charge) => total + Number(charge.priceGbp || 0), 0);
   const quoteTotal = itemsTotal + chargesTotal;
+  const deliveryPostcode = full ? extractPostcode(full.location) : null;
 
   return (
     <AppShell role="retailer" title={tender.reference}>
@@ -185,6 +188,7 @@ export default function RetailerTenderDetailPage() {
           <Card className="mb-6">
             {tender.clientTradeTenderId && <p className="text-sm font-semibold text-steel-blue">Client Trade Tender ID: {tender.clientTradeTenderId}</p>}
             <p className="text-sm text-concrete-grey">Location: {tender.location}</p>
+            {deliveryPostcode && <p className="mt-1 text-sm font-semibold text-foundation-navy">Delivery postcode: {deliveryPostcode}</p>}
             <p className="mt-1 text-sm text-concrete-grey">Urgency: {tender.urgency}</p>
             <p className="mt-1 text-sm text-concrete-grey">
               Closes: {new Date(tender.closingDate).toLocaleDateString('en-GB')}
@@ -243,6 +247,29 @@ export default function RetailerTenderDetailPage() {
                 )}
                 {full.supplyDate && <p className="mt-1 text-sm text-concrete-grey">Requested supply date: {new Date(full.supplyDate).toLocaleDateString('en-GB')}</p>}
               </Card>
+
+              {full.attachments.length > 0 && (
+                <Card className="mb-6">
+                  <h2 className="font-heading text-lg font-bold text-foundation-navy">Tender attachments</h2>
+                  <ul className="mt-4 flex flex-col gap-3">
+                    {full.attachments.map((attachment) => (
+                      <li key={attachment.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 last:border-0 last:pb-0">
+                        <span className="text-sm text-foundation-navy">
+                          <span className="font-semibold">{attachment.fileName}</span>
+                          <span className="ml-2 text-concrete-grey">({formatFileSize(attachment.sizeBytes)})</span>
+                        </span>
+                        <a
+                          href={`/api/tenders/${params.id}/attachments/${attachment.id}`}
+                          download={attachment.fileName}
+                          className="text-sm font-semibold text-steel-blue hover:text-foundation-navy hover:underline"
+                        >
+                          Download
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              )}
 
               {quoteSubmitted ? (
                 <Card>
@@ -377,6 +404,10 @@ export default function RetailerTenderDetailPage() {
       </section>
     </AppShell>
   );
+}
+
+function formatFileSize(sizeBytes: number) {
+  return sizeBytes < 1024 ? `${sizeBytes} bytes` : `${(sizeBytes / 1024).toFixed(1)} KB`;
 }
 
 function TenderItemDetail({ subcategory, item, quantity, description }: { subcategory: string; item: string | null; quantity: string; description: string }) {

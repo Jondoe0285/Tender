@@ -8,6 +8,7 @@ import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
 import { sponsoredPlacementEnabled } from '@/server/domain/sponsoredPlacementService';
 import { getClientReleaseFeeGbp } from '@/server/domain/platformSettings';
+import { assertRetailerEligibleForTender, assertTenderOpenForActivity } from '@/server/domain/tenderService';
 
 export function isQuoteRetentionLocked(retentionLockedUntil: Date | null | undefined, now = new Date()): boolean {
   return retentionLockedUntil !== null && retentionLockedUntil !== undefined && retentionLockedUntil > now;
@@ -15,8 +16,18 @@ export function isQuoteRetentionLocked(retentionLockedUntil: Date | null | undef
 
 /** Deletes only quotes outside the mandatory retention window. Callers must authorize the actor. */
 export async function deleteQuote(quoteId: string) {
-  const quote = await prisma.quote.findUnique({ where: { id: quoteId }, select: { retentionLockedUntil: true } });
+  const quote = await prisma.quote.findUnique({
+    where: { id: quoteId },
+    select: {
+      retentionLockedUntil: true,
+      legalHolds: { where: { releasedAt: null }, select: { id: true } },
+      tender: { select: { legalHolds: { where: { releasedAt: null }, select: { id: true } } } },
+    },
+  });
   if (!quote) return null;
+  if (quote.legalHolds.length > 0 || quote.tender.legalHolds.length > 0) {
+    throw new ForbiddenError('An active legal hold prevents quote deletion');
+  }
   if (isQuoteRetentionLocked(quote.retentionLockedUntil)) {
     throw new ForbiddenError('Accepted quotes are retained for five years and cannot be deleted');
   }
@@ -27,6 +38,8 @@ export async function deleteQuote(quoteId: string) {
 export async function submitQuote(retailerId: string, tenderId: string, input: SubmitQuoteInput) {
   const unlock = await prisma.unlock.findUnique({ where: { tenderId_retailerId: { tenderId, retailerId } } });
   if (!unlock) throw new ForbiddenError('Tender has not been unlocked by this Retailer');
+  await assertRetailerEligibleForTender(retailerId, tenderId);
+  await assertTenderOpenForActivity(tenderId);
 
   await enforceContentModeration(retailerId, 'QUOTE_SUBMISSION', [
     { name: 'delivery information', value: input.deliveryInfo },

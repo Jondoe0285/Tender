@@ -1,10 +1,20 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/server/data/prisma';
+import { analyticsFilterSchema } from '@/lib/schemas/analytics';
 
 export type AnalyticsFilters = {
   from?: Date;
   to?: Date;
+  client?: string;
+  retailer?: string;
+  tenderReference?: string;
+  quoteReference?: string;
   category?: string;
   region?: string;
+  status?: 'DRAFT' | 'OPEN' | 'CLOSED' | 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
+  valueBand?: 'UNDER_1000' | '1000_TO_4999' | '5000_TO_9999' | '10000_PLUS';
+  subscriptionPlan?: string;
+  paymentStatus?: 'PENDING' | 'CONFIRMED' | 'FAILED' | 'REFUNDED' | 'REVERSED';
 };
 
 type AnalyticsTender = {
@@ -17,8 +27,9 @@ type AnalyticsTender = {
   quotes: { status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED'; priceGbp: number }[];
 };
 
-function dateWhere(filters: AnalyticsFilters) {
-  return {
+export function buildAnalyticsTenderWhere(filters: AnalyticsFilters): Prisma.TenderWhereInput {
+  const conditions: Prisma.TenderWhereInput[] = [
+    {
     ...(filters.from || filters.to
       ? {
           createdAt: {
@@ -29,7 +40,54 @@ function dateWhere(filters: AnalyticsFilters) {
       : {}),
     ...(filters.category ? { category: filters.category } : {}),
     ...(filters.region ? { location: filters.region } : {}),
-  };
+    ...(filters.client
+      ? { client: { OR: [{ contactName: { contains: filters.client, mode: 'insensitive' } }, { email: { contains: filters.client, mode: 'insensitive' } }] } }
+      : {}),
+    ...(filters.tenderReference ? { reference: { contains: filters.tenderReference, mode: 'insensitive' } } : {}),
+  },
+  ];
+
+  if (filters.retailer) {
+    conditions.push({
+      OR: [
+        { unlocks: { some: { retailer: { OR: [{ contactName: { contains: filters.retailer, mode: 'insensitive' } }, { email: { contains: filters.retailer, mode: 'insensitive' } }] } } } },
+        { quotes: { some: { retailer: { OR: [{ contactName: { contains: filters.retailer, mode: 'insensitive' } }, { email: { contains: filters.retailer, mode: 'insensitive' } }] } } } },
+      ],
+    });
+  }
+  if (filters.quoteReference) conditions.push({ quotes: { some: { reference: { contains: filters.quoteReference, mode: 'insensitive' } } } });
+  if (filters.status) {
+    if (['DRAFT', 'OPEN', 'CLOSED'].includes(filters.status)) conditions.push({ status: filters.status as 'DRAFT' | 'OPEN' | 'CLOSED' });
+    else conditions.push({ quotes: { some: { status: filters.status as 'SUBMITTED' | 'ACCEPTED' | 'REJECTED' } } });
+  }
+  if (filters.valueBand) {
+    const priceGbp = filters.valueBand === 'UNDER_1000' ? { lt: 1000 }
+      : filters.valueBand === '1000_TO_4999' ? { gte: 1000, lte: 4999 }
+        : filters.valueBand === '5000_TO_9999' ? { gte: 5000, lte: 9999 }
+          : { gte: 10000 };
+    conditions.push({ quotes: { some: { priceGbp } } });
+  }
+  if (filters.subscriptionPlan) {
+    const planSearch = { contains: filters.subscriptionPlan, mode: 'insensitive' as const };
+    conditions.push({
+      OR: [
+        { unlocks: { some: { retailer: { memberships: { some: { tier: { name: planSearch } } } } } } },
+        { quotes: { some: { retailer: { memberships: { some: { tier: { name: planSearch } } } } } } },
+        { unlocks: { some: { retailer: { subscriptions: { some: { plan: { name: planSearch } } } } } } },
+        { quotes: { some: { retailer: { subscriptions: { some: { plan: { name: planSearch } } } } } } },
+      ],
+    });
+  }
+  if (filters.paymentStatus) {
+    conditions.push({
+      OR: [
+        { unlockPayments: { some: { status: filters.paymentStatus } } },
+        { quotes: { some: { releasePayment: { is: { status: filters.paymentStatus } } } } },
+      ],
+    });
+  }
+
+  return conditions.length === 1 ? conditions[0] : { AND: conditions };
 }
 
 function monthKey(date: Date): string {
@@ -46,7 +104,7 @@ export function getFinancialQuarter(date = new Date()) {
 }
 
 export async function getAnalytics(filters: AnalyticsFilters = {}) {
-  const tenderWhere = dateWhere(filters);
+  const tenderWhere = buildAnalyticsTenderWhere(filters);
   const tenders = (await prisma.tender.findMany({
     where: tenderWhere,
     orderBy: { createdAt: 'asc' },
@@ -135,12 +193,25 @@ export function parseAnalyticsFilters(searchParams: Record<string, string | stri
     const raw = searchParams[key];
     return Array.isArray(raw) ? raw[0] : raw;
   };
-  const fromValue = value('from');
-  const toValue = value('to');
+  const parsed = analyticsFilterSchema.safeParse({
+    client: value('client'),
+    retailer: value('retailer'),
+    tenderReference: value('tenderReference'),
+    quoteReference: value('quoteReference'),
+    category: value('category'),
+    region: value('region'),
+    status: value('status'),
+    from: value('from'),
+    to: value('to'),
+    valueBand: value('valueBand'),
+    subscriptionPlan: value('subscriptionPlan'),
+    paymentStatus: value('paymentStatus'),
+  });
+  if (!parsed.success) return {};
+  const { from: fromValue, to: toValue, ...filters } = parsed.data;
   return {
+    ...filters,
     from: fromValue ? new Date(`${fromValue}T00:00:00.000Z`) : undefined,
     to: toValue ? new Date(`${toValue}T23:59:59.999Z`) : undefined,
-    category: value('category') || undefined,
-    region: value('region') || undefined,
   };
 }

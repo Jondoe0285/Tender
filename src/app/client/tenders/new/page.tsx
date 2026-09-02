@@ -16,12 +16,11 @@ const QUANTITY_UNITS = ['units', 'tonnes', 'bags', 'pallets', 'm³', 'skips', 'd
 
 const STEPS: WizardStep[] = [
   { id: 1, label: 'Project Information' },
-  { id: 2, label: 'Category Selection' },
+  { id: 2, label: 'Items & Quantities' },
   { id: 3, label: 'Postcode & Access' },
-  { id: 4, label: 'Materials / Services' },
-  { id: 5, label: 'Schedule' },
-  { id: 6, label: 'Upload Files' },
-  { id: 7, label: 'Review & Submit' },
+  { id: 4, label: 'Schedule' },
+  { id: 5, label: 'Upload Files' },
+  { id: 6, label: 'Review & Submit' },
 ];
 
 type FormState = {
@@ -160,24 +159,20 @@ export default function NewTenderPage() {
       if (!form.category) next.category = 'Select a category.';
       if (!form.subcategory) next.subcategory = 'Select a subcategory.';
       if (!form.item) next.item = 'Select an item.';
+      if (!form.quantityValue.trim()) next.quantityValue = 'Enter a quantity.';
+      if (!form.quantityUnit) next.quantityUnit = 'Select a unit.';
       form.items.forEach((item, index) => {
         if (!item.category) next[`item-${index}-category`] = 'Select a category.';
         if (!item.subcategory) next[`item-${index}-subcategory`] = 'Select a subcategory.';
         if (!item.item) next[`item-${index}-item`] = 'Select an item.';
+        if (!item.quantityValue.trim()) next[`item-${index}-quantity`] = 'Enter a quantity.';
+        if (!item.quantityUnit) next[`item-${index}-unit`] = 'Select a unit.';
       });
     }
     if (targetStep === 3 && !/\b(?:GIR\s?0AA|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})\b/i.test(form.location)) {
       next.location = 'Enter a valid UK delivery or site postcode.';
     }
     if (targetStep === 4) {
-      if (!form.quantityValue.trim()) next.quantityValue = 'Enter a quantity.';
-      if (!form.quantityUnit) next.quantityUnit = 'Select a unit.';
-      form.items.forEach((item, index) => {
-        if (!item.quantityValue.trim()) next[`item-${index}-quantity`] = 'Enter a quantity.';
-        if (!item.quantityUnit) next[`item-${index}-unit`] = 'Select a unit.';
-      });
-    }
-    if (targetStep === 5) {
       if (!form.urgency) next.urgency = 'Select urgency.';
       if (!form.closingDate) next.closingDate = 'Select a quote closing date.';
       else if (new Date(form.closingDate).getTime() <= Date.now()) next.closingDate = 'Closing date must be in the future.';
@@ -227,7 +222,7 @@ export default function NewTenderPage() {
   }
 
   async function handleSubmit() {
-    const requiredStepsValid = [1, 2, 3, 4, 5].every((targetStep) => validateStep(targetStep));
+    const requiredStepsValid = [1, 2, 3, 4].every((targetStep) => validateStep(targetStep));
     if (!requiredStepsValid) {
       setError('Some required details are missing — please check the earlier steps.');
       return;
@@ -295,7 +290,7 @@ export default function NewTenderPage() {
     <AppShell role="client" title="Create Tender">
       <div className="mx-auto max-w-2xl">
         <p className="mb-6 max-w-xl text-sm leading-relaxed text-concrete-grey">
-          Seven quick steps, around 2&ndash;5 minutes. Retailers only see full details once they unlock your tender.
+          Six quick steps, around 2&ndash;5 minutes. Retailers only see full details once they unlock your tender.
         </p>
 
         <Stepper steps={STEPS} currentStep={step} />
@@ -331,7 +326,7 @@ export default function NewTenderPage() {
 
         {step === 2 && (
           <Card className="flex flex-col gap-6">
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">Category Selection</h2>
+            <h2 className="font-heading text-lg font-bold text-foundation-navy">Items &amp; Quantities</h2>
             <FieldGroup>
               <Label htmlFor="category">Category</Label>
               <Select
@@ -380,6 +375,26 @@ export default function NewTenderPage() {
               <Label htmlFor="item">Item</Label>
               <Combobox id="item" name="item" value={form.item} onChange={(value) => update('item', value)} disabled={!form.subcategory} required placeholder={form.subcategory ? 'Search items…' : 'Choose a category first'} groups={form.category ? [{ label: form.subcategory, options: catalog[form.category]?.[form.subcategory] ?? [] }] : []} />
               {errors.item && <p className="text-sm font-semibold text-attention">{errors.item}</p>}
+            </FieldGroup>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FieldGroup>
+                <Label htmlFor="quantity-value">Quantity</Label>
+                <Input id="quantity-value" placeholder="e.g. 4,000" value={form.quantityValue} onChange={(event) => update('quantityValue', event.target.value)} />
+                {errors.quantityValue && <p className="text-sm font-semibold text-attention">{errors.quantityValue}</p>}
+              </FieldGroup>
+              <FieldGroup>
+                <Label htmlFor="quantity-unit">Unit</Label>
+                <Select id="quantity-unit" value={form.quantityUnit} onChange={(event) => update('quantityUnit', event.target.value)}>
+                  <option value="" disabled>Select a unit</option>
+                  {QUANTITY_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                </Select>
+                {errors.quantityUnit && <p className="text-sm font-semibold text-attention">{errors.quantityUnit}</p>}
+              </FieldGroup>
+            </div>
+            <FieldGroup>
+              <Label htmlFor="description">Specification and notes (optional)</Label>
+              <Textarea id="description" rows={4} placeholder="Describe the products, waste stream, or plant required, along with any specification details." value={form.description} onChange={(event) => update('description', event.target.value)} />
+              {errors.description && <p className="text-sm font-semibold text-attention">{errors.description}</p>}
             </FieldGroup>
             <div className="border-t border-slate-200 pt-5 sm:col-span-2">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -440,7 +455,25 @@ export default function NewTenderPage() {
                           />
                           {errors[`item-${index}-item`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-item`]}</p>}
                         </FieldGroup>
+                        <FieldGroup>
+                          <Label htmlFor={`item-${index}-quantity`}>Quantity</Label>
+                          <Input id={`item-${index}-quantity`} value={item.quantityValue} placeholder="e.g. 20" onChange={(event) => updateItem(index, 'quantityValue', event.target.value)} />
+                          {errors[`item-${index}-quantity`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-quantity`]}</p>}
+                        </FieldGroup>
+                        <FieldGroup>
+                          <Label htmlFor={`item-${index}-unit`}>Unit</Label>
+                          <Select id={`item-${index}-unit`} value={item.quantityUnit} onChange={(event) => updateItem(index, 'quantityUnit', event.target.value)}>
+                            <option value="" disabled>Select a unit</option>
+                            {QUANTITY_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                          </Select>
+                          {errors[`item-${index}-unit`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-unit`]}</p>}
+                        </FieldGroup>
                       </div>
+                      <FieldGroup>
+                        <Label htmlFor={`item-${index}-description`}>Item specification (optional)</Label>
+                        <Textarea id={`item-${index}-description`} rows={3} value={item.description} placeholder="Add the specification or delivery requirement for this item." onChange={(event) => updateItem(index, 'description', event.target.value)} />
+                        {errors[`item-${index}-description`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-description`]}</p>}
+                      </FieldGroup>
                     </div>
                   ))}
                 </div>
@@ -482,81 +515,6 @@ export default function NewTenderPage() {
 
         {step === 4 && (
           <Card className="flex flex-col gap-6">
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">Materials / Services Required</h2>
-            <div className="grid gap-6 sm:grid-cols-2">
-              <FieldGroup>
-                <Label htmlFor="quantity-value">Quantity</Label>
-                <Input
-                  id="quantity-value"
-                  placeholder="e.g. 4,000"
-                  value={form.quantityValue}
-                  onChange={(event) => update('quantityValue', event.target.value)}
-                />
-                {errors.quantityValue && <p className="text-sm font-semibold text-attention">{errors.quantityValue}</p>}
-              </FieldGroup>
-              <FieldGroup>
-                <Label htmlFor="quantity-unit">Unit</Label>
-                <Select id="quantity-unit" value={form.quantityUnit} onChange={(event) => update('quantityUnit', event.target.value)}>
-                  <option value="" disabled>
-                    Select a unit
-                  </option>
-                  {QUANTITY_UNITS.map((unit) => (
-                    <option key={unit} value={unit}>
-                      {unit}
-                    </option>
-                  ))}
-                </Select>
-                {errors.quantityUnit && <p className="text-sm font-semibold text-attention">{errors.quantityUnit}</p>}
-              </FieldGroup>
-            </div>
-            <FieldGroup>
-              <Label htmlFor="description">Specification and notes (optional)</Label>
-              <Textarea
-                id="description"
-                rows={6}
-                placeholder="Describe the products, waste stream, or plant required, along with any specification details."
-                value={form.description}
-                onChange={(event) => update('description', event.target.value)}
-              />
-              {errors.description && <p className="text-sm font-semibold text-attention">{errors.description}</p>}
-            </FieldGroup>
-            {form.items.length > 0 && (
-              <div className="border-t border-slate-200 pt-5 sm:col-span-2">
-                <h3 className="font-heading text-base font-bold text-foundation-navy">Item quantities and specifications</h3>
-                <div className="mt-4 flex flex-col gap-5">
-                  {form.items.map((item, index) => (
-                    <div key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                      <p className="mb-4 text-sm font-semibold text-foundation-navy">Item {index + 2}: {item.subcategory || 'Unselected item'}</p>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <FieldGroup>
-                          <Label htmlFor={`item-${index}-quantity`}>Quantity</Label>
-                          <Input id={`item-${index}-quantity`} value={item.quantityValue} placeholder="e.g. 20" onChange={(event) => updateItem(index, 'quantityValue', event.target.value)} />
-                          {errors[`item-${index}-quantity`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-quantity`]}</p>}
-                        </FieldGroup>
-                        <FieldGroup>
-                          <Label htmlFor={`item-${index}-unit`}>Unit</Label>
-                          <Select id={`item-${index}-unit`} value={item.quantityUnit} onChange={(event) => updateItem(index, 'quantityUnit', event.target.value)}>
-                            <option value="" disabled>Select a unit</option>
-                            {QUANTITY_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
-                          </Select>
-                          {errors[`item-${index}-unit`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-unit`]}</p>}
-                        </FieldGroup>
-                      </div>
-                      <FieldGroup>
-                        <Label htmlFor={`item-${index}-description`}>Item specification (optional)</Label>
-                        <Textarea id={`item-${index}-description`} rows={3} value={item.description} placeholder="Add the specification or delivery requirement for this item." onChange={(event) => updateItem(index, 'description', event.target.value)} />
-                        {errors[`item-${index}-description`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-description`]}</p>}
-                      </FieldGroup>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Card>
-        )}
-
-        {step === 5 && (
-          <Card className="flex flex-col gap-6">
             <h2 className="font-heading text-lg font-bold text-foundation-navy">Schedule</h2>
             <FieldGroup>
               <Label htmlFor="urgency">Urgency</Label>
@@ -595,7 +553,7 @@ export default function NewTenderPage() {
           </Card>
         )}
 
-        {step === 6 && (
+        {step === 5 && (
           <Card className="flex flex-col gap-4">
             <h2 className="font-heading text-lg font-bold text-foundation-navy">Upload Files (optional)</h2>
             <p className="text-sm text-concrete-grey">
@@ -632,7 +590,7 @@ export default function NewTenderPage() {
           </Card>
         )}
 
-        {step === 7 && (
+        {step === 6 && (
           <Card className="flex flex-col gap-5">
             <h2 className="font-heading text-lg font-bold text-foundation-navy">Review &amp; Submit</h2>
             <dl className="grid gap-4 sm:grid-cols-2">

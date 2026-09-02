@@ -1,19 +1,25 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { randomUUID } from 'node:crypto';
 import { checkRateLimit } from '../../src/server/http/rateLimit';
 
-test('allows a low number of requests from the same IP', () => {
+test('allows a low number of requests from the same IP', async () => {
   const headers = new Headers({ 'x-forwarded-for': '203.0.113.10' });
-  const first = checkRateLimit(headers, 'register', { maxRequests: 5, windowMs: 60_000 });
-  const second = checkRateLimit(headers, 'register', { maxRequests: 5, windowMs: 60_000 });
+  const scope = `register-${randomUUID()}`;
+  const first = await checkRateLimit(headers, scope, { maxRequests: 5, windowMs: 60_000 });
+  const second = await checkRateLimit(headers, scope, { maxRequests: 5, windowMs: 60_000 });
 
   assert.equal(first.allowed, true);
   assert.equal(second.allowed, true);
 });
 
-test('blocks requests that exceed the configured rate limit for the same IP', () => {
+test('blocks requests that exceed the configured rate limit for the same IP', async () => {
   const headers = new Headers({ 'x-forwarded-for': '203.0.113.11' });
-  const results = Array.from({ length: 6 }, () => checkRateLimit(headers, 'register', { maxRequests: 5, windowMs: 60_000 }));
+  const scope = `register-${randomUUID()}`;
+  const results = [];
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    results.push(await checkRateLimit(headers, scope, { maxRequests: 5, windowMs: 60_000 }));
+  }
 
   assert.equal(results[0].allowed, true);
   assert.equal(results[1].allowed, true);
@@ -24,14 +30,15 @@ test('blocks requests that exceed the configured rate limit for the same IP', ()
   assert.equal(results[5].retryAfterSeconds, 60);
 });
 
-test('treats different source IP addresses separately', () => {
+test('treats different source IP addresses separately', async () => {
   const firstHeaders = new Headers({ 'x-forwarded-for': '203.0.113.12' });
   const secondHeaders = new Headers({ 'x-forwarded-for': '203.0.113.13' });
+  const scope = `login-${randomUUID()}`;
 
-  const first = checkRateLimit(firstHeaders, 'login', { maxRequests: 2, windowMs: 60_000 });
-  const second = checkRateLimit(secondHeaders, 'login', { maxRequests: 2, windowMs: 60_000 });
-  const third = checkRateLimit(firstHeaders, 'login', { maxRequests: 2, windowMs: 60_000 });
-  const fourth = checkRateLimit(firstHeaders, 'login', { maxRequests: 2, windowMs: 60_000 });
+  const first = await checkRateLimit(firstHeaders, scope, { maxRequests: 2, windowMs: 60_000 });
+  const second = await checkRateLimit(secondHeaders, scope, { maxRequests: 2, windowMs: 60_000 });
+  const third = await checkRateLimit(firstHeaders, scope, { maxRequests: 2, windowMs: 60_000 });
+  const fourth = await checkRateLimit(firstHeaders, scope, { maxRequests: 2, windowMs: 60_000 });
 
   assert.equal(first.allowed, true);
   assert.equal(second.allowed, true);
@@ -39,23 +46,24 @@ test('treats different source IP addresses separately', () => {
   assert.equal(fourth.allowed, false);
 });
 
-test('drops expired timestamps so stale rate-limit entries do not block future requests', () => {
+test('allows requests after the rate-limit window expires', async () => {
   const originalDateNow = Date.now;
   let fakeNow = 1_700_000_000_000;
   Date.now = () => fakeNow;
 
   try {
     const headers = new Headers({ 'x-forwarded-for': '203.0.113.14' });
-    const initial = checkRateLimit(headers, 'login', { maxRequests: 2, windowMs: 60_000 });
-    const second = checkRateLimit(headers, 'login', { maxRequests: 2, windowMs: 60_000 });
-    const third = checkRateLimit(headers, 'login', { maxRequests: 2, windowMs: 60_000 });
+    const scope = `login-${randomUUID()}`;
+    const initial = await checkRateLimit(headers, scope, { maxRequests: 2, windowMs: 60_000 });
+    const second = await checkRateLimit(headers, scope, { maxRequests: 2, windowMs: 60_000 });
+    const third = await checkRateLimit(headers, scope, { maxRequests: 2, windowMs: 60_000 });
 
     assert.equal(initial.allowed, true);
     assert.equal(second.allowed, true);
     assert.equal(third.allowed, false);
 
     fakeNow += 61_000;
-    const afterExpiry = checkRateLimit(headers, 'login', { maxRequests: 2, windowMs: 60_000 });
+    const afterExpiry = await checkRateLimit(headers, scope, { maxRequests: 2, windowMs: 60_000 });
     assert.equal(afterExpiry.allowed, true);
   } finally {
     Date.now = originalDateNow;

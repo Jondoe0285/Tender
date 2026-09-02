@@ -139,12 +139,11 @@ jobs:
     steps:
       - name: Confirm production credentials are configured
         env:
-          WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
-          CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          RENDER_PRODUCTION_DEPLOY_HOOK: ${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK }}
         run: |
           set -euo pipefail
-          if [ -z "$WEBAPP_NAME" ] || [ -z "$CREDENTIALS" ]; then
-            echo "::error::Production deployment is not configured. AZURE_WEBAPP_NAME and AZURE_CREDENTIALS are required."
+          if [ -z "$RENDER_PRODUCTION_DEPLOY_HOOK" ]; then
+            echo "::error::Production deployment is not configured. RENDER_PRODUCTION_DEPLOY_HOOK is required."
             exit 1
           fi
           echo "Production credentials are present."
@@ -166,33 +165,13 @@ jobs:
       - name: Production build
         run: npm run build
 
-      - name: Log in to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Confirm a database backup exists
+      - name: Deploy the approved commit to Render
+        env:
+          RENDER_PRODUCTION_DEPLOY_HOOK: ${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK }}
         run: |
           set -euo pipefail
-          SERVER="${{ secrets.AZURE_SQL_SERVER_NAME }}"
-          GROUP="${{ secrets.AZURE_RESOURCE_GROUP }}"
-          DATABASE="${{ secrets.AZURE_SQL_DATABASE_NAME }}"
-          if [ -z "$SERVER" ] || [ -z "$GROUP" ] || [ -z "$DATABASE" ]; then
-            echo "::error::Backup verification is not configured. Set AZURE_SQL_SERVER_NAME, AZURE_RESOURCE_GROUP and AZURE_SQL_DATABASE_NAME."
-            exit 1
-          fi
-          RETENTION=$(az sql db str-policy show --resource-group "$GROUP" --server "$SERVER" --name "$DATABASE" --query "retentionDays" -o tsv 2>/dev/null || echo "0")
-          if [ "${RETENTION:-0}" -lt 7 ]; then
-            echo "::error::Point-in-time restore retention is ${RETENTION} days. At least 7 days are required before a production release."
-            exit 1
-          fi
-          echo "Point-in-time restore retention: ${RETENTION} days."
-
-      - name: Deploy to Azure App Service
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
-          package: .
+          curl --fail --silent --show-error --retry 2 --retry-all-errors \
+            -X POST "${RENDER_PRODUCTION_DEPLOY_HOOK}&ref=${{ github.event.inputs.commit_sha }}"
 
   verify:
     name: Verify production deployment
@@ -282,16 +261,13 @@ jobs:
       - name: Rebuild the previous release
         run: npm run build
 
-      - name: Log in to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Redeploy the previous release
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
-          package: .
+      - name: Redeploy the previous release through Render
+        env:
+          RENDER_PRODUCTION_DEPLOY_HOOK: ${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 2 --retry-all-errors \
+            -X POST "${RENDER_PRODUCTION_DEPLOY_HOOK}&ref=${{ needs.verify-authorisation.outputs.previous_sha }}"
 
       - name: Confirm the rollback restored service
         env:

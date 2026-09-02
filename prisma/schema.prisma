@@ -33,6 +33,12 @@ enum QuoteStatus {
   REJECTED
 }
 
+enum LegalHoldScope {
+  TENDER
+  QUOTE
+  TENDER_ATTACHMENT
+}
+
 enum PaymentType {
   RETAILER_UNLOCK
   CLIENT_RELEASE
@@ -45,6 +51,12 @@ enum PaymentStatus {
   CONFIRMED
   FAILED
   REFUNDED
+  REVERSED
+}
+
+enum PaymentReversalType {
+  REFUND
+  DISPUTE
 }
 
 enum ModerationDecision {
@@ -58,6 +70,8 @@ model User {
   id                String   @id @default(cuid())
   email             String   @unique
   passwordHash      String
+  failedLoginAttempts Int    @default(0)
+  loginLockedUntil  DateTime?
   role              Role
   isOwner           Boolean  @default(false)
   isAccountant      Boolean  @default(false)
@@ -97,6 +111,20 @@ model User {
   clientMessages TenderMessage[] @relation("TenderMessageClient")
   moderationEvents  ModerationEvent[] @relation("ModerationActor")
   reviewedModerationEvents ModerationEvent[] @relation("ModerationReviewer")
+  legalHoldsCreated LegalHold[] @relation("LegalHoldCreatedBy")
+  legalHoldsReleased LegalHold[] @relation("LegalHoldReleasedBy")
+}
+
+model RateLimitEntry {
+  identifierHash String   @id
+  scope          String
+  windowStartedAt DateTime
+  requestCount   Int      @default(0)
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([expiresAt])
 }
 
 /** In-app route visits, used only to show a Super User which areas an account has been using. */
@@ -341,6 +369,7 @@ model Tender {
   items         TenderItem[]
   attachments   TenderAttachment[]
   messages      TenderMessage[]
+  legalHolds    LegalHold[] @relation("LegalHoldTender")
 }
 
 model TenderMessage {
@@ -369,6 +398,7 @@ model TenderAttachment {
   content     Bytes
   uploadedAt  DateTime @default(now())
   retentionLockedUntil DateTime?
+  legalHolds  LegalHold[] @relation("LegalHoldTenderAttachment")
 }
 
 model TenderItem {
@@ -441,6 +471,31 @@ model Quote {
   releasePayment Payment? @relation("QuoteReleasePayment")
   lines        QuoteLine[]
   charges      QuoteCharge[]
+  legalHolds   LegalHold[] @relation("LegalHoldQuote")
+}
+
+model LegalHold {
+  id           String         @id @default(cuid())
+  scope        LegalHoldScope
+  targetId     String
+  reason       String
+  createdById  String
+  createdBy    User           @relation("LegalHoldCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime       @default(now())
+  releasedById String?
+  releasedBy   User?          @relation("LegalHoldReleasedBy", fields: [releasedById], references: [id])
+  releasedAt   DateTime?
+  releaseReason String?
+  tenderId     String?
+  tender       Tender?        @relation("LegalHoldTender", fields: [tenderId], references: [id], onDelete: SetNull)
+  quoteId      String?
+  quote        Quote?         @relation("LegalHoldQuote", fields: [quoteId], references: [id], onDelete: SetNull)
+  attachmentId String?
+  attachment   TenderAttachment? @relation("LegalHoldTenderAttachment", fields: [attachmentId], references: [id], onDelete: SetNull)
+
+  @@index([tenderId, releasedAt])
+  @@index([quoteId, releasedAt])
+  @@index([attachmentId, releasedAt])
 }
 
 model QuoteCharge {
@@ -481,6 +536,7 @@ model Payment {
   tierId                String?
   tier                  MembershipTier? @relation("MembershipTierPayments", fields: [tierId], references: [id])
   stripePaymentIntentId String?       @unique
+  stripeCheckoutSessionId String?     @unique
   stripeCheckoutUrl     String?
   stripeEventId         String?       @unique
   stripeReceiptUrl      String?
@@ -494,6 +550,19 @@ model Payment {
   releases              ContactRelease[]
   sponsoredPlacement    RetailerSponsoredPlacement?
   retailerMembership    RetailerMembership?
+  reversals             PaymentReversal[]
+}
+
+model PaymentReversal {
+  id              String              @id @default(cuid())
+  paymentId       String
+  payment         Payment             @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  type            PaymentReversalType
+  stripeEventId   String              @unique
+  providerObjectId String?
+  reversedAt      DateTime            @default(now())
+
+  @@index([paymentId, reversedAt])
 }
 
 model ContactRelease {
@@ -506,6 +575,24 @@ model ContactRelease {
   releasedAt          DateTime @default(now())
   authorizingPaymentId String
   authorizingPayment  Payment  @relation(fields: [authorizingPaymentId], references: [id])
+}
+
+model ContactReleaseAuditEvent {
+  id                   String   @id @default(cuid())
+  contactReleaseId     String   @unique
+  actorId              String
+  tenderId             String
+  quoteId              String   @unique
+  clientId             String
+  retailerId           String
+  releasedDataCategory String
+  releasedAt           DateTime
+  authorizingPaymentId String
+  correlationId        String   @unique
+  createdAt            DateTime @default(now())
+
+  @@index([authorizingPaymentId])
+  @@index([clientId, retailerId])
 }
 
 model AuditLog {

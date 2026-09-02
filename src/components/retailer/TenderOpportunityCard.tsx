@@ -42,7 +42,7 @@ export function TenderOpportunityCard({ data, href }: { data: OpportunityCardDat
     <Link href={href} className="block">
       <Card
         interactive
-        className={`relative ${data.strongMatch ? 'border-2 border-approved bg-approved/5' : ''}`}
+        className={`relative ${data.strongMatch ? 'border-2 border-approved border-l-8 bg-approved/10 shadow-soft-md' : ''}`}
       >
         {data.isNew && (
           <span className="absolute right-4 top-4 flex items-center gap-1.5 text-xs font-semibold text-safety-amber">
@@ -52,9 +52,10 @@ export function TenderOpportunityCard({ data, href }: { data: OpportunityCardDat
         )}
 
         {data.strongMatch && (
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-approved">
-            Strong match — within your selected coverage area
-          </p>
+          <div className="mb-4 flex items-center gap-2">
+            <StatusBadge status="approved">Great match</StatusBadge>
+            <p className="text-sm font-semibold text-approved">Within your selected coverage area</p>
+          </div>
         )}
 
         <div className="flex flex-wrap items-center gap-2">

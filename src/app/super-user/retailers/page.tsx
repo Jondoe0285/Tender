@@ -12,7 +12,16 @@ export default async function RetailerManagementPage() {
   const retailers = await prisma.user.findMany({
     where: { role: 'RETAILER' },
     orderBy: { createdAt: 'desc' },
-    include: { retailerProfile: true, _count: { select: { unlocks: true, quotes: true } } },
+    include: {
+      retailerProfile: true,
+      _count: {
+        select: {
+          unlocks: true,
+          quotes: true,
+          itemMatches: { where: { tenderItem: { tender: { status: 'OPEN' } } } },
+        },
+      },
+    },
   });
 
   return (
@@ -29,6 +38,7 @@ export default async function RetailerManagementPage() {
           suspended: retailer.suspended,
           unlocks: retailer._count.unlocks,
           quotes: retailer._count.quotes,
+          openTenderRequests: retailer._count.itemMatches,
           launchCreditsLeft: retailer.retailerProfile?.launchCreditsLeft ?? 0,
         }))}
       />
