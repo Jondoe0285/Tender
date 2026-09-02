@@ -18,7 +18,7 @@ export default async function RetailerManagementPage() {
         select: {
           unlocks: true,
           quotes: true,
-          matches: { where: { tender: { status: 'OPEN' } } },
+          itemMatches: { where: { tenderItem: { tender: { status: 'OPEN' } } } },
         },
       },
     },
@@ -38,7 +38,7 @@ export default async function RetailerManagementPage() {
           suspended: retailer.suspended,
           unlocks: retailer._count.unlocks,
           quotes: retailer._count.quotes,
-          openTenderRequests: retailer._count.matches,
+          openTenderRequests: retailer._count.itemMatches,
           launchCreditsLeft: retailer.retailerProfile?.launchCreditsLeft ?? 0,
         }))}
       />

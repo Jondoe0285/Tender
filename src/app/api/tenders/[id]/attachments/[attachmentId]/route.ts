@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireRole } from '@/server/auth/session';
+import { requireRole, ForbiddenError } from '@/server/auth/session';
 import { toErrorResponse } from '@/server/http/errors';
 import { getTenderAttachmentForDownload } from '@/server/domain/tenderAttachmentService';
 
@@ -18,7 +18,9 @@ function safeMimeType(mimeType: string) {
 export async function GET(_request: Request, { params }: { params: { id: string; attachmentId: string } }) {
   try {
     const user = await requireRole('CLIENT', 'RETAILER');
-    const attachment = await getTenderAttachmentForDownload(params.id, params.attachmentId, user);
+    if (user.role !== 'CLIENT' && user.role !== 'RETAILER') throw new ForbiddenError();
+    const actor = { id: user.id, role: user.role };
+    const attachment = await getTenderAttachmentForDownload(params.id, params.attachmentId, actor);
     const fileName = safeDownloadFileName(attachment.fileName);
 
     return new NextResponse(attachment.content, {

@@ -57,8 +57,8 @@ export function buildAnalyticsTenderWhere(filters: AnalyticsFilters): Prisma.Ten
   }
   if (filters.quoteReference) conditions.push({ quotes: { some: { reference: { contains: filters.quoteReference, mode: 'insensitive' } } } });
   if (filters.status) {
-    if (['DRAFT', 'OPEN', 'CLOSED'].includes(filters.status)) conditions.push({ status: filters.status });
-    else conditions.push({ quotes: { some: { status: filters.status } } });
+    if (['DRAFT', 'OPEN', 'CLOSED'].includes(filters.status)) conditions.push({ status: filters.status as 'DRAFT' | 'OPEN' | 'CLOSED' });
+    else conditions.push({ quotes: { some: { status: filters.status as 'SUBMITTED' | 'ACCEPTED' | 'REJECTED' } } });
   }
   if (filters.valueBand) {
     const priceGbp = filters.valueBand === 'UNDER_1000' ? { lt: 1000 }
