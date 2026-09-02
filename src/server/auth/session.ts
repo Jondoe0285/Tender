@@ -1,5 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/server/auth/auth';
+import { prisma } from '@/server/data/prisma';
 
 export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'CLIENT' | 'RETAILER'; roles: SessionUser['role'][]; isOwner: boolean; isAccountant: boolean };
 
@@ -7,13 +8,36 @@ export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'CLI
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id || !session.user.role) return null;
+
+  // JWT claims are only a session hint. Reload access-critical account state so suspensions and
+  // Super User permission changes take effect immediately instead of waiting for token expiry.
+  const current = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      suspended: true,
+      isOwner: true,
+      isAccountant: true,
+      roleMemberships: { select: { role: true } },
+    },
+  });
+  if (!current || current.suspended) return null;
+
+  const roles = current.roleMemberships.length > 0
+    ? current.roleMemberships.map((membership) => membership.role)
+    : [current.role];
+  const selectedRole = session.user.role as SessionUser['role'];
+  if (!roles.includes(selectedRole)) return null;
+
   return {
-    id: session.user.id,
-    email: session.user.email ?? '',
-    role: session.user.role as SessionUser['role'],
-    roles: (session.user.roles ?? [session.user.role]) as SessionUser['role'][],
-    isOwner: Boolean(session.user.isOwner),
-    isAccountant: Boolean(session.user.isAccountant),
+    id: current.id,
+    email: current.email,
+    role: selectedRole,
+    roles,
+    isOwner: current.isOwner,
+    isAccountant: current.isAccountant,
   };
 }
 

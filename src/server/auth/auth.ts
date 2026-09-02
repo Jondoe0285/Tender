@@ -5,7 +5,7 @@ import { verifyPassword } from '@/server/auth/password';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 
 export const authOptions: AuthOptions = {
-  session: { strategy: 'jwt' },
+  session: { strategy: 'jwt', maxAge: 8 * 60 * 60, updateAge: 60 * 60 },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: '/login',
