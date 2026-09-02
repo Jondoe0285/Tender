@@ -7,7 +7,8 @@ type VerifiedTenderAttachment = {
   dataBase64: string;
 };
 
-const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+// A flat character class (no repeated group) avoids V8 regex stack overflows on large decoded files.
+const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
 const PDF_ACTIVE_CONTENT_MARKERS = [
   '/AA',
   '/EmbeddedFile',

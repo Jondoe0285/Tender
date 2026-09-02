@@ -1,7 +1,7 @@
 import { prisma } from '@/server/data/prisma';
 import { ForbiddenError } from '@/server/auth/session';
 import { createPayment } from '@/server/payments/paymentService';
-import { getPaymentFeeGbp, getPlatformSetting } from '@/server/domain/platformSettings';
+import { getPlatformSetting } from '@/server/domain/platformSettings';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 
 export async function sponsoredPlacementEnabled(): Promise<boolean> {

@@ -170,6 +170,11 @@ The platform must preserve anonymity and staged disclosure:
 - **SEC-116:** Post-deployment health checks shall verify authentication, role isolation, payment controls, and contact-release privacy.
 - **SEC-117:** A scheduled maintenance pipeline shall run dependency vulnerability audits, schema-drift checks, and the full validation suite so degradation is detected without a code change.
 - **SEC-117:** Security-relevant configuration changes shall be reviewed and auditable.
+- **SEC-118:** Development and feature branches shall use only local databases, sandbox provider accounts, local-only credentials, and non-production supporting app settings; they shall never share a database, credential, or integration account with staging or production/main.
+- **SEC-119:** Staging and production/main branches shall each have explicit, dedicated environment resources and branch-specific security permissions, including but not limited to databases, payment providers such as Stripe, email providers such as Resend, error monitoring such as Sentry, DNS/CDN/WAF providers such as Cloudflare, authentication providers, analytics/product telemetry, object/file storage, monitoring and alerting, webhook endpoints, API credentials and service tokens, service URLs, access policies, role assignments, and branch/environment deployment configuration.
+- **SEC-120:** A staging or production/main environment resource, integration setting, security permission, credential, webhook, storage configuration, monitoring configuration, authentication configuration, DNS/domain/TLS/WAF configuration, or deployment configuration shall never be reset, reseeded, overwritten, repointed, rotated, disabled, downgraded, deleted, replaced, weakened, or otherwise destructively changed unless the change records explicit Founder/product-owner/release-owner approval, the affected environment and resource names, backup/restore/rollback evidence, a migration or change plan, post-change validation evidence, and a named release or rollback owner.
+- **SEC-121:** Records of an approved environment or configuration change shall never contain secret values; they shall reference only environment-variable names, provider names, service names, or configuration categories.
+- **SEC-122:** Every pull request that touches deployment configuration, environment variables, integration settings, or security permissions shall state whether it affects staging or production/main environment resources.
 
 ## 14. Security Testing Requirements
 
@@ -198,4 +203,5 @@ A release must not be approved when any of the following is true:
 - Payment or contact-release events are not auditable.
 - Secrets or sensitive data appear in source, client bundles, logs, artifacts, or test fixtures.
 - Relevant tests fail, the database backup cannot be verified, or deployment health is unknown.
+- A staging or production/main environment resource, integration setting, or security permission is reset, reseeded, overwritten, repointed, rotated, disabled, downgraded, deleted, replaced, or weakened without recorded approval, resource identification, rollback evidence, a change plan, and post-change validation evidence.
 - The change conflicts with the approved business plan and the conflict has not been resolved.

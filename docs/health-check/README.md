@@ -10,7 +10,7 @@ step can run.
 
 ## Architecture
 
-Seven workflows, each with a single responsibility and its own permission boundary.
+Eight workflows, each with a single responsibility and its own permission boundary.
 
 | Workflow | File | Trigger | May write? | May merge? | May deploy? |
 | --- | --- | --- | --- | --- | --- |
@@ -18,6 +18,7 @@ Seven workflows, each with a single responsibility and its own permission bounda
 | Approved Fix Implementation | `.github/workflows/approved-fix.yml` | Manual only | Fix branch and draft PR only | No | No |
 | Approved Merge to Main | `.github/workflows/approved-merge.yml` | Manual only | Merge request only | Yes, through branch protection | No |
 | Approved Promote to Staging Branch | `.github/workflows/promote-staging-branch.yml` | Manual only | Moves `staging` branch only | No | No |
+| Approved Reconcile Staging Into Development | `.github/workflows/reconcile-staging-to-development.yml` | Manual only | Draft PR only | No | No |
 | Approved Deploy to Staging | `.github/workflows/deploy-staging.yml` | Manual only | Staging record branch only | No | Staging only |
 | Approved Deploy to Production | `.github/workflows/deploy-production.yml` | Manual only | Deployment record artifact only | No | Production only |
 | Break-glass Azure Deployment | `.github/workflows/deploy-azure.yml` | Manual only | No repository writes | No | Production only |
@@ -207,6 +208,23 @@ The promotion workflow verifies the approval statement, confirms the commit exis
 confirms `main` has not advanced beyond that commit, and then moves the permanent `staging`
 branch to that exact commit. It does not deploy.
 
+## Development and staging reconciliation
+
+The permanent `development` branch is where day-to-day feature work integrates before it flows
+into `staging` and, ultimately, `main`. Because `staging` can also move independently (staging
+record commits, direct hotfixes promoted from `main`), it must periodically be merged back into
+`development` so the two branches do not diverge.
+
+Actions -> **Approved Reconcile Staging Into Development** -> Run workflow.
+
+| Input | Value |
+| --- | --- |
+| `reconciliation_approval_statement` | `RECONCILE STAGING INTO DEVELOPMENT` |
+
+The workflow verifies the approval statement, then opens (or reuses) a draft pull request with
+`staging` as head and `development` as base. It never merges automatically and never deploys; a
+human must review and merge the pull request.
+
 ## Deployment workflows
 
 **Merging to main is not permission to deploy.** Render auto-deploy is disabled in
@@ -215,6 +233,32 @@ which deploy the approved commit through protected Render deploy hooks.
 
 Deployment approvals are workflow inputs, not chat messages. Every condition is verified against
 the repository, so an unfilled placeholder or an unprovable claim stops the release.
+
+### Protected environment resources
+
+Development and feature branches use local databases and local-only sandbox credentials for every
+supporting app and integration. Staging and production/main each have explicit, dedicated
+environment resources and branch-specific security permissions that must be preserved, including
+but not limited to databases, Stripe, Resend, Sentry, Cloudflare/DNS/WAF, authentication
+providers, analytics/product telemetry, object/file storage, monitoring and alerting, webhook
+endpoints, API credentials and service tokens, service URLs, access policies, role assignments,
+and deployment configuration.
+
+A staging or production/main environment resource, integration setting, or security permission
+must never be reset, reseeded, overwritten, repointed, rotated, disabled, downgraded, deleted,
+replaced, weakened, or otherwise destructively changed as part of a routine deployment or
+documentation change. A destructive change requires, and must record in
+[Implementation-Change-Register.md](../Implementation-Change-Register.md):
+
+- explicit Founder/product-owner/release-owner approval
+- the affected environment and resource names, without secret values
+- backup, restore, rollback, or recovery evidence
+- a migration or change plan
+- post-change validation evidence
+- a named release or rollback owner
+
+Secret values are never printed, logged, or committed; records reference only
+environment-variable names, provider names, service names, or configuration categories.
 
 ### Approved Deploy to Staging
 
