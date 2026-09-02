@@ -13,6 +13,13 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-02 - Permanent Development Branch And Staging Reconciliation
+
+- Changed: created a permanent `development` branch (from the current `staging` tip) as the integration branch for day-to-day feature work, which flows into `staging` and then `main`. Added an approval-gated workflow, `.github/workflows/reconcile-staging-to-development.yml`, that opens a draft pull request merging `staging` back into `development` so the branches do not diverge when `staging` moves independently (e.g. hotfixes promoted from `main`, staging record commits). Added `development` to the CI trigger list in `.github/workflows/ci.yml`.
+- Affects: GitHub branch topology and CI/CD workflows only. No application code, database, or environment configuration changed.
+- Environment: no operator action required for this change. If branch protection rules are configured for `main`/`staging`, an operator should add equivalent protection for `development` if desired; this was not done automatically since it requires GitHub repository settings access outside this change set.
+- Validation: `node scripts/health-check/validate-workflows.mjs` passes for all workflow files including the new one. `development` was pushed to `origin` and tracks `origin/development`.
+
 ### 2026-09-02 - Pending Super User Reporting Filters And Aggregate Export
 
 - Changed: Super User analytics and CSV export now accept schema-validated Client, Retailer, tender/quote reference, category, geography, tender/quote status, date range, quoted-value band, membership/subscription plan, and payment-status filters. All filters are translated into typed Prisma relationship predicates at the server boundary; the CSV remains aggregate-only and includes the applied filter values for auditability.

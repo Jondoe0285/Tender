@@ -10,7 +10,7 @@ step can run.
 
 ## Architecture
 
-Seven workflows, each with a single responsibility and its own permission boundary.
+Eight workflows, each with a single responsibility and its own permission boundary.
 
 | Workflow | File | Trigger | May write? | May merge? | May deploy? |
 | --- | --- | --- | --- | --- | --- |
@@ -18,6 +18,7 @@ Seven workflows, each with a single responsibility and its own permission bounda
 | Approved Fix Implementation | `.github/workflows/approved-fix.yml` | Manual only | Fix branch and draft PR only | No | No |
 | Approved Merge to Main | `.github/workflows/approved-merge.yml` | Manual only | Merge request only | Yes, through branch protection | No |
 | Approved Promote to Staging Branch | `.github/workflows/promote-staging-branch.yml` | Manual only | Moves `staging` branch only | No | No |
+| Approved Reconcile Staging Into Development | `.github/workflows/reconcile-staging-to-development.yml` | Manual only | Draft PR only | No | No |
 | Approved Deploy to Staging | `.github/workflows/deploy-staging.yml` | Manual only | Staging record branch only | No | Staging only |
 | Approved Deploy to Production | `.github/workflows/deploy-production.yml` | Manual only | Deployment record artifact only | No | Production only |
 | Break-glass Azure Deployment | `.github/workflows/deploy-azure.yml` | Manual only | No repository writes | No | Production only |
@@ -206,6 +207,23 @@ Actions -> **Approved Promote to Staging Branch** -> Run workflow.
 The promotion workflow verifies the approval statement, confirms the commit exists on `main`,
 confirms `main` has not advanced beyond that commit, and then moves the permanent `staging`
 branch to that exact commit. It does not deploy.
+
+## Development and staging reconciliation
+
+The permanent `development` branch is where day-to-day feature work integrates before it flows
+into `staging` and, ultimately, `main`. Because `staging` can also move independently (staging
+record commits, direct hotfixes promoted from `main`), it must periodically be merged back into
+`development` so the two branches do not diverge.
+
+Actions -> **Approved Reconcile Staging Into Development** -> Run workflow.
+
+| Input | Value |
+| --- | --- |
+| `reconciliation_approval_statement` | `RECONCILE STAGING INTO DEVELOPMENT` |
+
+The workflow verifies the approval statement, then opens (or reuses) a draft pull request with
+`staging` as head and `development` as base. It never merges automatically and never deploys; a
+human must review and merge the pull request.
 
 ## Deployment workflows
 

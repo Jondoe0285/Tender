@@ -1,0 +1,124 @@
+name: Approved Reconcile Staging Into Development
+
+# Opens a draft pull request merging the permanent staging branch back into the permanent
+# development branch. It never merges automatically and never touches main or a deployment.
+on:
+  workflow_dispatch:
+    inputs:
+      reconciliation_approval_statement:
+        description: 'Must be exactly: RECONCILE STAGING INTO DEVELOPMENT'
+        type: string
+        required: true
+
+concurrency:
+  group: reconcile-staging-to-development
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify reconciliation authorisation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Reject an inexact approval statement
+        if: github.event.inputs.reconciliation_approval_statement != 'RECONCILE STAGING INTO DEVELOPMENT'
+        run: |
+          echo "::error::The approval statement must be exactly: RECONCILE STAGING INTO DEVELOPMENT"
+          exit 1
+
+  reconcile:
+    name: Open pull request from staging into development
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout staging
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+
+      - name: Open the reconciliation pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify origin/development >/dev/null 2>&1; then
+            echo "::error::origin/development does not exist. Create the permanent development branch first."
+            exit 1
+          fi
+          AHEAD=$(git rev-list --count origin/development..origin/staging)
+          if [ "$AHEAD" = "0" ]; then
+            echo "::notice::development already contains every commit on staging. No pull request is needed."
+            exit 0
+          fi
+          EXISTING=$(gh pr list --base development --head staging --state open --json url --jq '.[0].url' || true)
+          if [ -n "$EXISTING" ]; then
+            echo "::notice::An open reconciliation pull request already exists: $EXISTING"
+            echo "pr_url=$EXISTING" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          {
+            echo "## Reconcile staging into development"
+            echo ""
+            echo "- Commits on staging not yet on development: $AHEAD"
+            echo "- Authorising actor: @${{ github.actor }}"
+            echo ""
+            echo "This pull request is a draft. Review and merge it manually; this workflow does not merge"
+            echo "automatically and does not deploy."
+          } > "$RUNNER_TEMP/reconcile-pr-body.md"
+          PR_URL=$(gh pr create --draft --base development --head staging \
+            --title "Reconcile staging into development" \
+            --body-file "$RUNNER_TEMP/reconcile-pr-body.md")
+          echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "Draft pull request: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
+
+  notify:
+    name: Email the reconciliation outcome
+    needs: [verify, reconcile]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Send the result
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          HEALTH_REPORT_FROM: ${{ secrets.HEALTH_REPORT_FROM }}
+          HEALTH_REPORT_TO: ${{ secrets.HEALTH_REPORT_TO }}
+        run: |
+          set -euo pipefail
+          if [ "${{ needs.reconcile.result }}" = "success" ]; then
+            SUBJECT="Staging to development reconciliation completed"
+          else
+            SUBJECT="STAGING TO DEVELOPMENT RECONCILIATION BLOCKED"
+          fi
+          BODY=$(printf '%s\n' \
+            "Authorising actor: @${{ github.actor }}" \
+            "Verification: ${{ needs.verify.result }}" \
+            "Reconciliation: ${{ needs.reconcile.result }}" \
+            "" \
+            "This is a draft pull request only. It must be reviewed and merged manually.")
+          npx tsx scripts/health-check/send-workflow-email.ts "$SUBJECT" "$BODY"
