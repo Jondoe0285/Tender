@@ -40,6 +40,9 @@ export function SiteFooter() {
             <a href="https://www.smartworkscivils.com" target="_blank" rel="noreferrer" className="flex min-h-20 items-center bg-white p-3 outline-offset-4 hover:ring-2 hover:ring-hi-viz-tint" aria-label="Visit Smart Works Civils Ltd">
               <Image src="/images/Smart%20Works%20Civils%20Logo.png" alt="Smart Works Civils Ltd" width={512} height={241} className="h-auto w-full" />
             </a>
+            <div className="flex min-h-20 items-center bg-white p-3" aria-label="HSQE Consult Hub (no website yet)">
+              <Image src="/images/HSQE%20Consult%20Hub%20Logo.png" alt="HSQE Consult Hub" width={420} height={210} className="h-auto w-full" />
+            </div>
           </div>
           <p className="mt-4 max-w-md text-xs leading-relaxed text-site-white/60">
             Partner information is separate from tender matching, quote ranking, supplier selection, and Client decisions.

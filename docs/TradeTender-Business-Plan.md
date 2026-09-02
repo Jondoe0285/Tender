@@ -327,7 +327,7 @@ The Standard launch is the recommended starting point. The Hard campaign can be 
 
 ### Partner Branding and Advertising Links
 
-Include basic partner branding and clearly labelled links for Sinclair Safety Solutions Ltd and Smart Works Civils Ltd. Partner visibility must remain separate from tender matching, quote ranking, supplier selection, and Client decision-making. The Super User manages partner names, locations, destination links, active status, and display positions.
+Include basic partner branding and clearly labelled links for Sinclair Safety Solutions Ltd, Smart Works Civils Ltd, and HSQE Consult Hub. HSQE Consult Hub does not yet have a website, so its logo is displayed without a destination link until one is provided. Partner visibility must remain separate from tender matching, quote ranking, supplier selection, and Client decision-making. The Super User manages partner names, locations, destination links, active status, and display positions.
 
 ### Website Footer and Public Policy Documents
 

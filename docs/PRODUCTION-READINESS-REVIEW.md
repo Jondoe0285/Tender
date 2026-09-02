@@ -44,7 +44,7 @@ This is a point-in-time gap analysis, not a repeat of the earlier technical revi
 
 3. **Partner advertising is static, not Super-User-managed (§10).** The plan requires the Super User to
    "manage partner names, locations, destination links, active status, and display positions." Sinclair Safety
-   Solutions Ltd and Smart Works Civils Ltd are currently hardcoded in
+   Solutions Ltd, Smart Works Civils Ltd, and HSQE Consult Hub are currently hardcoded in
    [src/components/layout/SiteFooter.tsx](../src/components/layout/SiteFooter.tsx). This was already tracked
    as an outstanding README item; re-confirmed here as a direct business-plan requirement, not just a "nice to
    have."

@@ -13,6 +13,13 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-02 - Add HSQE Consult Hub As Third Named Partner
+
+- Changed: added HSQE Consult Hub as a third clearly labelled partner alongside Sinclair Safety Solutions Ltd and Smart Works Civils Ltd. HSQE Consult Hub does not yet have a website, so its logo is displayed without an outbound link (no `<a>` wrapper) until one is provided.
+- Affects: [src/components/layout/SiteFooter.tsx](../src/components/layout/SiteFooter.tsx) (new logo tile), `public/images/HSQE Consult Hub Logo.png` (copied from the supplied `docs/branding/HSQE_ConsultHub_Stacked_Light.png`), [docs/TradeTender-Business-Plan.md](TradeTender-Business-Plan.md), [docs/branding/TradeTender-Brand-Rules.md](branding/TradeTender-Brand-Rules.md), [docs/Product-Requirements.md](Product-Requirements.md) (FR-090), and [docs/PRODUCTION-READINESS-REVIEW.md](PRODUCTION-READINESS-REVIEW.md).
+- Environment: no operator action; no environment resource, credential, or database change. Static UI/content change only.
+- Validation: `npm run type-check` and `npm run lint` pass. Add a website link once HSQE Consult Hub provides one.
+
 ### 2026-09-02 - Environment And Branch Resource Preservation Requirement
 
 - Changed: added a permanent governance rule distinguishing local development/feature resources from protected staging and production/main environment resources. Development and feature branches must use only local databases and local-only sandbox credentials/settings. Staging and production/main branches each have explicit, dedicated environment resources and branch-specific security permissions (databases, Stripe, Resend, Sentry, Cloudflare/DNS/WAF, authentication providers, analytics/telemetry, storage, monitoring, webhooks, API credentials, service URLs, access policies, role assignments, deployment configuration, and future integrations) that must never be reset, reseeded, overwritten, repointed, rotated, disabled, downgraded, deleted, replaced, or weakened without recorded Founder/product-owner/release-owner approval, resource identification, backup/rollback evidence, a change plan, post-change validation evidence, and a named release/rollback owner.

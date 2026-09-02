@@ -217,7 +217,7 @@ The Super User can, subject to authorization and audit logging:
 
 ### 5.10 Partners and Public Policies
 
-- **FR-090:** The platform shall support clearly labelled partner or advertising links for Sinclair Safety Solutions Ltd and Smart Works Civils Ltd.
+- **FR-090:** The platform shall support clearly labelled partner or advertising links for Sinclair Safety Solutions Ltd, Smart Works Civils Ltd, and HSQE Consult Hub (displayed without a link until it has a website).
 - **FR-091:** Partner visibility shall remain separate from matching, quote ranking, supplier selection, and Client decisions.
 - **FR-092:** The Super User shall manage partner names, display positions, destination links, active state, and labels.
 - **FR-093:** Public links shall be available to relevant users for platform, Client, Retailer, privacy, cookie, quote retention, payment/refund, contact-release, acceptable-use, advertising, complaints, and accessibility policies.
