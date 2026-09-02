@@ -40,6 +40,22 @@ export function ExecutiveDashboard({ data }: Props) {
 
       <form method="get" className="mb-8 grid gap-4 rounded-card border border-slate-200 bg-white p-5 shadow-soft sm:grid-cols-4">
         <label className="flex flex-col gap-2 text-sm font-semibold text-foundation-navy">
+          Client
+          <input name="client" defaultValue={data.filters.client ?? ''} placeholder="Name or email" className="h-11 rounded-lg border border-slate-300 px-3 font-normal placeholder:text-concrete-grey/70 focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30" />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-semibold text-foundation-navy">
+          Retailer
+          <input name="retailer" defaultValue={data.filters.retailer ?? ''} placeholder="Name or email" className="h-11 rounded-lg border border-slate-300 px-3 font-normal placeholder:text-concrete-grey/70 focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30" />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-semibold text-foundation-navy">
+          Tender reference
+          <input name="tenderReference" defaultValue={data.filters.tenderReference ?? ''} placeholder="TND-..." className="h-11 rounded-lg border border-slate-300 px-3 font-normal placeholder:text-concrete-grey/70 focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30" />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-semibold text-foundation-navy">
+          Quote reference
+          <input name="quoteReference" defaultValue={data.filters.quoteReference ?? ''} placeholder="...-Q01" className="h-11 rounded-lg border border-slate-300 px-3 font-normal placeholder:text-concrete-grey/70 focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30" />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-semibold text-foundation-navy">
           From
           <input type="date" name="from" defaultValue={formatDate(data.filters.from)} className="h-11 rounded-lg border border-slate-300 px-3 font-normal focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30" />
         </label>
@@ -57,6 +73,30 @@ export function ExecutiveDashboard({ data }: Props) {
         <label className="flex flex-col gap-2 text-sm font-semibold text-foundation-navy">
           Region
           <input name="region" defaultValue={data.filters.region ?? ''} placeholder="e.g. Leeds" className="h-11 rounded-lg border border-slate-300 px-3 font-normal placeholder:text-concrete-grey/70 focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30" />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-semibold text-foundation-navy">
+          Status
+          <select name="status" defaultValue={data.filters.status ?? ''} className="h-11 rounded-lg border border-slate-300 bg-white px-3 font-normal focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30">
+            <option value="">All statuses</option>
+            <option value="DRAFT">Tender: Draft</option><option value="OPEN">Tender: Open</option><option value="CLOSED">Tender: Closed</option>
+            <option value="SUBMITTED">Quote: Submitted</option><option value="ACCEPTED">Quote: Accepted</option><option value="REJECTED">Quote: Rejected</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-semibold text-foundation-navy">
+          Quoted value
+          <select name="valueBand" defaultValue={data.filters.valueBand ?? ''} className="h-11 rounded-lg border border-slate-300 bg-white px-3 font-normal focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30">
+            <option value="">All values</option><option value="UNDER_1000">Under £1,000</option><option value="1000_TO_4999">£1,000 to £4,999</option><option value="5000_TO_9999">£5,000 to £9,999</option><option value="10000_PLUS">£10,000 and over</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-semibold text-foundation-navy">
+          Subscription plan
+          <input name="subscriptionPlan" defaultValue={data.filters.subscriptionPlan ?? ''} placeholder="Plan or tier" className="h-11 rounded-lg border border-slate-300 px-3 font-normal placeholder:text-concrete-grey/70 focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30" />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-semibold text-foundation-navy">
+          Payment status
+          <select name="paymentStatus" defaultValue={data.filters.paymentStatus ?? ''} className="h-11 rounded-lg border border-slate-300 bg-white px-3 font-normal focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30">
+            <option value="">All payment states</option><option value="PENDING">Pending</option><option value="CONFIRMED">Confirmed</option><option value="FAILED">Failed</option><option value="REFUNDED">Refunded</option><option value="REVERSED">Reversed</option>
+          </select>
         </label>
         <div className="flex items-end gap-3 sm:col-span-4">
           <button type="submit" className="min-h-11 rounded-lg bg-foundation-navy px-5 text-sm font-semibold text-white hover:bg-steel-blue">Apply filters</button>
@@ -145,8 +185,16 @@ function buildExportUrl(filters: AnalyticsData['filters']) {
   const params = new URLSearchParams();
   if (filters.from) params.set('from', formatDate(filters.from));
   if (filters.to) params.set('to', formatDate(filters.to));
+  if (filters.client) params.set('client', filters.client);
+  if (filters.retailer) params.set('retailer', filters.retailer);
+  if (filters.tenderReference) params.set('tenderReference', filters.tenderReference);
+  if (filters.quoteReference) params.set('quoteReference', filters.quoteReference);
   if (filters.category) params.set('category', filters.category);
   if (filters.region) params.set('region', filters.region);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.valueBand) params.set('valueBand', filters.valueBand);
+  if (filters.subscriptionPlan) params.set('subscriptionPlan', filters.subscriptionPlan);
+  if (filters.paymentStatus) params.set('paymentStatus', filters.paymentStatus);
   const query = params.toString();
   return `/api/super-user/analytics/export${query ? `?${query}` : ''}`;
 }

@@ -23,16 +23,24 @@ type CreatePaymentResult = {
  */
 export async function createPayment(params: {
   type: PaymentType;
-  amountGbp: number;
   userId: string;
   tenderId?: string;
   tierId?: string;
   quoteId?: string;
   quotePriceGbp?: number;
 }): Promise<CreatePaymentResult> {
-  const netFeeGbp = params.type === 'CLIENT_RELEASE' && params.quotePriceGbp !== undefined
-    ? await getClientReleaseFeeGbp(params.quotePriceGbp)
-    : await getPaymentFeeGbp(params.type);
+  let netFeeGbp: number;
+  if (params.type === 'MEMBERSHIP_TIER') {
+    const tier = params.tierId
+      ? await prisma.membershipTier.findUnique({ where: { id: params.tierId }, select: { monthlyPriceGbp: true, active: true } })
+      : null;
+    if (!tier?.active) throw new Error('Membership tier is not available');
+    netFeeGbp = tier.monthlyPriceGbp;
+  } else {
+    netFeeGbp = params.type === 'CLIENT_RELEASE' && params.quotePriceGbp !== undefined
+      ? await getClientReleaseFeeGbp(params.quotePriceGbp)
+      : await getPaymentFeeGbp(params.type);
+  }
   const vatPercentage = await getVatPercentage();
   const { amountGbp, vatGbp, totalAmountGbp, netPence, vatPence } = buildPaymentAmounts(netFeeGbp, vatPercentage);
   const payment = await prisma.payment.create({

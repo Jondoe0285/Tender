@@ -12,7 +12,7 @@ export async function requestSponsoredPlacement(retailerId: string) {
   if (!await sponsoredPlacementEnabled()) throw new ForbiddenError('Sponsored placement is not active');
   const existing = await prisma.retailerSponsoredPlacement.findFirst({ where: { retailerId, active: true } });
   if (existing) return { status: 'ACTIVE' as const };
-  const payment = await createPayment({ type: 'SPONSORED_PLACEMENT', amountGbp: await getPaymentFeeGbp('SPONSORED_PLACEMENT'), userId: retailerId });
+  const payment = await createPayment({ type: 'SPONSORED_PLACEMENT', userId: retailerId });
   return { status: 'PAYMENT_REQUIRED' as const, ...payment };
 }
 

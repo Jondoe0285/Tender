@@ -24,7 +24,7 @@ export async function requestMembershipTierPurchase(retailerId: string, tierId: 
   if (!tier || !tier.active) throw new ForbiddenError('Membership tier is not available');
   const existing = await prisma.retailerMembership.findUnique({ where: { retailerId_tierId: { retailerId, tierId } } });
   if (existing?.active) return { status: 'ACTIVE' as const };
-  const payment = await createPayment({ type: 'MEMBERSHIP_TIER', amountGbp: tier.monthlyPriceGbp, userId: retailerId, tierId });
+  const payment = await createPayment({ type: 'MEMBERSHIP_TIER', userId: retailerId, tierId });
   return { status: 'PAYMENT_REQUIRED' as const, ...payment };
 }
 

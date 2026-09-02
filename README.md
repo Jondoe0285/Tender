@@ -52,45 +52,57 @@ Work top to bottom — production config first, then engineering debt. Items tha
   revocation and multi-role regression tests.
 - [ ] **Move rate limiting to shared storage and add per-account lockout.** The current in-process,
   IP-only limiter does not protect across Render instances or deployment restarts.
-- [ ] **Plan a tested Next.js 16 upgrade.** `npm audit` still reports high-severity advisories that
-  cannot be fixed on the currently installed Next.js 14 line.
+- [ ] **Plan a tested Next.js 16 upgrade.** Deferred: complete the dependency upgrade first in the
+  development branch. The plan is recorded in
+  [Implementation-Change-Register.md](docs/Implementation-Change-Register.md); retain its Node 20,
+  migration replay, build, and staging verification requirements before deployment.
 - [ ] **Add integration/E2E tests** for tender unlock, payment, webhook, contact release, and
-  pre-payment privacy invariants.
+  pre-payment privacy invariants. Initial PostgreSQL coverage is in
+  `tests/lib/message-contact-release.integration.test.ts`: it verifies that a Retailer with a
+  tender unlock cannot read or send messages until the Client release payment is confirmed and
+  the matching contact-release record exists. Payment, webhook, reversal, and other workflow
+  scenarios remain outstanding.
 - [ ] **Complete accessibility and real-device QA**, including the mobile sidebar and first-time
   Client/Retailer journeys.
-- [ ] **Restrict matching to eligible geographic coverage.** Tender matches are currently created
-  by category only; location restricts notification emails but not visibility, payment, or quoting.
-  Apply coverage rules when creating and refreshing matches, and test that out-of-area Retailers
-  cannot view, unlock, or quote a tender.
-- [ ] **Deliver authorised post-unlock attachment access.** Tender attachments are stored but are
-  absent from the unlocked tender response and have no protected download path. Add a no-store,
-  audited download endpoint that requires the matched Retailer unlock, with retention-aware access
-  tests.
-- [ ] **Harden tender attachment validation and request limits.** Validate decoded byte length rather
-  than client-supplied metadata, impose aggregate request limits, and accept only a small
-  server-verified file-type/signature allowlist. Test size mismatches, MIME spoofing, active
-  content, and aggregate limits.
-- [ ] **Add auditable legal holds to retention.** The 30-day purge deletes unaccepted quotes and
-  unlocked attachments without a dispute, investigation, or legal-hold exclusion. Add migration-
-  backed hold metadata and events, exclude held data from purge queries, and test hold lifecycle
-  and retention decisions.
-- [ ] **Gate inactive membership allowances.** Existing active membership tiers can grant free
-  tender unlocks even while membership functionality is disabled, conflicting with the active
-  pay-per-unlock pricing model. Remove or feature-gate membership entitlement calculation until
-  formally approved; test existing-tier behaviour while disabled.
-- [ ] **Correct future membership payment pricing before activation.** Membership payment creation
-  currently disregards the tier amount and uses the Client release fee. Keep memberships inactive
-  and, before activation, calculate the validated server-side tier price with explicit payment
-  support and billing tests.
-- [ ] **Complete contact-release audit records.** Record both party IDs, released-data category,
-  release timestamp, authorising payment, and correlation ID; minimise avoidable personal data and
-  test the immutable event contents.
-- [ ] **Improve audit-log tamper resistance.** Audit events are normal application writes with no
-  database-level immutability boundary. Restrict writes to a dedicated role and add database
-  protections or a ledger-style mechanism appropriate to the retention requirement.
-- [ ] **Expand Super User reporting filters and exports.** Required Client, Retailer, tender/quote
-  identifier, status, payment status, value-band, and subscription-plan filters are missing.
-  Extend the authorised query, dashboard, and export paths with integration coverage.
+- [x] **Restrict matching to eligible geographic coverage.** Implemented: tender and tender-item
+  matches now require exact Retailer category capability and raw tender-location coverage at
+  creation and retroactive refresh. Unlock and quote server boundaries recheck those controls, so
+  legacy out-of-area match rows cannot grant paid access or permit quote submission.
+- [x] **Deliver authorised post-unlock attachment access.** Unlocked Retailer tender responses now
+  include attachment metadata only, and a dynamic, no-store download endpoint rechecks the matched
+  Retailer unlock before returning Postgres-backed bytes. Owning Clients may also retrieve their own
+  attachments. Successful downloads are audited; focused PostgreSQL coverage verifies locked Retailers
+  cannot obtain metadata or bytes and deleted attachments are no longer accessible.
+- [x] **Harden tender attachment validation and request limits.** Tender creation now verifies strict
+  base64 decoding, derives stored size from decoded bytes, limits each attachment to 10 MiB and each
+  request to 10 attachments/25 MiB total, and permits only signature-verified PDF, PNG, and JPEG
+  files whose MIME type and extension match. Active PDF markers, unsupported types, malformed base64,
+  and MIME spoofing are rejected server-side.
+- [x] **Add auditable legal holds to retention.** Migration-backed Tender, Quote, and TenderAttachment
+  holds require a documented reason and full Super User authorisation. Create/release events are
+  audited; active direct and tender-level holds exclude unaccepted quotes and attachments from the
+  30-day purge.
+- [x] **Gate inactive membership allowances.** Membership tender allowances now require the
+  Super User `MEMBERSHIP_TIERS_ACTIVE` setting. Existing active tiers cannot bypass the current
+  pay-per-unlock model while the feature is disabled; focused PostgreSQL coverage verifies the
+  disabled-setting path creates a pending unlock payment without releasing tender details.
+- [x] **Correct future membership payment pricing before activation.** Membership payments now
+  resolve the active tier's monthly price at the server payment boundary, rather than accepting a
+  caller-provided amount or using the Client release fee. Membership tiers remain disabled by
+  default; focused PostgreSQL billing coverage verifies the disabled gate and tier net/VAT/gross
+  payment values.
+- [x] **Complete contact-release audit records.** Each release now creates a transaction-backed,
+  immutable event recording the actor, both party IDs, tender/quote IDs, released-data category,
+  release timestamp, authorising payment, and correlation ID. Event records contain no contact
+  details; PostgreSQL rejects later update or deletion attempts.
+- [ ] **Improve audit-log tamper resistance.** Deferred: complete this migration-backed work in
+  the development branch before promotion. Use an append-only database boundary that permits
+  application inserts but rejects unauthorised updates and deletes, with integration coverage.
+- [x] **Expand Super User reporting filters and exports.** Full Super Users can filter aggregate
+  analytics and CSV exports by Client, Retailer, tender/quote reference, category, geography,
+  tender/quote status, date, quoted-value band, membership/subscription plan, and payment status.
+  All query inputs are schema-validated server-side; exports retain aggregate-only data and exclude
+  restricted Accountant sub-accounts.
 - [ ] **Fix shared control colour tokens and contrast.** Tailwind maps Trade Blue and Sky Blue to
   misleading token names, producing non-compliant action hierarchy and insufficient text contrast.
   Introduce approved colour tokens, correct button foregrounds, and check all UI states against

@@ -33,6 +33,12 @@ enum QuoteStatus {
   REJECTED
 }
 
+enum LegalHoldScope {
+  TENDER
+  QUOTE
+  TENDER_ATTACHMENT
+}
+
 enum PaymentType {
   RETAILER_UNLOCK
   CLIENT_RELEASE
@@ -105,6 +111,8 @@ model User {
   clientMessages TenderMessage[] @relation("TenderMessageClient")
   moderationEvents  ModerationEvent[] @relation("ModerationActor")
   reviewedModerationEvents ModerationEvent[] @relation("ModerationReviewer")
+  legalHoldsCreated LegalHold[] @relation("LegalHoldCreatedBy")
+  legalHoldsReleased LegalHold[] @relation("LegalHoldReleasedBy")
 }
 
 model RateLimitEntry {
@@ -361,6 +369,7 @@ model Tender {
   items         TenderItem[]
   attachments   TenderAttachment[]
   messages      TenderMessage[]
+  legalHolds    LegalHold[] @relation("LegalHoldTender")
 }
 
 model TenderMessage {
@@ -389,6 +398,7 @@ model TenderAttachment {
   content     Bytes
   uploadedAt  DateTime @default(now())
   retentionLockedUntil DateTime?
+  legalHolds  LegalHold[] @relation("LegalHoldTenderAttachment")
 }
 
 model TenderItem {
@@ -461,6 +471,31 @@ model Quote {
   releasePayment Payment? @relation("QuoteReleasePayment")
   lines        QuoteLine[]
   charges      QuoteCharge[]
+  legalHolds   LegalHold[] @relation("LegalHoldQuote")
+}
+
+model LegalHold {
+  id           String         @id @default(cuid())
+  scope        LegalHoldScope
+  targetId     String
+  reason       String
+  createdById  String
+  createdBy    User           @relation("LegalHoldCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime       @default(now())
+  releasedById String?
+  releasedBy   User?          @relation("LegalHoldReleasedBy", fields: [releasedById], references: [id])
+  releasedAt   DateTime?
+  releaseReason String?
+  tenderId     String?
+  tender       Tender?        @relation("LegalHoldTender", fields: [tenderId], references: [id], onDelete: SetNull)
+  quoteId      String?
+  quote        Quote?         @relation("LegalHoldQuote", fields: [quoteId], references: [id], onDelete: SetNull)
+  attachmentId String?
+  attachment   TenderAttachment? @relation("LegalHoldTenderAttachment", fields: [attachmentId], references: [id], onDelete: SetNull)
+
+  @@index([tenderId, releasedAt])
+  @@index([quoteId, releasedAt])
+  @@index([attachmentId, releasedAt])
 }
 
 model QuoteCharge {
@@ -540,6 +575,24 @@ model ContactRelease {
   releasedAt          DateTime @default(now())
   authorizingPaymentId String
   authorizingPayment  Payment  @relation(fields: [authorizingPaymentId], references: [id])
+}
+
+model ContactReleaseAuditEvent {
+  id                   String   @id @default(cuid())
+  contactReleaseId     String   @unique
+  actorId              String
+  tenderId             String
+  quoteId              String   @unique
+  clientId             String
+  retailerId           String
+  releasedDataCategory String
+  releasedAt           DateTime
+  authorizingPaymentId String
+  correlationId        String   @unique
+  createdAt            DateTime @default(now())
+
+  @@index([authorizingPaymentId])
+  @@index([clientId, retailerId])
 }
 
 model AuditLog {

@@ -1,12 +1,23 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createTenderSchema } from '../../src/lib/schemas/tender';
-import { buildRetailerTenderSummary, formatRetailerSummaryLocation } from '../../src/server/domain/tenderService';
+import { buildRetailerTenderSummary, formatRetailerSummaryLocation, retailerCanMatchTender } from '../../src/server/domain/tenderService';
 import { getBroadLocation, getPostcodeDistrict, retailerCoversTenderLocation } from '../../src/lib/geography';
 import { isQuoteRetentionLocked } from '../../src/server/domain/quoteService';
-import { getPurchasedRetentionDeadline, getUnpurchasedQuoteCutoff } from '../../src/server/domain/retentionService';
+import { expiredAttachmentPurgeWhere, expiredQuotePurgeWhere, getPurchasedRetentionDeadline, getUnpurchasedQuoteCutoff } from '../../src/server/domain/retentionService';
 import { calculatePercentageFee, calculateVatGbp, buildPaymentAmounts } from '../../src/server/domain/platformSettings';
 import { getFinancialQuarter } from '../../src/server/domain/analyticsService';
+
+const VALID_TENDER = {
+  projectName: 'Warehouse concrete supply',
+  category: 'Materials',
+  subcategory: 'Aggregates',
+  location: 'Leeds LS10 2AB',
+  quantity: '20 tonnes',
+  urgency: 'standard' as const,
+  closingDate: '2099-08-27',
+  description: 'Twenty tonnes of aggregate with delivery to the project site.',
+};
 
 test('removes raw requirement detail from pre-unlock retailer summaries', () => {
   const summary = buildRetailerTenderSummary('Full specification: 40mm concrete, 3-week delivery window, site access required');
@@ -32,18 +43,38 @@ test('uses the raw delivery postcode for coverage matching before location is re
 });
 
 test('requires a UK postcode in a tender location', () => {
-  const base = {
-    projectName: 'Warehouse concrete supply',
-    category: 'Materials',
-    subcategory: 'Aggregates',
-    quantity: '20 tonnes',
-    urgency: 'standard' as const,
-    closingDate: '2099-08-27',
-    description: 'Twenty tonnes of aggregate with delivery to the project site.',
-  };
+  assert.equal(createTenderSchema.safeParse({ ...VALID_TENDER, location: 'Leeds' }).success, false);
+  assert.equal(createTenderSchema.safeParse(VALID_TENDER).success, true);
+});
 
-  assert.equal(createTenderSchema.safeParse({ ...base, location: 'Leeds' }).success, false);
-  assert.equal(createTenderSchema.safeParse({ ...base, location: 'Leeds LS10 2AB' }).success, true);
+test('derives attachment size from decoded content rather than client metadata', () => {
+  const result = createTenderSchema.safeParse({
+    ...VALID_TENDER,
+    attachments: [{
+      name: 'site-plan.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 1,
+      dataBase64: Buffer.from('%PDF-1.7\nTender plan').toString('base64'),
+    }],
+  });
+
+  assert.equal(result.success, true);
+  if (result.success) assert.equal(result.data.attachments[0]?.sizeBytes, Buffer.byteLength('%PDF-1.7\nTender plan'));
+});
+
+test('rejects tender attachments over the aggregate decoded-byte limit', () => {
+  const attachmentBytes = Buffer.alloc(9 * 1024 * 1024);
+  Buffer.from('%PDF-').copy(attachmentBytes);
+  const attachment = {
+    name: 'site-plan.pdf',
+    mimeType: 'application/pdf',
+    sizeBytes: 0,
+    dataBase64: attachmentBytes.toString('base64'),
+  };
+  const result = createTenderSchema.safeParse({ ...VALID_TENDER, attachments: [attachment, attachment, attachment] });
+
+  assert.equal(result.success, false);
+  if (!result.success) assert.equal(result.error.issues.some((issue) => issue.message.includes('25 MiB')), true);
 });
 
 test('matches a tender location against a Retailer\'s selected counties or regions without requiring postcodes', () => {
@@ -78,6 +109,20 @@ test('matches any UK postcode when a Retailer covers the whole UK', () => {
   assert.equal(retailerCoversTenderLocation(retailer, 'Cardiff CF10 1AA'), true);
 });
 
+test('requires both exact retailer capability and configured coverage before creating tender matches', () => {
+  const eligibleRetailer = {
+    coverageScope: 'REGION',
+    counties: '',
+    regions: 'Yorkshire and The Humber',
+    categories: 'Materials, Plant hire',
+  };
+
+  assert.equal(retailerCanMatchTender(eligibleRetailer, 'Leeds LS10 2AB', ['Materials']), true);
+  assert.equal(retailerCanMatchTender(eligibleRetailer, 'Bristol BS1 4DJ', ['Materials']), false);
+  assert.equal(retailerCanMatchTender(eligibleRetailer, 'Leeds LS10 2AB', ['Waste']), false);
+  assert.equal(retailerCanMatchTender({ ...eligibleRetailer, categories: 'Material' }, 'Leeds LS10 2AB', ['Materials']), false);
+});
+
 test('does not match when a Retailer has not configured any counties or regions', () => {
   assert.equal(retailerCoversTenderLocation({ coverageScope: 'COUNTY', counties: '', regions: '' }, 'Leeds LS10 2AB'), false);
   assert.equal(retailerCoversTenderLocation({ coverageScope: 'REGION', counties: '', regions: '' }, 'Leeds LS10 2AB'), false);
@@ -101,6 +146,15 @@ test('sets purchased document retention for five years', () => {
   const now = new Date('2026-08-28T12:00:00.000Z');
 
   assert.equal(getPurchasedRetentionDeadline(now).toISOString(), '2031-08-28T12:00:00.000Z');
+});
+
+test('excludes active direct and tender legal holds from retention purge decisions', () => {
+  const cutoff = new Date('2026-07-29T12:00:00.000Z');
+
+  assert.deepEqual(expiredQuotePurgeWhere(cutoff).legalHolds, { none: { releasedAt: null } });
+  assert.deepEqual(expiredQuotePurgeWhere(cutoff).tender, { legalHolds: { none: { releasedAt: null } } });
+  assert.deepEqual(expiredAttachmentPurgeWhere(cutoff).legalHolds, { none: { releasedAt: null } });
+  assert.deepEqual(expiredAttachmentPurgeWhere(cutoff).tender, { legalHolds: { none: { releasedAt: null } } });
 });
 
 test('uses separate percentage bands at the £10,000 quote boundary', () => {

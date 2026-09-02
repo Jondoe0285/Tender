@@ -3,14 +3,8 @@ import { Prisma } from '@prisma/client';
 import { createPayment } from '@/server/payments/paymentService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { ForbiddenError } from '@/server/auth/session';
-import { assertTenderOpenForActivity } from '@/server/domain/tenderService';
-
-async function assertMatched(tenderId: string, retailerId: string) {
-  const match = await prisma.tenderMatch.findUnique({
-    where: { tenderId_retailerId: { tenderId, retailerId } },
-  });
-  if (!match) throw new ForbiddenError('Tender is not matched to this Retailer');
-}
+import { assertRetailerEligibleForTender, assertTenderOpenForActivity } from '@/server/domain/tenderService';
+import { membershipTiersEnabled } from '@/server/domain/membershipService';
 
 type UnlockOutcome =
   | { status: 'ALREADY_UNLOCKED' }
@@ -19,7 +13,7 @@ type UnlockOutcome =
 
 /** Sole entry point for changing tender visibility for a Retailer (SEC-032/033). */
 export async function requestUnlock(retailerId: string, tenderId: string): Promise<UnlockOutcome> {
-  await assertMatched(tenderId, retailerId);
+  await assertRetailerEligibleForTender(retailerId, tenderId);
   await assertTenderOpenForActivity(tenderId);
 
   const existing = await prisma.unlock.findUnique({
@@ -47,30 +41,32 @@ export async function requestUnlock(retailerId: string, tenderId: string): Promi
     }
   }
 
-  const currentMonthStart = new Date();
-  currentMonthStart.setUTCDate(1);
-  currentMonthStart.setUTCHours(0, 0, 0, 0);
-  const membership = await prisma.retailerMembership.findFirst({
-    where: { retailerId, active: true, tier: { active: true } },
-    include: { tier: true },
-    orderBy: { assignedAt: 'desc' },
-  });
-  if (membership && membership.tier.freeTenderOpportunitiesPerMonth > 0) {
-    const monthlyUnlockCount = await prisma.unlock.count({ where: { retailerId, unlockedAt: { gte: currentMonthStart } } });
-    if (monthlyUnlockCount < membership.tier.freeTenderOpportunitiesPerMonth) {
-      await prisma.unlock.create({ data: { tenderId, retailerId, method: 'CREDIT' } });
-      await recordAuditEvent({ actorId: retailerId, action: 'TENDER_UNLOCKED', targetType: 'Tender', targetId: tenderId, metadata: { method: 'MEMBERSHIP', tierId: membership.tierId, monthlyAllowance: membership.tier.freeTenderOpportunitiesPerMonth } });
-      return { status: 'UNLOCKED_WITH_CREDIT' };
+  if (await membershipTiersEnabled()) {
+    const currentMonthStart = new Date();
+    currentMonthStart.setUTCDate(1);
+    currentMonthStart.setUTCHours(0, 0, 0, 0);
+    const membership = await prisma.retailerMembership.findFirst({
+      where: { retailerId, active: true, tier: { active: true } },
+      include: { tier: true },
+      orderBy: { assignedAt: 'desc' },
+    });
+    if (membership && membership.tier.freeTenderOpportunitiesPerMonth > 0) {
+      const monthlyUnlockCount = await prisma.unlock.count({ where: { retailerId, unlockedAt: { gte: currentMonthStart } } });
+      if (monthlyUnlockCount < membership.tier.freeTenderOpportunitiesPerMonth) {
+        await prisma.unlock.create({ data: { tenderId, retailerId, method: 'CREDIT' } });
+        await recordAuditEvent({ actorId: retailerId, action: 'TENDER_UNLOCKED', targetType: 'Tender', targetId: tenderId, metadata: { method: 'MEMBERSHIP', tierId: membership.tierId, monthlyAllowance: membership.tier.freeTenderOpportunitiesPerMonth } });
+        return { status: 'UNLOCKED_WITH_CREDIT' };
+      }
     }
   }
 
-  const payment = await createPayment({ type: 'RETAILER_UNLOCK', amountGbp: 0, userId: retailerId, tenderId });
+  const payment = await createPayment({ type: 'RETAILER_UNLOCK', userId: retailerId, tenderId });
   return { status: 'PAYMENT_REQUIRED', ...payment };
 }
 
 /** Called only after the payment is CONFIRMED (via webhook or the dev-only confirm route). */
 export async function finalizeUnlockWithPayment(retailerId: string, tenderId: string, paymentId: string) {
-  await assertMatched(tenderId, retailerId);
+  await assertRetailerEligibleForTender(retailerId, tenderId);
   await assertTenderOpenForActivity(tenderId);
 
   const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
@@ -127,6 +123,10 @@ export async function getUnlockedTenderForRetailer(retailerId: string, tenderId:
       description: true,
       status: true,
       createdAt: true,
+      attachments: {
+        select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
+        orderBy: { uploadedAt: 'asc' },
+      },
       items: {
         select: { id: true, category: true, subcategory: true, item: true, quantity: true, description: true },
         orderBy: { createdAt: 'asc' },

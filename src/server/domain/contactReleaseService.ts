@@ -1,5 +1,6 @@
 import { prisma } from '@/server/data/prisma';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { createPayment } from '@/server/payments/paymentService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { ForbiddenError } from '@/server/auth/session';
@@ -77,7 +78,7 @@ export async function acceptQuote(clientId: string, quoteId: string): Promise<Ac
 
   let payment: AcceptOutcome;
   try {
-    payment = { status: 'PAYMENT_REQUIRED', ...(await createPayment({ type: 'CLIENT_RELEASE', amountGbp: releaseFeeGbp, userId: clientId, quoteId, quotePriceGbp: quote.priceGbp })), feeGbp: releaseFeeGbp };
+    payment = { status: 'PAYMENT_REQUIRED', ...(await createPayment({ type: 'CLIENT_RELEASE', userId: clientId, quoteId, quotePriceGbp: quote.priceGbp })), feeGbp: releaseFeeGbp };
   } catch (error) {
     // A concurrent accept already created the release payment (Payment.quoteId is unique) — return it instead of failing.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -109,14 +110,51 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
 
   let release;
   try {
-    release = await prisma.contactRelease.create({
-      data: {
-        tenderId: quote.tenderId,
-        quoteId,
-        clientId,
-        retailerId: quote.retailerId,
-        authorizingPaymentId: paymentId,
-      },
+    const releasedAt = new Date();
+    const correlationId = randomUUID();
+    release = await prisma.$transaction(async (transaction) => {
+      const createdRelease = await transaction.contactRelease.create({
+        data: {
+          tenderId: quote.tenderId,
+          quoteId,
+          clientId,
+          retailerId: quote.retailerId,
+          releasedAt,
+          authorizingPaymentId: paymentId,
+        },
+      });
+      await transaction.contactReleaseAuditEvent.create({
+        data: {
+          contactReleaseId: createdRelease.id,
+          actorId: clientId,
+          tenderId: quote.tenderId,
+          quoteId,
+          clientId,
+          retailerId: quote.retailerId,
+          releasedDataCategory: 'CONTACT_DETAILS',
+          releasedAt,
+          authorizingPaymentId: paymentId,
+          correlationId,
+        },
+      });
+      await transaction.auditLog.create({
+        data: {
+          actorId: clientId,
+          action: 'CONTACT_RELEASED',
+          targetType: 'Quote',
+          targetId: quoteId,
+          metadata: JSON.stringify({
+            tenderId: quote.tenderId,
+            clientId,
+            retailerId: quote.retailerId,
+            releasedDataCategory: 'CONTACT_DETAILS',
+            releasedAt: releasedAt.toISOString(),
+            authorizingPaymentId: paymentId,
+            correlationId,
+          }),
+        },
+      });
+      return createdRelease;
     });
   } catch (error) {
     // The quoteId unique constraint rejects a concurrent duplicate finalisation; return the row it created.
@@ -126,14 +164,6 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
     }
     throw error;
   }
-
-  await recordAuditEvent({
-    actorId: clientId,
-    action: 'CONTACT_RELEASED',
-    targetType: 'Quote',
-    targetId: quoteId,
-    metadata: { tenderId: quote.tenderId, authorizingPaymentId: paymentId },
-  });
 
   const parties = await prisma.user.findMany({
     where: { id: { in: [clientId, quote.retailerId] } },

@@ -1,25 +1,26 @@
 import { NextResponse } from 'next/server';
 import { getAnalytics, parseAnalyticsFilters } from '@/server/domain/analyticsService';
-import { getCurrentUser } from '@/server/auth/session';
+import { requireFullSuperUser } from '@/server/auth/session';
 
 function csvCell(value: string | number) {
   return `"${String(value).replace(/"/g, '""')}"`;
 }
 
 export async function GET(request: Request) {
-  const user = await getCurrentUser();
-  if (!user || user.role !== 'SUPER_USER') {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  }
+  const user = await requireFullSuperUser().catch(() => null);
+  if (!user) return NextResponse.json({ error: 'Super User access required' }, { status: 403 });
 
   const url = new URL(request.url);
   const searchParams: Record<string, string> = {};
   url.searchParams.forEach((value, key) => {
     searchParams[key] = value;
   });
-  const data = await getAnalytics(parseAnalyticsFilters(searchParams));
+  const filters = parseAnalyticsFilters(searchParams);
+  const data = await getAnalytics(filters);
   const rows = [
     ['Metric', 'Value'],
+    ...Object.entries(filters).map(([key, value]) => [key, value instanceof Date ? value.toISOString().slice(0, 10) : value]),
+    [],
     ['New tenders', data.totals.newTenders],
     ['Tender volume', data.totals.tenderVolume],
     ['Retailer unlocks', data.totals.retailerUnlocks],

@@ -15,19 +15,34 @@ export function getPurchasedRetentionDeadline(now = new Date()): Date {
   return deadline;
 }
 
+export function expiredQuotePurgeWhere(cutoff: Date) {
+  return {
+    submittedAt: { lt: cutoff },
+    status: { not: 'ACCEPTED' as const },
+    releases: { none: {} },
+    legalHolds: { none: { releasedAt: null } },
+    tender: { legalHolds: { none: { releasedAt: null } } },
+  };
+}
+
+export function expiredAttachmentPurgeWhere(cutoff: Date) {
+  return {
+    uploadedAt: { lt: cutoff },
+    retentionLockedUntil: null,
+    legalHolds: { none: { releasedAt: null } },
+    tender: { legalHolds: { none: { releasedAt: null } } },
+  };
+}
+
 export async function purgeExpiredUnpurchasedQuotes(now = new Date()): Promise<{ quotesDeleted: number; documentsDeleted: number }> {
   const cutoff = getUnpurchasedQuoteCutoff(now);
   const quotes = await prisma.quote.findMany({
-    where: {
-      submittedAt: { lt: cutoff },
-      status: { not: 'ACCEPTED' },
-      releases: { none: {} },
-    },
+    where: expiredQuotePurgeWhere(cutoff),
     select: { id: true, reference: true, tenderId: true, submittedAt: true },
   });
 
   const attachments = await prisma.tenderAttachment.findMany({
-    where: { uploadedAt: { lt: cutoff }, retentionLockedUntil: null },
+    where: expiredAttachmentPurgeWhere(cutoff),
     select: { id: true, fileName: true, tenderId: true, uploadedAt: true },
   });
 

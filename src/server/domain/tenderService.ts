@@ -7,6 +7,40 @@ import { enforceContentModeration } from '@/server/moderation/contentModeration'
 import { retailerCoversTenderLocation, getBroadLocation, getPostcodeDistrict } from '@/lib/geography';
 import { ForbiddenError } from '@/server/auth/session';
 
+type RetailerTenderEligibilityProfile = {
+  coverageScope: string;
+  counties: string;
+  regions: string;
+  categories: string;
+};
+
+export function retailerCanMatchTender(
+  retailer: RetailerTenderEligibilityProfile,
+  tenderLocation: string,
+  tenderCategories: readonly string[]
+): boolean {
+  const retailerCategories = retailer.categories.split(',').map((value) => value.trim()).filter(Boolean);
+  return retailerCoversTenderLocation(retailer, tenderLocation)
+    && tenderCategories.some((category) => retailerCategories.includes(category));
+}
+
+/** Rechecks the mutable retailer capability and coverage controls before paid tender activity. */
+export async function assertRetailerEligibleForTender(retailerId: string, tenderId: string): Promise<void> {
+  const [match, profile] = await Promise.all([
+    prisma.tenderMatch.findUnique({
+      where: { tenderId_retailerId: { tenderId, retailerId } },
+      include: { tender: { select: { location: true, items: { select: { category: true } } } } },
+    }),
+    prisma.retailerProfile.findUnique({
+      where: { userId: retailerId },
+      select: { coverageScope: true, counties: true, regions: true, categories: true },
+    }),
+  ]);
+  if (!match || !profile || !retailerCanMatchTender(profile, match.tender.location, match.tender.items.map((item) => item.category))) {
+    throw new ForbiddenError('Tender is not eligible for this Retailer');
+  }
+}
+
 /** Rejects new tender activity once the tender is closed or its response deadline has passed. */
 export async function assertTenderOpenForActivity(tenderId: string): Promise<void> {
   const tender = await prisma.tender.findFirst({
@@ -84,12 +118,11 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
 
   const tenderItems = await prisma.tenderItem.findMany({ where: { tenderId: tender.id }, orderBy: { createdAt: 'asc' } });
   const services = [...new Set(tenderItems.map((item) => item.category))];
-  // Visibility and unlock eligibility are category-only, regardless of location — location only
-  // determines who is proactively emailed below.
-  const matchedRetailers = await prisma.retailerProfile.findMany({
+  const candidateRetailers = await prisma.retailerProfile.findMany({
     where: { OR: services.map((service) => ({ categories: { contains: service } })) },
     include: { user: { select: { email: true } } },
   });
+  const matchedRetailers = candidateRetailers.filter((retailer) => retailerCanMatchTender(retailer, tender.location, services));
 
   if (matchedRetailers.length > 0) {
     const clientCompany = await prisma.clientCompanyMember.findUnique({ where: { userId: clientId }, select: { company: { select: { tradeTenderId: true } } } });
@@ -114,12 +147,9 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
       metadata: { matchedRetailerCount: uniqueRetailerIds.length, matchedItemCount: itemMatches.length },
     });
 
-    // Email notification stays location-scoped — only Retailers whose coverage includes this
-    // tender's postcode are proactively emailed; others can still find and unlock it themselves.
-    const retailersToNotify = matchedRetailers.filter((retailer) => retailerCoversTenderLocation(retailer, tender.location));
     const notifyByService = new Map<string, typeof matchedRetailers>();
     for (const service of services) {
-      notifyByService.set(service, retailersToNotify.filter((retailer) => retailer.categories.split(',').map((value) => value.trim()).includes(service)));
+      notifyByService.set(service, matchedRetailers.filter((retailer) => retailer.categories.split(',').map((value) => value.trim()).includes(service)));
     }
 
     await Promise.allSettled(
@@ -151,8 +181,8 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
  * Retroactively matches a Retailer to already-open tenders that now qualify under their current
  * categories. Matching normally only runs once, at tender creation time, so this must be called
  * after a Retailer registers or changes their categories/coverage — otherwise they would never
- * see open opportunities that existed before they configured their profile. Visibility is
- * category-only; the Retailer's coverage only determines whether they are also emailed.
+ * see open opportunities that existed before they configured their profile. Category capability
+ * and geographic coverage are both required for visibility and notification.
  */
 export async function matchRetailerToOpenTenders(retailerId: string) {
   const profile = await prisma.retailerProfile.findUnique({ where: { userId: retailerId } });
@@ -178,6 +208,7 @@ export async function matchRetailerToOpenTenders(retailerId: string) {
   const retailer = await prisma.user.findUnique({ where: { id: retailerId }, select: { email: true } });
 
   for (const tender of candidateTenders) {
+    if (!retailerCanMatchTender(profile, tender.location, tender.items.map((item) => item.category))) continue;
     const matchingItems = tender.items.filter((item) => categories.includes(item.category));
 
     await prisma.$transaction([
@@ -194,7 +225,7 @@ export async function matchRetailerToOpenTenders(retailerId: string) {
       metadata: { matchedRetailerCount: 1, matchedItemCount: matchingItems.length, reason: 'RETROACTIVE_COVERAGE_UPDATE' },
     });
 
-    if (!retailer?.email || !retailerCoversTenderLocation(profile, tender.location)) continue;
+    if (!retailer?.email) continue;
     const clientTradeTenderId = tender.client.clientCompanyMembership?.company.tradeTenderId ?? 'Pending assignment';
     for (const item of matchingItems) {
       const result = await sendTenderOpportunityEmail(retailer.email, {
