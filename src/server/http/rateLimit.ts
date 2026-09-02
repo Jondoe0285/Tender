@@ -1,6 +1,5 @@
-const RATE_LIMIT_STORE = new Map<string, number[]>();
-const MAX_TRACKED_KEYS = 10_000;
-const MAX_BUCKET_SIZE = 1_000;
+import { createHash } from 'node:crypto';
+import { prisma } from '@/server/data/prisma';
 
 export type RateLimitOptions = {
   maxRequests: number;
@@ -23,56 +22,43 @@ function getClientKey(headers: Headers): string {
   return 'unknown';
 }
 
-function pruneRateLimitStore(now: number) {
-  if (RATE_LIMIT_STORE.size <= MAX_TRACKED_KEYS) return;
-
-  const entries = [...RATE_LIMIT_STORE.entries()].sort(([, left], [, right]) => (left[0] ?? 0) - (right[0] ?? 0));
-  for (const [key, bucket] of entries) {
-    if (RATE_LIMIT_STORE.size <= MAX_TRACKED_KEYS) break;
-
-    const pruned = bucket.filter((timestamp) => now - timestamp < 60_000);
-    if (pruned.length === 0) {
-      RATE_LIMIT_STORE.delete(key);
-      continue;
-    }
-
-    RATE_LIMIT_STORE.set(key, pruned);
-    if (RATE_LIMIT_STORE.size <= MAX_TRACKED_KEYS) break;
-  }
+function subjectHash(subject: string): string {
+  return createHash('sha256').update(subject).digest('hex');
 }
 
-export function checkRateLimit(headers: Headers, scope: string, options: RateLimitOptions) {
-  const key = `${scope}:${getClientKey(headers)}`;
-  const now = Date.now();
-  const windowMs = options.windowMs;
-  const maxRequests = options.maxRequests;
-  const bucket = RATE_LIMIT_STORE.get(key) ?? [];
-  const filtered = bucket.filter((timestamp) => now - timestamp < windowMs).slice(-MAX_BUCKET_SIZE);
-
-  if (filtered.length === 0) {
-    RATE_LIMIT_STORE.delete(key);
-  } else {
-    RATE_LIMIT_STORE.set(key, filtered);
-  }
-
-  pruneRateLimitStore(now);
-
-  const allowed = filtered.length < maxRequests;
-  if (allowed) {
-    filtered.push(now);
-    RATE_LIMIT_STORE.set(key, filtered);
-    return { allowed: true, retryAfterSeconds: 0 };
-  }
-
-  const oldest = filtered[0] ?? now;
-  const retryAfterSeconds = Math.max(1, Math.ceil((windowMs - (now - oldest)) / 1000));
-  RATE_LIMIT_STORE.set(key, filtered);
-
-  return { allowed: false, retryAfterSeconds };
+export function rateLimitWindow(now: Date, windowMs: number) {
+  const startedAt = new Date(Math.floor(now.getTime() / windowMs) * windowMs);
+  return { startedAt, expiresAt: new Date(startedAt.getTime() + windowMs) };
 }
 
-export function createRateLimitResponse(request: Request, scope: string, options: RateLimitOptions) {
-  const result = checkRateLimit(request.headers, scope, options);
+export async function checkRateLimitSubject(subject: string, scope: string, options: RateLimitOptions, now = new Date()) {
+  const window = rateLimitWindow(now, options.windowMs);
+  const bucket = await prisma.rateLimitBucket.upsert({
+    where: {
+      scope_subjectHash_windowStartedAt: {
+        scope,
+        subjectHash: subjectHash(subject),
+        windowStartedAt: window.startedAt,
+      },
+    },
+    create: { scope, subjectHash: subjectHash(subject), windowStartedAt: window.startedAt, expiresAt: window.expiresAt, count: 1 },
+    update: { count: { increment: 1 } },
+    select: { count: true },
+  });
+  const allowed = bucket.count <= options.maxRequests;
+  return {
+    allowed,
+    count: bucket.count,
+    retryAfterSeconds: allowed ? 0 : Math.max(1, Math.ceil((window.expiresAt.getTime() - now.getTime()) / 1000)),
+  };
+}
+
+export async function checkRateLimit(headers: Headers, scope: string, options: RateLimitOptions) {
+  return checkRateLimitSubject(`ip:${getClientKey(headers)}`, scope, options);
+}
+
+export async function createRateLimitResponse(request: Request, scope: string, options: RateLimitOptions) {
+  const result = await checkRateLimit(request.headers, scope, options);
   if (result.allowed) return null;
 
   return new Response(JSON.stringify({ error: 'Too many requests', retryAfterSeconds: result.retryAfterSeconds }), {
@@ -82,4 +68,36 @@ export function createRateLimitResponse(request: Request, scope: string, options
       'Retry-After': String(result.retryAfterSeconds),
     },
   });
+}
+
+const LOGIN_LOCKOUT = { maxRequests: 10, windowMs: 15 * 60_000 };
+
+export async function isLoginLocked(userId: string, now = new Date()): Promise<boolean> {
+  const lockout = await prisma.loginLockout.findUnique({ where: { userId }, select: { lockedUntil: true } });
+  return Boolean(lockout && lockout.lockedUntil > now);
+}
+
+export async function recordFailedLogin(userId: string, now = new Date()) {
+  const result = await checkRateLimitSubject(`account:${userId}`, 'login-account', LOGIN_LOCKOUT, now);
+  if (result.count < LOGIN_LOCKOUT.maxRequests) return false;
+
+  await prisma.loginLockout.upsert({
+    where: { userId },
+    create: { userId, lockedUntil: new Date(now.getTime() + LOGIN_LOCKOUT.windowMs) },
+    update: { lockedUntil: new Date(now.getTime() + LOGIN_LOCKOUT.windowMs) },
+  });
+  return true;
+}
+
+export async function clearLoginFailures(userId: string) {
+  const accountHash = subjectHash(`account:${userId}`);
+  await prisma.$transaction([
+    prisma.loginLockout.deleteMany({ where: { userId } }),
+    prisma.rateLimitBucket.deleteMany({ where: { scope: 'login-account', subjectHash: accountHash } }),
+  ]);
+}
+
+export async function purgeExpiredRateLimitBuckets(now = new Date()): Promise<number> {
+  const result = await prisma.rateLimitBucket.deleteMany({ where: { expiresAt: { lt: now } } });
+  return result.count;
 }

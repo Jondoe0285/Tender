@@ -11,7 +11,7 @@ import { createRateLimitResponse } from '@/server/http/rateLimit';
 const RESET_REQUEST_RESPONSE = { status: 'reset_link_requested' } as const;
 
 export async function POST(request: Request) {
-  const rateLimitError = createRateLimitResponse(request, 'password-reset-request', { maxRequests: 5, windowMs: 60_000 });
+  const rateLimitError = await createRateLimitResponse(request, 'password-reset-request', { maxRequests: 5, windowMs: 60_000 });
   if (rateLimitError) return rateLimitError;
 
   const originError = rejectCrossOrigin(request);

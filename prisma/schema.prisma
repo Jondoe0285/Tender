@@ -97,6 +97,7 @@ model User {
   clientMessages TenderMessage[] @relation("TenderMessageClient")
   moderationEvents  ModerationEvent[] @relation("ModerationActor")
   reviewedModerationEvents ModerationEvent[] @relation("ModerationReviewer")
+  loginLockout      LoginLockout?
 }
 
 /** In-app route visits, used only to show a Super User which areas an account has been using. */
@@ -517,4 +518,26 @@ model AuditLog {
   targetId   String
   metadata   String?
   createdAt  DateTime @default(now())
+}
+
+model RateLimitBucket {
+  id              String   @id @default(cuid())
+  scope           String
+  subjectHash     String
+  windowStartedAt DateTime
+  expiresAt       DateTime
+  count           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([scope, subjectHash, windowStartedAt])
+  @@index([expiresAt])
+}
+
+model LoginLockout {
+  userId      String   @id
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lockedUntil DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

@@ -11,6 +11,7 @@ Nothing here is done yet. Work top to bottom — production config first, then e
 
 - [ ] **Set production environment variables.** Configure all `sync: false` values in
   [render.yaml](render.yaml), including separate Stripe, Resend, Sentry, and retention secrets.
+  This requires authorized access to the Render dashboard; do not commit or share secret values in chat.
 - [ ] **Configure Stripe.** Add live keys, register a production webhook at
   `/api/webhooks/stripe`, store its signing secret, then test payment confirmation, refund, and
   chargeback handling.
@@ -23,10 +24,6 @@ Nothing here is done yet. Work top to bottom — production config first, then e
 
 ### Engineering Work
 
-- [ ] **Revalidate session claims and shorten session lifetime.** Suspended accounts and revoked Owner
-  flags currently remain effective in a JWT until the default NextAuth expiry.
-- [ ] **Move rate limiting to shared storage and add per-account lockout.** The current in-process,
-  IP-only limiter does not protect across Render instances or deployment restarts.
 - [ ] **Plan a tested Next.js 16 upgrade.** `npm audit` still reports high-severity advisories that
   cannot be fixed on the currently installed Next.js 14 line.
 - [ ] **Add integration/E2E tests** for tender unlock, payment, webhook, contact release, and
@@ -35,6 +32,26 @@ Nothing here is done yet. Work top to bottom — production config first, then e
   Client/Retailer journeys.
 
 ## Completed
+
+<details>
+<summary>Security</summary>
+
+- [x] **Revalidate session claims.** Protected server-side authorization now reloads the account's
+  suspension, role membership, Owner, and Accountant flags from the database on every request.
+- [x] **Add shared rate limiting and account lockout.** Rate-limit counters are stored in PostgreSQL
+  using fixed windows and hashed request identities. Failed account sign-ins are locked for fifteen
+  minutes after ten failures; successful sign-ins clear the lockout state.
+
+</details>
+
+<details>
+<summary>PWA</summary>
+
+- [x] **Make Trade Tender installable as a PWA.** Added the web app manifest, branded maskable
+  icons, iOS web-app metadata, service-worker registration, and an offline fallback. The service
+  worker caches only static assets and never caches API, payment, or authenticated page responses.
+
+</details>
 
 <details>
 <summary>Do Now</summary>

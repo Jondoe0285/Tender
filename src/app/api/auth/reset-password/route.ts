@@ -7,7 +7,7 @@ import { hashPassword } from '@/server/auth/password';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 
 export async function POST(request: Request) {
-  const rateLimitError = createRateLimitResponse(request, 'password-reset', { maxRequests: 5, windowMs: 60_000 });
+  const rateLimitError = await createRateLimitResponse(request, 'password-reset', { maxRequests: 5, windowMs: 60_000 });
   if (rateLimitError) return rateLimitError;
 
   const originError = rejectCrossOrigin(request);

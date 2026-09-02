@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma } from '@/server/data/prisma';
 import { verifyPassword } from '@/server/auth/password';
 import { recordAuditEvent } from '@/server/audit/auditLog';
+import { clearLoginFailures, isLoginLocked, recordFailedLogin } from '@/server/http/rateLimit';
 
 export const authOptions: AuthOptions = {
   session: { strategy: 'jwt' },
@@ -27,10 +28,15 @@ export const authOptions: AuthOptions = {
           where: { email },
           include: { roleMemberships: { select: { role: true } } },
         });
-        if (!user || user.suspended || !user.emailVerifiedAt) return null;
+        if (!user || user.suspended || !user.emailVerifiedAt || await isLoginLocked(user.id)) return null;
 
         const validPassword = await verifyPassword(password, user.passwordHash);
-        if (!validPassword) return null;
+        if (!validPassword) {
+          await recordFailedLogin(user.id);
+          return null;
+        }
+
+        await clearLoginFailures(user.id);
 
         const roles = user.roleMemberships.length > 0
           ? user.roleMemberships.map((membership) => membership.role)

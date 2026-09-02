@@ -21,7 +21,7 @@ async function sendVerificationEmail(userId: string, email: string) {
 }
 
 export async function POST(request: Request) {
-  const rateLimitError = createRateLimitResponse(request, 'register', { maxRequests: 5, windowMs: 60_000 });
+  const rateLimitError = await createRateLimitResponse(request, 'register', { maxRequests: 5, windowMs: 60_000 });
   if (rateLimitError) return rateLimitError;
 
   const originError = rejectCrossOrigin(request);

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { canManageUserAccounts, isManagedAccountRole, canManagePlatformOwnership, isAccountantOnly } from '../../src/lib/admin-permissions';
+import { currentSessionUser } from '../../src/server/auth/session';
 
 test('allows the Super User role to administer account management', () => {
   assert.equal(canManageUserAccounts('SUPER_USER'), true);
@@ -29,4 +30,27 @@ test('only identifies Accountant-flagged Super Users as accountant-only', () => 
   assert.equal(isAccountantOnly({ role: 'RETAILER', isAccountant: true }), false);
   assert.equal(isAccountantOnly(undefined), false);
   assert.equal(isAccountantOnly(null), false);
+});
+
+test('refreshes current authorization claims and rejects suspended accounts', () => {
+  const account = {
+    id: 'user-1',
+    email: 'user@example.test',
+    role: 'CLIENT' as const,
+    isOwner: false,
+    isAccountant: false,
+    suspended: false,
+    roleMemberships: [{ role: 'RETAILER' as const }],
+  };
+
+  assert.deepEqual(currentSessionUser(account, 'RETAILER'), {
+    id: 'user-1',
+    email: 'user@example.test',
+    role: 'RETAILER',
+    roles: ['CLIENT', 'RETAILER'],
+    isOwner: false,
+    isAccountant: false,
+  });
+  assert.equal(currentSessionUser({ ...account, suspended: true }, 'CLIENT'), null);
+  assert.equal(currentSessionUser(account, 'SUPER_USER').role, 'CLIENT');
 });

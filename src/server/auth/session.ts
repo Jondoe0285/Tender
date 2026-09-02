@@ -1,20 +1,53 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/server/auth/auth';
+import { prisma } from '@/server/data/prisma';
 
 export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'CLIENT' | 'RETAILER'; roles: SessionUser['role'][]; isOwner: boolean; isAccountant: boolean };
 
-/** Resolves the authenticated user from the server-side session only — never trust client-supplied identity. */
+type CurrentAccount = {
+  id: string;
+  email: string;
+  role: SessionUser['role'];
+  isOwner: boolean;
+  isAccountant: boolean;
+  suspended: boolean;
+  roleMemberships: { role: SessionUser['role'] }[];
+};
+
+export function currentSessionUser(account: CurrentAccount, requestedRole: SessionUser['role']): SessionUser | null {
+  if (account.suspended) return null;
+
+  const roles = [...new Set([account.role, ...account.roleMemberships.map((membership) => membership.role)])];
+  return {
+    id: account.id,
+    email: account.email,
+    role: roles.includes(requestedRole) ? requestedRole : account.role,
+    roles,
+    isOwner: account.isOwner,
+    isAccountant: account.isAccountant,
+  };
+}
+
+/** Resolves current account claims from the server-side session identity; authorization never trusts stale JWT claims. */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id || !session.user.role) return null;
-  return {
-    id: session.user.id,
-    email: session.user.email ?? '',
-    role: session.user.role as SessionUser['role'],
-    roles: (session.user.roles ?? [session.user.role]) as SessionUser['role'][],
-    isOwner: Boolean(session.user.isOwner),
-    isAccountant: Boolean(session.user.isAccountant),
-  };
+
+  const account = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      isOwner: true,
+      isAccountant: true,
+      suspended: true,
+      roleMemberships: { select: { role: true } },
+    },
+  });
+  if (!account) return null;
+
+  return currentSessionUser(account, session.user.role as SessionUser['role']);
 }
 
 export class UnauthorizedError extends Error {

@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { purgeExpiredUnpurchasedQuotes } from '@/server/domain/retentionService';
+import { purgeExpiredRateLimitBuckets } from '@/server/http/rateLimit';
 import { toErrorResponse } from '@/server/http/errors';
 
 function hasValidJobSecret(request: Request): boolean {
@@ -19,8 +20,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const deletedCount = await purgeExpiredUnpurchasedQuotes();
-    return NextResponse.json({ deletedCount });
+    const [deletedCount, rateLimitBucketsDeleted] = await Promise.all([
+      purgeExpiredUnpurchasedQuotes(),
+      purgeExpiredRateLimitBuckets(),
+    ]);
+    return NextResponse.json({ deletedCount, rateLimitBucketsDeleted });
   } catch (error) {
     return toErrorResponse(error);
   }
