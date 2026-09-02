@@ -3,7 +3,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { getCurrentUser } from '@/server/auth/session';
 import { listMatchedSummariesForRetailer } from '@/server/domain/tenderService';
 import { prisma } from '@/server/data/prisma';
-import { estimateDistanceMiles, retailerCoversTenderLocation } from '@/lib/geography';
+import { estimateDistanceMiles } from '@/lib/geography';
 import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
 import { OpportunitiesExplorer } from '@/components/retailer/OpportunitiesExplorer';
 import type { OpportunityCardData } from '@/components/retailer/TenderOpportunityCard';
@@ -34,16 +34,11 @@ export default async function NewOpportunitiesPage() {
   const hasCredits = (profile?.launchCreditsLeft ?? 0) > 0;
   const coverageAreas = profile?.coverageAreas ?? '';
 
-  const retailerCategories = profile?.categories
-    ? profile.categories.split(',').map((c) => c.trim().toLowerCase()).filter(Boolean)
-    : [];
-
   const opportunities: OpportunityCardData[] = matches
     .filter(({ tender }) => !unlockedIds.has(tender.id))
     .map(({ tender, viewedAt }) => {
-      const categoryMatch =
-        retailerCategories.length === 0 || retailerCategories.includes(tender.category.trim().toLowerCase());
-      const locationMatch = profile != null && retailerCoversTenderLocation(profile, tender.location);
+      const categoryMatch = tender.categoryMatch;
+      const locationMatch = tender.locationMatch;
       const strongMatch = categoryMatch && locationMatch;
 
       return {

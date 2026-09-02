@@ -53,7 +53,7 @@ export function TenderOpportunityCard({ data, href }: { data: OpportunityCardDat
 
         {data.strongMatch && (
           <div className="mb-4 flex items-center gap-2">
-            <StatusBadge status="approved">Strong match</StatusBadge>
+            <StatusBadge status="approved">Great match</StatusBadge>
             <p className="text-sm font-semibold text-approved">Within your selected coverage area</p>
           </div>
         )}

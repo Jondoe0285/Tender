@@ -5,7 +5,7 @@ import { getUnlockedTenderForRetailer } from '@/server/domain/unlockService';
 import { markMatchViewed } from '@/server/domain/tenderService';
 import { ForbiddenError, UnauthorizedError } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
-import { getBroadLocation } from '@/lib/geography';
+import { formatRetailerSummaryLocation } from '@/server/domain/tenderService';
 import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
@@ -53,7 +53,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         }),
         getPaymentFeeGbp('RETAILER_UNLOCK'),
       ]);
-      return NextResponse.json({ tender: { ...tender, location: getBroadLocation(tender.location), clientTradeTenderId: tender.client.clientCompanyMembership?.company.tradeTenderId ?? null, unlockFeeGbp }, unlocked: false });
+      return NextResponse.json({ tender: { ...tender, location: formatRetailerSummaryLocation(tender.location), clientTradeTenderId: tender.client.clientCompanyMembership?.company.tradeTenderId ?? null, unlockFeeGbp }, unlocked: false });
     }
 
     throw new ForbiddenError();

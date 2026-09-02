@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { AppShell } from '@/components/layout/AppShell';
 import { Label, Input, Textarea, FieldGroup } from '@/components/ui/Field';
 import { TenderMessages } from '@/components/quotes/TenderMessages';
+import { extractPostcode } from '@/lib/geography';
 
 type TenderSummary = {
   id: string;
@@ -168,6 +169,7 @@ export default function RetailerTenderDetailPage() {
   ), 0) ?? 0;
   const chargesTotal = charges.reduce((total, charge) => total + Number(charge.priceGbp || 0), 0);
   const quoteTotal = itemsTotal + chargesTotal;
+  const deliveryPostcode = full ? extractPostcode(full.location) : null;
 
   return (
     <AppShell role="retailer" title={tender.reference}>
@@ -185,6 +187,7 @@ export default function RetailerTenderDetailPage() {
           <Card className="mb-6">
             {tender.clientTradeTenderId && <p className="text-sm font-semibold text-steel-blue">Client Trade Tender ID: {tender.clientTradeTenderId}</p>}
             <p className="text-sm text-concrete-grey">Location: {tender.location}</p>
+            {deliveryPostcode && <p className="mt-1 text-sm font-semibold text-foundation-navy">Delivery postcode: {deliveryPostcode}</p>}
             <p className="mt-1 text-sm text-concrete-grey">Urgency: {tender.urgency}</p>
             <p className="mt-1 text-sm text-concrete-grey">
               Closes: {new Date(tender.closingDate).toLocaleDateString('en-GB')}

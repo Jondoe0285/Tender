@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createTenderSchema } from '../../src/lib/schemas/tender';
-import { buildRetailerTenderSummary } from '../../src/server/domain/tenderService';
-import { getBroadLocation, retailerCoversTenderLocation } from '../../src/lib/geography';
+import { buildRetailerTenderSummary, formatRetailerSummaryLocation } from '../../src/server/domain/tenderService';
+import { getBroadLocation, getPostcodeDistrict, retailerCoversTenderLocation } from '../../src/lib/geography';
 import { isQuoteRetentionLocked } from '../../src/server/domain/quoteService';
 import { getPurchasedRetentionDeadline, getUnpurchasedQuoteCutoff } from '../../src/server/domain/retentionService';
 import { calculatePercentageFee, calculateVatGbp, buildPaymentAmounts } from '../../src/server/domain/platformSettings';
@@ -17,6 +17,18 @@ test('removes raw requirement detail from pre-unlock retailer summaries', () => 
 test('reduces precise tender locations to a broad area before unlock', () => {
   assert.equal(getBroadLocation('42 Example Road, Leeds LS10 2AB'), 'Leeds');
   assert.equal(getBroadLocation('Bristol BS1 4DJ'), 'Bristol');
+});
+
+test('shows only the postcode district in pre-unlock retailer locations', () => {
+  assert.equal(getPostcodeDistrict('42 Example Road, Leeds LS10 2AB'), 'LS10');
+  assert.equal(formatRetailerSummaryLocation('42 Example Road, Leeds LS10 2AB'), 'Leeds (LS10)');
+});
+
+test('uses the raw delivery postcode for coverage matching before location is reduced', () => {
+  const retailer = { coverageScope: 'REGION', counties: '', regions: 'Yorkshire and The Humber' };
+
+  assert.equal(retailerCoversTenderLocation(retailer, 'LS10 2AB'), true);
+  assert.equal(getBroadLocation('LS10 2AB'), 'Location area available after unlock');
 });
 
 test('requires a UK postcode in a tender location', () => {

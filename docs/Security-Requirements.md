@@ -71,8 +71,8 @@ Requirements:
 
 The platform must preserve anonymity and staged disclosure:
 
-- **SEC-030:** Before Retailer unlock, only approved non-sensitive summary information may be returned: broad category, location area, headline requirement, indicative timescale, and non-sensitive notes.
-- **SEC-031:** Before Retailer unlock, hide Client identity, contact details, precise site information, full specification, attachments, and direct communication details.
+- **SEC-030:** Before Retailer unlock, only approved non-sensitive summary information may be returned: broad category, location area, postcode district, headline requirement, indicative timescale, and non-sensitive notes. A postcode district is the outward portion only (for example, `LS10`); it may be used to estimate delivery costs and lead times.
+- **SEC-031:** Before Retailer unlock, hide Client identity, contact details, the full postcode and address, other precise site information, full specification, attachments, and direct communication details.
 - **SEC-032:** Full tender details shall be returned only after a server-confirmed launch-credit entitlement or verified £10 unlock payment.
 - **SEC-033:** A Retailer shall only access details for tenders they are matched to and have legitimately unlocked.
 - **SEC-034:** Client and Retailer identities shall remain anonymous to one another until the Client release condition is met.

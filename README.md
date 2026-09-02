@@ -20,6 +20,28 @@ Nothing here is done yet. Work top to bottom — production config first, then e
   `/api/internal/retention` endpoint.
 - [ ] **Configure Sentry for production and confirm one test event.** Set browser/server DSNs and
   verify a scrubbed error event arrives. Staging is already verified.
+- [ ] **Repair Stripe webhook finalisation before production.** The webhook marks payments confirmed
+  and records the Stripe event before unlock/contact-release finalisation and audit logging. A
+  transient failure strands the entitlement because retries are discarded. Make payment,
+  entitlement, and audit transitions recoverable and idempotent; test retry and partial-failure
+  recovery.
+- [ ] **Handle Stripe refunds and disputes.** Persist reversal events, revoke any applicable unlock
+  or contact-release entitlement, create an audit event, and notify the affected parties. Test
+  refunds, chargebacks, duplicate events, and out-of-order webhook delivery.
+- [ ] **Block pre-release Client-Retailer messaging.** Messaging currently requires only a Retailer
+  unlock, allowing contact details to be exchanged before the Client has accepted a quote and paid
+  the release fee. Require a confirmed ContactRelease at the server boundary; keep moderation as
+  defence in depth and test obfuscated contact details.
+- [ ] **Prevent expired or closed tender activity.** Recheck tender status and closing date inside
+  the unlock and quote domain services immediately before creating a payment, unlock, or quote.
+  Test attempts after both the deadline and closure.
+- [ ] **Make deployment gates govern Render, not Azure.** The workflows target Azure while
+  `render.yaml` deploys directly from `staging` and `main`, bypassing documented approval,
+  rollback, and verification controls. Replace or remove the Azure workflows and establish a
+  single Render-based gated promotion path.
+- [ ] **Re-run release validation against the deployed staging SHA.** The current health-check record
+  predates the staging tip. Re-run CI, PostgreSQL migration replay, workflow checks, and staging
+  verification for the exact deployed commit; require the recorded SHA as release evidence.
 
 ### Engineering Work
 
@@ -33,6 +55,70 @@ Nothing here is done yet. Work top to bottom — production config first, then e
   pre-payment privacy invariants.
 - [ ] **Complete accessibility and real-device QA**, including the mobile sidebar and first-time
   Client/Retailer journeys.
+- [ ] **Restrict matching to eligible geographic coverage.** Tender matches are currently created
+  by category only; location restricts notification emails but not visibility, payment, or quoting.
+  Apply coverage rules when creating and refreshing matches, and test that out-of-area Retailers
+  cannot view, unlock, or quote a tender.
+- [ ] **Deliver authorised post-unlock attachment access.** Tender attachments are stored but are
+  absent from the unlocked tender response and have no protected download path. Add a no-store,
+  audited download endpoint that requires the matched Retailer unlock, with retention-aware access
+  tests.
+- [ ] **Harden tender attachment validation and request limits.** Validate decoded byte length rather
+  than client-supplied metadata, impose aggregate request limits, and accept only a small
+  server-verified file-type/signature allowlist. Test size mismatches, MIME spoofing, active
+  content, and aggregate limits.
+- [ ] **Add auditable legal holds to retention.** The 30-day purge deletes unaccepted quotes and
+  unlocked attachments without a dispute, investigation, or legal-hold exclusion. Add migration-
+  backed hold metadata and events, exclude held data from purge queries, and test hold lifecycle
+  and retention decisions.
+- [ ] **Gate inactive membership allowances.** Existing active membership tiers can grant free
+  tender unlocks even while membership functionality is disabled, conflicting with the active
+  pay-per-unlock pricing model. Remove or feature-gate membership entitlement calculation until
+  formally approved; test existing-tier behaviour while disabled.
+- [ ] **Correct future membership payment pricing before activation.** Membership payment creation
+  currently disregards the tier amount and uses the Client release fee. Keep memberships inactive
+  and, before activation, calculate the validated server-side tier price with explicit payment
+  support and billing tests.
+- [ ] **Complete contact-release audit records.** Record both party IDs, released-data category,
+  release timestamp, authorising payment, and correlation ID; minimise avoidable personal data and
+  test the immutable event contents.
+- [ ] **Improve audit-log tamper resistance.** Audit events are normal application writes with no
+  database-level immutability boundary. Restrict writes to a dedicated role and add database
+  protections or a ledger-style mechanism appropriate to the retention requirement.
+- [ ] **Expand Super User reporting filters and exports.** Required Client, Retailer, tender/quote
+  identifier, status, payment status, value-band, and subscription-plan filters are missing.
+  Extend the authorised query, dashboard, and export paths with integration coverage.
+- [ ] **Fix shared control colour tokens and contrast.** Tailwind maps Trade Blue and Sky Blue to
+  misleading token names, producing non-compliant action hierarchy and insufficient text contrast.
+  Introduce approved colour tokens, correct button foregrounds, and check all UI states against
+  WCAG contrast requirements.
+- [ ] **Make Retailer coverage selection keyboard accessible.** The multi-select trigger is a
+  non-focusable `div` without roles, keyboard interaction, or popup state. Replace it with a native
+  control or complete accessible listbox pattern and test keyboard and screen-reader use.
+- [ ] **Correct staged-privacy copy in tender creation.** The upload guidance says Retailers can
+  review drawings and site photos before unlock, contradicting platform policy. State clearly that
+  attachments and full specifications become available only after server-confirmed unlock.
+- [ ] **Separate sponsored content from quote comparison.** Sponsored Retailer quotes are displayed
+  beside price and lead-time data immediately above the decision workflow, contrary to advertising
+  governance. Move advertising to a clearly labelled partner-information surface outside ranking
+  and supplier selection.
+- [ ] **Fix mobile navigation dialog behaviour.** Add Escape dismissal, focus trapping, and opener
+  focus restoration; test keyboard navigation in the mobile sidebar.
+- [ ] **Keep quote comparison usable at tablet widths.** The desktop table activates at `md` with a
+  900px minimum width, forcing horizontal scrolling alongside the sidebar. Use a
+  container-appropriate breakpoint or condensed comparison layout.
+- [ ] **Protect initial administrator-created passwords.** The Super User account form renders the
+  password in plain text. Use a password field with a deliberate reveal control or an invitation
+  flow so administrators do not handle credentials unnecessarily.
+- [ ] **Make the shared combobox announce the active option.** It changes a private active index
+  without `aria-activedescendant` or stable option IDs. Implement the ARIA combobox pattern or use
+  a tested accessible primitive.
+- [ ] **Make high-risk staging verification mandatory.** The deployment verifier can pass while
+  payment/webhook reconciliation, audit access, email delivery, and error monitoring remain
+  unverified. Require explicit staging attestations for each before promotion.
+- [ ] **Establish production capacity and availability evidence.** Free-tier Render services have no
+  demonstrated path to the required 1,000 concurrent users. Select an appropriate plan, document
+  connection/scaling limits, configure alerts, and pass representative load and recovery tests.
 
 ## Completed
 

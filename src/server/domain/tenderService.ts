@@ -4,7 +4,7 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { sendTenderOpportunityEmail } from '@/server/notifications/resend';
 import type { CreateTenderInput } from '@/lib/schemas/tender';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
-import { retailerCoversTenderLocation, getBroadLocation } from '@/lib/geography';
+import { retailerCoversTenderLocation, getBroadLocation, getPostcodeDistrict } from '@/lib/geography';
 
 /** Creates a tender, assigns its reference, and matches it to eligible Retailers. Ownership is the caller's job. */
 export async function createTender(clientId: string, input: CreateTenderInput) {
@@ -220,25 +220,31 @@ export function buildRetailerTenderSummary(requirements: string | null | undefin
 /** Approved non-sensitive summary fields only (SEC-030/031) — the full free-text description
  *  remains hidden until unlock. */
 export async function listMatchedSummariesForRetailer(retailerId: string) {
-  const matches = await prisma.tenderMatch.findMany({
-    where: { retailerId },
-    include: {
-      tender: {
-        select: {
-          id: true,
-          reference: true,
-          category: true,
-          location: true,
-          urgency: true,
-          closingDate: true,
-          status: true,
-          requirements: true,
-          client: { select: { clientCompanyMembership: { select: { company: { select: { tradeTenderId: true } } } } } },
+  const [matches, retailer] = await Promise.all([
+    prisma.tenderMatch.findMany({
+      where: { retailerId },
+      include: {
+        tender: {
+          select: {
+            id: true,
+            reference: true,
+            category: true,
+            location: true,
+            urgency: true,
+            closingDate: true,
+            status: true,
+            requirements: true,
+            client: { select: { clientCompanyMembership: { select: { company: { select: { tradeTenderId: true } } } } } },
+          },
         },
       },
-    },
-    orderBy: { notifiedAt: 'desc' },
-  });
+      orderBy: { notifiedAt: 'desc' },
+    }),
+    prisma.retailerProfile.findUnique({
+      where: { userId: retailerId },
+      select: { coverageScope: true, counties: true, regions: true },
+    }),
+  ]);
 
   return matches.map((match) => ({
     id: match.id,
@@ -248,14 +254,23 @@ export async function listMatchedSummariesForRetailer(retailerId: string) {
       id: match.tender.id,
       reference: match.tender.reference,
       category: match.tender.category,
-      location: getBroadLocation(match.tender.location),
+      location: formatRetailerSummaryLocation(match.tender.location),
       urgency: match.tender.urgency,
       closingDate: match.tender.closingDate,
       status: match.tender.status,
       clientTradeTenderId: match.tender.client.clientCompanyMembership?.company.tradeTenderId ?? null,
       requirements: buildRetailerTenderSummary(match.tender.requirements),
+      categoryMatch: true,
+      locationMatch: retailer ? retailerCoversTenderLocation(retailer, match.tender.location) : false,
     },
   }));
+}
+
+/** Pre-unlock location retains only a broad area plus the approved outward postcode district. */
+export function formatRetailerSummaryLocation(location: string): string {
+  const broadLocation = getBroadLocation(location);
+  const postcodeDistrict = getPostcodeDistrict(location);
+  return postcodeDistrict ? `${broadLocation} (${postcodeDistrict})` : broadLocation;
 }
 
 /** Marks a matched tender as viewed by this Retailer — drives the "New" / unread indicator. */
