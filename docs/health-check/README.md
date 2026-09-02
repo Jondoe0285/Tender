@@ -209,9 +209,9 @@ branch to that exact commit. It does not deploy.
 
 ## Deployment workflows
 
-**Merging to main is not permission to deploy.** `deploy-azure.yml` no longer runs on push to
-`main`; it is retained as a manual break-glass workflow only. Routine releases must use the
-staging and production deployment workflows below.
+**Merging to main is not permission to deploy.** Render auto-deploy is disabled in
+`render.yaml`. Routine releases must use the staging and production deployment workflows below,
+which deploy the approved commit through protected Render deploy hooks.
 
 Deployment approvals are workflow inputs, not chat messages. Every condition is verified against
 the repository, so an unfilled placeholder or an unprovable claim stops the release.
@@ -269,20 +269,25 @@ Configure as repository secrets. Values are never printed or committed.
 | `RESEND_API_KEY` | notify jobs | Existing Resend key |
 | `HEALTH_REPORT_FROM` | notify jobs | Verified sender for health reports |
 | `HEALTH_REPORT_TO` | notify jobs | Recipient(s), comma-separated |
-| `AZURE_STAGING_WEBAPP_NAME` | `deploy-staging.yml` | Azure App Service staging target |
-| `AZURE_STAGING_CREDENTIALS` | `deploy-staging.yml` | Azure credentials scoped to staging only |
+| `RENDER_STAGING_DEPLOY_HOOK` | `deploy-staging.yml` | Secret deploy-hook URL for Tender Staging, scoped to the `staging` GitHub environment |
 | `STAGING_BASE_URL` | `deploy-staging.yml` | Base URL for non-destructive staging verification |
-| `AZURE_WEBAPP_NAME` | `deploy-production.yml`, `deploy-azure.yml` | Azure App Service production target |
-| `AZURE_CREDENTIALS` | `deploy-production.yml`, `deploy-azure.yml` | Azure credentials scoped to production deployment |
+| `RENDER_PRODUCTION_DEPLOY_HOOK` | `deploy-production.yml` | Secret deploy-hook URL for Trade Tender, scoped to the `production` GitHub environment |
 | `PRODUCTION_BASE_URL` | `deploy-production.yml` | Base URL for non-destructive production verification |
-| `AZURE_SQL_SERVER_NAME` | `deploy-production.yml` | Azure SQL server used for backup verification |
-| `AZURE_RESOURCE_GROUP` | `deploy-production.yml` | Resource group used for backup verification |
-| `AZURE_SQL_DATABASE_NAME` | `deploy-production.yml` | Azure SQL database used for backup verification |
 | `GITHUB_TOKEN` | publish, fix, merge, staging record, deployment metadata | Provided automatically by GitHub |
 
 The audit job runs with **no** production credentials. Its database, auth and Stripe values are
 non-functional placeholders and its `RESEND_API_KEY` is empty. Staging must use non-production
 credentials and synthetic data only.
+
+### Configure Render deployment gates
+
+1. In the Tender Staging service, create a deploy hook in Render and save its URL as
+  `RENDER_STAGING_DEPLOY_HOOK` in the protected `staging` GitHub environment.
+2. In the Trade Tender production service, create a separate deploy hook and save its URL as
+  `RENDER_PRODUCTION_DEPLOY_HOOK` in the protected `production` GitHub environment.
+3. Apply `render.yaml` and confirm both services show auto-deploy disabled.
+4. Keep the hook URLs confidential. The workflows append the approved commit SHA as Render's
+  `ref` parameter, so each deployment is bound to the reviewed commit rather than the branch tip.
 
 ## Required GitHub environments
 

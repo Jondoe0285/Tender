@@ -77,14 +77,12 @@ jobs:
     steps:
       - name: Confirm staging credentials are configured
         env:
-          STAGING_WEBAPP_NAME: ${{ secrets.AZURE_STAGING_WEBAPP_NAME }}
-          STAGING_CREDENTIALS: ${{ secrets.AZURE_STAGING_CREDENTIALS }}
+          RENDER_STAGING_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}
           STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
         run: |
           set -euo pipefail
           MISSING=""
-          [ -n "$STAGING_WEBAPP_NAME" ] || MISSING="${MISSING} AZURE_STAGING_WEBAPP_NAME"
-          [ -n "$STAGING_CREDENTIALS" ] || MISSING="${MISSING} AZURE_STAGING_CREDENTIALS"
+          [ -n "$RENDER_STAGING_DEPLOY_HOOK" ] || MISSING="${MISSING} RENDER_STAGING_DEPLOY_HOOK"
           [ -n "$STAGING_BASE_URL" ] || MISSING="${MISSING} STAGING_BASE_URL"
           if [ -n "$MISSING" ]; then
             echo "::error::Staging deployment is not configured. Missing secrets:${MISSING}"
@@ -121,16 +119,13 @@ jobs:
       - name: Production build
         run: npm run build
 
-      - name: Log in to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_STAGING_CREDENTIALS }}
-
-      - name: Deploy to the staging slot
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ secrets.AZURE_STAGING_WEBAPP_NAME }}
-          package: .
+      - name: Deploy the approved commit to Render
+        env:
+          RENDER_STAGING_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 2 --retry-all-errors \
+            -X POST "${RENDER_STAGING_DEPLOY_HOOK}&ref=${{ github.event.inputs.commit_sha }}"
 
       - name: Publish the staging URL
         id: target

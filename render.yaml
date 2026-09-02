@@ -14,6 +14,7 @@ services:
     plan: free
     region: frankfurt
     branch: main
+    autoDeploy: false
     healthCheckPath: /api/health
     buildCommand: npm ci && npm run type-check && npm run lint && npx prisma migrate deploy && npm run build
     startCommand: npm run start
@@ -73,6 +74,7 @@ services:
     plan: free
     region: frankfurt
     branch: staging
+    autoDeploy: false
     healthCheckPath: /api/health
     buildCommand: npm ci && npm run type-check && npm run lint && npx prisma migrate deploy && npm run build
     startCommand: npm run start
