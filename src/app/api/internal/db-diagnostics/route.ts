@@ -1,4 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/server/data/prisma';
 import { toErrorResponse } from '@/server/http/errors';
@@ -13,6 +15,21 @@ function hasValidJobSecret(request: Request): boolean {
   const provided = Buffer.from(authorization.slice('Bearer '.length));
   const configured = Buffer.from(expected);
   return provided.length === configured.length && timingSafeEqual(provided, configured);
+}
+
+/** Attempts the given migration's SQL inside a transaction that is always rolled back, to surface the real error safely. */
+async function dryRunMigration(migrationDir: string): Promise<{ migration: string; error: string | null }> {
+  const sql = readFileSync(path.join(process.cwd(), 'prisma', 'migrations', migrationDir, 'migration.sql'), 'utf8');
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(sql);
+      throw new Error('__DRY_RUN_ROLLBACK__');
+    });
+    return { migration: migrationDir, error: null };
+  } catch (error) {
+    if (error instanceof Error && error.message === '__DRY_RUN_ROLLBACK__') return { migration: migrationDir, error: null };
+    return { migration: migrationDir, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export async function GET(request: Request) {
@@ -30,8 +47,11 @@ export async function GET(request: Request) {
        FROM (VALUES ('RateLimitEntry'), ('AuditLog')) AS t(name)`
     );
 
-    return NextResponse.json({ migrations, tables });
+    const dryRun = await dryRunMigration('20260902000000_add_payment_reversals');
+
+    return NextResponse.json({ migrations, tables, dryRun });
   } catch (error) {
     return toErrorResponse(error);
   }
 }
+
