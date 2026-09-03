@@ -5,7 +5,7 @@
 **Business proposition by:** Thomas Osborne
 **Prepared by:** James Sinclair
 
-> **Status:** This is the new baseline business plan (received 2026-09-03), superseding the previous Client/Retailer model. See "Baseline Change Notes" at the end of this document for open conflicts and decisions required before implementation begins.
+> **Status:** This is the baseline business plan (received 2026-09-03), superseding the previous Client/Retailer model. The Super User has resolved the open conflicts raised on first review — see "Baseline Change Notes" at the end of this document for the resolved decisions that govern implementation.
 
 ## 1. Executive Summary
 
@@ -25,7 +25,7 @@ The plan assumes a 90-day launch credit window focused on Provider onboarding ra
 
 Year 1 revenue is based on two fees: a **£5 Provider quote participation fee** for accessing the full relevant tender package details and submitting a quote, and a **Tender Creator Accepted Quote Release Fee** based on a percentage of the accepted quote value. Provider subscription functionality, partner income, sponsorship, advertising, and additional premium revenue streams remain future options and should only be activated if later usage data supports them.
 
-> Note: sections 4.8 and Appendix B of the source document describe the Contractor release fee as a fixed £10 fee, while Section 5 and Section 7 describe it as percentage-based. This inconsistency is unresolved — see Baseline Change Notes.
+> Resolved: fee amounts are not being changed as part of this baseline. The platform keeps its current £10 Retailer/Provider unlock fee and £10 Contractor/Client Accepted Quote Release Fee, with the existing Super-User fee-setting controls. See Baseline Change Notes.
 
 ### Launch Funding Requirement
 
@@ -125,7 +125,7 @@ The platform acts as a connection and tender management tool between Contractors
 
 The platform will generate revenue through a simple two-sided fee model. Providers can sign up for free and receive matched tender package summaries at no cost. During the initial 90-day launch credit window, Providers receive limited free unlock credits to encourage onboarding and quote participation. After those credits are used, or once the credit window ends, a Provider pays a fixed £10 tender unlock fee to view the full relevant job-package specification and the information required to prepare a formal quote. Contractors can create jobs, issue tender packages, receive quotes, and compare responses for free. Provider and Contractor details remain anonymous from each other until the Contractor accepts a quote and pays the £10 Contractor Accepted Quote Release Fee. Once paid, the Provider's contact details are released to the Contractor and the Contractor's contact details are released to the Provider so the parties can arrange formal payment and complete the transaction directly. Provider subscription functionality and tiered Contractor release-fee functionality should remain in the platform build as inactive future features, controlled by the Super User, and excluded from the current revenue forecast.
 
-> Note: this section states a fixed £10 tender unlock fee, while Section 1 and Section 7 state a £5 Provider quote participation fee. This inconsistency is unresolved — see Baseline Change Notes.
+> Resolved: keep the current £10 fixed tender unlock fee and £10 Accepted Quote Release Fee; the £5/percentage-based figures elsewhere in this document do not apply. See Baseline Change Notes.
 
 ### 5.1 Current Contractor Accepted Quote Release Fee and Future Tiering Functionality
 
@@ -218,7 +218,7 @@ Monthly core running costs are estimated at approximately £190–£316 per mont
 | Resend email service | 50,000 transactional emails per month for alerts, confirmations, reminders, quote notifications, and contact-release emails. | Approximately £16 per month. |
 | Indicative monthly total | Core operating baseline, excluding staff, development labour, marketing, insurance, accounting, legal advisory work, tax, and payment processing fees. | Approximately £190–£316 per month. |
 
-> Note: this table references Azure hosting. The current platform runs on Render with Neon Lakebase Postgres, not Azure — see Baseline Change Notes.
+> Resolved: this table's Azure hosting reference is a legacy carry-over. The platform stays on Render with Neon Lakebase Postgres. See Baseline Change Notes.
 
 **Funding summary:** The funding requirement should be reviewed in the following order: pre-launch setup and assurance costs of approximately £770–£2,150; UK-wide marketing costs of approximately £2,500–£20,000 depending on launch intensity; and monthly platform running costs of approximately £190–£316 per month, equal to approximately £570–£948 across the initial 90-day launch credit window.
 
@@ -393,7 +393,7 @@ Footer links should use clear labels and should open the relevant public documen
 
 ## 11. Brand Guide
 
-> Note: this section proposes a different brand personality, colour palette, and identity than the currently approved Brand Authority ([docs/branding/Trade_Tender_Brand_Guide.pdf](branding/Trade_Tender_Brand_Guide.pdf) and [docs/branding/TradeTender-Brand-Rules.md](branding/TradeTender-Brand-Rules.md)). Per repo governance, the approved Brand Guide remains authoritative for UI work until a decision is made — see Baseline Change Notes.
+> Resolved: the Super User has confirmed the platform keeps its current approved brand palette and identity ([docs/branding/Trade_Tender_Brand_Guide.pdf](branding/Trade_Tender_Brand_Guide.pdf) and [docs/branding/TradeTender-Brand-Rules.md](branding/TradeTender-Brand-Rules.md)). The colour palette and personality proposed below are **not adopted**; they are retained in this document for reference only. See Baseline Change Notes.
 
 The brand should feel practical, robust, trustworthy, and construction-ready. It should appeal to contractors, suppliers, site managers, and clients by using a visual identity that feels familiar to the construction trade while still looking clean and professional as a modern SaaS platform.
 
@@ -572,17 +572,17 @@ Trade Tender sits within an established market that includes construction procur
 
 The competitive position for Trade Tender should therefore be based on clarity and execution. The platform should not try to compete immediately with full enterprise procurement suites or broad tender-intelligence databases. Its strongest position is as a practical UK-wide job-package quote marketplace for construction users who want a faster way to request, receive, compare, and accept formal quotes from relevant Providers while keeping contact details and sensitive job information controlled until the appropriate payment stage.
 
-## Baseline Change Notes (added 2026-09-03, not part of the source document)
+## Baseline Change Notes (added 2026-09-03, resolved 2026-09-03, not part of the source document)
 
-This document replaces the previous Client/Retailer business plan as the baseline, per Super User instruction. The following conflicts and open decisions must be resolved before implementation begins:
+This document replaces the previous Client/Retailer business plan as the baseline, per Super User instruction. The Super User has resolved the following conflicts; these decisions govern implementation:
 
-1. **Role model change:** "Client" → "Contractor", "Retailer" → "Provider". The current codebase, database enum (`Role: SUPER_USER | CLIENT | RETAILER`), auth/session logic, and every `requireRole` check use the old names. Confirm whether this is a pure rename (`Contractor` = current `Client`, `Provider` = current `Retailer`) or introduces new distinct roles.
-2. **Job-package tender splitting:** tenders are now split into multiple independently-matched "tender packages" per job/category. This is a data-model and matching-engine change, not a rename — `Tender` currently has a single category/subcategory, not a set of packages.
-3. **Fee inconsistency:** the source document states both a fixed £10 unlock/release fee (Sections 4.8, 5, Appendix B) and a £5 / percentage-based fee (Sections 1, 5, 7). Needs a single authoritative figure before implementation.
-4. **New identifier scheme:** `JOB-YYYYMMDD-000001` style IDs for jobs/packages/quotes, replacing the current identifier format — needs confirmation of the exact target format.
-5. **Active partner advertising:** partners move from static footer logos to a Super-User-managed system with names, destinations, status, and campaign source — this was already flagged as an outstanding gap in [docs/PRODUCTION-READINESS-REVIEW.md](PRODUCTION-READINESS-REVIEW.md).
-6. **Provider confirmation step:** a new "quote confirmed/accepted by Provider" step after Contractor acceptance, not present in the current quote lifecycle (`SUBMITTED → ACCEPTED/REJECTED`).
-7. **Provider/Retailer approval gate:** Phase Three lists "retailer approval" as a control; today Retailer accounts are self-serve/active immediately — already flagged as a gap in the production readiness review.
-8. **Brand palette conflict:** Section 11's proposed colours (Construction Navy, Safety Orange, etc.) differ from the currently approved Brand Authority. Per repo governance, the approved Brand Guide PDF/Rules remain in force until the Super User explicitly approves a rebrand.
-9. **Hosting reference:** Section 7.5.3 references Azure hosting; the platform currently runs on Render with Neon Lakebase Postgres. Confirm this is a legacy reference and not an intended infrastructure migration.
-10. **Subscription tier pricing:** new Free/Starter £29/Growth £49/Pro £99/Enterprise £149–199 tiers differ from any previously modelled tiers — confirm before building (feature remains inactive/future either way).
+1. **Role model change — RESOLVED, rename only.** "Client" → "Contractor", "Retailer" → "Provider" is a pure rename with no new roles. `Contractor` = current `Client`, `Provider` = current `Retailer`. Implementation should rename the `Role` enum values, UI labels, and route/portal naming without changing the underlying permission model.
+2. **Job-package tender splitting — RESOLVED, approved as specified.** The Super User has confirmed this is the intended direction: a job is split into multiple independently-matched tender packages by category, each with its own matching, unlock, and quote lifecycle. This requires a genuine data-model and matching-engine change (a `Tender`/job with one-to-many `TenderPackage` records), not a rename, and should be scoped as its own phase of work.
+3. **Fee inconsistency — RESOLVED, no fee changes.** Fees are out of scope for this baseline. The platform keeps its current £10 Retailer/Provider unlock fee and £10 Client/Contractor Accepted Quote Release Fee (with existing VAT and Super-User fee-setting controls) unchanged. The £5/percentage-based figures in this document do not apply.
+4. **Identifier scheme — RESOLVED, keep current format.** The platform keeps its existing tender/quote identifier format (`TND-YYYYMMDD-000001` style). The `JOB-YYYYMMDD-000001` scheme described in this document is not adopted.
+5. **Active partner advertising — RESOLVED, approved.** The Super User has approved moving from static footer logos to an actively managed partner/advertising system (names, destination links, status, campaign source), since partners already own real businesses and this is "a good progression." This should be built as a genuine Super-User-managed feature, closing the gap already flagged in [docs/PRODUCTION-READINESS-REVIEW.md](PRODUCTION-READINESS-REVIEW.md).
+6. **Provider confirmation step — DEFERRED, not yet decided.** The Super User was unsure what this referred to when asked. For clarity: it would add an extra step where the Provider must separately confirm/accept a quote after the Contractor has already accepted it, before work proceeds — beyond today's single-action `SUBMITTED → ACCEPTED/REJECTED` quote lifecycle. This is not being built until the Super User confirms whether it's wanted.
+7. **Provider/Retailer approval gate — RESOLVED, keep self-serve.** Retailer/Provider accounts remain self-serve and active immediately after email verification, as today. No pre-activation approval queue will be built.
+8. **Brand palette — RESOLVED, keep current brand.** The platform keeps its current approved brand palette and identity ([docs/branding/Trade_Tender_Brand_Guide.pdf](branding/Trade_Tender_Brand_Guide.pdf), [docs/branding/TradeTender-Brand-Rules.md](branding/TradeTender-Brand-Rules.md)). Section 11's proposed Construction Navy/Safety Orange palette is not adopted.
+9. **Hosting reference — RESOLVED, legacy reference only.** The Azure hosting mention in Section 7.5.3 is a leftover from an earlier version of the plan; the platform stays on Render with Neon Lakebase Postgres. No infrastructure migration is planned.
+10. **Subscription tier pricing — DEFERRED, pipeline item.** The Free/Starter/Growth/Pro/Enterprise tier pricing in Section 5.2 is a future pipeline change and does not affect immediate development; the feature remains built-but-inactive as already documented.

@@ -9,7 +9,7 @@
 
 ## Roles
 
-- Support only the approved roles: Super User, Client, and Retailer.
+- Support only the approved roles: Super User, Contractor, and Provider (renamed from Client and Retailer per the 2026-09-03 baseline business plan; the rename has not yet been applied to the codebase — the `Role` enum, routes, and portals still use `CLIENT`/`RETAILER` until that implementation work is scheduled).
 - Do not create features outside the approved Trade Tender business plan.
 
 ## Product And Security Rules
