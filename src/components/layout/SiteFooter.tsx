@@ -1,15 +1,22 @@
+'use client';
+
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import { TradeTenderLogo } from '@/components/layout/TradeTenderLogo';
 import { supportEmail } from '@/lib/contact';
-import { prisma } from '@/server/data/prisma';
 
-export async function SiteFooter() {
+type FooterPartner = { id: string; name: string; logoPath: string; destinationUrl: string | null };
+
+export function SiteFooter() {
   const support = supportEmail();
-  const partners = await prisma.partner.findMany({
-    where: { active: true, displayLocation: 'FOOTER' },
-    orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    select: { id: true, name: true, logoPath: true, destinationUrl: true },
-  });
+  const [partners, setPartners] = useState<FooterPartner[]>([]);
+
+  useEffect(() => {
+    fetch('/api/partners/footer')
+      .then((response) => response.ok ? response.json() : null)
+      .then((data: { partners?: FooterPartner[] } | null) => setPartners(data?.partners ?? []))
+      .catch(() => setPartners([]));
+  }, []);
   return (
     <footer className="mt-auto border-t-4 border-safety-amber bg-foundation-navy px-6 py-10 text-sm text-site-white/75 sm:px-10">
       <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.2fr_1fr_1fr]">
