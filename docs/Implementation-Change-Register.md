@@ -13,6 +13,13 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-03 - High-Severity Dependency Remediation
+
+- Changed: upgraded Next.js and its matching ESLint/React toolchain from the vulnerable Next 14 release line to Next 16.3.4, React 19.2.8, ESLint 9, and the corresponding React type packages. Replaced the removed `next lint` command and legacy ESLint configuration with the supported flat configuration. Added a root dependency override for Prisma 6's vulnerable `deepmerge-ts` 7.1.5 transitive dependency, resolving it to 8.0.0 without downgrading the final Prisma 6 release.
+- Affects: application build/lint toolchain and dependency lockfile only. No application workflow, database schema, migration, payment, contact-release, or staging/production environment resource changes.
+- Environment: Render already uses Node 20, which satisfies the Next 16 and Prisma runtime requirements. Local validation must use Node 20, 22, or 24; the current local Node 24 is supported by Prisma but not the repository's declared Node 20 release policy.
+- Validation: `npm audit --audit-level=high` reports zero vulnerabilities. `npm run lint` passes with two pre-existing non-blocking warnings; `npm run type-check`, `npm test` (134 passing), and `npm run build` pass. The build reports the existing `middleware`-to-`proxy` deprecation, which requires separate route-boundary regression testing before migration.
+
 ### 2026-09-03 - Staging Deployment Verification URL Repair
 
 - Changed: corrected the staging deployment workflow so its verification job reads `STAGING_BASE_URL` directly within the protected staging environment. GitHub masks that environment value and omits it when it is exposed as a cross-job output, which previously passed an empty base URL to the non-destructive verifier after Render accepted the deployment hook.

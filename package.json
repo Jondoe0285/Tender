@@ -10,7 +10,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "test": "tsx --test tests/lib/*.test.ts",
     "db:generate": "prisma generate",
@@ -37,15 +37,15 @@
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
-    "lucide-react": "^0.292.0",
+    "lucide-react": "^1.40.0",
     "nanoid": "^3.3.18",
-    "next": "^14.0.0",
+    "next": "^16.3.4",
     "next-auth": "^4.24.15",
     "pdf-lib": "^1.17.1",
     "postcss": "^8.4.31",
     "prisma": "6.19.3",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "recharts": "^2.10.3",
     "resend": "^6.24.0",
     "sharp": "^0.35.4",
@@ -57,10 +57,13 @@
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
-    "@types/react": "^18.2.37",
-    "@types/react-dom": "^18.2.15",
-    "eslint": "^8.54.0",
-    "eslint-config-next": "^14.0.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "^16.3.4",
     "tsx": "^4.23.12"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.0"
   }
 }

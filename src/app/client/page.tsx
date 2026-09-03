@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
 import { LinkButton } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -49,9 +50,9 @@ export default async function ClientPage() {
 
         <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
           <h2 className="font-heading text-xl font-bold text-foundation-navy">Recent tenders</h2>
-          <a href="/client/tenders" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">
+          <Link href="/client/tenders" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">
             View all tenders &rarr;
-          </a>
+          </Link>
         </div>
         {recentTenders.length === 0 ? (
           <Card className="py-16 text-center">
