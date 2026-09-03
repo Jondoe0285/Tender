@@ -39,7 +39,7 @@ export default async function AccountingSpacePage({ searchParams }: { searchPara
                 <div key={payment.id} className="flex flex-wrap items-center justify-between gap-4 px-6 py-5">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">
-                      {payment.type === 'RETAILER_UNLOCK' ? 'Retailer Unlock Fee' : payment.type === 'CLIENT_RELEASE' ? 'Client Release Fee' : payment.type === 'SPONSORED_PLACEMENT' ? 'Sponsored Placement Fee' : 'Membership Tier Fee'}
+                      {payment.type === 'RETAILER_UNLOCK' ? 'Provider Unlock Fee' : payment.type === 'CLIENT_RELEASE' ? 'Contractor Release Fee' : payment.type === 'SPONSORED_PLACEMENT' ? 'Sponsored Placement Fee' : 'Membership Tier Fee'}
                     </p>
                     <h3 className="font-heading text-base font-bold text-foundation-navy">&pound;{payment.totalAmountGbp.toFixed(2)} inc. VAT</h3>
                     <p className="mt-1 text-sm text-concrete-grey">Fee: &pound;{payment.amountGbp.toFixed(2)} excl. VAT &middot; VAT: &pound;{payment.vatGbp.toFixed(2)} ({payment.vatPercentage}%)</p>

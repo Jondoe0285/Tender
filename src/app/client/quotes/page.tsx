@@ -7,7 +7,7 @@ import { prisma } from '@/server/data/prisma';
 
 export default async function QuotesReceivedPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'CLIENT') redirect('/login');
+  if (!user || user.role !== 'CONTRACTOR') redirect('/login');
 
   const quotes = await prisma.quote.findMany({
     where: { tender: { clientId: user.id } },

@@ -6,7 +6,7 @@
 
 ## Brand Positioning
 
-Trade Tender connects construction buyers and retailers through a clear tender and quotation process.
+Trade Tender connects Contractors and Providers through a clear tender and quotation process.
 
 Construction buying is often opaque, slow, and relationship-driven. Trade Tender exists to make the process transparent, fast, and fair.
 
@@ -30,7 +30,7 @@ Lead with numbers, specifications, and facts.
 
 ### Impartial
 
-Remain neutral between Clients and Retailers.
+Remain neutral between Contractors and Providers.
 
 ### Assured
 
@@ -65,8 +65,8 @@ Never use excessive marketing language or imply that Trade Tender sells material
 | --- | --- |
 | Primary tagline | **Connect. Compare. Construct.** |
 | Short descriptor | **The tender platform for construction supply.** |
-| Client message | Clear requirements. Comparable formal quotes. |
-| Retailer message | Qualified construction demand, clearly specified. |
+| Contractor message | Clear requirements. Comparable formal quotes. |
+| Provider message | Qualified construction demand, clearly specified. |
 
 ## Visual Direction
 
@@ -74,7 +74,7 @@ Never use excessive marketing language or imply that Trade Tender sells material
 - Design mobile-first and maintain the same visual logic across narrow and wide layouts.
 - Use the approved colours, typography, controls, status states, and component patterns consistently.
 - Lead with practical information hierarchy rather than decoration.
-- Use reusable components to prevent inconsistent layouts between Super User, Client, and Retailer portals.
+- Use reusable components to prevent inconsistent layouts between Super User, Contractor, and Provider portals.
 - Keep dashboards, forms, navigation, tables, quote panels, dialogs, and notifications easy to scan.
 - Never let branding obscure payment state, data-visibility state, warnings, validation, or required actions.
 
@@ -177,9 +177,9 @@ Every workflow should support and reinforce these steps:
 
 The UI must clearly communicate staged access without revealing restricted data:
 
-- Before Retailer unlock, show only approved non-sensitive tender summary information.
-- Do not show Client contact details, precise site information, full specifications, attachments, or direct communication details before unlock.
-- Keep Client and Retailer identities anonymous until the Client Accepted Quote Release Fee is confirmed or an approved waiver applies.
+- Before Provider unlock, show only approved non-sensitive tender summary information.
+- Do not show Contractor contact details, precise site information, full specifications, attachments, or direct communication details before unlock.
+- Keep Contractor and Provider identities anonymous until the Contractor Accepted Quote Release Fee is confirmed or an approved waiver applies.
 - Explain what a payment unlocks before the payment action.
 - Show payment confirmation only after trusted server-side confirmation.
 - Never use a client-side visual state to imply authorization or payment when the server has not confirmed it.
@@ -195,7 +195,7 @@ Use wording that is clear, direct, helpful, practical, and free of unnecessary j
 - Payment complete
 - Action required
 
-Explain fees, visibility, responsibilities, and next actions near the relevant workflow step. Do not describe Trade Tender as the supplier, contractor, broker, guarantor, or responsible party for the final Client-Retailer transaction.
+Explain fees, visibility, responsibilities, and next actions near the relevant workflow step. Do not describe Trade Tender as the supplier, contractor, broker, guarantor, or responsible party for the final Contractor-Provider transaction.
 
 ## 9. Partner Branding and Advertising
 
@@ -206,7 +206,7 @@ Partner visibility must remain separate from:
 - Tender matching.
 - Quote ranking.
 - Supplier selection.
-- Client decision-making.
+- Contractor decision-making.
 
 The Super User may manage partner names, display locations, destination links, active state, and labels. Partner placement must not imply that payment or sponsorship affects tender results.
 
@@ -220,6 +220,6 @@ A branded interface is acceptable only when:
 - Text and controls remain accessible and readable.
 - Status colours are used consistently and are not the sole source of meaning.
 - Payment, workflow, permission, and privacy states are clear.
-- Restricted Client and Retailer details are not exposed.
+- Restricted Contractor and Provider details are not exposed.
 - Partner advertising is clearly separated from tender and quote decisions.
 - The design remains within the approved Trade Tender business plan.

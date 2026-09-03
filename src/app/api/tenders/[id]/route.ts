@@ -13,7 +13,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     const user = await getCurrentUser();
     if (!user) throw new UnauthorizedError();
 
-    if (user.role === 'CLIENT') {
+    if (user.role === 'CONTRACTOR') {
       const tender = await prisma.tender.findUnique({
         where: { id: params.id },
         include: { items: { orderBy: { createdAt: 'asc' } } },
@@ -22,7 +22,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       return NextResponse.json({ tender, unlocked: true });
     }
 
-    if (user.role === 'RETAILER') {
+    if (user.role === 'PROVIDER') {
       const match = await prisma.tenderMatch.findUnique({
         where: { tenderId_retailerId: { tenderId: params.id, retailerId: user.id } },
       });
@@ -49,11 +49,23 @@ export async function GET(_request: Request, { params }: { params: { id: string 
             id: true, reference: true, category: true, location: true, urgency: true, closingDate: true, status: true,
             client: { select: { clientCompanyMembership: { select: { company: { select: { tradeTenderId: true } } } } } },
             items: { orderBy: { createdAt: 'asc' }, select: { id: true, category: true, subcategory: true, item: true, quantity: true } },
+            packages: { orderBy: { createdAt: 'asc' }, select: { id: true, reference: true, category: true, subcategory: true, item: true, quantity: true } },
           },
         }),
         getPaymentFeeGbp('RETAILER_UNLOCK'),
       ]);
-      return NextResponse.json({ tender: { ...tender, location: formatRetailerSummaryLocation(tender.location), clientTradeTenderId: tender.client.clientCompanyMembership?.company.tradeTenderId ?? null, unlockFeeGbp }, unlocked: false });
+      const packageCategories = [...new Set((tender.packages ?? []).map((pkg) => pkg.category))];
+      return NextResponse.json({
+        tender: {
+          ...tender,
+          packageCategories,
+          packageCount: packageCategories.length,
+          location: formatRetailerSummaryLocation(tender.location),
+          clientTradeTenderId: tender.client.clientCompanyMembership?.company.tradeTenderId ?? null,
+          unlockFeeGbp,
+        },
+        unlocked: false,
+      });
     }
 
     throw new ForbiddenError();

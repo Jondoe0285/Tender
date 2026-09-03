@@ -7,7 +7,7 @@ import { getRetailerAnalyticsSectionSettings } from '@/server/domain/platformSet
 
 export default async function PerformancePage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'RETAILER') redirect('/login');
+  if (!user || user.role !== 'PROVIDER') redirect('/login');
 
   const [data, sections] = await Promise.all([
     getRetailerAnalytics(user.id),

@@ -5,7 +5,7 @@
 
 ## 1. Purpose and Security Boundary
 
-Trade Tender is a connection and tender-management platform for Clients and Retailers. It is not the supplier, contractor, broker, guarantor, payment intermediary, or responsible party for the final Client-Retailer transaction.
+Trade Tender is a connection and tender-management platform for Contractors and Providers. It is not the supplier, contractor, broker, guarantor, payment intermediary, or responsible party for the final Contractor-Provider transaction.
 
 The platform processes account data, tender and quote data, payment state, project information, attachments, and contact-release events. Security controls must protect these assets throughout their lifecycle and must be enforced at trusted server boundaries.
 
@@ -29,14 +29,14 @@ Only these roles are approved:
 | Role | Permitted scope |
 | --- | --- |
 | Super User | Platform administration, approved support, user and category management, pricing and feature controls, analytics, audit review, and operational monitoring. |
-| Client | Own account, own tenders, matched workflow state, received quotes, quote comparison, acceptance, and authorised contact release. |
-| Retailer | Own account, own capabilities and coverage, matched summaries, paid or credited unlocks, unlocked tender details, and own quote submissions. |
+| Contractor | Own account, own tenders, matched workflow state, received quotes, quote comparison, acceptance, and authorised contact release. |
+| Provider | Own account, own capabilities and coverage, matched summaries, paid or credited unlocks, unlocked tender details, and own quote submissions. |
 
 Requirements:
 
 - **SEC-001:** Every protected route, server action, API endpoint, background operation, and webhook-related state change shall have an explicit authorization decision.
 - **SEC-002:** Role checks shall be performed server-side on every protected operation.
-- **SEC-003:** Resource ownership shall be checked for every Client tender, Retailer profile, quote, attachment, payment, and audit query.
+- **SEC-003:** Resource ownership shall be checked for every Contractor tender, Provider profile, quote, attachment, payment, and audit query.
 - **SEC-004:** A user shall not access another user’s data by changing an identifier, URL, request body, query parameter, or client-side state.
 - **SEC-005:** Super User access shall be limited to documented administrative capabilities and audited.
 - **SEC-006:** Support access shall not silently grant access to protected details or bypass payment conditions.
@@ -71,12 +71,12 @@ Requirements:
 
 The platform must preserve anonymity and staged disclosure:
 
-- **SEC-030:** Before Retailer unlock, only approved non-sensitive summary information may be returned: broad category, location area, postcode district, headline requirement, indicative timescale, and non-sensitive notes. A postcode district is the outward portion only (for example, `LS10`); it may be used to estimate delivery costs and lead times.
-- **SEC-031:** Before Retailer unlock, hide Client identity, contact details, the full postcode and address, other precise site information, full specification, attachments, and direct communication details.
+- **SEC-030:** Before Provider unlock, only approved non-sensitive summary information may be returned: broad category, location area, postcode district, headline requirement, indicative timescale, and non-sensitive notes. A postcode district is the outward portion only (for example, `LS10`); it may be used to estimate delivery costs and lead times.
+- **SEC-031:** Before Provider unlock, hide Contractor identity, contact details, the full postcode and address, other precise site information, full specification, attachments, and direct communication details.
 - **SEC-032:** Full tender details shall be returned only after a server-confirmed launch-credit entitlement or verified £10 unlock payment.
-- **SEC-033:** A Retailer shall only access details for tenders they are matched to and have legitimately unlocked.
-- **SEC-034:** Client and Retailer identities shall remain anonymous to one another until the Client release condition is met.
-- **SEC-035:** Contact details shall be released only to the authorised Client and Retailer after confirmed £10 Client Accepted Quote Release Fee payment or an explicitly approved waiver.
+- **SEC-033:** A Provider shall only access details for tenders they are matched to and have legitimately unlocked.
+- **SEC-034:** Contractor and Provider identities shall remain anonymous to one another until the Contractor release condition is met.
+- **SEC-035:** Contact details shall be released only to the authorised Contractor and Provider after confirmed £10 Contractor Accepted Quote Release Fee payment or an explicitly approved waiver.
 - **SEC-036:** Failed, cancelled, duplicate, replayed, refunded where release is revoked, or ambiguous payment events shall not release protected details.
 - **SEC-037:** Restricted details shall not leak through API responses, server-rendered pages, client bundles, browser storage, notification previews, email summaries, analytics, exports, logs, error pages, metadata, or attachments.
 - **SEC-038:** The server shall re-check release state on every request for protected tender, quote, attachment, or contact data.
@@ -118,7 +118,7 @@ The platform must preserve anonymity and staged disclosure:
 - **SEC-072:** The platform shall allow only documented file types and shall reject executable or active content where not required.
 - **SEC-073:** Uploaded files shall be stored outside executable web roots with private access by default.
 - **SEC-074:** File access shall be issued through an authorized, expiring server-controlled mechanism.
-- **SEC-075:** Before Retailer unlock, tender attachments shall not be downloadable, enumerable, previewable, or inferable.
+- **SEC-075:** Before Provider unlock, tender attachments shall not be downloadable, enumerable, previewable, or inferable.
 - **SEC-076:** File names and metadata shall be normalised to prevent path traversal, injection, and data leakage.
 - **SEC-077:** Upload processing shall enforce quotas and protect against decompression bombs, oversized archives, malware, and resource exhaustion.
 - **SEC-078:** Failed, rejected, abandoned, and deleted uploads shall not remain accessible through stale URLs or caches.
@@ -139,7 +139,7 @@ The platform must preserve anonymity and staged disclosure:
 ## 11. Audit Logging and Monitoring
 
 - **SEC-090:** Payment events shall be logged with actor or system source, event, target, amount or relevant state, provider reference, timestamp, and correlation identifier.
-- **SEC-091:** Every Client or Retailer contact-release event shall be logged with actor, parties, target tender or quote, released-data category, timestamp, authorizing payment or waiver, and correlation identifier.
+- **SEC-091:** Every Contractor or Provider contact-release event shall be logged with actor, parties, target tender or quote, released-data category, timestamp, authorizing payment or waiver, and correlation identifier.
 - **SEC-092:** Unlock, quote submission, quote acceptance, authorization failure, account suspension, waiver, refund, migration, and security-relevant administrative events shall be logged where required for traceability.
 - **SEC-093:** Logs shall not contain secrets, full payment credentials, unnecessary personal data, or unrestricted contact details.
 - **SEC-094:** Audit records shall be append-only or otherwise protected against unauthorized alteration.
@@ -197,7 +197,7 @@ A release must not be approved when any of the following is true:
 
 - A protected route or operation lacks a server-side authentication or authorization check.
 - A user can access another role’s, another user’s, or another tender’s protected data.
-- Client or Retailer details can be exposed before the required confirmed payment or approved waiver.
+- Contractor or Provider details can be exposed before the required confirmed payment or approved waiver.
 - Payment status relies on client-side state or an unverified webhook.
 - A database change lacks a reviewed migration.
 - Payment or contact-release events are not auditable.

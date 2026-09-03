@@ -17,8 +17,8 @@ function safeMimeType(mimeType: string) {
 
 export async function GET(_request: Request, { params }: { params: { id: string; attachmentId: string } }) {
   try {
-    const user = await requireRole('CLIENT', 'RETAILER');
-    if (user.role !== 'CLIENT' && user.role !== 'RETAILER') throw new ForbiddenError();
+    const user = await requireRole('CONTRACTOR', 'PROVIDER');
+    if (user.role !== 'CONTRACTOR' && user.role !== 'PROVIDER') throw new ForbiddenError();
     const actor = { id: user.id, role: user.role };
     const attachment = await getTenderAttachmentForDownload(params.id, params.attachmentId, actor);
     const fileName = safeDownloadFileName(attachment.fileName);

@@ -3,7 +3,30 @@ import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { prisma } from '../../src/server/data/prisma';
 import { ForbiddenError } from '../../src/server/auth/session';
-import { requestMembershipTierPurchase } from '../../src/server/domain/membershipService';
+import { ensureDefaultMembershipTiers, requestMembershipTierPurchase } from '../../src/server/domain/membershipService';
+
+test('the approved default membership tier catalog is seeded inactive with the baseline pricing', async () => {
+  const expected = [
+    ['Free', 0],
+    ['Starter', 29],
+    ['Growth', 49],
+    ['Pro', 99],
+    ['Enterprise', 199],
+  ] as const;
+
+  await ensureDefaultMembershipTiers();
+
+  const tiers = await prisma.membershipTier.findMany({
+    where: { name: { in: expected.map(([name]) => name) } },
+    orderBy: { monthlyPriceGbp: 'asc' },
+  });
+
+  assert.deepEqual(
+    tiers.map((tier) => [tier.name, tier.monthlyPriceGbp] as const),
+    expected,
+  );
+  assert.ok(tiers.every((tier) => tier.active === false));
+});
 
 test('membership purchases use the active server-side tier price and remain disabled by default', async (context) => {
   const suffix = randomUUID();
@@ -22,7 +45,7 @@ test('membership purchases use the active server-side tier price and remain disa
     }
   });
 
-  const retailer = await prisma.user.create({ data: { email: `membership-billing-${suffix}@example.test`, passwordHash: 'not-used', role: 'RETAILER', contactName: 'Membership Billing Retailer' } });
+  const retailer = await prisma.user.create({ data: { email: `membership-billing-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Membership Billing Retailer' } });
   retailerId = retailer.id;
   const tier = await prisma.membershipTier.create({
     data: { name: `Membership billing ${suffix}`, description: 'Fictional test tier', monthlyPriceGbp: 49, freeTenderOpportunitiesPerMonth: 10, active: true },

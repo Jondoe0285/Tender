@@ -46,6 +46,26 @@ export const SERVICE_CATALOG = {
     'Welfare and temporary accommodation': ['Site cabins', 'Drying rooms', 'Toilets', 'Welfare units', 'Storage containers', 'Temporary offices', 'Canteen units'],
     'Transport, haulage and logistics': ['Plant trailers', 'Low loaders', 'HIAB vehicles', 'Abnormal load transport', 'Loader/securer services', 'Lifting supervisors', 'Slinger/signallers', 'Plant marshals'],
   },
+  'Contractor Services': {
+    'Groundworks & Civil Engineering': ['Groundworks, drainage, roads, utilities, concrete and civils activities'],
+    'Demolition & Enabling Works': ['Demolition, strip-out, clearance, remediation and enabling activities'],
+    'General Building & Construction': ['General building, refurbishment, structural and construction works'],
+    'Roofing & Cladding': ['Roofing, roof maintenance, cladding and rainwater systems'],
+    'Carpentry, Joinery & Fit-Out': ['Carpentry, joinery, interiors, kitchens, doors and fit-out works'],
+    'Mechanical, Plumbing & HVAC': ['Mechanical installation, plumbing, heating, ventilation and air conditioning'],
+    'Electrical, Data & Renewables': ['Electrical works, testing, data, temporary power, EV charging and renewables'],
+    'Fire, Security & Life Safety': ['Fire protection, alarms, access control, CCTV and security systems'],
+    'Finishing Trades': ['Plastering, dry lining, decoration, flooring, tiling, ceilings and partitions'],
+    'External Works & Landscaping': ['Fencing, surfacing, landscaping, grounds works and external finishing'],
+    'Facilities, Maintenance & Cleaning': ['Planned and reactive maintenance, cleaning and property support services'],
+    'Transport, Haulage & Logistics': ['Haulage, specialist transport, courier and delivery support'],
+    'Specialist Construction Services': ['Scaffolding, drilling, cutting, welding, temporary works and specialist access'],
+    'Labour & Workforce Supply': ['General labour, skilled trades, plant operators, supervisors and site management'],
+  },
+  'Professional Services': {
+    'Surveying, Design & Engineering': ['Surveying, architecture, engineering, project management and technical design'],
+    'Safety, Compliance & Consultancy': ['Health and safety, CDM, Principal Designer, quality, environmental, fire, occupational health, training and management-system consultancy'],
+  },
 } as const;
 
 export type ServiceName = keyof typeof SERVICE_CATALOG;
@@ -88,6 +108,8 @@ export function isValidSubcategory(service: string, category: string, item?: str
       Materials: ['Bricks and blocks', 'Aggregates', 'Timber', 'Insulation', 'Roofing materials', 'Plumbing and drainage materials', 'Electrical supplies', 'Other materials'],
       Waste: ['Skip hire', 'Muck away', 'Waste collection', 'Recycling and disposal', 'Other waste services'],
       'Plant Hire': ['Excavators', 'Dumpers', 'Access and scaffolding', 'Welfare units', 'Generators and power', 'Other plant hire'],
+      'Contractor Services': [],
+      'Professional Services': [],
     };
     return categoriesForService(normalised).includes(category) || legacyLabels[normalised].includes(category) || Object.values(SERVICE_CATALOG[normalised]).some((items) => items.includes(category));
   }

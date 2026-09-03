@@ -90,7 +90,7 @@ export function QuoteComparison({
         <p className="text-xs text-concrete-grey">Select a column heading to sort</p>
       </div>
 
-      <div className="hidden overflow-x-auto rounded-card border border-slate-200 bg-white shadow-soft md:block">
+      <div className="hidden overflow-x-auto rounded-card border border-slate-200 bg-white shadow-soft lg:block">
         <table className="w-full min-w-[900px] border-collapse text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-concrete-grey">
             <tr>
@@ -123,7 +123,7 @@ export function QuoteComparison({
         </table>
       </div>
 
-      <div className="flex flex-col gap-4 md:hidden">
+      <div className="flex flex-col gap-4 lg:hidden">
         {sortedQuotes.map((quote) => (
           <QuoteCard
             key={quote.id}

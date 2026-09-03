@@ -21,8 +21,8 @@ The following advertising types are strictly prohibited:
 ### Platform-Competitive Restrictions
 
 - **Direct Competition**: Advertising directly competing with Trade Tender's core business model
-- **Tender Interference**: Any advertising attempting to bypass the tender matching system or influence Client decisions outside the proper workflow
-- **Recruitment Conflicts**: During active tenders, advertising from Retailers competing in those same tenders
+- **Tender Interference**: Any advertising attempting to bypass the tender matching system or influence Contractor decisions outside the proper workflow
+- **Recruitment Conflicts**: During active tenders, advertising from Providers competing in those same tenders
 
 ### Privacy and Data Restrictions
 

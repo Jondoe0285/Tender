@@ -13,7 +13,7 @@ import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [role, setRole] = useState<'CLIENT' | 'RETAILER'>('CLIENT');
+  const [role, setRole] = useState<'CONTRACTOR' | 'PROVIDER'>('CONTRACTOR');
   const [coverageScope, setCoverageScope] = useState<'COUNTY' | 'REGION' | 'UK'>('COUNTY');
   const [counties, setCounties] = useState<string[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
@@ -41,11 +41,11 @@ export default function RegisterPage() {
         role,
         termsAccepted: form.get('termsAccepted') === 'on',
         companyName: form.get('companyName') || undefined,
-        categories: role === 'RETAILER' ? categories : undefined,
+        categories: role === 'PROVIDER' ? categories : undefined,
         coverageAreas: form.get('coverageAreas') || undefined,
-        coverageScope: role === 'RETAILER' ? coverageScope : undefined,
-        counties: role === 'RETAILER' && coverageScope === 'COUNTY' ? counties : undefined,
-        regions: role === 'RETAILER' && coverageScope === 'REGION' ? regions : undefined,
+        coverageScope: role === 'PROVIDER' ? coverageScope : undefined,
+        counties: role === 'PROVIDER' && coverageScope === 'COUNTY' ? counties : undefined,
+        regions: role === 'PROVIDER' && coverageScope === 'REGION' ? regions : undefined,
       }),
     });
 
@@ -70,7 +70,7 @@ export default function RegisterPage() {
           </p>
 
           <div className="mt-6 flex gap-2 rounded-lg bg-slate-100 p-1" role="radiogroup" aria-label="Account type">
-            {(['CLIENT', 'RETAILER'] as const).map((option) => (
+            {(['CONTRACTOR', 'PROVIDER'] as const).map((option) => (
               <button
                 key={option}
                 type="button"
@@ -83,14 +83,14 @@ export default function RegisterPage() {
                     : 'text-concrete-grey hover:text-foundation-navy'
                 }`}
               >
-                {option === 'CLIENT' ? 'Client' : 'Retailer'}
+                {option === 'CONTRACTOR' ? 'Contractor' : 'Provider'}
               </button>
             ))}
           </div>
           <p className="mt-3 text-xs text-concrete-grey">
-            {role === 'CLIENT'
+            {role === 'CONTRACTOR'
               ? 'For construction businesses raising requirements and comparing trade prices.'
-              : 'For merchants and suppliers responding to matched construction demand.'}
+              : 'For providers responding to matched construction demand.'}
           </p>
 
           <Card className="mt-6">
@@ -123,10 +123,10 @@ export default function RegisterPage() {
                 <Input id="companyName" name="companyName" required autoComplete="organization" />
               </FieldGroup>
 
-              {role === 'RETAILER' && (
+              {role === 'PROVIDER' && (
                 <>
                   <fieldset className="flex flex-col gap-2">
-                    <legend className="text-sm font-semibold text-foundation-navy">Categories you supply</legend>
+                    <legend className="text-sm font-semibold text-foundation-navy">Categories you provide</legend>
                     <p className="text-xs text-concrete-grey">These categories determine which tender opportunities are matched to you.</p>
                     {CATEGORY_NAMES.map((category) => (
                       <label key={category} className="flex items-center gap-3 text-sm text-concrete-grey">

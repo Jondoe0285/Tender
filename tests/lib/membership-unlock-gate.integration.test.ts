@@ -37,8 +37,8 @@ test('an active membership allowance cannot unlock a tender while membership tie
   });
 
   const [client, retailer] = await Promise.all([
-    prisma.user.create({ data: { email: `membership-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CLIENT', contactName: 'Membership Client' } }),
-    prisma.user.create({ data: { email: `membership-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'RETAILER', contactName: 'Membership Retailer' } }),
+    prisma.user.create({ data: { email: `membership-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CONTRACTOR', contactName: 'Membership Client' } }),
+    prisma.user.create({ data: { email: `membership-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Membership Retailer' } }),
   ]);
   clientId = client.id;
   retailerId = retailer.id;

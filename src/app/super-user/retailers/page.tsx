@@ -10,7 +10,7 @@ export default async function RetailerManagementPage() {
   if (user.isAccountant) redirect('/super-user/accounting');
 
   const retailers = await prisma.user.findMany({
-    where: { role: 'RETAILER' },
+    where: { role: 'PROVIDER' },
     orderBy: { createdAt: 'desc' },
     include: {
       retailerProfile: true,
@@ -25,10 +25,10 @@ export default async function RetailerManagementPage() {
   });
 
   return (
-    <AppShell role="super-user" title="Retailer Management">
-      <p className="mb-6 max-w-xl text-sm text-concrete-grey">Registered Retailer accounts and their activity.</p>
+    <AppShell role="super-user" title="Provider Management">
+      <p className="mb-6 max-w-xl text-sm text-concrete-grey">Registered Provider accounts and their activity.</p>
       <AccountManagementTable
-        role="RETAILER"
+        role="PROVIDER"
         rows={retailers.map((retailer) => ({
           id: retailer.id,
           email: retailer.email,

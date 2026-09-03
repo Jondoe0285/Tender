@@ -6,22 +6,22 @@ const policies = [
   {
     id: 'platform-terms',
     title: 'Platform Terms and Conditions',
-    text: 'These terms govern use of Trade Tender as a construction tender-management platform. Trade Tender connects Clients and Retailers but is not the supplier, contractor, broker, guarantor, or party responsible for the final transaction.',
+    text: 'These terms govern use of Trade Tender as a construction tender-management platform. Trade Tender connects Contractors and Providers but is not the supplier, contractor, broker, guarantor, or party responsible for the final transaction.',
   },
   {
     id: 'client-terms',
-    title: 'Client Terms of Use',
-    text: 'Clients are responsible for accurate tender information, their quote decisions, and agreements made with Retailers after authorised contact release.',
+    title: 'Contractor Terms of Use',
+    text: 'Contractors are responsible for accurate tender information, their quote decisions, and agreements made with Providers after authorised contact release.',
   },
   {
     id: 'retailer-terms',
-    title: 'Retailer Terms of Use',
-    text: 'Retailers are responsible for the accuracy, availability, price, lead time, and terms of every quote submitted through the platform.',
+    title: 'Provider Terms of Use',
+    text: 'Providers are responsible for the accuracy, availability, price, lead time, and terms of every quote submitted through the platform.',
   },
   {
     id: 'marketplace-disclaimer',
     title: 'Marketplace Disclaimer and Platform Role Statement',
-    text: 'Trade Tender provides tender-management and connection tools. It does not endorse, guarantee, inspect, supply, contract for, or resolve disputes relating to Client-Retailer transactions.',
+    text: 'Trade Tender provides tender-management and connection tools. It does not endorse, guarantee, inspect, supply, contract for, or resolve disputes relating to Contractor-Provider transactions.',
   },
   {
     id: 'privacy',
@@ -41,12 +41,12 @@ const policies = [
   {
     id: 'payments',
     title: 'Payment and Refund Policy',
-    text: 'Current fees are a £10 Retailer tender unlock fee and a £10 Client Accepted Quote Release Fee, both excluding VAT. All quoted line prices and totals are displayed excluding VAT. VAT is added at the prevailing rate set by Trade Tender and is charged with the fee at checkout; the fee, VAT amount, and total paid are recorded against each payment. Access and contact release depend on server-confirmed payment or an approved waiver; redirects alone do not confirm payment.',
+    text: 'Current fees are a £10 Provider tender unlock fee and a £10 Contractor Accepted Quote Release Fee, both excluding VAT. All quoted line prices and totals are displayed excluding VAT. VAT is added at the prevailing rate set by Trade Tender and is charged with the fee at checkout; the fee, VAT amount, and total paid are recorded against each payment. Access and contact release depend on server-confirmed payment or an approved waiver; redirects alone do not confirm payment.',
   },
   {
     id: 'contact-release',
     title: 'Contact-Release Policy',
-    text: 'Client and Retailer identities remain private until the Client accepts a quote and the required release condition is confirmed. Each release is authorised server-side and audited.',
+    text: 'Contractor and Provider identities remain private until the Contractor accepts a quote and the required release condition is confirmed. Each release is authorised server-side and audited.',
   },
   {
     id: 'acceptable-use',
@@ -56,12 +56,12 @@ const policies = [
   {
     id: 'partners',
     title: 'Advertising and Partner Links Policy',
-    text: 'Partner information and advertising are clearly labelled and are separate from tender matching, quote ranking, supplier selection, Client decisions, and payment outcomes.',
+    text: 'Partner information and advertising are clearly labelled and are separate from tender matching, quote ranking, supplier selection, Contractor decisions, and payment outcomes.',
   },
   {
     id: 'support',
     title: 'Complaints and Support Policy',
-    text: 'For account, access, payment, or platform support, contact the support team with the relevant tender, quote, or payment reference where applicable. Transaction and delivery disputes remain a matter for the Client and Retailer.',
+    text: 'For account, access, payment, or platform support, contact the support team with the relevant tender, quote, or payment reference where applicable. Transaction and delivery disputes remain a matter for the Contractor and Provider.',
   },
   {
     id: 'accessibility',

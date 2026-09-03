@@ -5,6 +5,9 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { FieldGroup, Input, Label, PasswordInput } from '@/components/ui/Field';
+import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
+import { SERVICE_NAMES } from '@/lib/categories';
+import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 
 type Profile = {
   firstName: string;
@@ -12,13 +15,15 @@ type Profile = {
   email: string;
   phoneNumber: string;
   companyName: string | null;
+  services: string[];
+  operatingLocations: string[];
   tradeTenderId: string | null;
   isPrimaryUser: boolean;
   additionalUsers: Array<{ id: string; user: { firstName: string | null; lastName: string | null; contactName: string; email: string } }>;
 };
 
 const emptyProfile: Profile = {
-  firstName: '', lastName: '', email: '', phoneNumber: '', companyName: null, tradeTenderId: null, isPrimaryUser: false, additionalUsers: [],
+  firstName: '', lastName: '', email: '', phoneNumber: '', companyName: null, services: [], operatingLocations: [], tradeTenderId: null, isPrimaryUser: false, additionalUsers: [],
 };
 
 export default function ClientProfilePage() {
@@ -47,7 +52,7 @@ export default function ClientProfilePage() {
       body: JSON.stringify({
         firstName: profile.firstName, lastName: profile.lastName, email: profile.email,
         phoneNumber: profile.phoneNumber || undefined,
-        ...(profile.isPrimaryUser ? { companyName: profile.companyName } : {}),
+        ...(profile.isPrimaryUser ? { companyName: profile.companyName, services: profile.services, operatingLocations: profile.operatingLocations } : {}),
       }),
     });
     setSaving(false);
@@ -103,6 +108,8 @@ export default function ClientProfilePage() {
               <FieldGroup><Label htmlFor="email">Email address</Label><Input id="email" type="email" value={profile.email} onChange={(event) => setProfile({ ...profile, email: event.target.value })} autoComplete="email" /></FieldGroup>
               <FieldGroup><Label htmlFor="phone">Phone number</Label><Input id="phone" type="tel" value={profile.phoneNumber} onChange={(event) => setProfile({ ...profile, phoneNumber: event.target.value })} autoComplete="tel" /></FieldGroup>
               {profile.isPrimaryUser && <FieldGroup wide><Label htmlFor="companyName">Company name</Label><Input id="companyName" value={profile.companyName ?? ''} onChange={(event) => setProfile({ ...profile, companyName: event.target.value })} autoComplete="organization" /></FieldGroup>}
+              {profile.isPrimaryUser && <FieldGroup wide><Label>Services</Label><MultiSelectDropdown options={SERVICE_NAMES.map((service) => ({ label: service, value: service }))} selected={profile.services} onChange={(services) => setProfile({ ...profile, services })} placeholder="Select services offered" /></FieldGroup>}
+              {profile.isPrimaryUser && <FieldGroup wide><Label>Operating locations</Label><MultiSelectDropdown options={[...UK_REGIONS, ...UK_COUNTIES].map((location) => ({ label: location, value: location }))} selected={profile.operatingLocations} onChange={(operatingLocations) => setProfile({ ...profile, operatingLocations })} placeholder="Select regions or counties" /></FieldGroup>}
               <FieldGroup wide><Label htmlFor="tradeTenderId">Trade Tender ID</Label><Input id="tradeTenderId" value={profile.tradeTenderId ?? 'Not assigned'} readOnly /></FieldGroup>
               <div className="sm:col-span-2"><Button onClick={saveProfile} loading={saving}>Save profile</Button></div>
             </div>

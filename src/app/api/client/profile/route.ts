@@ -7,6 +7,8 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { isPrimaryClientUser } from '@/lib/client-company';
 import { toErrorResponse } from '@/server/http/errors';
+import { SERVICE_NAMES } from '@/lib/categories';
+import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 
 const personalProfileSchema = z.object({
   firstName: z.string().trim().min(1).max(80),
@@ -17,6 +19,8 @@ const personalProfileSchema = z.object({
 
 const profileUpdateSchema = personalProfileSchema.extend({
   companyName: z.string().trim().min(2).max(160).optional(),
+  services: z.array(z.enum(SERVICE_NAMES)).max(SERVICE_NAMES.length).optional(),
+  operatingLocations: z.array(z.enum([...UK_COUNTIES, ...UK_REGIONS])).max(UK_COUNTIES.length + UK_REGIONS.length).optional(),
 });
 
 const passwordSchema = z.object({
@@ -37,7 +41,7 @@ async function getClientCompanyMembership(userId: string) {
 
 export async function GET() {
   try {
-    const user = await requireRole('CLIENT');
+    const user = await requireRole('CONTRACTOR');
     const [account, membership] = await Promise.all([
       prisma.user.findUniqueOrThrow({
         where: { id: user.id },
@@ -52,6 +56,8 @@ export async function GET() {
       email: account.email,
       phoneNumber: account.contactPhone ?? '',
       companyName: membership?.company.companyName ?? null,
+      services: membership?.company.services ? membership.company.services.split(',').filter(Boolean) : [],
+      operatingLocations: membership?.company.operatingLocations ? membership.company.operatingLocations.split(',').filter(Boolean) : [],
       tradeTenderId: membership?.company.tradeTenderId ?? null,
       isPrimaryUser: membership ? isPrimaryClientUser(membership.company.primaryUserId, user.id) : false,
       additionalUsers: membership && isPrimaryClientUser(membership.company.primaryUserId, user.id)
@@ -71,14 +77,14 @@ export async function PUT(request: Request) {
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
-    const user = await requireRole('CLIENT');
+    const user = await requireRole('CONTRACTOR');
     const parsed = profileUpdateSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: 'Invalid profile details' }, { status: 400 });
 
     const membership = await getClientCompanyMembership(user.id);
     if (!membership) return NextResponse.json({ error: 'Client company membership is required' }, { status: 409 });
     const isPrimaryUser = isPrimaryClientUser(membership.company.primaryUserId, user.id);
-    if (parsed.data.companyName !== undefined && !isPrimaryUser) {
+    if ((parsed.data.companyName !== undefined || parsed.data.services !== undefined || parsed.data.operatingLocations !== undefined) && !isPrimaryUser) {
       return NextResponse.json({ error: 'Only the primary user can update company details' }, { status: 403 });
     }
 
@@ -95,7 +101,9 @@ export async function PUT(request: Request) {
         },
       }),
       ...(parsed.data.companyName !== undefined
-        ? [prisma.clientCompany.update({ where: { id: membership.companyId }, data: { companyName: parsed.data.companyName } })]
+        ? [prisma.clientCompany.update({ where: { id: membership.companyId }, data: { companyName: parsed.data.companyName, ...(parsed.data.services !== undefined ? { services: parsed.data.services.join(',') } : {}), ...(parsed.data.operatingLocations !== undefined ? { operatingLocations: parsed.data.operatingLocations.join(',') } : {}) } })]
+        : parsed.data.services !== undefined || parsed.data.operatingLocations !== undefined
+          ? [prisma.clientCompany.update({ where: { id: membership.companyId }, data: { ...(parsed.data.services !== undefined ? { services: parsed.data.services.join(',') } : {}), ...(parsed.data.operatingLocations !== undefined ? { operatingLocations: parsed.data.operatingLocations.join(',') } : {}) } })]
         : []),
     ]);
     await recordAuditEvent({ actorId: user.id, action: 'CLIENT_PROFILE_UPDATED', targetType: 'User', targetId: user.id });
@@ -109,7 +117,7 @@ export async function PATCH(request: Request) {
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
-    const user = await requireRole('CLIENT');
+    const user = await requireRole('CONTRACTOR');
     const parsed = passwordSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: 'Invalid password details' }, { status: 400 });
 
@@ -129,7 +137,7 @@ export async function POST(request: Request) {
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
-    const user = await requireRole('CLIENT');
+    const user = await requireRole('CONTRACTOR');
     const parsed = additionalUserSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: 'Invalid additional user details' }, { status: 400 });
 
@@ -145,13 +153,13 @@ export async function POST(request: Request) {
       data: {
         email: parsed.data.email,
         passwordHash: await hashPassword(parsed.data.password),
-        role: 'CLIENT',
+        role: 'CONTRACTOR',
         firstName: parsed.data.firstName,
         lastName: parsed.data.lastName,
         contactName,
         contactPhone: parsed.data.phoneNumber || null,
         termsAcceptedAt: new Date(),
-        roleMemberships: { create: { role: 'CLIENT' } },
+        roleMemberships: { create: { role: 'CONTRACTOR' } },
         clientCompanyMembership: { create: { companyId: membership.companyId } },
       },
       select: { id: true, email: true, firstName: true, lastName: true, contactName: true },

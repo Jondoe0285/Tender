@@ -5,11 +5,12 @@ import { rejectCrossOrigin } from '@/server/http/origin';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { getAdminSettings } from '@/server/domain/platformSettings';
 import { requireFullSuperUser, requireOwner } from '@/server/auth/session';
+import { ensureDefaultMembershipTiers } from '@/server/domain/membershipService';
 
 const settingSchema = z.object({
   action: z.enum(['fee', 'tier', 'subscription']),
   id: z.string().optional(),
-  key: z.enum(['RETAILER_UNLOCK_FEE_GBP', 'CLIENT_RELEASE_FEE_GBP', 'CLIENT_RELEASE_FEE_MODE', 'CLIENT_RELEASE_PERCENTAGE_LOW', 'CLIENT_RELEASE_PERCENTAGE_HIGH', 'VAT_PERCENTAGE', 'SPONSORED_PLACEMENT_ACTIVE', 'SPONSORED_PLACEMENT_FEE_GBP', 'MEMBERSHIP_TIERS_ACTIVE', 'ADSPACE_ACTIVE']).optional(),
+  key: z.enum(['RETAILER_UNLOCK_FEE_GBP', 'CLIENT_RELEASE_FEE_GBP', 'CLIENT_RELEASE_FEE_MODE', 'CLIENT_RELEASE_PERCENTAGE_LOW', 'CLIENT_RELEASE_PERCENTAGE_HIGH', 'CLIENT_RELEASE_PERCENTAGE_TOP', 'VAT_PERCENTAGE', 'SPONSORED_PLACEMENT_ACTIVE', 'SPONSORED_PLACEMENT_FEE_GBP', 'MEMBERSHIP_TIERS_ACTIVE', 'ADSPACE_ACTIVE']).optional(),
   value: z.union([z.number().nonnegative(), z.enum(['FIXED', 'PERCENTAGE']), z.boolean()]).optional(),
   name: z.string().trim().min(2).max(80).optional(),
   description: z.string().trim().max(500).optional(),
@@ -22,6 +23,7 @@ const settingSchema = z.object({
 export async function GET() {
   try {
     await requireFullSuperUser();
+    await ensureDefaultMembershipTiers();
     return NextResponse.json(await getAdminSettings());
   } catch {
     return NextResponse.json({ error: 'Super User access required' }, { status: 403 });

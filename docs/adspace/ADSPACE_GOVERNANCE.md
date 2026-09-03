@@ -14,7 +14,7 @@ Adspace can only be activated by a Super User through the platform settings pane
 
 1. **User Transparency**: All users are informed that advertising may be present on the platform.
 2. **Compliance**: All advertising content must comply with applicable UK and international regulations.
-3. **Separation from Platform Function**: Advertising is kept separate from core platform operations (tender matching, quote ranking, supplier selection, and Client decision-making).
+3. **Separation from Platform Function**: Advertising is kept separate from core platform operations (tender matching, quote ranking, supplier selection, and Contractor decision-making).
 4. **Audit and Recording**: All adspace activations, deactivations, and content decisions are recorded in audit logs.
 
 ## Cookie and Privacy Requirements

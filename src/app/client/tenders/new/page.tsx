@@ -25,7 +25,7 @@ const STEPS: WizardStep[] = [
 
 type FormState = {
   projectName: string;
-  category: ServiceName | '';
+  category: ServiceName | string;
   subcategory: string;
   item: string;
   location: string;
@@ -41,7 +41,7 @@ type FormState = {
 
 type TenderItem = {
   id: string;
-  category: ServiceName | '';
+  category: ServiceName | string;
   subcategory: string;
   item: string;
   quantityValue: string;
@@ -333,7 +333,7 @@ export default function NewTenderPage() {
                 id="category"
                 value={form.category}
                 onChange={(event) => {
-                  update('category', event.target.value as ServiceName);
+                  update('category', event.target.value);
                   update('subcategory', '');
                 }}
               >
@@ -419,7 +419,7 @@ export default function NewTenderPage() {
                             id={`item-${index}-category`}
                             value={item.category}
                             onChange={(event) => {
-                              updateItem(index, 'category', event.target.value as ServiceName);
+                              updateItem(index, 'category', event.target.value);
                               updateItem(index, 'subcategory', '');
                               updateItem(index, 'item', '');
                             }}
@@ -557,8 +557,8 @@ export default function NewTenderPage() {
           <Card className="flex flex-col gap-4">
             <h2 className="font-heading text-lg font-bold text-foundation-navy">Upload Files (optional)</h2>
             <p className="text-sm text-concrete-grey">
-              Attach drawings, specifications, or site photos. These files are saved with the tender so
-              Retailers can review the project context before they unlock the full detail set.
+              Attach drawings, specifications, or site photos. These files are saved with the tender, but
+              Retailers cannot preview or download them until they unlock the full detail set.
             </p>
             <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-6 py-10 text-center hover:border-steel-blue">
               <span className="text-sm font-semibold text-steel-blue">Choose files or drag them here</span>

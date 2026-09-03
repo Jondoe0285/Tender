@@ -8,7 +8,7 @@ import { prisma } from '@/server/data/prisma';
 
 export default async function ClientPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'CLIENT') redirect('/login');
+  if (!user || user.role !== 'CONTRACTOR') redirect('/login');
 
   const [openCount, quotesReceivedCount, awardedCount, recentTenders] = await Promise.all([
     prisma.tender.count({ where: { clientId: user.id, status: 'OPEN' } }),
@@ -33,7 +33,7 @@ export default async function ClientPage() {
       <div className="mx-auto max-w-4xl">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <p className="max-w-xl text-base leading-relaxed text-concrete-grey">
-            Raise a tender for materials, waste services, or plant hire, then compare Retailer quotes here.
+            Raise a tender for materials, waste services, or plant hire, then compare Provider quotes here.
           </p>
           <LinkButton href="/client/tenders/new" size="lg">Create Tender</LinkButton>
         </div>
