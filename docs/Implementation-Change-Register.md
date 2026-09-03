@@ -13,6 +13,13 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-03 - Staging Deployment Verification URL Repair
+
+- Changed: corrected the staging deployment workflow so its verification job reads `STAGING_BASE_URL` directly within the protected staging environment. GitHub masks that environment value and omits it when it is exposed as a cross-job output, which previously passed an empty base URL to the non-destructive verifier after Render accepted the deployment hook.
+- Affects: `.github/workflows/deploy-staging.yml` release verification only. No Render service, staging environment variable, credential, deploy hook, database, or application runtime configuration was changed.
+- Environment: no operator action or environment-resource change is required. The next approved staging deployment continues to require its existing protected-environment approval and will use the already configured `STAGING_BASE_URL` value.
+- Validation: `npm run health:validate-workflows` passes. The repair is based on failed approved staging deployment run `33648207019`, whose verifier exited before issuing any live probe because `--base-url` was empty.
+
 ### 2026-09-03 - Contractor Services And Operating Locations
 
 - Changed: added company-level Contractor services and operating locations. The Contractor profile now lets the primary company user select approved tender catalogue service groups and UK counties or regions. The API validates every value server-side before storing the company-level lists; additional company users can view, but cannot change, shared company details.

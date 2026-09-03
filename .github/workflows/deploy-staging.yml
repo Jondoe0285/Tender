@@ -58,8 +58,6 @@ jobs:
     environment: staging
     permissions:
       contents: read
-    outputs:
-      base_url: ${{ steps.target.outputs.base_url }}
     services:
       postgres:
         image: postgres:16
@@ -127,15 +125,12 @@ jobs:
           curl --fail --silent --show-error --retry 2 --retry-all-errors \
             -X POST "${RENDER_STAGING_DEPLOY_HOOK}&ref=${{ github.event.inputs.commit_sha }}"
 
-      - name: Publish the staging URL
-        id: target
-        run: echo "base_url=${{ secrets.STAGING_BASE_URL }}" >> "$GITHUB_OUTPUT"
-
   verify:
     name: Verify staging deployment
     needs: [deploy]
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: staging
     permissions:
       contents: write
     outputs:
@@ -155,9 +150,11 @@ jobs:
       - name: Run non-destructive verification
         id: checks
         continue-on-error: true
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
         run: |
           node scripts/health-check/verify-deployment.mjs \
-            --base-url "${{ needs.deploy.outputs.base_url }}" \
+            --base-url "$STAGING_BASE_URL" \
             --target staging \
             --sha "${{ github.event.inputs.commit_sha }}"
 
