@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Card } from '@/components/ui/Card';
+import { PasswordInput } from '@/components/ui/Field';
 
 export type OwnerSuperUserRow = {
   id: string;
@@ -109,7 +110,7 @@ export function OwnerConsolePanel({ initialSuperUsers, currentUserId }: { initia
             </label>
             <label className="text-sm text-concrete-grey">
               <span className="mb-1 block font-medium text-foundation-navy">Initial password</span>
-              <input required type="text" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30" />
+              <PasswordInput required value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} />
             </label>
             <label className="text-sm text-concrete-grey">
               <span className="mb-1 block font-medium text-foundation-navy">Phone</span>

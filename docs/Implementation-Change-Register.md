@@ -13,6 +13,13 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-03 - Four Quick-Win Outstanding Actions Completed
+
+- Changed: fixed 4 small, self-contained items from the README Outstanding Actions list. Corrected the tender-creation upload copy so it no longer implies Retailers can preview attachments before unlock ([src/app/client/tenders/new/page.tsx](../src/app/client/tenders/new/page.tsx)). Replaced the plain-text initial password field on the Super User creation form with the shared `PasswordInput` reveal control ([src/components/admin/OwnerConsolePanel.tsx](../src/components/admin/OwnerConsolePanel.tsx)). Moved the quote comparison table/card breakpoint from `md` to `lg` so tablet widths use the condensed card layout instead of forcing horizontal scroll ([src/components/quotes/QuoteComparison.tsx](../src/components/quotes/QuoteComparison.tsx)). Added Escape-to-close and Tab focus trapping to the mobile navigation dialog ([src/components/layout/AppShell.tsx](../src/components/layout/AppShell.tsx)).
+- Affects: UI copy and layout only. No schema, API, or environment changes.
+- Environment: no operator action.
+- Validation: `npm run type-check` and `npm run lint` pass. No behavioral/schema change, so no new automated test was required; manual keyboard/tablet verification recommended before the next staging deploy.
+
 ### 2026-09-03 - Phased Implementation Plan For New Business Plan
 
 - Changed: added a "New Business Plan Implementation Plan" section to [README.md](../README.md), breaking the 4 code-affecting baseline decisions into four sequential phases: (1) Contractor/Provider terminology rename (labels/routes first, `Role` enum migration last, as the highest-risk step), (2) active Super-User-managed partner advertising, (3) job/tender-package data model and matching engine rework, (4) subscription tier price alignment (still inactive).

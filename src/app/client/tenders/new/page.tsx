@@ -557,8 +557,8 @@ export default function NewTenderPage() {
           <Card className="flex flex-col gap-4">
             <h2 className="font-heading text-lg font-bold text-foundation-navy">Upload Files (optional)</h2>
             <p className="text-sm text-concrete-grey">
-              Attach drawings, specifications, or site photos. These files are saved with the tender so
-              Retailers can review the project context before they unlock the full detail set.
+              Attach drawings, specifications, or site photos. These files are saved with the tender, but
+              Retailers cannot preview or download them until they unlock the full detail set.
             </p>
             <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-6 py-10 text-center hover:border-steel-blue">
               <span className="text-sm font-semibold text-steel-blue">Choose files or drag them here</span>

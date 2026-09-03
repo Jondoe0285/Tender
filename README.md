@@ -181,21 +181,22 @@ Work top to bottom — production config first, then engineering debt. Items tha
 - [ ] **Make Retailer coverage selection keyboard accessible.** The multi-select trigger is a
   non-focusable `div` without roles, keyboard interaction, or popup state. Replace it with a native
   control or complete accessible listbox pattern and test keyboard and screen-reader use.
-- [ ] **Correct staged-privacy copy in tender creation.** The upload guidance says Retailers can
-  review drawings and site photos before unlock, contradicting platform policy. State clearly that
-  attachments and full specifications become available only after server-confirmed unlock.
+- [x] **Correct staged-privacy copy in tender creation.** Fixed: the upload guidance now states
+  attachments and full specifications become available only after server-confirmed unlock, instead
+  of implying Retailers can review them beforehand.
 - [ ] **Separate sponsored content from quote comparison.** Sponsored Retailer quotes are displayed
   beside price and lead-time data immediately above the decision workflow, contrary to advertising
   governance. Move advertising to a clearly labelled partner-information surface outside ranking
   and supplier selection.
-- [ ] **Fix mobile navigation dialog behaviour.** Add Escape dismissal, focus trapping, and opener
-  focus restoration; test keyboard navigation in the mobile sidebar.
-- [ ] **Keep quote comparison usable at tablet widths.** The desktop table activates at `md` with a
-  900px minimum width, forcing horizontal scrolling alongside the sidebar. Use a
-  container-appropriate breakpoint or condensed comparison layout.
-- [ ] **Protect initial administrator-created passwords.** The Super User account form renders the
-  password in plain text. Use a password field with a deliberate reveal control or an invitation
-  flow so administrators do not handle credentials unnecessarily.
+- [x] **Fix mobile navigation dialog behaviour.** Fixed: the mobile sidebar dialog now closes on
+  Escape, traps Tab focus within the drawer while open, and restores focus to the opener/drawer on
+  toggle.
+- [x] **Keep quote comparison usable at tablet widths.** Fixed: the desktop comparison table now
+  activates at `lg` instead of `md`, so tablet widths use the condensed card layout instead of
+  forcing horizontal scroll.
+- [x] **Protect initial administrator-created passwords.** Fixed: the Super User account creation
+  form now uses the shared `PasswordInput` control with a deliberate reveal toggle instead of a
+  plain-text field.
 - [ ] **Make the shared combobox announce the active option.** It changes a private active index
   without `aria-activedescendant` or stable option IDs. Implement the ARIA combobox pattern or use
   a tested accessible primitive.
