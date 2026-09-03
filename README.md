@@ -3,6 +3,77 @@
 Detailed product scope: [business plan](docs/TradeTender-Business-Plan.md). Technical and release
 procedures: [docs](docs/).
 
+## New Business Plan Implementation Plan
+
+The 2026-09-03 baseline business plan resolved 10 open decisions (see the "Baseline Change Notes"
+section of [the business plan](docs/TradeTender-Business-Plan.md)). Four of them require code
+changes; this is their phased delivery plan. Work top to bottom — each phase should ship, be
+verified in staging, and be reflected in the Implementation Change Register before the next phase
+starts, since later phases depend on earlier ones.
+
+### Phase 1: Contractor / Provider Terminology Rename
+
+Pure rename per decision #1: `Contractor` = current `Client`, `Provider` = current `Retailer`. No
+new roles, no permission-model change.
+
+- [ ] **Rename user-facing labels and copy** across portals, emails, and policies from
+  Client/Retailer to Contractor/Provider, without touching the `Role` enum or routes yet.
+- [ ] **Add route aliases with redirects.** Introduce `/contractor` and `/provider` portal routes
+  that render the existing `/client` and `/retailer` pages, then redirect the old paths so no
+  existing link or bookmark breaks.
+- [ ] **Rename the `Role` enum and database columns in a dedicated migration** (`CLIENT` →
+  `CONTRACTOR`, `RETAILER` → `PROVIDER`), updating every `requireRole` check, seed data, and test
+  fixture in the same change. Do this only after Phase steps above are verified in staging, since
+  it is the highest-risk, hardest-to-roll-back step.
+- [ ] **Update all documentation** (`docs/`, `.github/copilot-instructions.md`,
+  `docs/Security-Requirements.md`, `docs/Product-Requirements.md`) to drop the "renamed from"
+  transitional note once the rename is live everywhere.
+
+### Phase 2: Active Partner Advertising
+
+Approved per decision #5: move from static footer logos to a Super-User-managed system.
+
+- [ ] **Add a `Partner` model and migration**: name, logo path, destination URL, display location,
+  active status, and campaign source.
+- [ ] **Build Super User CRUD screens** to create, edit, activate/deactivate, and reorder partners,
+  audit-logged per change (matching the existing admin patterns in `/super-user`).
+- [ ] **Replace the hardcoded partner block in `SiteFooter.tsx`** with a server-rendered list of
+  active partners from the database, preserving the "clearly labelled as advertising" requirement
+  and the separation from tender matching/quote ranking.
+- [ ] **Migrate existing partners** (Sinclair Safety Solutions Ltd, Smart Works Civils Ltd, HSQE
+  Consult Hub) into the new table as the initial seeded rows.
+
+### Phase 3: Job / Tender-Package Data Model
+
+Approved per decision #2 — the largest change: a job splits into multiple independently-matched
+tender packages by category.
+
+- [ ] **Design the schema**: a `TenderPackage` (or similar) model with a one-to-many relation from
+  the job/tender, each package carrying its own category, subcategory, requirement detail, match
+  set, unlock state, and quotes. Confirm with the Super User whether existing `Tender` becomes the
+  "job" and packages are a new child entity, or whether naming changes further.
+- [ ] **Write the migration and backfill**, converting every existing single-category `Tender` into
+  a job with exactly one package, so no historical data is lost.
+- [ ] **Rework the matching engine** to match Providers per package (category + capability +
+  location) instead of per whole tender.
+- [ ] **Update the Contractor job-creation form** to select multiple package types per job (per
+  Section 4.1/10.2 of the business plan) instead of a single category/subcategory.
+- [ ] **Update Provider-facing views, unlock, and quote submission** to operate per package rather
+  than per tender, including pre-unlock summaries scoped to the relevant package only.
+- [ ] **Update Super User analytics filters** to add package-level reporting alongside existing
+  tender-level reporting.
+- [ ] **Add regression tests** covering multi-package jobs, per-package matching, and per-package
+  unlock/quote isolation (a Provider unlocking one package must not see another package's details).
+
+### Phase 4: Subscription Tier Pricing Alignment
+
+Confirmed per decision #10 — no activation yet, just keep the inactive feature ready with the
+final agreed prices.
+
+- [ ] **Update the inactive subscription tier constants/seed data** to Free £0, Starter £29, Growth
+  £49, Pro £99, Enterprise £149–199, so the feature is correct whenever the Super User activates it.
+  No other behavior change; `MEMBERSHIP_TIERS_ACTIVE` (or equivalent) stays off.
+
 ## Outstanding Actions
 
 Work top to bottom — production config first, then engineering debt. Items that state
