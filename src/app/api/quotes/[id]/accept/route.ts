@@ -8,7 +8,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
   try {
     const originError = rejectCrossOrigin(_request);
     if (originError) return originError;
-    const user = await requireRole('CLIENT');
+    const user = await requireRole('CONTRACTOR');
     const outcome = await acceptQuote(user.id, params.id);
     return NextResponse.json(outcome);
   } catch (error) {

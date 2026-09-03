@@ -7,7 +7,7 @@ export const registerSchema = z.object({
   firstName: z.string().trim().min(1).max(80).optional(),
   lastName: z.string().trim().min(1).max(80).optional(),
   contactPhone: z.string().trim().max(40).optional(),
-  role: z.enum(['CLIENT', 'RETAILER']),
+  role: z.enum(['CONTRACTOR', 'PROVIDER']),
   termsAccepted: z.literal(true, { message: 'You must accept the terms to register' }),
   companyName: z.string().trim().min(2).max(160).optional(),
   categories: z.array(z.string()).optional(),

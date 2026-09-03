@@ -19,7 +19,7 @@ const sourceSans = Source_Sans_3({
 export const metadata = {
   title: 'Trade Tender | The tender platform for construction supply',
   description:
-    'Connect. Compare. Construct. Trade Tender connects construction Clients with Retailers through a clear tender and quotation process.',
+    'Connect. Compare. Construct. Trade Tender connects construction Contractors with Providers through a clear tender and quotation process.',
 };
 
 export default function RootLayout({

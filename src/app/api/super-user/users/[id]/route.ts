@@ -90,7 +90,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   if (action === 'set-release-credits') {
-    if (user.role !== 'CLIENT') {
+    if (user.role !== 'CONTRACTOR') {
       return NextResponse.json({ error: 'Release credits only apply to Client accounts' }, { status: 400 });
     }
     const releaseCreditsLeft = Number(body?.releaseCreditsLeft);
@@ -121,7 +121,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   if (action === 'set-launch-credits') {
-    if (user.role !== 'RETAILER') {
+    if (user.role !== 'PROVIDER') {
       return NextResponse.json({ error: 'Launch credits only apply to Retailer accounts' }, { status: 400 });
     }
     const launchCreditsLeft = Number(body?.launchCreditsLeft);

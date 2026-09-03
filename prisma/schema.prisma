@@ -11,8 +11,8 @@ datasource db {
 
 enum Role {
   SUPER_USER
-  CLIENT
-  RETAILER
+  CONTRACTOR
+  PROVIDER
 }
 
 enum TenderStatus {
@@ -185,6 +185,8 @@ model ClientCompany {
   id            String   @id @default(cuid())
   tradeTenderId String?  @unique
   companyName   String
+  services      String   @default("")
+  operatingLocations String @default("")
   primaryUserId String   @unique
   primaryUser   User     @relation("ClientCompanyPrimary", fields: [primaryUserId], references: [id])
   releaseCreditsLeft Int  @default(0)
@@ -210,6 +212,21 @@ model PlatformSetting {
   key       String   @unique
   value     String
   updatedAt DateTime @updatedAt
+}
+
+model Partner {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  logoPath        String
+  destinationUrl  String?
+  displayLocation String
+  campaignSource  String?
+  sortOrder       Int      @default(0)
+  active          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([displayLocation, active, sortOrder])
 }
 
 model CategoryDefinition {
@@ -362,6 +379,7 @@ model Tender {
   status        TenderStatus @default(OPEN)
   createdAt     DateTime     @default(now())
 
+  packages      TenderPackage[]
   matches       TenderMatch[]
   unlocks       Unlock[]
   unlockPayments Payment[] @relation("TenderUnlockPayments")
@@ -370,6 +388,28 @@ model Tender {
   attachments   TenderAttachment[]
   messages      TenderMessage[]
   legalHolds    LegalHold[] @relation("LegalHoldTender")
+}
+
+model TenderPackage {
+  id           String       @id @default(cuid())
+  tenderId     String
+  tender       Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  reference    String       @unique
+  category     String
+  subcategory  String
+  service      String       @default("Materials")
+  item         String?
+  location     String
+  quantity     String
+  urgency      String
+  closingDate  DateTime
+  supplyDate   DateTime?
+  requirements String       // comma-separated tick-box requirements
+  description  String
+  status       TenderStatus @default(OPEN)
+  createdAt    DateTime     @default(now())
+
+  @@index([tenderId, status, createdAt])
 }
 
 model TenderMessage {

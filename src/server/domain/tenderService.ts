@@ -24,19 +24,27 @@ export function retailerCanMatchTender(
     && tenderCategories.some((category) => retailerCategories.includes(category));
 }
 
+export function getTenderPackageCategories<T extends { category: string }>(packages: readonly T[] | null | undefined): string[] {
+  return (packages ?? []).map((pkg) => pkg.category);
+}
+
 /** Rechecks the mutable retailer capability and coverage controls before paid tender activity. */
 export async function assertRetailerEligibleForTender(retailerId: string, tenderId: string): Promise<void> {
   const [match, profile] = await Promise.all([
     prisma.tenderMatch.findUnique({
       where: { tenderId_retailerId: { tenderId, retailerId } },
-      include: { tender: { select: { location: true, items: { select: { category: true } } } } },
+      include: { tender: { select: { location: true, items: { select: { category: true } }, packages: { select: { category: true } } } } },
     }),
     prisma.retailerProfile.findUnique({
       where: { userId: retailerId },
       select: { coverageScope: true, counties: true, regions: true, categories: true },
     }),
   ]);
-  if (!match || !profile || !retailerCanMatchTender(profile, match.tender.location, match.tender.items.map((item) => item.category))) {
+  const tenderCategories = [...new Set([
+    ...getTenderPackageCategories(match?.tender.packages),
+    ...match?.tender.items.map((item) => item.category) ?? [],
+  ])];
+  if (!match || !profile || !retailerCanMatchTender(profile, match.tender.location, tenderCategories)) {
     throw new ForbiddenError('Tender is not eligible for this Retailer');
   }
 }
@@ -106,6 +114,54 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
         })),
       },
     },
+  });
+
+  const packages = [
+    {
+      category: input.category,
+      subcategory: input.subcategory,
+      service: input.category,
+      item: input.item ?? null,
+      location: input.location,
+      quantity: input.quantity,
+      urgency: input.urgency,
+      closingDate: input.closingDate,
+      supplyDate: input.supplyDate ?? null,
+      requirements: input.requirements.join(','),
+      description: input.description,
+    },
+    ...(input.items ?? []).map((item) => ({
+      category: item.category,
+      subcategory: item.subcategory,
+      service: item.category,
+      item: item.item ?? null,
+      location: input.location,
+      quantity: item.quantity,
+      urgency: input.urgency,
+      closingDate: input.closingDate,
+      supplyDate: input.supplyDate ?? null,
+      requirements: input.requirements.join(','),
+      description: item.description,
+    })),
+  ];
+
+  await prisma.tenderPackage.createMany({
+    data: packages.map((pkg, index) => ({
+      tenderId: tender.id,
+      reference: `${tender.reference}-PK${index + 1}`,
+      category: pkg.category,
+      subcategory: pkg.subcategory,
+      service: pkg.service,
+      item: pkg.item,
+      location: pkg.location,
+      quantity: pkg.quantity,
+      urgency: pkg.urgency,
+      closingDate: pkg.closingDate,
+      supplyDate: pkg.supplyDate,
+      requirements: pkg.requirements,
+      description: pkg.description,
+      status: 'OPEN',
+    })),
   });
 
   await recordAuditEvent({
@@ -195,11 +251,15 @@ export async function matchRetailerToOpenTenders(retailerId: string) {
     where: {
       status: 'OPEN',
       closingDate: { gt: new Date() },
-      items: { some: { category: { in: categories } } },
+      OR: [
+        { items: { some: { category: { in: categories } } } },
+        { packages: { some: { category: { in: categories } } } },
+      ],
       matches: { none: { retailerId } },
     },
     include: {
       items: true,
+      packages: true,
       client: { select: { clientCompanyMembership: { select: { company: { select: { tradeTenderId: true } } } } } },
     },
   });
@@ -208,7 +268,9 @@ export async function matchRetailerToOpenTenders(retailerId: string) {
   const retailer = await prisma.user.findUnique({ where: { id: retailerId }, select: { email: true } });
 
   for (const tender of candidateTenders) {
-    if (!retailerCanMatchTender(profile, tender.location, tender.items.map((item) => item.category))) continue;
+    const packageCategories = getTenderPackageCategories(tender.packages);
+    const tenderCategories = [...new Set([...packageCategories, ...tender.items.map((item) => item.category)])];
+    if (!retailerCanMatchTender(profile, tender.location, tenderCategories)) continue;
     const matchingItems = tender.items.filter((item) => categories.includes(item.category));
 
     await prisma.$transaction([
@@ -275,6 +337,7 @@ export async function listMatchedSummariesForRetailer(retailerId: string) {
             closingDate: true,
             status: true,
             requirements: true,
+            packages: { select: { category: true } },
             client: { select: { clientCompanyMembership: { select: { company: { select: { tradeTenderId: true } } } } } },
           },
         },
@@ -287,24 +350,29 @@ export async function listMatchedSummariesForRetailer(retailerId: string) {
     }),
   ]);
 
-  return matches.map((match) => ({
-    id: match.id,
-    notifiedAt: match.notifiedAt,
-    viewedAt: match.viewedAt,
-    tender: {
-      id: match.tender.id,
-      reference: match.tender.reference,
-      category: match.tender.category,
-      location: formatRetailerSummaryLocation(match.tender.location),
-      urgency: match.tender.urgency,
-      closingDate: match.tender.closingDate,
-      status: match.tender.status,
-      clientTradeTenderId: match.tender.client.clientCompanyMembership?.company.tradeTenderId ?? null,
-      requirements: buildRetailerTenderSummary(match.tender.requirements),
-      categoryMatch: true,
-      locationMatch: retailer ? retailerCoversTenderLocation(retailer, match.tender.location) : false,
-    },
-  }));
+  return matches.map((match) => {
+    const packageCategories = [...new Set((match.tender.packages ?? []).map((pkg) => pkg.category))];
+    return {
+      id: match.id,
+      notifiedAt: match.notifiedAt,
+      viewedAt: match.viewedAt,
+      tender: {
+        id: match.tender.id,
+        reference: match.tender.reference,
+        category: match.tender.category,
+        packageCategories,
+        packageCount: packageCategories.length,
+        location: formatRetailerSummaryLocation(match.tender.location),
+        urgency: match.tender.urgency,
+        closingDate: match.tender.closingDate,
+        status: match.tender.status,
+        clientTradeTenderId: match.tender.client.clientCompanyMembership?.company.tradeTenderId ?? null,
+        requirements: buildRetailerTenderSummary(match.tender.requirements),
+        categoryMatch: true,
+        locationMatch: retailer ? retailerCoversTenderLocation(retailer, match.tender.location) : false,
+      },
+    };
+  });
 }
 
 /** Pre-unlock location retains only a broad area plus the approved outward postcode district. */

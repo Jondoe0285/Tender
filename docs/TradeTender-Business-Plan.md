@@ -5,7 +5,7 @@
 **Business proposition by:** Thomas Osborne
 **Prepared by:** James Sinclair
 
-> **Status:** This is the baseline business plan (received 2026-09-03), superseding the previous Client/Retailer model. The Super User has resolved the open conflicts raised on first review — see "Baseline Change Notes" at the end of this document for the resolved decisions that govern implementation.
+> **Status:** This is the baseline business plan (received 2026-09-03). The Super User has resolved the open conflicts raised on first review; see "Baseline Change Notes" at the end of this document for the decisions that govern implementation.
 
 ## 1. Executive Summary
 
@@ -25,7 +25,7 @@ The plan assumes a 90-day launch credit window focused on Provider onboarding ra
 
 Year 1 revenue is based on two fees: a **£5 Provider quote participation fee** for accessing the full relevant tender package details and submitting a quote, and a **Tender Creator Accepted Quote Release Fee** based on a percentage of the accepted quote value. Provider subscription functionality, partner income, sponsorship, advertising, and additional premium revenue streams remain future options and should only be activated if later usage data supports them.
 
-> Resolved: fee amounts are not being changed as part of this baseline. The platform keeps its current £10 Retailer/Provider unlock fee and £10 Contractor/Client Accepted Quote Release Fee, with the existing Super-User fee-setting controls. See Baseline Change Notes.
+> Resolved: fee amounts are not being changed as part of this baseline. The platform keeps its current £10 Provider unlock fee and £10 Contractor Accepted Quote Release Fee, with the existing Super-User fee-setting controls. See Baseline Change Notes.
 
 ### Launch Funding Requirement
 
@@ -107,9 +107,9 @@ The platform should retain only the records needed to operate the tender process
 
 ### 4.10 Platform Capacity and Data Retention Requirements
 
-The early production platform should be designed and performance-tested to support up to 1,000 concurrent users. This means the infrastructure, database, payment flow, email notification process, quote submission workflow, and client dashboard should remain usable when up to 1,000 users are active on the platform at the same time. Load testing should be completed before wider launch so the hosting setup, database tier, caching, background jobs, and monitoring can be adjusted before real usage grows.
+The early production platform should be designed and performance-tested to support up to 1,000 concurrent users. This means the infrastructure, database, payment flow, email notification process, quote submission workflow, and Contractor dashboard should remain usable when up to 1,000 users are active on the platform at the same time. Load testing should be completed before wider launch so the hosting setup, database tier, caching, background jobs, and monitoring can be adjusted before real usage grows.
 
-The platform should apply a clear formal quote-retention policy. All formal quotes should be stored for 30 days from submission so Clients can compare live responses and Retailers can manage recent quote activity. Unsuccessful, expired, or non-accepted quotes should then be deleted or anonymised after 30 days unless there is a dispute, investigation, suspicious activity review, legal hold, or other valid reason to retain them. Successful or accepted formal quotes, together with the related tender identifier, payment records, contact-release events, and audit logs, should be retained for five years for operational audit, dispute support, fraud prevention, tax, regulatory, and platform governance purposes.
+The platform should apply a clear formal quote-retention policy. All formal quotes should be stored for 30 days from submission so Contractors can compare live responses and Providers can manage recent quote activity. Unsuccessful, expired, or non-accepted quotes should then be deleted or anonymised after 30 days unless there is a dispute, investigation, suspicious activity review, legal hold, or other valid reason to retain them. Successful or accepted formal quotes, together with the related tender identifier, payment records, contact-release events, and audit logs, should be retained for five years for operational audit, dispute support, fraud prevention, tax, regulatory, and platform governance purposes.
 
 ### 4.11 Platform Role and Transaction Responsibility
 
@@ -138,10 +138,10 @@ The platform will generate revenue through a simple two-sided fee model. Provide
 
 | Plan | Monthly Price | Included Tender Unlocks | Purpose |
 |---|---|---|---|
-| Free | £0 | 0 | Retailer receives matched summaries and pays per tender unlock. |
+| Free | £0 | 0 | Provider receives matched summaries and pays per tender unlock. |
 | Starter | £29 per month | 1–10 tenders | Suitable for small local suppliers or occasional users. |
 | Growth | £49 per month | 11–20 tenders | Suitable for active suppliers receiving regular enquiries. |
-| Pro | £99 per month | 21+ tenders / unlimited fair-use allowance | Suitable for regional suppliers or higher-volume retailers. |
+| Pro | £99 per month | 21+ tenders / unlimited fair-use allowance | Suitable for regional suppliers or higher-volume Providers. |
 | Enterprise | £149–£199 per month | 21+ tenders / unlimited fair-use allowance | Suitable for larger businesses, multi-branch suppliers, or high-volume users. |
 
 Provider subscription options should be included in the build as an inactive future feature, not as part of the current revenue model. The Super User should be able to keep subscriptions switched off during launch, then activate them later if Trade Tender has evidence of repeat Provider usage, sufficient job-package tender volume, and a clear demand for monthly plans. If activated, the plans can be structured around clear tender package bands: 1–10 tender packages, 11–20 tender packages, and 21 tender packages to unlimited, subject to fair-use or custom controls. The Super User should be able to set monthly prices, included tender bands, the standard unlock fee, free promotional unlocks, fair-use rules, and whether subscriptions are active or disabled.
@@ -230,19 +230,19 @@ The build and launch plan should prioritise the core job-package workflow first,
 
 | Risk | Potential Impact | Mitigation |
 |---|---|---|
-| Low Client adoption | Not enough tenders are created to make the platform valuable for Retailers. | Keep tender creation free during the initial launch window, make the form quick to complete, use UK-wide targeted marketing, and monitor conversion by category and region. |
-| Low Retailer uptake | Clients may not receive enough quotes, reducing trust in the platform. | Allow free retailer registration, explain the fixed-fee model clearly, offer launch promotions, prioritise onboarding by category and geography, and keep future subscription functionality available but switched off until usage supports it. |
-| Poor quote response rate | Clients may receive too few useful quotes after submitting a tender. | Send tenders only to relevant Retailers, add response deadlines, use reminder emails, monitor category performance, and identify categories or regions with weak coverage. |
-| Inaccurate category matching | Tenders may be sent to unsuitable Retailers, causing wasted emails and lower conversion. | Use structured categories and subcategories, require Retailers to maintain their capability profiles, test matching rules during pilot launch, and allow Super Users to refine categories over time. |
-| Payment friction | Retailers or Clients may abandon the process when asked to pay a fee. | Keep Retailer unlock fees low and fixed, use a 90-day Retailer launch credit window, cap the Client Accepted Quote Release Fee at £10, show exactly what is unlocked before payment, use a trusted payment provider, provide clear payment confirmation, and allow the Super User to extend credits selectively by category, region, or Retailer group where justified by supply coverage or quote activity. |
-| Disputes between Clients and Retailers | Users may expect the platform to resolve problems with delivery, workmanship, goods, or final payment. | Use clear terms stating that the platform only connects Clients and Retailers, make both parties responsible for the final transaction, and display responsibility wording before details are released. |
+| Low Contractor adoption | Not enough tenders are created to make the platform valuable for Providers. | Keep tender creation free during the initial launch window, make the form quick to complete, use UK-wide targeted marketing, and monitor conversion by category and region. |
+| Low Provider uptake | Contractors may not receive enough quotes, reducing trust in the platform. | Allow free Provider registration, explain the fixed-fee model clearly, offer launch promotions, prioritise onboarding by category and geography, and keep future subscription functionality available but switched off until usage supports it. |
+| Poor quote response rate | Contractors may receive too few useful quotes after submitting a tender. | Send tenders only to relevant Providers, add response deadlines, use reminder emails, monitor category performance, and identify categories or regions with weak coverage. |
+| Inaccurate category matching | Tenders may be sent to unsuitable Providers, causing wasted emails and lower conversion. | Use structured categories and subcategories, require Providers to maintain their capability profiles, test matching rules during pilot launch, and allow Super Users to refine categories over time. |
+| Payment friction | Providers or Contractors may abandon the process when asked to pay a fee. | Keep Provider unlock fees low and fixed, use a 90-day Provider launch credit window, cap the Contractor Accepted Quote Release Fee at £10, show exactly what is unlocked before payment, use a trusted payment provider, provide clear payment confirmation, and allow the Super User to extend credits selectively by category, region, or Provider group where justified by supply coverage or quote activity. |
+| Disputes between Contractors and Providers | Users may expect the platform to resolve problems with delivery, workmanship, goods, or final payment. | Use clear terms stating that the platform only connects Contractors and Providers, make both parties responsible for the final transaction, and display responsibility wording before details are released. |
 | Data protection and contact-release issues | Users may lose trust if contact details or restricted project information are shown too early. | Define clear visibility rules, restrict contact details until the correct payment stage, use secure account access, maintain privacy wording, and keep audit records of detail release events. |
 | Weak document control or suspicious transaction monitoring | Without traceable tender and quote identifiers, the platform may struggle to investigate disputes, detect unusual behaviour, or evidence controls around potential misuse or money-laundering risk. | Assign every tender a unique identifier, link all returned quotes to that identifier, maintain immutable audit logs, create owner monitoring dashboards, flag unusual tender or quote patterns, and define escalation procedures for suspicious activity. |
-| Retailer quality concerns | Clients may receive quotes from unsuitable or unverified businesses. | Introduce retailer verification, collect business details, allow relevant accreditations to be recorded, enable account suspension, and consider future ratings or feedback after completed jobs. |
-| Regional coverage gaps | Some Client requests may not match enough Retailers in the required area. | Track unmatched tenders, recruit Retailers into weak locations and categories, and increase marketing spend only where supply coverage can support Client demand. |
+| Provider quality concerns | Contractors may receive quotes from unsuitable or unverified businesses. | Introduce Provider verification, collect business details, allow relevant accreditations to be recorded, enable account suspension, and consider future ratings or feedback after completed jobs. |
+| Regional coverage gaps | Some Contractor requests may not match enough Providers in the required area. | Track unmatched tenders, recruit Providers into weak locations and categories, and increase marketing spend only where supply coverage can support Contractor demand. |
 | Technical failure or downtime | Users may be unable to submit tenders, unlock details, or respond to quotes. | Use reliable hosting, regular backups, monitoring, secure payment integration, basic support processes, and staged testing before public launch. |
-| Email deliverability issues | Retailers may not receive tender alerts, reducing quote volume. | Use a reputable email service, authenticate sending domains, monitor bounce rates, provide in-platform tender alerts, and allow Retailers to manage notification preferences. |
-| Pricing resistance | Retailers or Clients may feel the access or processing fees are too high. | Start with low fixed launch fees, use limited Retailer launch credits, monitor conversion, provide targeted promotional credits where needed, allow the Super User to adjust pricing by platform stage, and only activate subscription plans later if usage data supports them. |
+| Email deliverability issues | Providers may not receive tender alerts, reducing quote volume. | Use a reputable email service, authenticate sending domains, monitor bounce rates, provide in-platform tender alerts, and allow Providers to manage notification preferences. |
+| Pricing resistance | Providers or Contractors may feel the access or processing fees are too high. | Start with low fixed launch fees, use limited Provider launch credits, monitor conversion, provide targeted promotional credits where needed, allow the Super User to adjust pricing by platform stage, and only activate subscription plans later if usage data supports them. |
 
 ## 9. Targeted Marketing and User Acquisition Plan
 
@@ -264,30 +264,30 @@ Provider messaging should focus on low-risk access to new UK-wide tender package
 
 | Channel | Target | How to Use It | Indicative Cost |
 |---|---|---|---|
-| Manual direct outreach | Retailers first, then Clients | Build targeted lists from trade directories, Google Maps, local supplier searches, existing contacts, construction networks, and category-specific searches. Contact each business with a short explanation, free registration offer, and clear category/location fit. | £0–£300 for list building tools, data checking, and basic outreach support. |
-| LinkedIn outreach and small paid test | Clients, contractors, site managers, owners, directors, and supplier decision-makers | Use founder-led LinkedIn posting, connection requests, direct messages, and a small sponsored test aimed at construction decision-makers. LinkedIn should be used carefully because B2B clicks and leads can be expensive. | £250–£1,000 test budget. |
-| Google Search Ads pilot | Clients with immediate quote intent | Run tightly controlled search ads for specific terms such as plant hire quotes, skip hire quotes, aggregate suppliers, muck away quotes, concrete quotes, or local construction supplier quotes. Start narrow by region and category. | £300–£1,000 test budget. |
-| Trade directory and local supplier list building | Retailers | Use category-by-category directory research to identify plant hire firms, waste companies, aggregate suppliers, scaffolders, transport firms, and subcontractors in the first launch area. Prioritise phone and email outreach over passive advertising. | £100–£500 depending on research/list/admin support used. |
-| Direct mail or printed introduction campaign | Selected Retailers and local construction buyers | Send a simple postcard or letter to a small, targeted list in the launch area. Use only where the audience is highly relevant and follow up by phone or email. | £250–£1,250 for a focused 500–1,000 item campaign. |
-| Launch incentives | Retailers and Clients | Offer limited free unlock credits to early Retailers and waive or discount selected Client release fees during the pilot so the platform can prove response rates and collect feedback. | £0 cash cost if structured as waived platform fees, but reduces early revenue while improving adoption. |
+| Manual direct outreach | Providers first, then Contractors | Build targeted lists from trade directories, Google Maps, local supplier searches, existing contacts, construction networks, and category-specific searches. Contact each business with a short explanation, free registration offer, and clear category/location fit. | £0–£300 for list building tools, data checking, and basic outreach support. |
+| LinkedIn outreach and small paid test | Contractors, site managers, owners, directors, and supplier decision-makers | Use founder-led LinkedIn posting, connection requests, direct messages, and a small sponsored test aimed at construction decision-makers. LinkedIn should be used carefully because B2B clicks and leads can be expensive. | £250–£1,000 test budget. |
+| Google Search Ads pilot | Contractors with immediate quote intent | Run tightly controlled search ads for specific terms such as plant hire quotes, skip hire quotes, aggregate suppliers, muck away quotes, concrete quotes, or local construction supplier quotes. Start narrow by region and category. | £300–£1,000 test budget. |
+| Trade directory and local supplier list building | Providers | Use category-by-category directory research to identify plant hire firms, waste companies, aggregate suppliers, scaffolders, transport firms, and subcontractors in the first launch area. Prioritise phone and email outreach over passive advertising. | £100–£500 depending on research/list/admin support used. |
+| Direct mail or printed introduction campaign | Selected Providers and construction buyers | Send a simple postcard or letter to a small, targeted list in the launch area. Use only where the audience is highly relevant and follow up by phone or email. | £250–£1,250 for a focused 500–1,000 item campaign. |
+| Launch incentives | Providers and Contractors | Offer limited free unlock credits to early Providers and waive or discount selected Contractor release fees during the pilot so the platform can prove response rates and collect feedback. | £0 cash cost if structured as waived platform fees, but reduces early revenue while improving adoption. |
 
 ### 9.4 90-Day Launch Marketing Sequence
 
 | Period | Objective | Actions |
 |---|---|---|
-| Days 1–30 | Drive UK-wide Client demand | Build national Retailer supply before public launch. Create UK-wide target lists by category, prioritise high-frequency services, contact Retailers directly, explain free registration, offer launch credits, and track coverage by region, category, and service radius. |
-| Days 31–60 | Test Client demand with controlled outreach | Approach Clients nationally, including small and medium contractors, groundworkers, maintenance firms, developers, builders, facilities managers, landlords with repeat works, and site managers. Use Google Search Ads, LinkedIn outreach, direct email, trade groups, and referral introductions to encourage real tenders from multiple UK regions. |
-| Days 61–90 | Refine and scale the best channel | Review national coverage, unlock rate, quote rate, accepted quote rate, cost per registered Retailer, cost per Client tender, and response quality by region and category. Increase spend only where the channel produces real tenders, useful quotes, and clear conversion evidence across the UK. |
+| Days 1–30 | Drive UK-wide Contractor demand | Build national Provider supply before public launch. Create UK-wide target lists by category, prioritise high-frequency services, contact Providers directly, explain free registration, offer launch credits, and track coverage by region, category, and service radius. |
+| Days 31–60 | Test Contractor demand with controlled outreach | Approach Contractors nationally, including small and medium contractors, groundworkers, maintenance firms, developers, builders, facilities managers, landlords with repeat works, and site managers. Use Google Search Ads, LinkedIn outreach, direct email, trade groups, and referral introductions to encourage real tenders from multiple UK regions. |
+| Days 61–90 | Refine and scale the best channel | Review national coverage, unlock rate, quote rate, accepted quote rate, cost per registered Provider, cost per Contractor tender, and response quality by region and category. Increase spend only where the channel produces real tenders, useful quotes, and clear conversion evidence across the UK. |
 
 ### 9.5 UK-Wide Launch Budget Options
 
 | Launch Type | Indicative Budget | What It Involves | Expected Use Case |
 |---|---|---|---|
-| Lean UK-wide Launch | £2,500–£5,000 | Founder-led national outreach supported by UK-wide Retailer list building, direct email, telephone follow-up, trade-directory research, small LinkedIn testing, small Google Search testing, and launch credits for early Retailers and Clients. | Suitable where funding is limited and the objective is to test UK-wide demand while keeping spend tightly controlled. |
-| Standard UK-wide Launch | £5,000–£10,000 | Broader national Retailer acquisition, more structured category-by-category list building, larger direct outreach volume, paid search across priority services, LinkedIn prospecting, selected direct mail, launch incentives, and weekly performance tracking by category and region. | Recommended baseline for a professional UK-wide market entry, balancing meaningful reach with cost control. |
-| Hard UK-wide Release | £10,000–£20,000 | High-intensity national launch with larger Retailer outreach volume, stronger paid search coverage, wider LinkedIn campaigns, industry list-building support, selected printed/direct mail activity, structured follow-up, launch incentives, and faster expansion across multiple service categories. | Suitable where the objective is rapid UK-wide visibility and faster marketplace coverage from day one. |
+| Lean UK-wide Launch | £2,500–£5,000 | Founder-led national outreach supported by UK-wide Provider list building, direct email, telephone follow-up, trade-directory research, small LinkedIn testing, small Google Search testing, and launch credits for early Providers and Contractors. | Suitable where funding is limited and the objective is to test UK-wide demand while keeping spend tightly controlled. |
+| Standard UK-wide Launch | £5,000–£10,000 | Broader national Provider acquisition, more structured category-by-category list building, larger direct outreach volume, paid search across priority services, LinkedIn prospecting, selected direct mail, launch incentives, and weekly performance tracking by category and region. | Recommended baseline for a professional UK-wide market entry, balancing meaningful reach with cost control. |
+| Hard UK-wide Release | £10,000–£20,000 | High-intensity national launch with larger Provider outreach volume, stronger paid search coverage, wider LinkedIn campaigns, industry list-building support, selected printed/direct mail activity, structured follow-up, launch incentives, and faster expansion across multiple service categories. | Suitable where the objective is rapid UK-wide visibility and faster marketplace coverage from day one. |
 
-The recommended starting point for a hard UK-wide release is the Standard UK-wide launch budget, with the Hard UK-wide release campaign used if Trade Tender wants faster national visibility and broader category coverage from day one. Marketing spend should be reviewed against practical marketplace metrics, including registered Retailers by category and region, verified service coverage, tender submissions, retailer unlocks, quote submissions, accepted quotes, response rates, and cost per converted Client or Retailer.
+The recommended starting point for a hard UK-wide release is the Standard UK-wide launch budget, with the Hard UK-wide release campaign used if Trade Tender wants faster national visibility and broader category coverage from day one. Marketing spend should be reviewed against practical marketplace metrics, including registered Providers by category and region, verified service coverage, tender submissions, Provider unlocks, quote submissions, accepted quotes, response rates, and cost per converted Contractor or Provider.
 
 ## 10. Risks and Mitigation
 
@@ -345,51 +345,51 @@ Footer links should use clear labels and should open the relevant public documen
 
 ### 10.5 Phase Three: Payments, Controls, and Quote Records
 
-- Integrate a payment provider for retailer release fees and client processing fees.
+- Integrate a payment provider for Provider unlock fees and Contractor release fees.
 - Define payment status, failed payment handling, refund rules, and fee disablement controls.
 - Add data visibility rules so contact details and restricted project details are only released at the correct stage.
 - Add quote-record rules so each tender receives a unique tender identifier and each returned formal quote receives a linked quote identifier.
 - Add owner reporting tools to monitor tender and formal quote activity for unusual patterns, including repeated parties, abnormal values, duplicate tenders, repeated cancellations, unusual payment behaviour, or other indicators of potential misuse.
-- Add basic terms acceptance for Clients and Retailers.
-- Add Super User controls for user suspension, category editing, retailer approval, and support access.
-- Build the Super User analytics dashboard with filters for Client, Retailer, tender identifier, quote identifier, category, location, date range, status, payment status, and subscription status where the future subscription feature is enabled.
+- Add basic terms acceptance for Contractors and Providers.
+- Add Super User controls for user suspension, category editing, Provider approval, and support access.
+- Build the Super User analytics dashboard with filters for Contractor, Provider, tender identifier, quote identifier, category, location, date range, status, payment status, and subscription status where the future subscription feature is enabled.
 - Prepare privacy, data protection, and contact-release wording for the platform.
-- Prepare platform terms that clearly state Clients and Retailers are responsible for their own final transaction, and that the platform is not responsible for disputes, fulfilment, workmanship, goods supplied, delivery, or final payment arrangements between the parties.
+- Prepare platform terms that clearly state Contractors and Providers are responsible for their own final transaction, and that the platform is not responsible for disputes, fulfilment, workmanship, goods supplied, delivery, or final payment arrangements between the parties.
 
 ### 10.6 Phase Four: Testing and Pilot Launch
 
-- Test the full workflow from Client project creation to Retailer notification, payment, quote submission, Client acceptance, and detail release.
+- Test the full workflow from Contractor project creation to Provider notification, payment, quote submission, Contractor acceptance, and detail release.
 - Test category matching accuracy using plant hire, job site hire, materials, waste, trades, logistics, and compliance categories.
-- Invite a small initial group of Retailers to create profiles and confirm their service categories and coverage areas.
-- Invite a small group of Clients to submit test projects and provide feedback on the online form.
+- Invite a small initial group of Providers to create profiles and confirm their service categories and coverage areas.
+- Invite a small group of Contractors to submit test projects and provide feedback on the online form.
 - Collect feedback on form speed, category clarity, quote quality, payment friction, and notification accuracy.
 - Fix priority issues before opening the platform to a wider market.
 
-### 10.7 Phase Five: Retailer Onboarding
+### 10.7 Phase Five: Provider Onboarding
 
-- Create a simple retailer onboarding process explaining how opportunities are matched and how the release fee works.
-- Recruit Retailers across the core categories first: plant hire, job site hire, construction materials, waste services, construction trades, delivery and logistics, and specialist subcontractor services.
-- Prioritise Retailers by geographical coverage so the platform can support real client enquiries from launch.
-- Prepare email templates for retailer invitations, tender alerts, payment confirmation, quote reminders, and account updates.
-- Check that Retailers understand what information they receive before payment and what is released after payment.
+- Create a simple Provider onboarding process explaining how opportunities are matched and how the unlock fee works.
+- Recruit Providers across the core categories first: plant hire, job site hire, construction materials, waste services, construction trades, delivery and logistics, and specialist subcontractor services.
+- Prioritise Providers by geographical coverage so the platform can support real Contractor enquiries from launch.
+- Prepare email templates for Provider invitations, tender alerts, payment confirmation, quote reminders, and account updates.
+- Check that Providers understand what information they receive before payment and what is released after payment.
 
 ### 10.8 Phase Six: Public Launch
 
 - Prepare for a hard UK-wide release, supported by category and regional coverage tracking so supply gaps are visible before and after launch.
-- Promote the platform to Clients who regularly need plant, materials, waste services, trades, and site support.
-- Use UK-wide direct outreach, construction networks, trade groups, LinkedIn, paid search testing, and referral introductions to attract early Clients and Retailers.
-- Monitor the number of tenders submitted, tenders submitted by each Client, retailer matches, emails opened, release fees paid, tenders accepted or unlocked by Retailers, quotes submitted, quotes accepted by Clients, retailer confirmations, and client acceptances.
+- Promote the platform to Contractors who regularly need plant, materials, waste services, trades, and site support.
+- Use UK-wide direct outreach, construction networks, trade groups, LinkedIn, paid search testing, and referral introductions to attract early Contractors and Providers.
+- Monitor the number of tenders submitted, tenders submitted by each Contractor, Provider matches, emails opened, release fees paid, tenders accepted or unlocked by Providers, quotes submitted, quotes accepted by Contractors, Provider confirmations, and Contractor acceptances.
 - Review whether the fee amounts are low enough to encourage participation while still creating a sustainable revenue stream.
 
 ### 10.9 Phase Seven: Post-Launch Improvement
 
-- Review tender conversion rates, including tender submissions, retailer unlocks, quote submissions, and client acceptances.
+- Review tender conversion rates, including tender submissions, Provider unlocks, quote submissions, and Contractor acceptances.
 - Improve category and subcategory matching based on real platform usage.
-- Add retailer performance insights, such as response rate, average quote time, and accepted quote history.
+- Add Provider performance insights, such as response rate, average quote time, and accepted quote history.
 - Review the fixed-fee pricing model and adjust fees, promotional credits, or future subscription activation where supported by real platform usage.
-- Improve dashboards for Clients, Retailers, and Super Users.
+- Improve dashboards for Contractors, Providers, and Super Users.
 - Add reporting tools for platform activity, revenue, category demand, and regional coverage gaps.
-- Expand into additional regions once retailer coverage is strong enough to support client demand.
+- Expand into additional regions once Provider coverage is strong enough to support Contractor demand.
 
 ## 11. Brand Guide
 
@@ -412,10 +412,10 @@ The brand should feel practical, robust, trustworthy, and construction-ready. It
 | Construction Navy | #1F2A33 | Main brand colour, dashboard navigation, headers, footer, login screens, and primary structural elements. |
 | Safety Orange | #F28C28 | Main call-to-action colour for buttons, tender unlock actions, quote acceptance, payment prompts, and key alerts. |
 | Concrete Grey | #6B7280 | Secondary text, form labels, dividing lines, borders, table lines, and neutral interface elements. |
-| Steel Blue | #2F5D7C | Secondary buttons, links, dashboard highlights, retailer profile accents, and information panels. |
+| Steel Blue | #2F5D7C | Secondary buttons, links, dashboard highlights, Provider profile accents, and information panels. |
 | High-Vis Yellow | #F5C542 | Urgent tender markers, warning highlights, action-required notices, and limited site-safety style accents. |
 | Off-White | #F7F5F0 | Page backgrounds, form areas, portal screens, and soft interface backgrounds. |
-| Success Green | #2E7D32 | Accepted quotes, payment complete status, approved retailer accounts, and successful submissions. |
+| Success Green | #2E7D32 | Accepted quotes, payment complete status, approved Provider accounts, and successful submissions. |
 | Warning Amber | #D97706 | Pending payments, quote expiry warnings, incomplete profiles, and required actions. |
 | Error Red | #B91C1C | Failed payments, expired tenders, rejected actions, account issues, and validation errors. |
 
@@ -444,7 +444,7 @@ The written tone should be clear, direct, helpful, and practical. Platform wordi
 
 ## Appendix A: Construction Industry Tender Selection Categories
 
-This appendix provides an initial list of selectable options that a Client could choose from when building a construction project tender. The categories are designed to support fast project creation, accurate matching, and targeted tender distribution to relevant Retailers.
+This appendix provides an initial list of selectable options that a Contractor could choose from when building a construction project tender. The categories are designed to support fast project creation, accurate matching, and targeted tender distribution to relevant Providers.
 
 ### A.1 Plant Hire Equipment
 
@@ -522,7 +522,7 @@ This appendix provides an initial list of selectable options that a Client could
 - Documentation: RAMS documentation, method statements, risk assessments, lifting plans, insurance documentation, waste transfer notes, duty of care documentation, and COSHH documentation.
 - Accreditations: CHAS, Constructionline, SafeContractor, SSIP accreditation, ISO 9001, ISO 14001, and ISO 45001.
 
-### A.10 Client Selection Filters
+### A.10 Contractor Selection Filters
 
 - Project information: project name, project address, delivery postcode, site contact, required date, start date, hire duration, and expected completion date.
 - Commercial information: quantity required, budget range, quote validity period, payment terms, VAT status, and whether partial fulfilment is acceptable.
@@ -543,18 +543,18 @@ The current revenue forecast is based only on the fixed Provider tender package 
 
 | Future Revenue Option | How It Could Work | When to Consider It |
 |---|---|---|
-| Retailer membership with inclusive quote opportunities | Retailers pay a monthly fee that includes a defined number of tender unlocks or quote opportunities. Pay-per-unlock remains available for non-members or for usage above the included allowance. | Once repeat Retailer usage, regular tender volume, and willingness to pay have been proven. |
-| Featured Retailer placement | Retailers pay for enhanced visibility in relevant categories, locations, or search results, without changing the underlying quote comparison rules. | Once there is enough Retailer competition in key categories to make visibility valuable. |
+| Provider membership with inclusive quote opportunities | Providers pay a monthly fee that includes a defined number of tender unlocks or quote opportunities. Pay-per-unlock remains available for non-members or for usage above the included allowance. | Once repeat Provider usage, regular tender volume, and willingness to pay have been proven. |
+| Featured Provider placement | Providers pay for enhanced visibility in relevant categories, locations, or search results, without changing the underlying quote comparison rules. | Once there is enough Provider competition in key categories to make visibility valuable. |
 | Marketing and advertising space | Relevant suppliers, manufacturers, finance providers, insurers, training providers, or construction service businesses pay for clearly labelled advertising space on dashboards, email footers, category pages, or account areas. | Once the platform has consistent traffic and advertising can be introduced without making tender results appear biased. |
 | Sponsored categories or regions | A supplier or partner pays for sponsorship of a category or geographical area, such as plant hire, aggregates, skips, welfare hire, or concrete, with sponsorship clearly separated from quote ranking and selection. | Once category traffic is measurable and sponsorship can be managed transparently. |
-| Premium supplier profiles | Retailers pay for enhanced profile pages that show service coverage, company description, response performance, accreditations, branch coverage, and preferred service categories. | Once Retailers see value in presenting themselves more professionally to Clients after contact release. |
-| Verified Retailer status | Retailers pay for an optional verification package covering basic business checks, insurance confirmation, accreditation records, or approved supplier status shown within the platform. | Once Client trust and quote quality become important differentiators. |
-| Priority tender alerts | Retailers pay for faster or enhanced notification options, such as priority email alerts, SMS alerts, or category-specific opportunity alerts. | Once high-value or time-sensitive tenders are being submitted regularly. |
-| Analytics and reporting packages | Retailers pay for insight into tender demand, category activity, regional opportunity trends, response performance, and conversion from unlock to quote. | Once enough platform activity exists to create meaningful commercial insights. |
-| Enterprise and multi-branch Retailer accounts | Larger suppliers pay for multiple users, branch-level coverage, territory management, central reporting, and account-level controls. | Once the platform attracts larger suppliers or multi-location businesses. |
-| API or integration fees | Larger Retailers pay for integrations that allow tender opportunities, quote submissions, or status updates to connect with CRM, quoting, or internal workflow systems. | Once larger suppliers require operational integration rather than manual platform use. |
-| Trusted Partner status | A supplier becomes eligible to apply for Trusted Partner status after completing a defined number of valid quote submissions, such as 25, 50, or 100 submitted quotes. The application could be subject to platform review, quote quality checks, response performance, complaint history, and any additional business verification required by Trade Tender. | Once the platform has enough supplier activity to measure quote reliability, response quality, and Client outcomes. This should be introduced only if the status can be awarded transparently and kept separate from quote ranking unless clearly disclosed. |
-| Future tiered Client release fees | The current £10 fixed Client fee remains the active model, but the platform retains inactive functionality to introduce tiered release fees later based on accepted quote value or platform usage rules. | Only after the business has evidence that higher Client fees will not reduce quote acceptance or drive users away from the platform. |
+| Premium supplier profiles | Providers pay for enhanced profile pages that show service coverage, company description, response performance, accreditations, branch coverage, and preferred service categories. | Once Providers see value in presenting themselves more professionally to Contractors after contact release. |
+| Verified Provider status | Providers pay for an optional verification package covering basic business checks, insurance confirmation, accreditation records, or approved supplier status shown within the platform. | Once Contractor trust and quote quality become important differentiators. |
+| Priority tender alerts | Providers pay for faster or enhanced notification options, such as priority email alerts, SMS alerts, or category-specific opportunity alerts. | Once high-value or time-sensitive tenders are being submitted regularly. |
+| Analytics and reporting packages | Providers pay for insight into tender demand, category activity, regional opportunity trends, response performance, and conversion from unlock to quote. | Once enough platform activity exists to create meaningful commercial insights. |
+| Enterprise and multi-branch Provider accounts | Larger suppliers pay for multiple users, branch-level coverage, territory management, central reporting, and account-level controls. | Once the platform attracts larger suppliers or multi-location businesses. |
+| API or integration fees | Larger Providers pay for integrations that allow tender opportunities, quote submissions, or status updates to connect with CRM, quoting, or internal workflow systems. | Once larger suppliers require operational integration rather than manual platform use. |
+| Trusted Partner status | A supplier becomes eligible to apply for Trusted Partner status after completing a defined number of valid quote submissions, such as 25, 50, or 100 submitted quotes. The application could be subject to platform review, quote quality checks, response performance, complaint history, and any additional business verification required by Trade Tender. | Once the platform has enough supplier activity to measure quote reliability, response quality, and Contractor outcomes. This should be introduced only if the status can be awarded transparently and kept separate from quote ranking unless clearly disclosed. |
+| Future tiered Contractor release fees | The current £10 fixed Contractor fee remains the active model, but the platform retains inactive functionality to introduce tiered release fees later based on accepted quote value or platform usage rules. | Only after the business has evidence that higher Contractor fees will not reduce quote acceptance or drive users away from the platform. |
 
 ## Appendix C: Competitor Landscape and Positioning
 
@@ -574,15 +574,15 @@ The competitive position for Trade Tender should therefore be based on clarity a
 
 ## Baseline Change Notes (added 2026-09-03, resolved 2026-09-03, not part of the source document)
 
-This document replaces the previous Client/Retailer business plan as the baseline, per Super User instruction. The Super User has resolved the following conflicts; these decisions govern implementation:
+This document records the resolved baseline decisions that govern implementation:
 
-1. **Role model change — RESOLVED, rename only.** "Client" → "Contractor", "Retailer" → "Provider" is a pure rename with no new roles. `Contractor` = current `Client`, `Provider` = current `Retailer`. Implementation should rename the `Role` enum values, UI labels, and route/portal naming without changing the underlying permission model.
+1. **Role terminology alignment — RESOLVED and complete.** Contractor and Provider are the platform role names. This was a pure rename with no new roles or permission-model change; persisted role enum values and user-facing terminology now use the approved terms.
 2. **Job-package tender splitting — RESOLVED, approved as specified.** The Super User has confirmed this is the intended direction: a job is split into multiple independently-matched tender packages by category, each with its own matching, unlock, and quote lifecycle. This requires a genuine data-model and matching-engine change (a `Tender`/job with one-to-many `TenderPackage` records), not a rename, and should be scoped as its own phase of work.
-3. **Fee inconsistency — RESOLVED, no fee changes.** Fees are out of scope for this baseline. The platform keeps its current £10 Retailer/Provider unlock fee and £10 Client/Contractor Accepted Quote Release Fee (with existing VAT and Super-User fee-setting controls) unchanged. The £5/percentage-based figures in this document do not apply.
+3. **Fee inconsistency — RESOLVED, no fee changes.** Fees are out of scope for this baseline. The platform keeps its current £10 Provider unlock fee and £10 Contractor Accepted Quote Release Fee (with existing VAT and Super-User fee-setting controls) unchanged. The £5/percentage-based figures in this document do not apply.
 4. **Identifier scheme — RESOLVED, keep current format.** The platform keeps its existing tender/quote identifier format (`TND-YYYYMMDD-000001` style). The `JOB-YYYYMMDD-000001` scheme described in this document is not adopted.
 5. **Active partner advertising — RESOLVED, approved.** The Super User has approved moving from static footer logos to an actively managed partner/advertising system (names, destination links, status, campaign source), since partners already own real businesses and this is "a good progression." This should be built as a genuine Super-User-managed feature, closing the gap already flagged in [docs/PRODUCTION-READINESS-REVIEW.md](PRODUCTION-READINESS-REVIEW.md).
 6. **Provider confirmation step — RESOLVED, no change.** The Super User has confirmed the quote lifecycle stays as-is: a single Contractor action (`SUBMITTED → ACCEPTED/REJECTED`). No separate Provider confirmation/acceptance step is added.
-7. **Provider/Retailer approval gate — RESOLVED, keep self-serve.** Retailer/Provider accounts remain self-serve and active immediately after email verification, as today. No pre-activation approval queue will be built.
+7. **Provider approval gate — RESOLVED, keep self-serve.** Provider accounts remain self-serve and active immediately after email verification, as today. No pre-activation approval queue will be built.
 8. **Brand palette — RESOLVED, keep current brand.** The platform keeps its current approved brand palette and identity ([docs/branding/Trade_Tender_Brand_Guide.pdf](branding/Trade_Tender_Brand_Guide.pdf), [docs/branding/TradeTender-Brand-Rules.md](branding/TradeTender-Brand-Rules.md)). Section 11's proposed Construction Navy/Safety Orange palette is not adopted.
 9. **Hosting reference — RESOLVED, legacy reference only.** The Azure hosting mention in Section 7.5.3 is a leftover from an earlier version of the plan; the platform stays on Render with Neon Lakebase Postgres. No infrastructure migration is planned.
 10. **Subscription tier pricing — RESOLVED, confirmed for future activation.** The Free/Starter £29/Growth £49/Pro £99/Enterprise £149–199 tiers in Section 5.2 are the confirmed pricing model for when Provider subscriptions are eventually activated, superseding any previously modelled tiers. This does not affect immediate development — the feature stays built-but-inactive under existing Super User controls until activated — but no further pricing debate is expected when that day comes.

@@ -9,7 +9,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
-    const user = await requireRole('RETAILER');
+    const user = await requireRole('PROVIDER');
     const parsed = submitQuoteSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid quote details', issues: parsed.error.flatten() }, { status: 400 });
@@ -23,7 +23,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
-    const user = await requireRole('CLIENT');
+    const user = await requireRole('CONTRACTOR');
     const quotes = await listQuotesForClientTender(user.id, params.id);
     return NextResponse.json({ quotes });
   } catch (error) {

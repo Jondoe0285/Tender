@@ -3,6 +3,14 @@ import { hash } from 'bcryptjs';
 import { SERVICE_NAMES } from '../src/lib/categories';
 import { UK_COUNTIES, UK_REGIONS } from '../src/lib/geography';
 
+const DEFAULT_MEMBERSHIP_TIERS = [
+  { name: 'Free', monthlyPriceGbp: 0, freeTenderOpportunitiesPerMonth: 0, description: 'Matched summaries and pay-per-tender unlocks.' },
+  { name: 'Starter', monthlyPriceGbp: 29, freeTenderOpportunitiesPerMonth: 10, description: 'Suitable for small local suppliers or occasional users.' },
+  { name: 'Growth', monthlyPriceGbp: 49, freeTenderOpportunitiesPerMonth: 20, description: 'Suitable for active suppliers receiving regular enquiries.' },
+  { name: 'Pro', monthlyPriceGbp: 99, freeTenderOpportunitiesPerMonth: 9999, description: 'Suitable for regional suppliers or higher-volume Providers.' },
+  { name: 'Enterprise', monthlyPriceGbp: 199, freeTenderOpportunitiesPerMonth: 9999, description: 'Suitable for larger businesses, multi-branch suppliers, or high-volume users.' },
+] as const;
+
 const prisma = new PrismaClient();
 const DEFAULT_SANDBOX_PASSWORD = 'TradeTenderDev!2026';
 const TRIAL_RETAILER_COUNT = 300;
@@ -20,6 +28,24 @@ const TRIAL_RETAILER_LOCATIONS = [
 const TRIAL_RETAILER_COMPANY_TYPES = [
   'Building Supplies', 'Plant Hire', 'Waste Services', 'Construction Solutions', 'Site Support',
 ];
+
+const INITIAL_PARTNERS = [
+  {
+    name: 'Sinclair Safety Solutions Ltd',
+    logoPath: '/images/Sinclair%20Safety%20Solutions%20Logo.jpeg',
+    destinationUrl: 'https://www.sinclairsafetysolutions.co.uk',
+  },
+  {
+    name: 'Smart Works Civils Ltd',
+    logoPath: '/images/Smart%20Works%20Civils%20Logo.png',
+    destinationUrl: 'https://www.smartworkscivils.com',
+  },
+  {
+    name: 'HSQE Consult Hub',
+    logoPath: '/images/HSQE_ConsultHub_Stacked_Light.png',
+    destinationUrl: null,
+  },
+] as const;
 
 async function upsertRoleMembership(userId: string, role: Role) {
   await prisma.userRole.upsert({
@@ -54,7 +80,7 @@ async function seedTrialRetailers(passwordHash: string) {
       where: { email: `trial-retailer-${paddedIndex}@example.test` },
       update: {
         passwordHash,
-        role: Role.RETAILER,
+        role: Role.PROVIDER,
         contactName: `Trial Retailer ${paddedIndex}`,
         contactPhone: `07700${String(index).padStart(6, '0')}`,
         suspended: false,
@@ -64,14 +90,14 @@ async function seedTrialRetailers(passwordHash: string) {
       create: {
         email: `trial-retailer-${paddedIndex}@example.test`,
         passwordHash,
-        role: Role.RETAILER,
+        role: Role.PROVIDER,
         contactName: `Trial Retailer ${paddedIndex}`,
         contactPhone: `07700${String(index).padStart(6, '0')}`,
         emailVerifiedAt: new Date(),
         termsAcceptedAt: new Date(),
       },
     });
-    await upsertRoleMembership(retailer.id, Role.RETAILER);
+    await upsertRoleMembership(retailer.id, Role.PROVIDER);
     await prisma.retailerProfile.upsert({
       where: { userId: retailer.id },
       update: {
@@ -87,6 +113,35 @@ async function seedTrialRetailers(passwordHash: string) {
         categories: services.join(','),
         launchCreditsLeft: 3,
         ...coverage,
+      },
+    });
+  }
+}
+
+async function seedInitialPartners() {
+  await Promise.all(INITIAL_PARTNERS.map((partner, sortOrder) => prisma.partner.upsert({
+    where: { name: partner.name },
+    update: { ...partner, displayLocation: 'FOOTER', campaignSource: 'Initial partner migration', sortOrder, active: true },
+    create: { ...partner, displayLocation: 'FOOTER', campaignSource: 'Initial partner migration', sortOrder, active: true },
+  })));
+}
+
+async function seedDefaultMembershipTiers() {
+  for (const tier of DEFAULT_MEMBERSHIP_TIERS) {
+    await prisma.membershipTier.upsert({
+      where: { name: tier.name },
+      update: {
+        description: tier.description,
+        monthlyPriceGbp: tier.monthlyPriceGbp,
+        freeTenderOpportunitiesPerMonth: tier.freeTenderOpportunitiesPerMonth,
+        active: false,
+      },
+      create: {
+        name: tier.name,
+        description: tier.description,
+        monthlyPriceGbp: tier.monthlyPriceGbp,
+        freeTenderOpportunitiesPerMonth: tier.freeTenderOpportunitiesPerMonth,
+        active: false,
       },
     });
   }
@@ -139,7 +194,7 @@ async function main() {
     where: { email: 'client@example.test' },
     update: {
       passwordHash: sandboxPasswordHash,
-      role: Role.CLIENT,
+      role: Role.CONTRACTOR,
       contactName: 'Demo Client',
       contactPhone: '07123456789',
       suspended: false,
@@ -149,14 +204,14 @@ async function main() {
     create: {
       email: 'client@example.test',
       passwordHash: sandboxPasswordHash,
-      role: Role.CLIENT,
+      role: Role.CONTRACTOR,
       contactName: 'Demo Client',
       contactPhone: '07123456789',
       emailVerifiedAt: new Date(),
       termsAcceptedAt: new Date(),
     },
   });
-  await upsertRoleMembership(client.id, Role.CLIENT);
+  await upsertRoleMembership(client.id, Role.CONTRACTOR);
   const clientCompany = await prisma.clientCompany.upsert({
     where: { primaryUserId: client.id },
     update: { companyName: 'Demo Construction Client Ltd' },
@@ -172,7 +227,7 @@ async function main() {
     where: { email: 'retailer@example.test' },
     update: {
       passwordHash: sandboxPasswordHash,
-      role: Role.RETAILER,
+      role: Role.PROVIDER,
       contactName: 'Demo Retailer',
       contactPhone: '07987654321',
       suspended: false,
@@ -182,14 +237,14 @@ async function main() {
     create: {
       email: 'retailer@example.test',
       passwordHash: sandboxPasswordHash,
-      role: Role.RETAILER,
+      role: Role.PROVIDER,
       contactName: 'Demo Retailer',
       contactPhone: '07987654321',
       emailVerifiedAt: new Date(),
       termsAcceptedAt: new Date(),
     },
   });
-  await upsertRoleMembership(retailer.id, Role.RETAILER);
+  await upsertRoleMembership(retailer.id, Role.PROVIDER);
 
   await prisma.retailerProfile.upsert({
     where: { userId: retailer.id },
@@ -210,8 +265,10 @@ async function main() {
   });
 
   await seedTrialRetailers(sandboxPasswordHash);
+  await seedInitialPartners();
+  await seedDefaultMembershipTiers();
 
-  console.log(`Seeded persistent sandbox accounts, the platform owner, and ${TRIAL_RETAILER_COUNT} trial Retailers.`);
+  console.log(`Seeded persistent sandbox accounts, ${TRIAL_RETAILER_COUNT} trial Retailers, ${INITIAL_PARTNERS.length} partner records, and ${DEFAULT_MEMBERSHIP_TIERS.length} inactive membership tiers.`);
 }
 
 main()

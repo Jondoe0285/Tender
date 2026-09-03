@@ -7,7 +7,7 @@ import { prisma } from '@/server/data/prisma';
 
 export default async function UnlockedTendersPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'RETAILER') redirect('/login');
+  if (!user || user.role !== 'PROVIDER') redirect('/login');
 
   const unlocks = await prisma.unlock.findMany({
     where: { retailerId: user.id },

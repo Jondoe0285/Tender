@@ -12,9 +12,9 @@ This is a point-in-time gap analysis, not a repeat of the earlier technical revi
 
 ### Confirmed aligned with the business plan
 
-- Roles, workflow order (Raise Tender → Retailers Tender → Compare Prices → Award Contract), and the
-  £10 Retailer unlock fee / £10 Client Accepted Quote Release Fee model (§5, §5.1) match the implementation.
-- Retailer subscriptions (§5.3) and tiered Client release fees (§5.1) are built but correctly gated inactive
+- Roles, workflow order (Raise Tender → Provider Tender → Compare Prices → Award Contract), and the
+  £10 Provider unlock fee / £10 Contractor Accepted Quote Release Fee model (§5, §5.1) match the implementation.
+- Provider subscriptions (§5.3) and tiered Contractor release fees (§5.1) are built but correctly gated inactive
   behind Owner-controlled platform settings, matching "must not be included in the current revenue forecast."
 - Staged visibility rules (§4.7): pre-unlock summary only, full detail after unlock, contact identities hidden
   until the release fee is confirmed — verified server-side and in rendered markup in the earlier security review.
@@ -22,7 +22,7 @@ This is a point-in-time gap analysis, not a repeat of the earlier technical revi
 - 30-day quote retention / five-year accepted-quote-and-audit retention (§4.10) is implemented and tested.
 - All 12 required footer/policy documents (§10, "Website Footer and Public Policy Documents") exist on
   `/policies`, including the Marketplace Disclaimer and Platform Role Statement.
-- Retailer accreditations field, category/coverage-area matching, and email notifications (§4.3–§4.4) exist.
+- Provider accreditations field, category/coverage-area matching, and email notifications (§4.3–§4.4) exist.
 
 ### Gaps found — recommended additions
 
@@ -31,15 +31,15 @@ This is a point-in-time gap analysis, not a repeat of the earlier technical revi
    near-duplicate tenders, and other potential misuse." No such detection exists today — `contentModeration.ts`
    only screens for premature contact/company disclosure in free-text fields, which is a different control.
    **Recommendation:** add a lightweight monitoring service (e.g. flag tenders with near-identical
-   description/category/location from the same Client within a short window, flag Retailers with an unusually
+  description/category/location from the same Contractor within a short window, flag Providers with an unusually
    high ratio of unlocks-to-quotes, surface both as a Super User "Flags" panel) before scaling past pilot volume.
 
-2. **Super User analytics filtering is incomplete against §4.6.** The plan requires filtering by "Client,
-   Retailer, tender identifier, quote identifier, category, geographical area, status, date range, value band,
+2. **Super User analytics filtering is incomplete against §4.6.** The plan requires filtering by "Contractor,
+   Provider, tender identifier, quote identifier, category, geographical area, status, date range, value band,
    subscription plan, and payment status." The current `getAnalytics`/`parseAnalyticsFilters`
    ([src/server/domain/analyticsService.ts](../src/server/domain/analyticsService.ts)) only supports date
    range, category, and region. **Recommendation:** extend the filter set to include tender/quote status,
-   value band, and a free-text Client/Retailer/identifier search; expose subscription plan and payment status
+  value band, and a free-text Contractor/Provider/identifier search; expose subscription plan and payment status
    filters once membership/subscription usage data exists to filter against.
 
 3. **Partner advertising is static, not Super-User-managed (§10).** The plan requires the Super User to
@@ -49,9 +49,9 @@ This is a point-in-time gap analysis, not a repeat of the earlier technical revi
    as an outstanding README item; re-confirmed here as a direct business-plan requirement, not just a "nice to
    have."
 
-4. **No formal Retailer approval/vetting gate (§10, Phase Three).** The plan lists "Retailer approval"
-   alongside Super User suspension as a Phase Three control. Today, Retailer accounts are self-serve and active
-   immediately after email verification; there is no admin review step before a new Retailer can receive
+4. **No formal Provider approval/vetting gate (§10, Phase Three).** The plan lists "Provider approval"
+  alongside Super User suspension as a Phase Three control. Today, Provider accounts are self-serve and active
+  immediately after email verification; there is no admin review step before a new Provider can receive
    matched opportunities or submit quotes. **Recommendation:** clarify with the business owner whether this
    means (a) a formal pre-activation approval queue, or (b) the existing suspend/activate control is sufficient
    post-launch moderation. If (a), add a `pendingApproval` state to `RetailerProfile` and a Super User approval
@@ -61,15 +61,15 @@ This is a point-in-time gap analysis, not a repeat of the earlier technical revi
    scripts, results, or CI job exist in the repository. This is an operational/QA task, not a code gap, but
    should be scheduled before the funded pre-launch assurance budget (§7.5, £770–£2,150) is spent.
 
-6. **Retailer confirmation step (§4.6) is not implemented.** The plan lists "Retailer confirmations where a
+6. **Provider confirmation step (§4.6) is not implemented.** The plan lists "Provider confirmations where a
    confirmation step is used" as an analytics metric, implying an optional post-acceptance confirmation from
-   the Retailer (e.g. confirming they will fulfil the awarded work). No such step exists; quote lifecycle stops
+  the Provider (e.g. confirming they will fulfil the awarded work). No such step exists; quote lifecycle stops
    at `ACCEPTED`. **Recommendation:** treat as an optional Phase Seven enhancement — confirm with the business
    owner whether this is required for the Year 1 launch or a later refinement.
 
 7. **Launch-credit window is a fixed field (`launchCreditsLeft`), not a time-boxed 90-day window (§Executive
-   Summary, §5, §9.4).** The plan describes a 90-day Retailer launch credit window, extendable "selectively by
-   category, region, or Retailer group." The current implementation grants a flat credit count per Retailer
+  Summary, §5, §9.4).** The plan describes a 90-day Provider launch credit window, extendable "selectively by
+  category, region, or Provider group." The current implementation grants a flat credit count per Provider
    with no start/end date or category/region-scoped extension mechanism. **Recommendation:** clarify whether
    the flat-credit model is an accepted simplification for Year 1, or whether a dated window with
    category/region overrides is required before the marketing launch begins.
@@ -79,14 +79,14 @@ prioritized alongside the technical outstanding items below.
 
 ## Fixed in this review
 
-- **Race condition on Retailer launch-credit unlocks** — concurrent unlock requests could both spend the same
+- **Race condition on Provider launch-credit unlocks** — concurrent unlock requests could both spend the same
   last credit. Now uses an atomic conditional `updateMany` guard. ([src/server/domain/unlockService.ts](../src/server/domain/unlockService.ts))
 - **Duplicate `ContactRelease` rows possible under concurrent webhook/finalisation retries** — added a
   `@@unique` constraint on `ContactRelease.quoteId` (migration `20260828250000_add_contact_release_quote_unique`)
   and made `finalizeContactRelease` handle the race gracefully instead of relying on a non-atomic check-then-create.
 - **`acceptQuote` threw a raw 500 on a concurrent duplicate release-payment creation** — now catches the
   unique-constraint conflict and returns the existing payment.
-- **Accountant sub-accounts could grant free Retailer membership/subscription entitlements**, bypassing the
+- **Accountant sub-accounts could grant free Provider membership/subscription entitlements**, bypassing the
   payment flow — `/api/super-user/retailers/[id]/entitlements` now requires `requireFullSuperUser()` instead of
   plain `requireRole('SUPER_USER')`.
 - **Tender match/item-match creation was not transactional** — wrapped in `prisma.$transaction` so a partial
@@ -101,9 +101,9 @@ prioritized alongside the technical outstanding items below.
 - **No Node engine pin** — added `"engines": { "node": ">=20 <21" }` to `package.json`.
 - **No test coverage for Owner/Accountant permission gating** — added unit tests for
   `canManagePlatformOwnership` and `isAccountantOnly` in `tests/lib/admin-permissions.test.ts`.
-- **Client tender detail page could spin on "Loading…" forever if the fetch failed** — added a persisted
+- **Contractor tender detail page could spin on "Loading…" forever if the fetch failed** — added a persisted
   error message state in [src/app/client/tenders/[id]/page.tsx](../src/app/client/tenders/%5Bid%5D/page.tsx).
-- **Retailer Performance dashboard ignored the Super-User-configurable analytics section toggles** — wired up
+- **Provider Performance dashboard ignored the Super-User-configurable analytics section toggles** — wired up
   in an earlier pass (`RetailerAnalyticsDashboard` + `retailerAnalyticsService`); confirmed still correct.
 
 ## Outstanding — requires product/human decision
@@ -185,21 +185,21 @@ prioritized alongside the technical outstanding items below.
 21. **Critical for launch:** no misuse/fraud monitoring (duplicate tenders, repeated parties, unusual payment
     behaviour) per business plan §4.9.
 22. **High:** Super User analytics filters are missing status, value band, payment status, subscription plan,
-    and Client/Retailer/identifier search per §4.6.
+    and Contractor/Provider/identifier search per §4.6.
 23. **High:** partner advertising (Sinclair Safety Solutions Ltd, Smart Works Civils Ltd) is hardcoded rather
     than Super-User-managed per §10.
-24. **Medium:** no formal Retailer approval/vetting gate before matching begins — clarify against §10 Phase
+24. **Medium:** no formal Provider approval/vetting gate before matching begins — clarify against §10 Phase
     Three intent.
 25. **Medium:** no evidence of load testing against the 1,000-concurrent-user target in §4.10.
-26. **Low:** optional Retailer confirmation step from §4.6 is not implemented — confirm whether required for
+26. **Low:** optional Provider confirmation step from §4.6 is not implemented — confirm whether required for
     Year 1.
 27. **Low:** the 90-day, category/region-extendable launch credit window from the Executive Summary/§9.4 is
-    currently a flat per-Retailer credit count with no time window or scoped extension mechanism.
+    currently a flat per-Provider credit count with no time window or scoped extension mechanism.
 
 ## Verified secure / no action needed
 
 - Stripe webhook signature verification, amount matching, and idempotency (event ID + `PENDING` guard).
-- Contact details (Client/Retailer identity) are never exposed before a `CONFIRMED` `CLIENT_RELEASE` payment,
+- Contact details (Contractor/Provider identity) are never exposed before a `CONFIRMED` `CLIENT_RELEASE` payment,
   both in API responses and rendered markup.
 - No raw SQL (`$queryRaw`/`$executeRaw`) anywhere — all data access goes through Prisma.
 - No hardcoded secrets/API keys found in source.

@@ -10,7 +10,7 @@ export default async function ClientManagementPage() {
   if (user.isAccountant) redirect('/super-user/accounting');
 
   const clients = await prisma.user.findMany({
-    where: { role: 'CLIENT' },
+    where: { role: 'CONTRACTOR' },
     orderBy: { createdAt: 'desc' },
     include: {
       _count: { select: { tenders: true } },
@@ -19,10 +19,10 @@ export default async function ClientManagementPage() {
   });
 
   return (
-    <AppShell role="super-user" title="Client Management">
-      <p className="mb-6 max-w-xl text-sm text-concrete-grey">Registered Client accounts and their tender activity.</p>
+    <AppShell role="super-user" title="Contractor Management">
+      <p className="mb-6 max-w-xl text-sm text-concrete-grey">Registered Contractor accounts and their tender activity.</p>
       <AccountManagementTable
-        role="CLIENT"
+        role="CONTRACTOR"
         rows={clients.map((client) => ({
           id: client.id,
           email: client.email,

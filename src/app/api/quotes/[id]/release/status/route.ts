@@ -5,7 +5,7 @@ import { prisma } from '@/server/data/prisma';
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
-    const user = await requireRole('CLIENT');
+    const user = await requireRole('CONTRACTOR');
     const quote = await prisma.quote.findUnique({
       where: { id: params.id },
       include: { tender: true, releasePayment: true },

@@ -5,7 +5,7 @@ export type ActivityLogFilters = {
   search?: string;
   action?: string;
   targetType?: string;
-  actorRole?: 'SUPER_USER' | 'CLIENT' | 'RETAILER';
+  actorRole?: 'SUPER_USER' | 'CONTRACTOR' | 'PROVIDER';
   from?: Date;
   to?: Date;
 };
@@ -27,7 +27,7 @@ export function parseActivityLogFilters(searchParams: Record<string, string | st
     search: search || undefined,
     action: action || undefined,
     targetType: targetType || undefined,
-    actorRole: actorRole && ['SUPER_USER', 'CLIENT', 'RETAILER'].includes(actorRole) ? (actorRole as ActivityLogFilters['actorRole']) : undefined,
+    actorRole: actorRole && ['SUPER_USER', 'CONTRACTOR', 'PROVIDER'].includes(actorRole) ? (actorRole as ActivityLogFilters['actorRole']) : undefined,
     from: fromValue ? new Date(`${fromValue}T00:00:00.000Z`) : undefined,
     to: toValue ? new Date(`${toValue}T23:59:59.999Z`) : undefined,
   };

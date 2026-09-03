@@ -14,7 +14,7 @@ import { accountCreatedByAdminTemplate, appUrl } from '@/server/notifications/em
  * Invites the account holder to set their own password. Delivery failure must not roll back
  * the account, so the outcome is recorded in the audit log and returned to the Super User.
  */
-async function sendAccountInvitation(user: { id: string; email: string; contactName: string }, role: 'CLIENT' | 'RETAILER', companyName: string | undefined, actorId: string) {
+async function sendAccountInvitation(user: { id: string; email: string; contactName: string }, role: 'CONTRACTOR' | 'PROVIDER', companyName: string | undefined, actorId: string) {
   const token = await createPasswordResetToken(user.id);
   const result = await sendTransactionalEmail(
     user.email,
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
 
     await prisma.$transaction([
       prisma.userRole.create({ data: { userId: existing.id, role: input.role } }),
-      ...(input.role === 'RETAILER'
+      ...(input.role === 'PROVIDER'
         ? [
             prisma.retailerProfile.upsert({
               where: { userId: existing.id },
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
       contactPhone: input.contactPhone ?? null,
       termsAcceptedAt: new Date(),
       roleMemberships: { create: { role: input.role } },
-      ...(input.role === 'RETAILER'
+      ...(input.role === 'PROVIDER'
         ? {
             retailerProfile: {
               create: {

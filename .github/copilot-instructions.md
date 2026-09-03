@@ -9,7 +9,7 @@
 
 ## Roles
 
-- Support only the approved roles: Super User, Contractor, and Provider (renamed from Client and Retailer per the 2026-09-03 baseline business plan; the rename has not yet been applied to the codebase — the `Role` enum, routes, and portals still use `CLIENT`/`RETAILER` until that implementation work is scheduled).
+- Support only the approved roles: Super User, Contractor, and Provider.
 - Do not create features outside the approved Trade Tender business plan.
 
 ## Product And Security Rules
@@ -18,8 +18,8 @@
 - Require authentication on every protected route and enforce authorization server-side.
 - Validate all untrusted input on the server, even when client-side validation exists.
 - Create and apply database migrations for every schema change.
-- Maintain audit logs for payment events and Client or Retailer contact-release events.
-- Never expose Client or Retailer details before the required payment trigger.
+- Maintain audit logs for payment events and Contractor or Provider contact-release events.
+- Never expose Contractor or Provider details before the required payment trigger.
 - Never bypass authentication, authorization, validation, payment, or other security controls.
 
 ## Environment Resource Preservation
@@ -36,12 +36,12 @@
 - All development decisions must align with the approved business plan.
 - Before implementing any feature, consult the business plan, check user role requirements, check security requirements, check payment requirements, and check platform workflow requirements.
 - If a requested feature conflicts with the business plan, flag the conflict before implementation.
-- The active Year 1 revenue model is a £10 Retailer tender unlock fee and a £10 Client Accepted Quote Release Fee.
-- Keep Retailer subscriptions and tiered Client release fees inactive and excluded from current forecasts unless explicitly approved by the Super User.
-- Keep tender creation, quote receipt, and quote comparison free for Clients, subject to the approved payment and contact-release workflow.
-- Treat Trade Tender as a connection and tender-management platform, not the supplier, contractor, broker, guarantor, or responsible party for the final Client-Retailer transaction.
+- The active Year 1 revenue model is a £10 Provider tender unlock fee and a £10 Contractor Accepted Quote Release Fee.
+- Keep Provider subscriptions and tiered Contractor release fees inactive and excluded from current forecasts unless explicitly approved by the Super User.
+- Keep tender creation, quote receipt, and quote comparison free for Contractors, subject to the approved payment and contact-release workflow.
+- Treat Trade Tender as a connection and tender-management platform, not the supplier, contractor, broker, guarantor, or responsible party for the final Contractor-Provider transaction.
 - Apply the documented 30-day formal quote retention and five-year accepted-quote, payment, contact-release, and audit-record retention requirements unless a valid hold or investigation requires otherwise.
-- Keep partner advertising separate from tender matching, quote ranking, supplier selection, and Client decision-making.
+- Keep partner advertising separate from tender matching, quote ranking, supplier selection, and Contractor decision-making.
 
 ## Brand Rules
 

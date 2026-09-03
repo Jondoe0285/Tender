@@ -7,7 +7,7 @@ export const pageViewSchema = z.object({
     .trim()
     .min(1)
     .max(300)
-    .regex(/^\/(client|retailer|super-user)(\/[a-zA-Z0-9\-_/]*)?$/, 'Unsupported path'),
+    .regex(/^\/(client|contractor|retailer|provider|super-user)(\/[a-zA-Z0-9\-_/]*)?$/, 'Unsupported path'),
 });
 
 export type PageViewInput = z.infer<typeof pageViewSchema>;

@@ -25,7 +25,7 @@ const STEPS: WizardStep[] = [
 
 type FormState = {
   projectName: string;
-  category: ServiceName | '';
+  category: ServiceName | string;
   subcategory: string;
   item: string;
   location: string;
@@ -41,7 +41,7 @@ type FormState = {
 
 type TenderItem = {
   id: string;
-  category: ServiceName | '';
+  category: ServiceName | string;
   subcategory: string;
   item: string;
   quantityValue: string;
@@ -333,7 +333,7 @@ export default function NewTenderPage() {
                 id="category"
                 value={form.category}
                 onChange={(event) => {
-                  update('category', event.target.value as ServiceName);
+                  update('category', event.target.value);
                   update('subcategory', '');
                 }}
               >
@@ -419,7 +419,7 @@ export default function NewTenderPage() {
                             id={`item-${index}-category`}
                             value={item.category}
                             onChange={(event) => {
-                              updateItem(index, 'category', event.target.value as ServiceName);
+                              updateItem(index, 'category', event.target.value);
                               updateItem(index, 'subcategory', '');
                               updateItem(index, 'item', '');
                             }}

@@ -15,6 +15,8 @@ type TenderSummary = {
   id: string;
   reference: string;
   category: string;
+  packageCategories?: string[];
+  packageCount?: number;
   clientTradeTenderId: string | null;
   location: string;
   urgency: string;
@@ -32,6 +34,7 @@ type TenderFull = Omit<TenderSummary, 'items'> & {
   requirements: string;
   description: string;
   attachments: { id: string; fileName: string; mimeType: string; sizeBytes: number }[];
+  packages?: { id: string; reference: string; category: string; subcategory: string; item: string | null; quantity: string; description: string; urgency: string; closingDate: string; status: string }[];
   items: { id: string; category: string; subcategory: string; item: string | null; quantity: string; description: string }[];
 };
 
@@ -182,6 +185,13 @@ export default function RetailerTenderDetailPage() {
           <h2 className="font-heading text-2xl font-bold tracking-tight text-foundation-navy">{tender.category}</h2>
           <StatusBadge status={unlocked ? 'approved' : 'pending'}>{unlocked ? 'Unlocked' : 'Locked'}</StatusBadge>
         </div>
+        {(tender.packageCount ?? 0) > 1 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(tender.packageCategories ?? []).map((pkg) => (
+              <StatusBadge key={pkg} status="neutral">{pkg}</StatusBadge>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="mx-auto mt-6 max-w-2xl">
@@ -236,6 +246,13 @@ export default function RetailerTenderDetailPage() {
             <>
               <Card className="mb-6">
                 <h2 className="font-heading text-lg font-bold text-foundation-navy">Tender requirements</h2>
+                {(full.packages && full.packages.length > 0) && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {full.packages.map((pkg) => (
+                      <StatusBadge key={pkg.id} status="neutral">{pkg.category}</StatusBadge>
+                    ))}
+                  </div>
+                )}
                 <div className="mt-4 flex flex-col gap-4">
                   <TenderItemDetail subcategory={full.subcategory} item={null} quantity={full.quantity} description={full.description} />
                   {full.items.slice(1).map((item) => (

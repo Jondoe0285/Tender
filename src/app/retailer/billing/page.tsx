@@ -12,7 +12,7 @@ import { MembershipPackages } from '@/components/retailer/MembershipPackages';
 
 export default async function RetailerBillingPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'RETAILER') redirect('/login');
+  if (!user || user.role !== 'PROVIDER') redirect('/login');
 
   const [payments, profile, placementEnabled, activePlacement, placementFeeGbp, membershipPackages] = await Promise.all([
     prisma.payment.findMany({ where: { userId: user.id, type: { in: ['RETAILER_UNLOCK', 'SPONSORED_PLACEMENT', 'MEMBERSHIP_TIER'] } }, orderBy: { createdAt: 'desc' } }),
