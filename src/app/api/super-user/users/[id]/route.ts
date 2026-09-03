@@ -8,7 +8,8 @@ import { createPasswordResetToken, PASSWORD_RESET_EXPIRY_LABEL } from '@/server/
 import { appUrl, passwordResetTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
 
@@ -148,7 +149,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
 

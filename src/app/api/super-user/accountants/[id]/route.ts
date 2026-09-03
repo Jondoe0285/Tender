@@ -8,7 +8,8 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { accountantActionSchema } from '@/lib/schemas/accountant';
 import { toErrorResponse } from '@/server/http/errors';
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
 

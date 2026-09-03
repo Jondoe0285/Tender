@@ -8,7 +8,8 @@ import { toErrorResponse } from '@/server/http/errors';
 
 const reviewSchema = z.object({ note: z.string().trim().min(3).max(500) });
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;

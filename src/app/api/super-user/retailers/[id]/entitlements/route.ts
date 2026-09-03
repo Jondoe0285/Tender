@@ -11,7 +11,8 @@ const entitlementSchema = z.object({
   active: z.boolean(),
 });
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
   // Free entitlement grants bypass the payment flow, so Accountant sub-accounts must not reach this route.

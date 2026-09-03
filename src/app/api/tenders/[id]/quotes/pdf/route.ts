@@ -3,7 +3,8 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { getCurrentUser } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await getCurrentUser();
   if (!user || user.role !== 'CONTRACTOR') {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });

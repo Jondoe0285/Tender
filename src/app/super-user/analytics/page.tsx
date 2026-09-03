@@ -6,7 +6,8 @@ import { getAnalytics, parseAnalyticsFilters } from '@/server/domain/analyticsSe
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
-export default async function AnalyticsPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function AnalyticsPage(props: { searchParams?: Promise<SearchParams> }) {
+  const searchParams = await props.searchParams;
   const user = await getCurrentUser();
   if (!user || user.role !== 'SUPER_USER') redirect('/login');
   if (user.isAccountant) redirect('/super-user/accounting');

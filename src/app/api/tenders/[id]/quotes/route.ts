@@ -5,7 +5,8 @@ import { rejectCrossOrigin } from '@/server/http/origin';
 import { submitQuoteSchema } from '@/lib/schemas/quote';
 import { submitQuote, listQuotesForClientTender } from '@/server/domain/quoteService';
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
@@ -21,7 +22,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 }
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireRole('CONTRACTOR');
     const quotes = await listQuotesForClientTender(user.id, params.id);

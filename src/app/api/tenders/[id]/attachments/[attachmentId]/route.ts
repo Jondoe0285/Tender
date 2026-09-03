@@ -15,7 +15,11 @@ function safeMimeType(mimeType: string) {
     : 'application/octet-stream';
 }
 
-export async function GET(_request: Request, { params }: { params: { id: string; attachmentId: string } }) {
+export async function GET(
+  _request: Request,
+  props: { params: Promise<{ id: string; attachmentId: string }> }
+) {
+  const params = await props.params;
   try {
     const user = await requireRole('CONTRACTOR', 'PROVIDER');
     if (user.role !== 'CONTRACTOR' && user.role !== 'PROVIDER') throw new ForbiddenError();

@@ -7,7 +7,8 @@ import { listTenderMessages, sendTenderMessage } from '@/server/domain/messageSe
 
 const messageSchema = z.object({ body: z.string().trim().min(1).max(2000), quoteId: z.string().min(1).optional() });
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await requireRole('CONTRACTOR', 'PROVIDER');
     const actor = { id: user.id, role: user.role as 'CONTRACTOR' | 'PROVIDER' };
@@ -19,7 +20,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;

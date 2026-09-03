@@ -8,7 +8,8 @@ import { prisma } from '@/server/data/prisma';
 import { formatRetailerSummaryLocation } from '@/server/domain/tenderService';
 import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const user = await getCurrentUser();
     if (!user) throw new UnauthorizedError();
