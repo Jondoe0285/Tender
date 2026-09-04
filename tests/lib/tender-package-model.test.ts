@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { prisma } from '../../src/server/data/prisma';
-import { createTender, listMatchedSummariesForRetailer } from '../../src/server/domain/tenderService';
+import { createTender, listMatchedSummariesForRetailer, updateTender } from '../../src/server/domain/tenderService';
 import { getUnlockedTenderForRetailer } from '../../src/server/domain/unlockService';
 
 test('a tender job can own a tender package record', async (context) => {
@@ -126,6 +126,71 @@ test('createTender creates a package record for the job and extra package items'
   assert.equal(packages.length, 2);
   assert.deepEqual(packages.map((pkg) => pkg.category), ['Materials', 'Plant Hire']);
   assert.ok(packages.every((pkg) => pkg.reference.startsWith(tender.reference)));
+});
+
+test('editing a tender preserves its reference and existing Provider unlock', async (context) => {
+  const suffix = randomUUID();
+  let tenderId: string | undefined;
+  let clientId: string | undefined;
+  let retailerId: string | undefined;
+
+  context.after(async () => {
+    if (tenderId) {
+      await prisma.unlock.deleteMany({ where: { tenderId } });
+      await prisma.tenderMatch.deleteMany({ where: { tenderId } });
+      await prisma.tenderPackage.deleteMany({ where: { tenderId } });
+      await prisma.tenderItem.deleteMany({ where: { tenderId } });
+      await prisma.tender.deleteMany({ where: { id: tenderId } });
+    }
+    if (retailerId) await prisma.user.deleteMany({ where: { id: retailerId } });
+    if (clientId) {
+      await prisma.moderationEvent.deleteMany({ where: { actorId: clientId } });
+      await prisma.user.deleteMany({ where: { id: clientId } });
+    }
+  });
+
+  const [client, retailer] = await Promise.all([
+    prisma.user.create({ data: { email: `edit-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CONTRACTOR', contactName: 'Tender Editor' } }),
+    prisma.user.create({ data: { email: `edit-provider-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Tender Provider' } }),
+  ]);
+  clientId = client.id;
+  retailerId = retailer.id;
+  const tender = await prisma.tender.create({
+    data: {
+      reference: `EDIT-${suffix}`,
+      clientId,
+      category: 'Materials',
+      subcategory: 'Aggregates',
+      location: 'Leeds LS10 2AB',
+      quantity: '20 tonnes',
+      urgency: 'standard',
+      closingDate: new Date(Date.now() + 86_400_000),
+      requirements: 'Delivery to site required',
+      description: 'Initial tender specification',
+      items: { create: { category: 'Materials', subcategory: 'Aggregates', item: 'MOT Type 1', quantity: '20 tonnes', description: 'Initial tender specification' } },
+      packages: { create: { reference: `EDIT-${suffix}-PK1`, category: 'Materials', subcategory: 'Aggregates', service: 'Materials', item: 'MOT Type 1', location: 'Leeds LS10 2AB', quantity: '20 tonnes', urgency: 'standard', closingDate: new Date(Date.now() + 86_400_000), requirements: 'Delivery to site required', description: 'Initial tender specification' } },
+    },
+    include: { items: true },
+  });
+  tenderId = tender.id;
+  await prisma.tenderMatch.create({ data: { tenderId, retailerId } });
+  await prisma.unlock.create({ data: { tenderId, retailerId, method: 'PAID' } });
+
+  await updateTender(clientId, tenderId, {
+    location: 'Leeds LS10 2AB',
+    urgency: 'urgent',
+    closingDate: new Date(Date.now() + 172_800_000),
+    requirements: ['Delivery to site required'],
+    description: 'Updated tender specification',
+    items: [{ id: tender.items[0]!.id, quantity: '30 tonnes', description: 'Updated tender specification' }],
+  });
+
+  const updated = await prisma.tender.findUniqueOrThrow({ where: { id: tenderId }, include: { items: true } });
+  assert.equal(updated.reference, `EDIT-${suffix}`);
+  assert.equal(updated.description, 'Updated tender specification');
+  assert.equal(updated.items[0]!.quantity, '30 tonnes');
+  assert.ok(await prisma.unlock.findUnique({ where: { tenderId_retailerId: { tenderId, retailerId } } }));
+  assert.equal(await prisma.auditLog.count({ where: { targetId: tenderId, action: 'TENDER_UPDATED' } }), 1);
 });
 
 test('listMatchedSummariesForRetailer exposes package metadata for multi-package jobs', async (context) => {

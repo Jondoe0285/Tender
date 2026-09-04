@@ -50,6 +50,7 @@ export function Combobox({ id, name, groups, value, onChange, placeholder, disab
   }, [groups, query]);
 
   const flatOptions = useMemo(() => filteredGroups.flatMap((group) => group.options), [filteredGroups]);
+  const activeOptionId = activeIndex >= 0 && flatOptions[activeIndex] ? `${id}-option-${activeIndex}` : undefined;
 
   function selectOption(option: string) {
     onChange(option);
@@ -86,6 +87,7 @@ export function Combobox({ id, name, groups, value, onChange, placeholder, disab
         aria-expanded={open}
         aria-controls={`${id}-listbox`}
         aria-autocomplete="list"
+        aria-activedescendant={activeOptionId}
         autoComplete="off"
         disabled={disabled}
         placeholder={placeholder}
@@ -119,9 +121,10 @@ export function Combobox({ id, name, groups, value, onChange, placeholder, disab
                     return (
                       <li key={option}>
                         <button
+                          id={flatIndex >= 0 ? `${id}-option-${flatIndex}` : undefined}
                           type="button"
                           role="option"
-                          aria-selected={value === option}
+                          aria-selected={value === option || flatIndex === activeIndex}
                           onMouseDown={(event) => event.preventDefault()}
                           onClick={() => selectOption(option)}
                           className={`block w-full px-4 py-2 text-left text-sm hover:bg-safety-amber/10 ${

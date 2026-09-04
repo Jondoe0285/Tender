@@ -118,19 +118,26 @@ export function isValidSubcategory(service: string, category: string, item?: str
 
 export const URGENCY_OPTIONS = ['standard', 'urgent', 'flexible'] as const;
 export const REQUIREMENT_OPTIONS = [
+  'Site access required',
   'Delivery to site required',
+  'Collection or uplift required',
   'Driver or operator required',
   'Timed delivery required',
   'Delivery booking required',
   'Offloading required',
   'Lifting equipment required',
+  'Parking or restricted-access arrangements',
   'Site induction required',
   'PPE required',
   'CSCS-certified operative required',
   'Risk assessment (RAMS) required',
   'Proof of insurance required',
   'Waste transfer note required',
+  'Waste segregation or skip exchange required',
+  'Plant, machinery or specialist equipment required',
   'Out-of-hours access',
+  'Working windows or scheduling constraints',
+  'Pre-start survey or site visit required',
 ] as const;
 export const RETAILER_UNLOCK_FEE_GBP = 10;
 export const CLIENT_RELEASE_FEE_GBP = 10;

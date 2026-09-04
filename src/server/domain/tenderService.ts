@@ -1,8 +1,8 @@
 import { prisma } from '@/server/data/prisma';
 import { buildTenderReference } from '@/lib/identifiers';
 import { recordAuditEvent } from '@/server/audit/auditLog';
-import { sendTenderOpportunityEmail } from '@/server/notifications/resend';
-import type { CreateTenderInput } from '@/lib/schemas/tender';
+import { sendTenderOpportunityEmail, sendTenderUpdatedEmail } from '@/server/notifications/resend';
+import type { CreateTenderInput, UpdateTenderInput } from '@/lib/schemas/tender';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
 import { retailerCoversTenderLocation, getBroadLocation, getPostcodeDistrict } from '@/lib/geography';
 import { ForbiddenError } from '@/server/auth/session';
@@ -231,6 +231,102 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
   }
 
   return tender;
+}
+
+/** Updates a Contractor-owned tender in place, preserving its reference, matches, and unlock entitlement records. */
+export async function updateTender(clientId: string, tenderId: string, input: UpdateTenderInput) {
+  const tender = await prisma.tender.findFirst({
+    where: { id: tenderId, clientId },
+    include: {
+      items: { orderBy: { createdAt: 'asc' } },
+      packages: { orderBy: { createdAt: 'asc' } },
+      matches: true,
+    },
+  });
+  if (!tender) throw new ForbiddenError('Tender not found for this Contractor');
+  if (tender.status !== 'OPEN') throw new ForbiddenError('Only open tenders can be edited');
+
+  const existingItemIds = new Set(tender.items.map((item) => item.id));
+  if (input.items.length !== tender.items.length || input.items.some((item) => !existingItemIds.has(item.id))) {
+    throw new ForbiddenError('Tender packages cannot be added or removed after submission');
+  }
+
+  await enforceContentModeration(clientId, 'TENDER_UPDATE', [
+    { name: 'location', value: input.location },
+    { name: 'requirements', value: input.requirements.join(', ') },
+    { name: 'description', value: input.description },
+    ...input.items.flatMap((item, index) => [
+      { name: `item ${index + 1} quantity`, value: item.quantity },
+      { name: `item ${index + 1} description`, value: item.description },
+    ]),
+  ]);
+
+  const itemsById = new Map(input.items.map((item) => [item.id, item]));
+  const updatedTender = await prisma.$transaction(async (transaction) => {
+    const updated = await transaction.tender.update({
+      where: { id: tender.id },
+      data: {
+        location: input.location,
+        urgency: input.urgency,
+        closingDate: input.closingDate,
+        supplyDate: input.supplyDate ?? null,
+        requirements: input.requirements.join(','),
+        description: input.description,
+      },
+    });
+
+    await Promise.all(tender.items.map((item) => {
+      const update = itemsById.get(item.id)!;
+      return transaction.tenderItem.update({ where: { id: item.id }, data: { quantity: update.quantity, description: update.description } });
+    }));
+    await transaction.tenderPackage.updateMany({
+      where: { tenderId: tender.id },
+      data: {
+        location: input.location,
+        urgency: input.urgency,
+        closingDate: input.closingDate,
+        supplyDate: input.supplyDate ?? null,
+        requirements: input.requirements.join(','),
+      },
+    });
+    await Promise.all(tender.packages.map((pkg, index) => {
+      const item = itemsById.get(tender.items[index]?.id ?? '');
+      return item
+        ? transaction.tenderPackage.update({ where: { id: pkg.id }, data: { quantity: item.quantity, description: item.description } })
+        : Promise.resolve();
+    }));
+    await recordAuditEvent({
+      actorId: clientId,
+      action: 'TENDER_UPDATED',
+      targetType: 'Tender',
+      targetId: tender.id,
+      metadata: { reference: tender.reference, matchedRetailerCount: tender.matches.length },
+    }, transaction);
+    return updated;
+  });
+
+  const matchedRetailers = await prisma.user.findMany({
+    where: { id: { in: tender.matches.map((match) => match.retailerId) }, role: 'PROVIDER' },
+    select: { id: true, email: true },
+  });
+  await Promise.allSettled(matchedRetailers.map(async (retailer) => {
+    const result = await sendTenderUpdatedEmail(retailer.email, {
+      id: tender.id,
+      reference: tender.reference,
+      category: tender.category,
+      locationArea: formatRetailerSummaryLocation(input.location),
+      closingDate: input.closingDate,
+    });
+    await recordAuditEvent({
+      actorId: clientId,
+      action: result.sent ? 'TENDER_UPDATE_NOTIFICATION_SENT' : 'TENDER_UPDATE_NOTIFICATION_SKIPPED',
+      targetType: 'Tender',
+      targetId: tender.id,
+      metadata: { retailerId: retailer.id, reason: result.sent ? undefined : result.reason },
+    });
+  }));
+
+  return updatedTender;
 }
 
 /**

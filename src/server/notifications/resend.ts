@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { tenderOpportunityTemplate, type EmailTemplate } from '@/server/notifications/emailTemplates';
+import { tenderOpportunityTemplate, tenderUpdatedTemplate, type EmailTemplate } from '@/server/notifications/emailTemplates';
 
 const PLACEHOLDER_SECRET_VALUES = new Set(['test', 'placeholder', 'changeme', 'example']);
 
@@ -90,4 +90,9 @@ export async function sendHealthReportEmail(template: HealthReportEmail, attachm
 /** Sends only the approved pre-unlock summary; Client identity, precise site data and full specification stay private. */
 export async function sendTenderOpportunityEmail(to: string, tender: TenderNotification) {
   return sendTransactionalEmail(to, tenderOpportunityTemplate(tender));
+}
+
+/** Sends a non-sensitive update notice without altering the Provider's existing access entitlement. */
+export async function sendTenderUpdatedEmail(to: string, tender: Pick<TenderNotification, 'id' | 'reference' | 'category' | 'locationArea' | 'closingDate'>) {
+  return sendTransactionalEmail(to, tenderUpdatedTemplate(tender));
 }

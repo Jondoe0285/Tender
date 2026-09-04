@@ -45,6 +45,13 @@ export function tenderOpportunityTemplate(input: { id: string; reference: string
   };
 }
 
+export function tenderUpdatedTemplate(input: { id: string; reference: string; category: string; locationArea: string; closingDate: Date }): EmailTemplate {
+  return {
+    subject: `Tender updated: ${input.reference}`,
+    html: layout({ eyebrow: 'Tender update', title: 'A matched tender has been updated', intro: 'The Contractor has updated the tender details. Review the current requirements before preparing or revising a quote.', body: detailRows([['Tender ID', input.reference], ['Category', input.category], ['Location area', input.locationArea], ['Quote deadline', input.closingDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })]]) + '<p style="font-size:14px;line-height:1.6">Your existing tender access remains available. Contractor identity and direct contact details remain restricted until the required release condition is met.</p>', action: { label: 'Review tender', href: appUrl(`/retailer/tenders/${encodeURIComponent(input.id)}`) } }),
+  };
+}
+
 export function quoteReceivedTemplate(input: { tenderReference: string; quoteReference: string; category: string; priceGbp: number; leadTimeDays: number; reviewPath: string }): EmailTemplate {
   return {
     subject: `Quote received for ${input.tenderReference}`,

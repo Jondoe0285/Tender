@@ -13,6 +13,28 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-04 - Two-Level Contractor Service Provisions
+
+- Changed: tender packages now require only the selected service group and its service provision. For example, a Contractor can submit `Contractor Services` with `Groundworks & Civil Engineering` without selecting the optional third-level detailed provision.
+- Affects: Contractor tender-builder labels and client-side validation plus existing tender-schema regression coverage. Server-side catalogue relationship validation, Provider matching, tender identifiers, payments, contact-release controls, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/tender-schema.test.ts tests/lib/client-tender-builder.test.ts` passes (29 tests); `npm run type-check` passes.
+
+### 2026-09-04 - Contractor Tender Detail And Edit Workflow
+
+- Changed: Contractors can now open the full tender they own, including its requirements, package specifications, and their attachments, then edit its mutable timing, location, requirements, overall information, and existing package quantities/specifications. The tender ID, tender reference, package identities, matches, quote records, and Provider unlock records remain unchanged.
+- Changed: every successful tender edit is server-authorized, server-validated, content-moderated, atomically audited, and sends every currently matched Provider a non-sensitive tender-update email. A Provider who previously unlocked the tender retains that access and is not charged again.
+- Affects: Contractor tender detail and edit workflow, matched Provider notifications, and tender audit history. No database migration, payment calculation, contact-release behavior, tender identifier, or environment configuration changed.
+- Environment: no operator action required. Update emails use the existing configured Resend sender where present; otherwise the attempted notification is recorded as skipped without exposing tender details.
+- Validation: `npx tsx --test tests/lib/tender-package-model.test.ts` passes (4 tests); `npm run type-check` passes.
+
+### 2026-09-04 - Contractor Tender Deadline Screen Removal
+
+- Changed: moved the required quote-deadline input and its preset controls into the initial Contractor project-details screen, then removed the separate duplicate deadline step. The tender builder now proceeds from additional requirements to uploads, then review and submission.
+- Affects: Contractor tender-creation workflow and its focused regression coverage only. Server-side tender deadline validation, Provider visibility, matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-tender-builder.test.ts` passes (1 test); `npm run type-check` passes.
+
 ### 2026-09-04 - Test Fixture Isolation For Tender Workflow Release
 
 - Changed: updated the tender-builder expectation for the guided per-service package screens and made membership billing coverage explicitly set and restore its VAT fixture. The test suite no longer depends on the active staging database's mutable VAT setting.

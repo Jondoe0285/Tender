@@ -172,7 +172,6 @@ test('accepts Contractor and Professional Services tender provisions', () => {
     ...VALID_TENDER,
     category: 'Contractor Services',
     subcategory: 'Groundworks & Civil Engineering',
-    item: 'Groundworks, drainage, roads, utilities, concrete and civils activities',
   });
   const professionalService = createTenderSchema.safeParse({
     ...VALID_TENDER,

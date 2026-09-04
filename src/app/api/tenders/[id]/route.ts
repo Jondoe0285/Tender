@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/server/auth/session';
+import { getCurrentUser, requireRole } from '@/server/auth/session';
 import { toErrorResponse } from '@/server/http/errors';
 import { getUnlockedTenderForRetailer } from '@/server/domain/unlockService';
 import { markMatchViewed } from '@/server/domain/tenderService';
@@ -7,6 +7,9 @@ import { ForbiddenError, UnauthorizedError } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
 import { formatRetailerSummaryLocation } from '@/server/domain/tenderService';
 import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
+import { rejectCrossOrigin } from '@/server/http/origin';
+import { updateTenderSchema } from '@/lib/schemas/tender';
+import { updateTender } from '@/server/domain/tenderService';
 
 export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -17,7 +20,10 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
     if (user.role === 'CONTRACTOR') {
       const tender = await prisma.tender.findUnique({
         where: { id: params.id },
-        include: { items: { orderBy: { createdAt: 'asc' } } },
+        include: {
+          items: { orderBy: { createdAt: 'asc' } },
+          attachments: { select: { id: true, fileName: true, mimeType: true, sizeBytes: true } },
+        },
       });
       if (!tender || tender.clientId !== user.id) throw new ForbiddenError('Tender not found for this Client');
       return NextResponse.json({ tender, unlocked: true });
@@ -70,6 +76,23 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
     }
 
     throw new ForbiddenError();
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  try {
+    const originError = rejectCrossOrigin(request);
+    if (originError) return originError;
+    const user = await requireRole('CONTRACTOR');
+    const parsed = updateTenderSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid tender details', issues: parsed.error.flatten() }, { status: 400 });
+    }
+    const tender = await updateTender(user.id, params.id, parsed.data);
+    return NextResponse.json({ id: tender.id, reference: tender.reference });
   } catch (error) {
     return toErrorResponse(error);
   }

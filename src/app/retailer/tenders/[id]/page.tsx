@@ -82,7 +82,7 @@ export default function RetailerTenderDetailPage() {
       setMessage(data.error ?? 'Unable to start unlock.');
       return;
     }
-    if (data.status === 'ALREADY_UNLOCKED' || data.status === 'UNLOCKED_WITH_CREDIT') {
+    if (data.status === 'ALREADY_UNLOCKED' || data.status === 'UNLOCKED_WITH_CREDIT' || data.status === 'UNLOCKED_WITHOUT_PAYMENT_REQUIRED') {
       await load();
       return;
     }

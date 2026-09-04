@@ -87,3 +87,19 @@ export function createTenderSchemaForCatalog(catalog: CategoryCatalog = CATEGORI
 
 export const createTenderSchema = createTenderSchemaForCatalog();
 export type CreateTenderInput = z.infer<typeof createTenderSchema>;
+
+export const updateTenderSchema = z.object({
+  location: z.string().trim().min(2).max(120).refine(locationHasPostcode, 'Enter a valid UK postcode so delivery fees and matching companies can be determined'),
+  urgency: z.enum(URGENCY_OPTIONS),
+  closingDate: z.coerce.date().refine((value) => value.getTime() > Date.now(), 'Closing date must be in the future'),
+  supplyDate: z.coerce.date().optional().refine((value) => !value || value.getTime() > Date.now(), 'Supply date must be in the future'),
+  requirements: z.array(z.enum(REQUIREMENT_OPTIONS)).optional().default([]),
+  description: z.string().trim().max(4000),
+  items: z.array(z.object({
+    id: z.string().cuid(),
+    quantity: z.string().trim().min(1).max(120),
+    description: z.string().trim().max(4000),
+  })).min(1).max(50),
+});
+
+export type UpdateTenderInput = z.infer<typeof updateTenderSchema>;
