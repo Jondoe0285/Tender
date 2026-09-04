@@ -1,0 +1,99 @@
+{
+  "target": "staging",
+  "commitSha": "f132acf7f867ec62d1e8cea6b8fa83eee8a709c3",
+  "baseUrl": "https://tender-m0xw.onrender.com",
+  "result": "SUCCESSFUL",
+  "deployedAt": "2026-09-04T06:06:51.782Z",
+  "actor": "TenantSpace",
+  "workflowRunId": "33842775177",
+  "passed": 13,
+  "failed": 0,
+  "unverified": 4,
+  "verification": [
+    {
+      "name": "Application health",
+      "status": "PASS",
+      "detail": "status ok in 410ms"
+    },
+    {
+      "name": "Database connectivity",
+      "status": "PASS",
+      "detail": "database reachable"
+    },
+    {
+      "name": "Authentication",
+      "status": "PASS",
+      "detail": "auth provider endpoint responding"
+    },
+    {
+      "name": "Client access control",
+      "status": "PASS",
+      "detail": "redirected an unauthenticated caller (307)"
+    },
+    {
+      "name": "Retailer access control",
+      "status": "PASS",
+      "detail": "redirected an unauthenticated caller (307)"
+    },
+    {
+      "name": "Super User access control",
+      "status": "PASS",
+      "detail": "redirected an unauthenticated caller (307)"
+    },
+    {
+      "name": "Tender creation",
+      "status": "PASS",
+      "detail": "denied unauthenticated access (401)"
+    },
+    {
+      "name": "Tender unlocking",
+      "status": "PASS",
+      "detail": "denied unauthenticated access (401)"
+    },
+    {
+      "name": "Quote submission",
+      "status": "PASS",
+      "detail": "denied unauthenticated access (401)"
+    },
+    {
+      "name": "Quote acceptance",
+      "status": "PASS",
+      "detail": "denied unauthenticated access (401)"
+    },
+    {
+      "name": "Contact-release controls",
+      "status": "PASS",
+      "detail": "denied unauthenticated access (401)"
+    },
+    {
+      "name": "Payment endpoints",
+      "status": "PASS",
+      "detail": "denied unauthenticated access (401)"
+    },
+    {
+      "name": "Super User settings",
+      "status": "PASS",
+      "detail": "denied unauthenticated access (403)"
+    },
+    {
+      "name": "Stripe webhook processing",
+      "status": "UNVERIFIED",
+      "detail": "Stripe is not configured at this target"
+    },
+    {
+      "name": "Resend delivery",
+      "status": "UNVERIFIED",
+      "detail": "requires a provider-side delivery check; not provable by probe"
+    },
+    {
+      "name": "Audit logging",
+      "status": "UNVERIFIED",
+      "detail": "requires database inspection; not provable by unauthenticated probe"
+    },
+    {
+      "name": "Error rates",
+      "status": "UNVERIFIED",
+      "detail": "requires an observability platform; none is configured"
+    }
+  ]
+}
