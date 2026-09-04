@@ -13,6 +13,13 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-04 - Test Fixture Isolation For Tender Workflow Release
+
+- Changed: updated the tender-builder expectation for the guided per-service package screens and made membership billing coverage explicitly set and restore its VAT fixture. The test suite no longer depends on the active staging database's mutable VAT setting.
+- Affects: automated test coverage only. No production application behavior, pricing setting, database schema, migration, payment, contact-release, or environment configuration changed.
+- Environment: no operator action required; the membership test restores the prior VAT setting after execution.
+- Validation: focused affected tests pass (3 tests); `npm test` passes (137 tests).
+
 ### 2026-09-04 - Full-Tender Provider Unlock Rule
 
 - Changed: confirmed and documented the Provider unlock rule: a Provider receives only its relevant pre-unlock opportunity summary, but one confirmed tender unlock releases the full tender job and every package. The Provider can price each tender item or mark it unavailable. No additional fee applies to other packages in that tender.
