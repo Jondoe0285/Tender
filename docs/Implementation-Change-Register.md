@@ -13,6 +13,36 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-04 - Full-Tender Provider Unlock Rule
+
+- Changed: confirmed and documented the Provider unlock rule: a Provider receives only its relevant pre-unlock opportunity summary, but one confirmed tender unlock releases the full tender job and every package. The Provider can price each tender item or mark it unavailable. No additional fee applies to other packages in that tender.
+- Affects: Provider visibility and quote workflow requirements plus package-unlock regression coverage. Existing server behavior already implements one payment/unlock per tender and returns every package only after that unlock; no schema, payment calculation, or environment configuration change is required.
+- Environment: no operator action required.
+- Validation: focused `npx tsx --test tests/lib/tender-package-model.test.ts` passes (3 tests); `npm run type-check` passes.
+
+### 2026-09-04 - Restore Approved Partner Records
+
+- Changed: added a narrow idempotent restoration utility for the three approved partners: Sinclair Safety Solutions Ltd, Smart Works Civils Ltd, and HSQE Consult Hub. It creates or updates only those records as active `FOOTER` partners in the approved display order, without running the broader demo-account seed.
+- Affects: configured database `Partner` records and public partner-information/footer display. No user accounts, tender matching, quote ranking, payments, contact release, or environment configuration changed.
+- Environment: executed against the configured staging test database at the Super User's request. The partner records remain editable through Super User partner management after restoration.
+- Validation: `npm run db:restore-initial-partners` restored 3 records. Database verification confirms all 3 are active `FOOTER` partners in the order Sinclair Safety Solutions Ltd, Smart Works Civils Ltd, then HSQE Consult Hub. `npm run type-check` passes.
+
+### 2026-09-04 - Landing Page Partner Information
+
+- Changed: added a restrained landing-page partner-information band after the role workspaces. It renders only active database-managed partner records through the existing minimal public display endpoint, labels the content clearly, and states that it is separate from tender matching, quote ranking, supplier selection, and Contractor decisions.
+- Affects: public landing page and active partner display only. No partner records, matching, quote comparison, payment, contact-release, analytics, or environment configuration changed.
+- Environment: no operator action required. Super Users continue to manage active partner records and their footer display order through the existing partner administration screen.
+- Validation: focused `npx tsx --test tests/lib/site-footer-partners.test.ts` passes (2 tests); `npm run type-check` passes.
+
+### 2026-09-04 - Contractor Job-First Tender Creation
+
+- Changed: reorganized the Contractor tender form around the job before its packages. The first step now captures project name, optional additional information, jobsite/delivery postcode, and all required service groups. Each selected service initializes a package on the next step, ensuring package details drive the existing category/location Provider matching and opportunity notification process.
+- Changed: added project urgency and an optional planned works start date to the same first step, before package completion and Provider notification. The stored `urgency` and `supplyDate` fields remain server-validated; the later step now collects only the quote deadline.
+- Changed: selected services now advance through one requirements screen per package, such as Materials Requirements followed by Waste Requirements, instead of presenting all selected packages on one screen.
+- Affects: Contractor tender form and product requirements only. Existing server-side tender/package validation, Provider matching, staged visibility, payments, and notification boundaries remain unchanged.
+- Environment: no operator action, migration, or configuration change required.
+- Validation: focused `npx tsx --test tests/lib/tender-schema.test.ts` passes (28 tests); `npm run type-check` passes.
+
 ### 2026-09-04 - Staging Deployment Branch Alignment
 
 - Changed: aligned the approved staging deployment gate with the direct-to-`staging` workflow. It now requires the approved SHA to be the exact current `origin/staging` head rather than the `main` head, while retaining the protected staging environment, exact approval statement, clean PostgreSQL migration replay, production build, Render deploy hook, and post-deployment verification requirements.

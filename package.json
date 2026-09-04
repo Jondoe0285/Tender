@@ -17,6 +17,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
+    "db:restore-initial-partners": "tsx --env-file=.env scripts/restore-initial-partners.ts",
     "db:seed-fake-tenders": "tsx --env-file=.env scripts/seed-fake-tenders.ts",
     "db:verify-owner-password": "tsx --env-file=.env scripts/verify-owner-password.ts",
     "retention:purge": "tsx --env-file=.env scripts/purge-retention.ts",

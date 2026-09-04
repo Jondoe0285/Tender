@@ -74,7 +74,7 @@ The platform must preserve anonymity and staged disclosure:
 - **SEC-030:** Before Provider unlock, only approved non-sensitive summary information may be returned: broad category, location area, postcode district, headline requirement, indicative timescale, and non-sensitive notes. A postcode district is the outward portion only (for example, `LS10`); it may be used to estimate delivery costs and lead times.
 - **SEC-031:** Before Provider unlock, hide Contractor identity, contact details, the full postcode and address, other precise site information, full specification, attachments, and direct communication details.
 - **SEC-032:** Full tender details shall be returned only after a server-confirmed launch-credit entitlement or verified £10 unlock payment.
-- **SEC-033:** A Provider shall only access details for tenders they are matched to and have legitimately unlocked.
+- **SEC-033:** A Provider shall only access details for tenders they are matched to and have legitimately unlocked. A legitimate tender unlock may reveal every package within that same tender but shall not reveal a different tender.
 - **SEC-034:** Contractor and Provider identities shall remain anonymous to one another until the Contractor release condition is met.
 - **SEC-035:** Contact details shall be released only to the authorised Contractor and Provider after confirmed £10 Contractor Accepted Quote Release Fee payment or an explicitly approved waiver.
 - **SEC-036:** Failed, cancelled, duplicate, replayed, refunded where release is revoked, or ambiguous payment events shall not release protected details.

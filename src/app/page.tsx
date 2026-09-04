@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
+import { LandingPartners } from '@/components/layout/LandingPartners';
 import { LinkButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 
@@ -61,6 +62,7 @@ export default function HomePage() {
             </Card>
           ))}
         </section>
+        <LandingPartners />
       </main>
       <SiteFooter />
     </div>

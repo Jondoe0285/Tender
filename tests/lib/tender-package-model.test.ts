@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { prisma } from '../../src/server/data/prisma';
 import { createTender, listMatchedSummariesForRetailer } from '../../src/server/domain/tenderService';
+import { getUnlockedTenderForRetailer } from '../../src/server/domain/unlockService';
 
 test('a tender job can own a tender package record', async (context) => {
   const suffix = randomUUID();
@@ -135,6 +136,7 @@ test('listMatchedSummariesForRetailer exposes package metadata for multi-package
 
   context.after(async () => {
     if (tenderId) {
+      await prisma.unlock.deleteMany({ where: { tenderId } });
       await prisma.tenderMatch.deleteMany({ where: { tenderId } });
       await prisma.tenderPackage.deleteMany({ where: { tenderId } });
       await prisma.tenderItem.deleteMany({ where: { tenderId } });
@@ -258,4 +260,8 @@ test('listMatchedSummariesForRetailer exposes package metadata for multi-package
   assert.equal(summaries.length, 1);
   assert.equal(summaries[0].tender.packageCount, 2);
   assert.deepEqual(summaries[0].tender.packageCategories, ['Materials', 'Plant Hire']);
+
+  await prisma.unlock.create({ data: { tenderId: tender.id, retailerId: retailer.id, method: 'CREDIT' } });
+  const unlockedTender = await getUnlockedTenderForRetailer(retailer.id, tender.id);
+  assert.deepEqual(unlockedTender.packages.map((pkg) => pkg.category), ['Materials', 'Plant Hire']);
 });

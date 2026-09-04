@@ -63,8 +63,8 @@ Only these three roles are approved. New roles or unrelated product areas requir
 ### 4.2 Contractor Tender Creation
 
 1. The Contractor starts a new tender.
-2. The Contractor enters project information using guided fields, dropdowns, tick boxes, and structured categories.
-3. The form captures category, subcategory, location, quantity, delivery or start date, hire duration where relevant, urgency, response deadline, access conditions, required documentation, and supporting notes or attachments.
+2. The Contractor enters a project name, optional additional information, jobsite or delivery postcode, project urgency, and an optional planned works start date before selecting each required service group.
+3. The selected service groups create sequential service-specific tender-package requirement screens, such as Materials or Waste. The form captures each package category, subcategory, quantity, delivery or start date, hire duration where relevant, urgency, response deadline, access conditions, required documentation, and supporting notes or attachments.
 4. The server validates and normalises all submitted values.
 5. The platform assigns a unique tender identifier, such as `TND-YYYYMMDD-000001`.
 6. The platform stores the tender and its lifecycle state.
@@ -86,7 +86,7 @@ Only these three roles are approved. New roles or unrelated product areas requir
 3. The Provider uses an available launch credit or starts payment for the £10 unlock fee.
 4. The server determines eligibility, current credit status, amount, and payment state. Contractor input cannot establish unlock entitlement.
 5. Stripe payment completion is verified through a trusted server-side flow and signed webhook where applicable.
-6. After confirmed entitlement, the platform releases the full tender details required to prepare a quote: complete specification, relevant attachments, precise delivery or site requirements, response deadline, and project conditions.
+6. After confirmed entitlement, the platform releases the full tender job and all its packages, including complete specification, relevant attachments, precise delivery or site requirements, response deadline, and project conditions. One tender unlock covers every package in that tender; no additional package unlock fee applies.
 7. The platform records the unlock against the tender, Provider, payment or credit event, timestamp, and any Super User override.
 8. Failed, cancelled, incomplete, or ambiguous payments do not release restricted details.
 
@@ -159,7 +159,7 @@ The Super User can, subject to authorization and audit logging:
 - **FR-031:** Before Provider unlock, the platform shall hide Contractor identity, contact details, precise site information, full specification, attachments, and direct communication details.
 - **FR-032:** The platform shall support limited launch credits for Providers during the initial 90-day window.
 - **FR-033:** The platform shall charge or waive the £10 Provider unlock fee according to server-controlled configuration.
-- **FR-034:** The platform shall release full tender details only after confirmed credit entitlement or verified payment.
+- **FR-034:** A confirmed Provider tender unlock shall release full tender details and every package in that tender. One unlock shall not create an additional fee for another package in the same tender.
 - **FR-035:** Contractor and Provider identities shall remain anonymous to one another until the Contractor Accepted Quote Release Fee is confirmed or an approved waiver applies.
 - **FR-036:** The platform shall charge or waive the £10 Contractor Accepted Quote Release Fee according to server-controlled configuration.
 - **FR-037:** The platform shall release contact details only to the authorised Contractor and Provider after the release condition is confirmed server-side.
@@ -167,7 +167,7 @@ The Super User can, subject to authorization and audit logging:
 
 ### 5.5 Quotes
 
-- **FR-040:** An authorised Provider shall be able to submit a formal quote only for an unlocked tender.
+- **FR-040:** An authorised Provider shall be able to submit a formal quote only for an unlocked tender, pricing each tender item or marking it unavailable.
 - **FR-041:** Each quote shall have a unique identifier linked to its tender.
 - **FR-042:** The platform shall validate quote values, dates, required content, documents, and ownership server-side.
 - **FR-043:** A Contractor shall be able to view and compare quotes for their own tender.

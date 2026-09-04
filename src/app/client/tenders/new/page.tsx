@@ -15,16 +15,17 @@ import { buildSafeAttachmentName } from '@/lib/attachment-utils';
 const QUANTITY_UNITS = ['units', 'tonnes', 'bags', 'pallets', 'm³', 'skips', 'days', 'weeks'];
 
 const STEPS: WizardStep[] = [
-  { id: 1, label: 'Project Information' },
-  { id: 2, label: 'Items & Quantities' },
-  { id: 3, label: 'Postcode & Access' },
-  { id: 4, label: 'Schedule' },
+  { id: 1, label: 'Project Details' },
+  { id: 2, label: 'Tender Packages' },
+  { id: 3, label: 'Access Requirements' },
+  { id: 4, label: 'Quote Deadline' },
   { id: 5, label: 'Upload Files' },
   { id: 6, label: 'Review & Submit' },
 ];
 
 type FormState = {
   projectName: string;
+  selectedServices: string[];
   category: ServiceName | string;
   subcategory: string;
   item: string;
@@ -51,6 +52,7 @@ type TenderItem = {
 
 const EMPTY_FORM: FormState = {
   projectName: '',
+  selectedServices: [],
   category: '',
   subcategory: '',
   item: '',
@@ -76,6 +78,7 @@ function closingDatePreset(days: number): string {
 export default function NewTenderPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  const [activePackageIndex, setActivePackageIndex] = useState(0);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [files, setFiles] = useState<File[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -129,13 +132,12 @@ export default function NewTenderPage() {
     }));
   }
 
-  function addItem() {
-    setForm((prev) => ({
-      ...prev,
-      items: [
-        ...prev.items,
-        { id: `${Date.now()}-${prev.items.length}`, category: '', subcategory: '', item: '', quantityValue: '', quantityUnit: '', description: '' },
-      ],
+  function toggleService(service: string) {
+    setForm((current) => ({
+      ...current,
+      selectedServices: current.selectedServices.includes(service)
+        ? current.selectedServices.filter((item) => item !== service)
+        : [...current.selectedServices, service],
     }));
   }
 
@@ -146,34 +148,32 @@ export default function NewTenderPage() {
     }));
   }
 
-  function removeItem(index: number) {
-    setForm((prev) => ({ ...prev, items: prev.items.filter((_, itemIndex) => itemIndex !== index) }));
-  }
-
   function validateStep(targetStep: number): boolean {
     const next: Record<string, string> = {};
-    if (targetStep === 1 && form.projectName.trim().length < 3) {
-      next.projectName = 'Enter a tender name (at least 3 characters).';
+    if (targetStep === 1) {
+      if (form.projectName.trim().length < 3) next.projectName = 'Enter a project name (at least 3 characters).';
+      if (form.selectedServices.length === 0) next.selectedServices = 'Select at least one service group to tender.';
+      if (!form.urgency) next.urgency = 'Select the project urgency.';
+      if (!/\b(?:GIR\s?0AA|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})\b/i.test(form.location)) {
+        next.location = 'Enter a valid UK jobsite or delivery postcode.';
+      }
     }
     if (targetStep === 2) {
-      if (!form.category) next.category = 'Select a category.';
-      if (!form.subcategory) next.subcategory = 'Select a subcategory.';
-      if (!form.item) next.item = 'Select an item.';
-      if (!form.quantityValue.trim()) next.quantityValue = 'Enter a quantity.';
-      if (!form.quantityUnit) next.quantityUnit = 'Select a unit.';
-      form.items.forEach((item, index) => {
-        if (!item.category) next[`item-${index}-category`] = 'Select a category.';
-        if (!item.subcategory) next[`item-${index}-subcategory`] = 'Select a subcategory.';
-        if (!item.item) next[`item-${index}-item`] = 'Select an item.';
-        if (!item.quantityValue.trim()) next[`item-${index}-quantity`] = 'Enter a quantity.';
-        if (!item.quantityUnit) next[`item-${index}-unit`] = 'Select a unit.';
-      });
-    }
-    if (targetStep === 3 && !/\b(?:GIR\s?0AA|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})\b/i.test(form.location)) {
-      next.location = 'Enter a valid UK delivery or site postcode.';
+      if (activePackageIndex === 0) {
+        if (!form.subcategory) next.subcategory = 'Select a service category.';
+        if (!form.item) next.item = 'Select an item.';
+        if (!form.quantityValue.trim()) next.quantityValue = 'Enter a quantity.';
+        if (!form.quantityUnit) next.quantityUnit = 'Select a unit.';
+      } else {
+        const item = form.items[activePackageIndex - 1];
+        const prefix = `item-${activePackageIndex - 1}-`;
+        if (!item?.subcategory) next[`${prefix}subcategory`] = 'Select a service category.';
+        if (!item?.item) next[`${prefix}item`] = 'Select an item.';
+        if (!item?.quantityValue.trim()) next[`${prefix}quantity`] = 'Enter a quantity.';
+        if (!item?.quantityUnit) next[`${prefix}unit`] = 'Select a unit.';
+      }
     }
     if (targetStep === 4) {
-      if (!form.urgency) next.urgency = 'Select urgency.';
       if (!form.closingDate) next.closingDate = 'Select a quote closing date.';
       else if (new Date(form.closingDate).getTime() <= Date.now()) next.closingDate = 'Closing date must be in the future.';
     }
@@ -183,11 +183,39 @@ export default function NewTenderPage() {
 
   function goNext() {
     if (!validateStep(step)) return;
+    if (step === 1) {
+      const [primaryService, ...additionalServices] = form.selectedServices;
+      setForm((current) => ({
+        ...current,
+        category: primaryService,
+        subcategory: '',
+        item: '',
+        quantityValue: '',
+        quantityUnit: '',
+        items: additionalServices.map((service, index) => ({
+          id: `${Date.now()}-${index}`,
+          category: service,
+          subcategory: '',
+          item: '',
+          quantityValue: '',
+          quantityUnit: '',
+          description: '',
+        })),
+      }));
+    }
+    if (step === 2 && activePackageIndex < form.items.length) {
+      setActivePackageIndex((current) => current + 1);
+      return;
+    }
     setStep((current) => Math.min(current + 1, STEPS.length));
   }
 
   function goBack() {
     setErrors({});
+    if (step === 2 && activePackageIndex > 0) {
+      setActivePackageIndex((current) => current - 1);
+      return;
+    }
     setStep((current) => Math.max(current - 1, 1));
   }
 
@@ -290,7 +318,7 @@ export default function NewTenderPage() {
     <AppShell role="client" title="Create Tender">
       <div className="mx-auto max-w-2xl">
         <p className="mb-6 max-w-xl text-sm leading-relaxed text-concrete-grey">
-          Six quick steps, around 2&ndash;5 minutes. Retailers only see full details once they unlock your tender.
+          Complete the project details, then provide requirements for each selected service. Providers only see full details once they unlock your tender.
         </p>
 
         <Stepper steps={STEPS} currentStep={step} />
@@ -310,56 +338,66 @@ export default function NewTenderPage() {
 
         {step === 1 && (
           <Card className="flex flex-col gap-6">
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">Project Information</h2>
+            <h2 className="font-heading text-lg font-bold text-foundation-navy">Project Details</h2>
             <FieldGroup>
-              <Label htmlFor="project-name">Tender name</Label>
+              <Label htmlFor="project-name">Project name</Label>
               <Input
                 id="project-name"
-                placeholder="e.g. Bricks and blocks for side extension"
+                placeholder="e.g. Side extension and external works"
                 value={form.projectName}
                 onChange={(event) => update('projectName', event.target.value)}
               />
               {errors.projectName && <p className="text-sm font-semibold text-attention">{errors.projectName}</p>}
+            </FieldGroup>
+            <FieldGroup>
+              <Label htmlFor="location">Jobsite or delivery postcode</Label>
+              <Input id="location" placeholder="e.g. LS10 2AB" value={form.location} onChange={(event) => update('location', event.target.value)} />
+              <p className="text-xs text-concrete-grey">Used to notify only Providers that cover this area.</p>
+              {errors.location && <p className="text-sm font-semibold text-attention">{errors.location}</p>}
+            </FieldGroup>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <FieldGroup>
+                <Label htmlFor="urgency">Project urgency</Label>
+                <Select id="urgency" value={form.urgency} onChange={(event) => update('urgency', event.target.value)}>
+                  <option value="" disabled>Select urgency</option>
+                  <option value="standard">Standard</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="flexible">Flexible</option>
+                </Select>
+                {errors.urgency && <p className="text-sm font-semibold text-attention">{errors.urgency}</p>}
+              </FieldGroup>
+              <FieldGroup>
+                <Label htmlFor="supply-date">Planned works start date (optional)</Label>
+                <Input id="supply-date" type="date" value={form.supplyDate} onChange={(event) => update('supplyDate', event.target.value)} />
+                {errors.supplyDate && <p className="text-sm font-semibold text-attention">{errors.supplyDate}</p>}
+              </FieldGroup>
+            </div>
+            <FieldGroup>
+              <Label>Services to tender</Label>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {Object.keys(catalog).map((service) => (
+                  <label key={service} className="flex items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-foundation-navy">
+                    <input type="checkbox" checked={form.selectedServices.includes(service)} onChange={() => toggleService(service)} className="h-4 w-4 accent-safety-amber" />
+                    {service}
+                  </label>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-concrete-grey">Each selected service becomes a tender package. Only matching Providers and contractors in this area receive the relevant opportunity.</p>
+              {errors.selectedServices && <p className="text-sm font-semibold text-attention">{errors.selectedServices}</p>}
+            </FieldGroup>
+            <FieldGroup>
+              <Label htmlFor="description">Additional information (optional)</Label>
+              <Textarea id="description" rows={4} placeholder="Add a project overview, site constraints, or information relevant to every tender package." value={form.description} onChange={(event) => update('description', event.target.value)} />
             </FieldGroup>
           </Card>
         )}
 
         {step === 2 && (
           <Card className="flex flex-col gap-6">
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">Items &amp; Quantities</h2>
-            <FieldGroup>
-              <Label htmlFor="category">Category</Label>
-              <Select
-                id="category"
-                value={form.category}
-                onChange={(event) => {
-                  update('category', event.target.value);
-                  update('subcategory', '');
-                }}
-              >
-                <option value="" disabled>
-                  Select a category
-                </option>
-                {Object.keys(catalog).map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </Select>
-              {errors.category && <p className="text-sm font-semibold text-attention">{errors.category}</p>}
-            </FieldGroup>
-            <FieldGroup>
-              <Label htmlFor="supply-date">Delivery or supply date (optional)</Label>
-              <Input
-                id="supply-date"
-                type="date"
-                value={form.supplyDate}
-                onChange={(event) => update('supplyDate', event.target.value)}
-              />
-              {errors.supplyDate && <p className="text-sm font-semibold text-attention">{errors.supplyDate}</p>}
-            </FieldGroup>
-            <FieldGroup>
-              <Label htmlFor="subcategory">Category</Label>
+            <h2 className="font-heading text-lg font-bold text-foundation-navy">{activePackageIndex === 0 ? form.category : form.items[activePackageIndex - 1]?.category} Requirements</h2>
+            <p className="text-sm text-concrete-grey">Complete this service package before moving to the next selected service.</p>
+            {activePackageIndex === 0 && <><FieldGroup>
+              <Label htmlFor="subcategory">Service category</Label>
               <Combobox
                 id="subcategory"
                 name="subcategory"
@@ -390,47 +428,19 @@ export default function NewTenderPage() {
                 </Select>
                 {errors.quantityUnit && <p className="text-sm font-semibold text-attention">{errors.quantityUnit}</p>}
               </FieldGroup>
-            </div>
-            <FieldGroup>
-              <Label htmlFor="description">Specification and notes (optional)</Label>
-              <Textarea id="description" rows={4} placeholder="Describe the products, waste stream, or plant required, along with any specification details." value={form.description} onChange={(event) => update('description', event.target.value)} />
-              {errors.description && <p className="text-sm font-semibold text-attention">{errors.description}</p>}
-            </FieldGroup>
+            </div></>}
             <div className="border-t border-slate-200 pt-5 sm:col-span-2">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-heading text-base font-bold text-foundation-navy">Additional tender items</h3>
-                  <p className="mt-1 text-xs text-concrete-grey">Add each material or service you want Retailers to price separately.</p>
-                </div>
-                <Button type="button" variant="secondary" onClick={addItem}>Add item</Button>
-              </div>
+              <p className="text-xs text-concrete-grey">Package {activePackageIndex + 1} of {form.selectedServices.length}</p>
               {form.items.length > 0 && (
                 <div className="mt-5 flex flex-col gap-4">
-                  {form.items.map((item, index) => (
+                  {form.items.map((item, index) => index === activePackageIndex - 1 && (
                     <div key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                       <div className="mb-3 flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-foundation-navy">Item {index + 2}</p>
-                        <button type="button" onClick={() => removeItem(index)} className="text-xs font-semibold text-attention hover:underline">Remove</button>
+                        <p className="text-sm font-semibold text-foundation-navy">{item.category}</p>
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <FieldGroup>
-                          <Label htmlFor={`item-${index}-category`}>Service</Label>
-                          <Select
-                            id={`item-${index}-category`}
-                            value={item.category}
-                            onChange={(event) => {
-                              updateItem(index, 'category', event.target.value);
-                              updateItem(index, 'subcategory', '');
-                              updateItem(index, 'item', '');
-                            }}
-                          >
-                            <option value="" disabled>Select a category</option>
-                            {Object.keys(catalog).map((option) => <option key={option} value={option}>{option}</option>)}
-                          </Select>
-                          {errors[`item-${index}-category`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-category`]}</p>}
-                        </FieldGroup>
-                        <FieldGroup>
-                          <Label htmlFor={`item-${index}-subcategory`}>Category</Label>
+                          <Label htmlFor={`item-${index}-subcategory`}>Service category</Label>
                           <Combobox
                             id={`item-${index}-subcategory`}
                             name={`item-${index}-subcategory-input`}
@@ -484,18 +494,7 @@ export default function NewTenderPage() {
 
         {step === 3 && (
           <Card className="flex flex-col gap-6">
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">Postcode &amp; Access</h2>
-            <FieldGroup>
-              <Label htmlFor="location">Delivery or site postcode</Label>
-              <Input
-                id="location"
-                placeholder="e.g. LS10 2AB"
-                value={form.location}
-                onChange={(event) => update('location', event.target.value)}
-              />
-              <p className="text-xs text-concrete-grey">The postcode is required to calculate delivery fees and notify applicable companies.</p>
-              {errors.location && <p className="text-sm font-semibold text-attention">{errors.location}</p>}
-            </FieldGroup>
+            <h2 className="font-heading text-lg font-bold text-foundation-navy">Access Requirements</h2>
             <fieldset className="flex flex-col gap-3">
               <legend className="text-sm font-semibold text-foundation-navy">Access &amp; supporting requirements</legend>
               {REQUIREMENT_OPTIONS.map((option) => (
@@ -515,21 +514,9 @@ export default function NewTenderPage() {
 
         {step === 4 && (
           <Card className="flex flex-col gap-6">
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">Schedule</h2>
+            <h2 className="font-heading text-lg font-bold text-foundation-navy">Quote Deadline</h2>
             <FieldGroup>
-              <Label htmlFor="urgency">Urgency</Label>
-              <Select id="urgency" value={form.urgency} onChange={(event) => update('urgency', event.target.value)}>
-                <option value="" disabled>
-                  Select urgency
-                </option>
-                <option value="standard">Standard</option>
-                <option value="urgent">Urgent</option>
-                <option value="flexible">Flexible</option>
-              </Select>
-              {errors.urgency && <p className="text-sm font-semibold text-attention">{errors.urgency}</p>}
-            </FieldGroup>
-            <FieldGroup>
-              <Label htmlFor="closing-date">Quote closing date</Label>
+              <Label htmlFor="closing-date">Quote deadline</Label>
               <div className="flex flex-wrap gap-2">
                 {[7, 14, 30].map((days) => (
                   <button
@@ -594,15 +581,15 @@ export default function NewTenderPage() {
           <Card className="flex flex-col gap-5">
             <h2 className="font-heading text-lg font-bold text-foundation-navy">Review &amp; Submit</h2>
             <dl className="grid gap-4 sm:grid-cols-2">
-              <ReviewItem label="Tender name" value={form.projectName} />
-              <ReviewItem label="Category" value={`${form.category} / ${form.subcategory}`} />
-              <ReviewItem label="Delivery postcode" value={form.location} />
+              <ReviewItem label="Project name" value={form.projectName} />
+              <ReviewItem label="Selected services" value={form.selectedServices.join(', ')} />
+              <ReviewItem label="Jobsite or delivery postcode" value={form.location} />
               <ReviewItem label="Requirements" value={form.requirements.join(', ') || 'None'} />
               <ReviewItem label="Quantity" value={`${form.quantityValue} ${form.quantityUnit}`.trim()} />
               <ReviewItem label="Urgency" value={form.urgency} />
               <ReviewItem label="Closing date" value={form.closingDate} />
-              <ReviewItem label="Delivery or supply date" value={form.supplyDate || 'Not specified'} />
-              <ReviewItem label="Tender items" value={`${form.items.length + 1} item(s)`} />
+              <ReviewItem label="Planned works start date" value={form.supplyDate || 'Not specified'} />
+              <ReviewItem label="Tender packages" value={`${form.items.length + 1} package(s)`} />
               <ReviewItem
                 label="Attachments"
                 value={files.length > 0 ? `${files.length} file(s) selected and saved with this tender` : 'None'}

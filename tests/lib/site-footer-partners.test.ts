@@ -5,6 +5,7 @@ import test from 'node:test';
 
 const footerPath = path.join(process.cwd(), 'src/components/layout/SiteFooter.tsx');
 const footerApiPath = path.join(process.cwd(), 'src/app/api/partners/footer/route.ts');
+const landingPartnersPath = path.join(process.cwd(), 'src/components/layout/LandingPartners.tsx');
 
 test('footer fetches active, ordered partner advertising from a server-only display endpoint', () => {
   const source = readFileSync(footerPath, 'utf8');
@@ -19,4 +20,12 @@ test('footer fetches active, ordered partner advertising from a server-only disp
   assert.match(source, /Partner advertising is separate from tender matching, quote ranking, supplier selection, and Contractor decisions/);
   assert.match(source, /partner\.destinationUrl \?/);
   assert.doesNotMatch(source, /sinclairsafetysolutions\.co\.uk|smartworkscivils\.com/);
+});
+
+test('landing partner information uses the same display-only partner endpoint', () => {
+  const source = readFileSync(landingPartnersPath, 'utf8');
+
+  assert.match(source, /fetch\('\/api\/partners\/footer'\)/);
+  assert.match(source, /Partner information is separate from tender matching, quote ranking, supplier selection, and Contractor decisions/);
+  assert.doesNotMatch(source, /from '@\/server\/data\/prisma'/);
 });
