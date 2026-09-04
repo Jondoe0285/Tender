@@ -168,7 +168,6 @@ async function main() {
   const superUser = await prisma.user.upsert({
     where: { email: platformOwnerEmail },
     update: {
-      passwordHash: platformOwnerPasswordHash,
       role: Role.SUPER_USER,
       isOwner: true,
       contactName: 'Demo Super User',

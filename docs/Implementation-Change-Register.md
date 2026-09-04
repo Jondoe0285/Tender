@@ -13,6 +13,27 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-04 - Staging Deployment Branch Alignment
+
+- Changed: aligned the approved staging deployment gate with the direct-to-`staging` workflow. It now requires the approved SHA to be the exact current `origin/staging` head rather than the `main` head, while retaining the protected staging environment, exact approval statement, clean PostgreSQL migration replay, production build, Render deploy hook, and post-deployment verification requirements.
+- Affects: staging deployment authorization workflow only. No Render service, staging environment variable, deploy hook, database, credential, or application runtime configuration was changed.
+- Environment: an authorized Render operator must add the missing `RENDER_STAGING_DEPLOY_HOOK` secret to the GitHub `staging` environment before deployment. The hook value is not recorded in this repository. Run the approved staging workflow only with the current staging SHA and its required approval statement.
+- Validation: `npm run health:validate-workflows` and focused deployment-authorization tests pass.
+
+### 2026-09-04 - Owner Password Verification Utility
+
+- Changed: added `npm run db:verify-owner-password`, which prompts for an owner password without echoing it and compares it against the configured `PLATFORM_OWNER_EMAIL` account's existing hash. It reports only match or mismatch and never changes the user row, session state, or audit log.
+- Affects: local development diagnostic workflow only. No account password, staging or production environment resource, integration setting, credential, or deployment configuration is changed.
+- Environment: run the command in a terminal connected to the intended database. It is a non-destructive diagnostic and does not reset credentials.
+- Validation: `npm run type-check` passes. The utility prompts without echoing the supplied password and reports only whether it matches; no account state is modified.
+
+### 2026-09-04 - Preserve Existing Owner Passwords During Seeding
+
+- Changed: stopped `prisma/seed.ts` from rewriting an existing `PLATFORM_OWNER_EMAIL` account's password hash. The seed retains role and account-status normalization, but only uses `PLATFORM_OWNER_PASSWORD` when creating a missing owner account. This prevents a routine seed against an existing development database from silently replacing an operator's known password.
+- Affects: local development seed behavior and future owner password preservation only. No account password, database schema, migration, staging or production environment resource, integration setting, or deployment configuration was changed.
+- Environment: existing owner passwords are intentionally preserved. Create a new local database or use the normal authenticated reset flow to establish a different password; do not use routine seeding as a password-reset mechanism.
+- Validation: focused `npx tsx --test tests/lib/seed-owner-password.test.ts` and `npm run type-check` pass.
+
 ### 2026-09-03 - High-Severity Dependency Remediation
 
 - Changed: upgraded Next.js and its matching ESLint/React toolchain from the vulnerable Next 14 release line to Next 16.3.4, React 19.2.8, ESLint 9, and the corresponding React type packages. Replaced the removed `next lint` command and legacy ESLint configuration with the supported flat configuration. Added a root dependency override for Prisma 6's vulnerable `deepmerge-ts` 7.1.5 transitive dependency, resolving it to 8.0.0 without downgrading the final Prisma 6 release.

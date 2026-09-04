@@ -18,6 +18,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
     "db:seed-fake-tenders": "tsx --env-file=.env scripts/seed-fake-tenders.ts",
+    "db:verify-owner-password": "tsx --env-file=.env scripts/verify-owner-password.ts",
     "retention:purge": "tsx --env-file=.env scripts/purge-retention.ts",
     "health:audit": "node scripts/health-check/run-audit.mjs",
     "health:validate-workflows": "node scripts/health-check/validate-workflows.mjs",
