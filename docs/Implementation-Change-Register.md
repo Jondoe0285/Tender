@@ -13,13 +13,6 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
-### 2026-09-05 - Promotion Validation Fixture Alignment
-
-- Changed: aligned membership unlock-gate integration fixtures with the company-based User eligibility model by supplying the required active company service and UK coverage records.
-- Affects: automated integration coverage only. No production application behavior, database schema, payment calculation, contact release, or environment configuration changed.
-- Environment: no operator action required.
-- Validation: `npx tsx --test tests/lib/membership-unlock-gate.integration.test.ts` passes (2 tests); `npm test` passes (152 tests); `npm run build`, `npm run lint` (2 existing warnings), `npx prisma validate`, and `npm audit --audit-level=high` (0 vulnerabilities) pass.
-
 ### 2026-09-05 - Professional Services Interest Workflow
 
 - Changed: Professional Services tender opportunities now use a Register interest action instead of a paid unlock and formal quote. The server accepts interest only for a matching company with Professional Services active and while the tender remains open.

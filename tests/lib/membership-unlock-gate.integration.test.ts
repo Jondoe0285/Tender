@@ -8,7 +8,6 @@ test('a zero-cost unlock fee waives payment and opens the tender immediately', a
   const suffix = randomUUID();
   let clientId: string | undefined;
   let retailerId: string | undefined;
-  let retailerCompanyId: string | undefined;
   let tenderId: string | undefined;
   const originalMembershipTiersSetting = await prisma.platformSetting.findUnique({ where: { key: 'MEMBERSHIP_TIERS_ACTIVE' } });
   const originalUnlockFeeSetting = await prisma.platformSetting.findUnique({ where: { key: 'RETAILER_UNLOCK_FEE_GBP' } });
@@ -20,7 +19,6 @@ test('a zero-cost unlock fee waives payment and opens the tender immediately', a
     if (tenderId) await prisma.tenderItem.deleteMany({ where: { tenderId } });
     if (tenderId) await prisma.tender.deleteMany({ where: { id: tenderId } });
     if (retailerId) await prisma.retailerProfile.deleteMany({ where: { userId: retailerId } });
-    if (retailerCompanyId) await prisma.clientCompany.deleteMany({ where: { id: retailerCompanyId } });
     const userIds = [clientId, retailerId].filter((id): id is string => Boolean(id));
     if (userIds.length > 0) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     if (originalMembershipTiersSetting) {
@@ -52,11 +50,6 @@ test('a zero-cost unlock fee waives payment and opens the tender immediately', a
   ]);
   clientId = client.id;
   retailerId = retailer.id;
-
-  const retailerCompany = await prisma.clientCompany.create({
-    data: { companyName: `Zero Fee Test Supplies ${suffix}`, branchIdentifier: suffix, primaryUserId: retailerId, services: 'Construction Materials', operatingLocations: 'United Kingdom', members: { create: { userId: retailerId } } },
-  });
-  retailerCompanyId = retailerCompany.id;
 
   await prisma.retailerProfile.create({
     data: { userId: retailerId, companyName: 'Zero Fee Test Supplies', coverageScope: 'UK', counties: '', regions: '', categories: 'Construction Materials', coverageAreas: '', launchCreditsLeft: 0 },
@@ -91,7 +84,6 @@ test('an active membership allowance cannot unlock a tender while membership tie
   const suffix = randomUUID();
   let clientId: string | undefined;
   let retailerId: string | undefined;
-  let retailerCompanyId: string | undefined;
   let tenderId: string | undefined;
   let tierId: string | undefined;
   const originalMembershipTiersSetting = await prisma.platformSetting.findUnique({ where: { key: 'MEMBERSHIP_TIERS_ACTIVE' } });
@@ -104,7 +96,6 @@ test('an active membership allowance cannot unlock a tender while membership tie
     if (tenderId) await prisma.tender.deleteMany({ where: { id: tenderId } });
     if (retailerId) await prisma.retailerMembership.deleteMany({ where: { retailerId } });
     if (retailerId) await prisma.retailerProfile.deleteMany({ where: { userId: retailerId } });
-    if (retailerCompanyId) await prisma.clientCompany.deleteMany({ where: { id: retailerCompanyId } });
     const userIds = [clientId, retailerId].filter((id): id is string => Boolean(id));
     if (userIds.length > 0) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     if (tierId) await prisma.membershipTier.deleteMany({ where: { id: tierId } });
@@ -132,11 +123,6 @@ test('an active membership allowance cannot unlock a tender while membership tie
   ]);
   clientId = client.id;
   retailerId = retailer.id;
-
-  const retailerCompany = await prisma.clientCompany.create({
-    data: { companyName: `Membership Test Supplies ${suffix}`, branchIdentifier: suffix, primaryUserId: retailerId, services: 'Construction Materials', operatingLocations: 'United Kingdom', members: { create: { userId: retailerId } } },
-  });
-  retailerCompanyId = retailerCompany.id;
 
   await prisma.retailerProfile.create({
     data: { userId: retailerId, companyName: 'Membership Test Supplies', coverageScope: 'UK', counties: '', regions: '', categories: 'Construction Materials', coverageAreas: '', launchCreditsLeft: 0 },
