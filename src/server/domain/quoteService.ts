@@ -1,4 +1,5 @@
 import { prisma } from '@/server/data/prisma';
+import { Prisma } from '@prisma/client';
 import { buildQuoteReference } from '@/lib/identifiers';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { ForbiddenError, ValidationError } from '@/server/auth/session';
@@ -66,11 +67,7 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
   const priceGbp = input.lineItems.reduce((total, line) => total + (line.available ? line.priceGbp : 0), 0)
     + input.charges.reduce((total, charge) => total + charge.priceGbp, 0);
   const existingQuoteCount = await prisma.quote.count({ where: { tenderId } });
-  const reference = buildQuoteReference(tender.reference, existingQuoteCount + 1);
-
-  const quote = await prisma.quote.create({
-    data: {
-      reference,
+  const quoteData = {
       tenderId,
       retailerId,
       priceGbp,
@@ -78,11 +75,23 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
       deliveryDateConfirmed: input.deliveryDateConfirmed,
       deliveryInfo: input.deliveryInfo,
       validityDays: input.validityDays,
-      status: 'SUBMITTED',
+      status: 'SUBMITTED' as const,
       lines: { create: input.lineItems },
       charges: { create: input.charges },
-    },
-  });
+  };
+
+  let quote;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      quote = await prisma.quote.create({
+        data: { ...quoteData, reference: buildQuoteReference(tender.reference, existingQuoteCount + attempt + 1) },
+      });
+      break;
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002' || attempt === 4) throw error;
+    }
+  }
+  if (!quote) throw new Error('Unable to allocate a unique quote reference');
 
   await recordAuditEvent({
     actorId: retailerId,

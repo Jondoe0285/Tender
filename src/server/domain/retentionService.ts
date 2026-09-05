@@ -30,7 +30,7 @@ export function expiredAttachmentPurgeWhere(cutoff: Date) {
     uploadedAt: { lt: cutoff },
     retentionLockedUntil: null,
     legalHolds: { none: { releasedAt: null } },
-    tender: { legalHolds: { none: { releasedAt: null } } },
+    tender: { status: { not: 'OPEN' as const }, legalHolds: { none: { releasedAt: null } } },
   };
 }
 

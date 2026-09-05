@@ -155,7 +155,7 @@ test('excludes active direct and tender legal holds from retention purge decisio
   assert.deepEqual(expiredQuotePurgeWhere(cutoff).legalHolds, { none: { releasedAt: null } });
   assert.deepEqual(expiredQuotePurgeWhere(cutoff).tender, { legalHolds: { none: { releasedAt: null } } });
   assert.deepEqual(expiredAttachmentPurgeWhere(cutoff).legalHolds, { none: { releasedAt: null } });
-  assert.deepEqual(expiredAttachmentPurgeWhere(cutoff).tender, { legalHolds: { none: { releasedAt: null } } });
+  assert.deepEqual(expiredAttachmentPurgeWhere(cutoff).tender, { status: { not: 'OPEN' }, legalHolds: { none: { releasedAt: null } } });
 });
 
 test('calculates progressive percentage release fees across all three bands', () => {

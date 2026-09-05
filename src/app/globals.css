@@ -13,7 +13,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid theme('colors.safety-amber');
+    outline: 2px solid theme('colors.trade-blue');
     outline-offset: 2px;
   }
 }

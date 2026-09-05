@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 
 interface Option {
   label: string;
@@ -10,6 +10,7 @@ interface MultiSelectDropdownProps {
   selected: string[];
   onChange: (selected: string[]) => void;
   placeholder?: string;
+  id?: string;
 }
 
 export function MultiSelectDropdown({
@@ -17,10 +18,12 @@ export function MultiSelectDropdown({
   selected,
   onChange,
   placeholder = 'Select options',
+  id,
 }: MultiSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -58,7 +61,20 @@ export function MultiSelectDropdown({
     <div ref={containerRef} className="relative w-full">
       <div className="relative">
         <div
+          id={id}
           onClick={() => setIsOpen(!isOpen)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              setIsOpen((open) => !open);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label={placeholder}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-controls={listboxId}
           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white cursor-pointer hover:border-gray-400 focus-within:outline-none focus-within:ring-amber-500 focus-within:border-amber-500 flex flex-wrap gap-2 items-center min-h-10"
         >
           {selected.length === 0 ? (
@@ -78,7 +94,8 @@ export function MultiSelectDropdown({
                   }}
                   className="hover:text-amber-700 font-bold"
                 >
-                  ×
+                  <span aria-hidden="true">×</span>
+                  <span className="sr-only">Remove {options.find((option) => option.value === value)?.label}</span>
                 </button>
               </span>
             ))
@@ -87,11 +104,12 @@ export function MultiSelectDropdown({
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-10">
+        <div id={listboxId} role="listbox" aria-label={placeholder} className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-10">
           <div className="p-2 border-b border-gray-200">
             <input
               type="text"
               placeholder="Search..."
+              aria-label={`Search ${placeholder.toLowerCase()}`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"

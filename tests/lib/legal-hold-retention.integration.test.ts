@@ -32,7 +32,7 @@ test('active legal holds exclude expired quotes and tender attachments until rel
   retailerId = retailer.id;
 
   const tender = await prisma.tender.create({
-    data: { reference: `HOLD-${suffix}`, clientId, category: 'Materials', subcategory: 'Aggregate', location: 'Leeds', quantity: '20 tonnes', urgency: 'Standard', closingDate: new Date('2026-01-02T00:00:00.000Z'), requirements: 'Delivery', description: 'Fictional legal hold test tender' },
+    data: { reference: `HOLD-${suffix}`, clientId, category: 'Materials', subcategory: 'Aggregate', location: 'Leeds', quantity: '20 tonnes', urgency: 'Standard', status: 'CLOSED', closingDate: new Date('2026-01-02T00:00:00.000Z'), requirements: 'Delivery', description: 'Fictional legal hold test tender' },
   });
   tenderId = tender.id;
   const [quote, attachment] = await Promise.all([

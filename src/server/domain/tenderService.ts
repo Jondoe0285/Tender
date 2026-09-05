@@ -1,4 +1,5 @@
 import { prisma } from '@/server/data/prisma';
+import { Prisma } from '@prisma/client';
 import { buildTenderReference } from '@/lib/identifiers';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { sendTenderOpportunityEmail, sendTenderUpdatedEmail } from '@/server/notifications/resend';
@@ -115,11 +116,7 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
   const tendersToday = await prisma.tender.count({ where: { createdAt: { gte: startOfDay } } });
-  const reference = buildTenderReference(new Date(), tendersToday + 1);
-
-  const tender = await prisma.tender.create({
-    data: {
-      reference,
+  const tenderData = {
       clientId,
       category: input.category,
       subcategory: input.subcategory,
@@ -132,7 +129,7 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
       supplyDate: input.supplyDate ?? null,
       requirements: input.requirements.join(','),
       description: input.description,
-      status: 'OPEN',
+      status: 'OPEN' as const,
       items: {
         create: [
           { category: input.category, subcategory: input.subcategory, item: input.item ?? null, quantity: input.quantity, description: input.itemDescription ?? '' },
@@ -147,8 +144,20 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
           content: Buffer.from(attachment.dataBase64, 'base64'),
         })),
       },
-    },
-  });
+  };
+
+  let tender;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      tender = await prisma.tender.create({
+        data: { ...tenderData, reference: buildTenderReference(new Date(), tendersToday + attempt + 1) },
+      });
+      break;
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002' || attempt === 4) throw error;
+    }
+  }
+  if (!tender) throw new Error('Unable to allocate a unique tender reference');
 
   const packages = [
     {

@@ -16,6 +16,8 @@ This document is the detailed release review behind the summary in [Action-Track
 | `npm audit --audit-level=high` | PASS: 0 vulnerabilities | This supersedes the older health report's dependency-audit result for this checkout. |
 | Production build | PASS | TypeScript build errors are enforced; Next.js reports only the existing middleware-to-proxy deprecation warning. |
 | `npm run health:validate-workflows` | PASS | Nine workflow files validated; unrelated trailing-whitespace notes remain in `approved-fix.yml`. |
+| Local browser QA | PASS with environment findings | Landing and registration pages were checked at 390px width; no horizontal overflow was observed, registration controls expose labels, and the county multi-select now opens from keyboard focus with `aria-expanded`. Local console still reports invalid Sentry DSN `test`; support resolves to `mailto:test`. |
+| Staging/production provider verification | BLOCKED locally | No staging or production base URL is configured in the local environment, and no deploy origin is documented in the repository. Render, Stripe, Resend, Sentry, retention, backup, capacity, and live-cookie evidence require environment access. |
 
 ## Release blockers
 
@@ -68,16 +70,7 @@ This document is the detailed release review behind the summary in [Action-Track
 - **Can complete:** Yes for code/tests.
 - **Requires input:** Render/Cloudflare proxy configuration and evidence.
 
-### P1-H04: Fix retention so active tender attachments cannot disappear prematurely
-
-- **Severity:** High
-- **Status:** Open; implementation predicate requires lifecycle review.
-- **Evidence:** `src/server/domain/retentionService.ts` purges based on attachment age, retention lock, and legal holds without an obvious open/closed tender guard.
-- **Corrective action:** Define whether attachment retention follows upload age, tender lifecycle, quote retention, or accepted-quote retention. Implement the approved policy and test open, closed, accepted, held, released-hold, and repeated-purge cases.
-- **Can complete:** Yes after the policy is confirmed.
-- **Requires input:** Founder/product owner and legal/privacy owner must approve the retention interpretation.
-
-### P1-H05: Fix unlocked attachment authorization or revise the contract
+### P1-H04: Fix unlocked attachment authorization or revise the contract
 
 - **Severity:** High availability/privacy workflow defect
 - **Status:** Open; conflicting behavior is covered by an existing test.
@@ -86,7 +79,7 @@ This document is the detailed release review behind the summary in [Action-Track
 - **Can complete:** Yes after the contract is decided.
 - **Requires input:** Product owner decision on tender-wide versus package-scoped attachment visibility.
 
-### P1-H06: Add session, authorization, reversal, retention, and route-level rate-limit tests
+### P1-H05: Add session, authorization, reversal, retention, and route-level rate-limit tests
 
 - **Severity:** High
 - **Status:** Open; confirmed coverage gap.
@@ -94,7 +87,7 @@ This document is the detailed release review behind the summary in [Action-Track
 - **Can complete:** Yes.
 - **Requires input:** Staging browser validation for cookies, proxy behavior, and multi-user journeys.
 
-### P1-H07: Separate sponsored content from quote comparison
+### P1-H06: Separate sponsored content from quote comparison
 
 - **Severity:** High
 - **Status:** Open; confirmed in source and action tracker.
@@ -103,12 +96,12 @@ This document is the detailed release review behind the summary in [Action-Track
 - **Can complete:** Yes for implementation.
 - **Requires input:** Product owner must confirm whether sponsorship is permitted in the current release or must remain disabled.
 
-### P1-H08: Correct shared brand tokens and contrast
+### P1-H07: Complete shared brand contrast verification
 
 - **Severity:** High brand compliance
-- **Status:** Open; the approved light logo and neutral payment-return copy are complete, but the shared colour tokens remain non-compliant.
-- **Evidence:** `tailwind.config.ts` contains values that do not match the approved palette, including the orange `safety-amber` treatment and incorrect Trade Blue token.
-- **Corrective action:** Align semantic tokens with the brand authority: Navy `#0D1B2A`, Trade Blue `#1D6FB8`, Sky Blue `#6EB1E4`, Steel Grey `#6B7280`, Light Grey `#F2F4F7`. Recheck contrast and focus states.
+- **Status:** Token correction complete in this change; full UI-state contrast verification remains open.
+- **Evidence:** `tailwind.config.ts` and `src/app/globals.css` now use the approved Trade Blue, Sky Blue, Steel Grey, and focus tokens.
+- **Corrective action:** Complete a WCAG contrast audit across buttons, fields, status states, focus states, disabled states, and dark/light surfaces.
 - **Can complete:** Yes for implementation.
 - **Requires input:** Brand owner approval for any new functional/status colours.
 
@@ -123,23 +116,15 @@ This document is the detailed release review behind the summary in [Action-Track
 
 ## Medium-priority engineering and UX actions
 
-### P2-M01: Add a restrictive Content-Security-Policy
+### P2-M01: Add real browser, mobile, and accessibility release coverage
 
 - **Severity:** Medium
-- **Evidence:** `next.config.mjs` sets several security headers but no CSP.
-- **Corrective action:** Add a CSP compatible with Next.js, Stripe, Sentry, fonts, and required assets; validate it in staging without weakening it broadly.
-- **Can complete:** Yes.
-- **Requires input:** Staging/browser validation and any CDN policy coordination.
-
-### P2-M02: Add real browser, mobile, and accessibility release coverage
-
-- **Severity:** Medium
-- **Status:** Open; no Playwright/axe/browser test script is configured.
+- **Status:** Open; partial local QA completed, but no repeatable browser/axe suite is configured.
 - **Corrective action:** Add deterministic browser journeys for registration, tender creation, matching, unlock, quote, acceptance, release, mobile navigation, keyboard coverage selection, focus management, loading/error states, and protected-data absence. Include desktop, tablet, and mobile viewports.
 - **Can complete:** Test harness and deterministic fixtures can be added here.
 - **Requires input:** Real device, staging cookie, email, Stripe, and deployment validation.
 
-### P2-M04: Complete frontend accessibility and responsive polish
+### P2-M03: Complete frontend accessibility and responsive polish
 
 - **Severity:** Medium
 - **Evidence:** `src/components/retailer/OpportunitiesExplorer.tsx` contains controls needing labels/state semantics; `src/components/quotes/QuoteComparison.tsx` needs sortable-column announcements; `src/components/layout/LandingPartners.tsx` and `src/components/layout/SiteFooter.tsx` use narrow-screen minimum widths; detail pages have weak loading/error states.
@@ -147,15 +132,7 @@ This document is the detailed release review behind the summary in [Action-Track
 - **Can complete:** Yes.
 - **Requires input:** Brand review for any functional colour changes.
 
-### P2-M05: Fix reference-generation concurrency races
-
-- **Severity:** Medium
-- **Evidence:** `src/server/domain/tenderService.ts` and `src/server/domain/quoteService.ts` derive references from counts before insertion.
-- **Corrective action:** Use database-backed sequence allocation or bounded retry on unique conflict, with a concurrent creation test.
-- **Can complete:** Yes.
-- **Requires input:** None.
-
-### P2-M06: Decide launch-credit scope and Provider vetting
+### P2-M04: Decide launch-credit scope and Provider vetting
 
 - **Severity:** Medium
 - **Evidence:** The business plan describes a time/category/region/provider-group launch-credit policy, while the schema uses a flat `launchCreditsLeft`; the business plan also discusses Provider approval while the current flow appears self-service.
@@ -180,10 +157,10 @@ These cannot be proven from source code or completed by a local coding change:
 
 ## Recommended execution order
 
-1. Resolve product decisions in P1-H10, P1-H07, P1-H05, P2-M06, and the retention policy.
-2. Repair the failing suite and add payment/privacy/session/reversal/retention coverage.
-3. Fix fail-open deployment verification, TypeScript build enforcement, Stripe event handling, session revocation, rate-limit trust, and retention behavior.
-4. Apply brand, payment-copy, accessibility, responsive, and error-state corrections.
+1. Resolve the remaining product decisions around the role model, pricing, sponsorship, launch credits, Provider vetting, attachment visibility, and retention semantics.
+2. Add payment/privacy/webhook/reversal/session/rate-limit integration coverage.
+3. Complete fail-closed staging attestations, Stripe event ordering, and proxy trust verification.
+4. Complete WCAG contrast, browser, mobile, and accessibility verification.
 5. Run build, lint, type-check, full tests, dependency/security checks, migration replay, and browser checks.
 6. Complete staging provider/infrastructure evidence and only then request release approval.
 
