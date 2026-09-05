@@ -13,6 +13,13 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-05 - Source Staging Synchronization Policy
+
+- Changed: defined the source synchronization workflow so an explicit request to track or synchronize the source repository fetches, reviews, and transposes applicable differences from `origin/staging` into local `staging`. Local `main` may then be promoted only from local `staging` through the protected pull-request and release workflow.
+- Affects: repository governance, Git branch synchronization, and release workflow only. Application behavior, database schema, payments, contact-release controls, and environment configuration remain unchanged.
+- Environment: local `staging` tracks `origin/staging`. No deployment, production resource, or secret change is required.
+- Validation: instruction changes pass `git diff --check`; the `staging` branch continues to track `origin/staging`.
+
 ### 2026-09-05 - Test Database Role Realignment
 
 - Changed: added migration `20260905040000_realign_test_roles_with_user_platform` to return the configured test database from the temporary Contractor/Provider recovery state to the current staging User role model. It preserves Super Users and normalizes all other role values to User.

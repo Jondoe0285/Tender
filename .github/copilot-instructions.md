@@ -65,3 +65,12 @@
 - Write tests for every new feature and update affected tests when behavior changes.
 - Keep interfaces accessible, including keyboard navigation and meaningful labels.
 - Run `npm run type-check` after TypeScript changes and `npm run build` for routing or production behavior changes.
+
+## Source Repository Synchronization
+
+- Treat the Git `origin` repository (`https://github.com/Jondoe0285/Tender.git`) as the authoritative source repository.
+- When the user explicitly asks to track or synchronize the source repository, fetch and review `origin/staging` and compare it with this repository's local `staging` branch.
+- For an explicit source-tracking request, transpose every applicable difference from `origin/staging` into this repository's `staging` branch, including code, database migrations, configuration, tests, documentation, security controls, and workflow updates. Do not stop after configuring Git tracking; review the source material and make the required local `staging` changes.
+- After source changes are aligned in local `staging`, the user may make additional local changes in `staging` before release. Treat local `staging` as the source for changes promoted to local `main`, and promote to `main` only through the protected pull-request and release workflow.
+- Do not overwrite local work blindly. Resolve conflicts by preserving the source repository's intended behavior, this workspace's explicit requirements, and all security controls; raise an irreconcilable conflict before proceeding.
+- Validate every transposed change using the source repository's relevant checks before considering the local update complete.
