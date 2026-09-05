@@ -2,10 +2,19 @@
 
 ## Technology
 
-- Use Next.js, TypeScript, and Tailwind CSS for the application.
+- Use Next.js, TypeScript, and Tailwind CSS for the existing server and browser application.
 - Target Render for hosting with Render PostgreSQL for persistence.
 - Use Stripe for payments and GitHub Actions for CI/CD.
 - TypeScript only. Do not add JavaScript application files.
+
+## Mobile Application Architecture
+
+- The mobile app shall be a genuinely packaged native application built with React Native and Expo in `mobile/`.
+- React Native with Expo is the mandatory development method for every mobile-client task. Do not use Flutter, a Progressive Web App, Capacitor, a browser wrapper, a WebView, or any other web-based mobile implementation unless the user explicitly overrides this instruction.
+- Treat the existing Next.js application as the server/API implementation while native mobile workflow parity is delivered. For every user-facing mobile workflow, implement or update the React Native client rather than adding a browser-only alternative.
+- Before enabling a protected workflow in the mobile client, implement and test a dedicated mobile authentication and authorization path. Store device credentials only in platform-secure storage; never reuse browser session cookies or weaken server-side validation, payment, audit, or contact-release controls.
+- Build Android and iOS packages through the Expo/EAS configuration in `mobile/`. Keep package identifiers, signing configuration, API origins, and all environment-specific values out of committed source unless they are non-secret identifiers explicitly approved for release.
+- The approved working name and existing brand assets may be used for internal development. Do not register a final package identifier, configure release signing, publish a store listing, or make any other irreversible external identity commitment until the Founder explicitly approves the final name.
 
 ## Roles
 

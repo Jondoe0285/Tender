@@ -12,7 +12,7 @@ import { getPurchasedRetentionDeadline } from '@/server/domain/retentionService'
 type AcceptOutcome = { status: 'PAYMENT_REQUIRED' | 'RELEASED_WITH_CREDIT'; paymentId: string; checkoutUrl: string | null; devMode: boolean; feeGbp: number; vatGbp: number; totalAmountGbp: number; creditsLeft?: number };
 
 /** Accepting a quote enters a pending release-fee state — no contact data is exposed yet (SEC-035). */
-export async function acceptQuote(clientId: string, quoteId: string): Promise<AcceptOutcome> {
+export async function acceptQuote(clientId: string, quoteId: string, mobileReturnUrl?: string): Promise<AcceptOutcome> {
   const quote = await prisma.quote.findUnique({ where: { id: quoteId }, include: { tender: true, retailer: { select: { email: true } }, releasePayment: true } });
   if (!quote || quote.tender.clientId !== clientId) throw new ForbiddenError('Quote not found for this Client');
   if (quote.status === 'ACCEPTED' && quote.releasePayment) {
@@ -78,7 +78,7 @@ export async function acceptQuote(clientId: string, quoteId: string): Promise<Ac
 
   let payment: AcceptOutcome;
   try {
-    payment = { status: 'PAYMENT_REQUIRED', ...(await createPayment({ type: 'CLIENT_RELEASE', userId: clientId, quoteId, quotePriceGbp: quote.priceGbp })), feeGbp: releaseFeeGbp };
+    payment = { status: 'PAYMENT_REQUIRED', ...(await createPayment({ type: 'CLIENT_RELEASE', userId: clientId, quoteId, quotePriceGbp: quote.priceGbp, mobileReturnUrl })), feeGbp: releaseFeeGbp };
   } catch (error) {
     // A concurrent accept already created the release payment (Payment.quoteId is unique) — return it instead of failing.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {

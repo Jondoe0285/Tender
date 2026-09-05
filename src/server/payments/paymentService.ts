@@ -16,6 +16,8 @@ type CreatePaymentResult = {
   devMode: boolean;
 };
 
+export const MOBILE_PAYMENT_RETURN_URL = 'tradetender://payment/return';
+
 /**
  * Creates a PENDING payment record and, when Stripe is configured, a matching Checkout Session.
  * Without Stripe keys (local/dev only) the payment stays PENDING until the dev-only confirm
@@ -28,7 +30,11 @@ export async function createPayment(params: {
   tierId?: string;
   quoteId?: string;
   quotePriceGbp?: number;
+  mobileReturnUrl?: string;
 }): Promise<CreatePaymentResult> {
+  if (params.mobileReturnUrl !== undefined && params.mobileReturnUrl !== MOBILE_PAYMENT_RETURN_URL) {
+    throw new Error('Invalid mobile payment return URL');
+  }
   let netFeeGbp: number;
   if (params.type === 'MEMBERSHIP_TIER') {
     const tier = params.tierId
@@ -84,8 +90,8 @@ export async function createPayment(params: {
         quantity: 1,
       }] : []),
     ],
-    success_url: appUrl(`/payment/success?payment_id=${payment.id}`),
-    cancel_url: appUrl(`/payment/cancelled?payment_id=${payment.id}`),
+    success_url: params.mobileReturnUrl ? `${params.mobileReturnUrl}?payment_id=${encodeURIComponent(payment.id)}&result=success` : appUrl(`/payment/success?payment_id=${payment.id}`),
+    cancel_url: params.mobileReturnUrl ? `${params.mobileReturnUrl}?payment_id=${encodeURIComponent(payment.id)}&result=cancelled` : appUrl(`/payment/cancelled?payment_id=${payment.id}`),
     metadata: { paymentId: payment.id, vatPercentage: String(vatPercentage) },
   });
 

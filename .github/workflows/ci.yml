@@ -7,6 +7,39 @@ on:
     branches: [ main, staging, development ]
 
 jobs:
+  mobile:
+    name: Mobile type-check and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Type-check mobile app
+        working-directory: mobile
+        run: npm run type-check
+
+      - name: Test mobile app
+        working-directory: mobile
+        run: npm test
+
+      - name: Validate Expo configuration
+        working-directory: mobile
+        run: npx expo-doctor
+
   validate:
     name: Lint, type-check, tests, build
     runs-on: ubuntu-latest

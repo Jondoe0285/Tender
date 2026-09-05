@@ -19,6 +19,7 @@ for (let index = 2; index < process.argv.length; index += 2) {
 const baseUrl = (args['base-url'] ?? '').replace(/\/$/, '');
 const target = args.target ?? 'staging';
 const commitSha = args.sha ?? 'unknown';
+const HIGH_RISK_ATTESTATION = 'HIGH RISK STAGING CONTROLS VERIFIED';
 
 if (!baseUrl || /^\[.*\]$/.test(baseUrl)) {
   console.error('VERIFICATION FAILED: --base-url is required and must not be a placeholder.');
@@ -85,6 +86,12 @@ async function expectProtectedApi(name, pathname, method = 'GET') {
 
 console.log(`Verifying ${target} deployment at ${baseUrl}`);
 console.log(`Commit: ${commitSha}\n`);
+
+if (target === 'staging') {
+  args['high-risk-attestation'] === HIGH_RISK_ATTESTATION
+    ? record('High-risk controls attestation', 'PASS', 'payment/webhook, audit, email, and monitoring checks were explicitly attested')
+    : record('High-risk controls attestation', 'FAIL', `must be exactly: ${HIGH_RISK_ATTESTATION}`);
+}
 
 // Application health and database connectivity.
 const health = await request('/api/health');
@@ -164,6 +171,7 @@ const record_ = {
   passed: results.filter((entry) => entry.status === 'PASS').length,
   failed: failed.length,
   unverified: unverified.length,
+  highRiskAttestation: target === 'staging' ? args['high-risk-attestation'] === HIGH_RISK_ATTESTATION : null,
   verification: results,
 };
 

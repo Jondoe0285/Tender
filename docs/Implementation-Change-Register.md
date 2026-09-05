@@ -13,6 +13,48 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-05 - Mobile Stress-Test Release Gate
+
+- Changed: added `npm run mobile-stress-test`, which assesses Android and iOS staging origins, validates the mobile security contract, consumes protected real-device evidence, and produces crash, performance, battery, security, network-resilience, recommendations, and launch-readiness reports. Production deployment now depends on this fail-closed gate and uploads its reports.
+- Affects: mobile release assessment and production deployment gating only. Application business logic, database data, payment provider configuration, and external environment resources remain unchanged.
+- Environment: configure protected staging URLs and `MOBILE_STRESS_DEVICE_EVIDENCE` only after real Android/iOS testing. Evidence must not claim results not measured on real devices or a managed device farm.
+- Validation: `npx tsx --test tests/lib/mobile-stress-test.test.ts` passes; `npm run health:validate-workflows` validates 9 workflows. An unconfigured local run generates reports and correctly exits `FAIL`.
+
+### 2026-09-05 - Native Mobile Security And Workflow Completion
+
+- Changed: added versioned mobile bearer tokens revoked on password changes, bearer-only mobile logout, interactive Provider opportunity access, fixed-scheme validated payment return handling, explicit mobile registration consent, and mobile CI type/configuration checks.
+- Affects: native authentication, authorization, tender opportunities, unlock/payment return, registration consent, and CI only. Payment confirmation and contact release remain server-authoritative; no database credential, payment secret, or external environment resource was changed.
+- Environment: apply migration `20260905050000_add_mobile_auth_version` through the approved environment process. The working-name deep-link scheme is for internal testing only and must be reviewed with final mobile identity before release.
+- Validation: mobile type check and package tests pass; Expo Doctor reports 21/21 checks; `npm run health:validate-workflows` passes; focused mobile token/session tests pass.
+
+### 2026-09-05 - Session Claim Revalidation Coverage
+
+- Changed: extracted the current-account authorization decision into a focused resolver while retaining database reload for browser and mobile sessions.
+- Affects: server-side session authorization only. Account roles, payment controls, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/session-revalidation.test.ts` passes (3 tests), covering suspended accounts, removed roles, and refreshed claims.
+
+### 2026-09-05 - Mandatory High-Risk Staging Attestation
+
+- Changed: staging deployment verification now fails unless the protected workflow supplies the exact high-risk-controls attestation. A successful staging record therefore includes explicit evidence for payment/webhook reconciliation, audit logging, email delivery, and monitoring checks that cannot be proven by an unauthenticated probe.
+- Affects: staging deployment workflow and release evidence only. Application behavior, database schema, payments, and user data remain unchanged.
+- Environment: staging approvers must verify the required provider-side evidence and enter the documented attestation before a successful staging record can be created.
+- Validation: `npx tsx --test tests/lib/deployment-high-risk-attestation.test.ts` passes; `npm run health:validate-workflows` validates 9 workflow files.
+
+### 2026-09-05 - Quote Comparison Advertising Separation
+
+- Changed: removed sponsored quote placement from the quote comparison decision surface. Partner advertising remains available only through existing, clearly labelled partner-information surfaces outside ranking and supplier selection.
+- Affects: Contractor quote comparison presentation and advertising separation only. Quote sorting, acceptance, payment, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/quote-comparison-advertising.test.ts tests/lib/site-footer-partners.test.ts` passes (3 tests).
+
+### 2026-09-05 - Native Mobile Client Foundation
+
+- Changed: replaced the uncommitted PWA direction with a standalone Expo/React Native TypeScript package in `mobile/`, configured for Android and iOS package builds with the approved working name and EAS build profiles. React Native with Expo is now the mandatory method for all mobile-client work; Flutter, PWA, Capacitor, browser wrappers, and WebViews are excluded unless explicitly approved by the user.
+- Affects: native mobile packaging, account setup, sign-in, secure session storage, profile read/update, tender creation and summary/detail, pre-unlock opportunity, unlock, quote entry/submission, quote acceptance, server-issued payment handoff, and server-confirmed contact display. The server now issues and validates a short-lived mobile bearer token while reloading current authorization state. Database schema, payment logic, and contact-release controls remain unchanged.
+- Environment: use Node 22.13 or later in `mobile/`; do not externally register the working-name Android or iOS package identifiers, configure release signing, or publish a store listing before final product-identity approval. Configure only the public HTTPS mobile API origin in `EXPO_PUBLIC_API_URL`.
+- Validation: `npx tsc --noEmit` and `npx expo-doctor` pass in `mobile/` (21/21 checks); `npx tsx --test tests/lib/mobile-token.test.ts` passes (4 tests). Device builds, full workflow parity, and external release configuration remain pending.
+
 ### 2026-09-05 - Source Staging Synchronization Policy
 
 - Changed: defined the source synchronization workflow so an explicit request to track or synchronize the source repository fetches, reviews, and transposes applicable differences from `origin/staging` into local `staging`. Local `main` may then be promoted only from local `staging` through the protected pull-request and release workflow.

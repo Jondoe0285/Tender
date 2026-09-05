@@ -122,6 +122,9 @@ if (productionWorkflow) {
   check(/rollback/i.test(productionWorkflow), 'deploy-production.yml must define a rollback path.');
   check(!/schedule:/.test(productionWorkflow), 'A deployment workflow must never be scheduled.');
   check(!/\bpush:/.test(productionWorkflow), 'deploy-production.yml must not deploy automatically on push.');
+  check(/mobile-stress-test:/.test(productionWorkflow), 'deploy-production.yml must define a mobile release readiness gate.');
+  check(/needs:\s*\[verify-authorisation, mobile-stress-test\]/.test(productionWorkflow), 'Production deployment must depend on the mobile release readiness gate.');
+  check(/npm run mobile-stress-test/.test(productionWorkflow), 'The mobile release readiness gate must run npm run mobile-stress-test.');
 }
 
 // Merging to main must never be the same action as releasing to production.

@@ -5,6 +5,8 @@ node_modules/
 
 # Testing
 coverage/
+mobile-stress-test-results/
+mobile-stress-test-evidence/
 
 # Production
 build/
