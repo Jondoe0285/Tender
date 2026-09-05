@@ -13,6 +13,13 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-05 - Test Database Role Realignment
+
+- Changed: added migration `20260905040000_realign_test_roles_with_user_platform` to return the configured test database from the temporary Contractor/Provider recovery state to the current staging User role model. It preserves Super Users and normalizes all other role values to User.
+- Affects: configured test database role enum and UserRole memberships only. Tender, company, profile, quote, payment, contact-release, audit, and role-recovery backup records remain unchanged.
+- Environment: applies only to the configured test database. No production/main resource or secret is changed.
+- Validation: local `npx prisma migrate deploy` applied the migration; the test database now has 10 Users and 2 Super Users. `npx prisma validate`, `npm run type-check`, and `npm run build` pass. Deploy staging after committing this migration, then verify login on the staging service.
+
 ### 2026-09-05 - Professional Services Interest Workflow
 
 - Changed: Professional Services tender opportunities now use a Register interest action instead of a paid unlock and formal quote. The server accepts interest only for a matching company with Professional Services active and while the tender remains open.
