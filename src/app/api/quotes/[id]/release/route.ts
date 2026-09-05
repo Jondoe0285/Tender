@@ -12,7 +12,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
-    const user = await requireRole('USER');
+    const user = await requireRole('CONTRACTOR');
     const parsed = bodySchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 

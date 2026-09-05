@@ -6,13 +6,8 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { FieldGroup, Input, Label, PasswordInput } from '@/components/ui/Field';
 import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
-import { SERVICE_CATALOG, SERVICE_NAMES } from '@/lib/categories';
+import { SERVICE_NAMES } from '@/lib/categories';
 import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
-
-const PROFILE_SERVICE_LABELS: Record<string, string> = {
-  Materials: 'Materials Supplier',
-  Waste: 'Waste Disposal',
-};
 
 type Profile = {
   firstName: string;
@@ -20,9 +15,7 @@ type Profile = {
   email: string;
   phoneNumber: string;
   companyName: string | null;
-  branchIdentifier: string | null;
   services: string[];
-  serviceProvisions: string[];
   operatingLocations: string[];
   tradeTenderId: string | null;
   isPrimaryUser: boolean;
@@ -30,7 +23,7 @@ type Profile = {
 };
 
 const emptyProfile: Profile = {
-  firstName: '', lastName: '', email: '', phoneNumber: '', companyName: null, branchIdentifier: null, services: [], serviceProvisions: [], operatingLocations: [], tradeTenderId: null, isPrimaryUser: false, additionalUsers: [],
+  firstName: '', lastName: '', email: '', phoneNumber: '', companyName: null, services: [], operatingLocations: [], tradeTenderId: null, isPrimaryUser: false, additionalUsers: [],
 };
 
 export default function ClientProfilePage() {
@@ -59,7 +52,7 @@ export default function ClientProfilePage() {
       body: JSON.stringify({
         firstName: profile.firstName, lastName: profile.lastName, email: profile.email,
         phoneNumber: profile.phoneNumber || undefined,
-        ...(profile.isPrimaryUser ? { companyName: profile.companyName, branchIdentifier: profile.branchIdentifier, services: profile.services, serviceProvisions: profile.serviceProvisions, operatingLocations: profile.operatingLocations } : {}),
+        ...(profile.isPrimaryUser ? { companyName: profile.companyName, services: profile.services, operatingLocations: profile.operatingLocations } : {}),
       }),
     });
     setSaving(false);
@@ -102,19 +95,6 @@ export default function ClientProfilePage() {
     await loadProfile();
   }
 
-  function toggleAllProvisions(service: string) {
-    const values = Object.keys(SERVICE_CATALOG[service as keyof typeof SERVICE_CATALOG]).map((provision) => `${service}::${provision}`);
-    setProfile((current) => {
-      const allSelected = values.every((value) => current.serviceProvisions.includes(value));
-      return {
-        ...current,
-        serviceProvisions: allSelected
-          ? current.serviceProvisions.filter((value) => !values.includes(value))
-          : [...new Set([...current.serviceProvisions, ...values])],
-      };
-    });
-  }
-
   return (
     <AppShell role="client" title="Profile">
       <div className="mx-auto max-w-3xl space-y-6">
@@ -128,31 +108,8 @@ export default function ClientProfilePage() {
               <FieldGroup><Label htmlFor="email">Email address</Label><Input id="email" type="email" value={profile.email} onChange={(event) => setProfile({ ...profile, email: event.target.value })} autoComplete="email" /></FieldGroup>
               <FieldGroup><Label htmlFor="phone">Phone number</Label><Input id="phone" type="tel" value={profile.phoneNumber} onChange={(event) => setProfile({ ...profile, phoneNumber: event.target.value })} autoComplete="tel" /></FieldGroup>
               {profile.isPrimaryUser && <FieldGroup wide><Label htmlFor="companyName">Company name</Label><Input id="companyName" value={profile.companyName ?? ''} onChange={(event) => setProfile({ ...profile, companyName: event.target.value })} autoComplete="organization" /></FieldGroup>}
-              {profile.isPrimaryUser && <FieldGroup wide><Label htmlFor="branchIdentifier">Branch or location</Label><Input id="branchIdentifier" value={profile.branchIdentifier ?? ''} onChange={(event) => setProfile({ ...profile, branchIdentifier: event.target.value })} /></FieldGroup>}
-              {profile.isPrimaryUser && <FieldGroup wide><Label>Services</Label><MultiSelectDropdown options={SERVICE_NAMES.map((service) => ({ label: PROFILE_SERVICE_LABELS[service] ?? service, value: service }))} selected={profile.services} onChange={(services) => setProfile({ ...profile, services, serviceProvisions: profile.serviceProvisions.filter((entry) => services.includes(entry.split('::')[0] ?? '')) })} placeholder="Select services offered" /></FieldGroup>}
-              {profile.isPrimaryUser && profile.services.map((service) => (
-                <FieldGroup key={service} wide>
-                  <div className="flex items-center justify-between gap-3">
-                    <Label>{service} provisions</Label>
-                    <button type="button" onClick={() => toggleAllProvisions(service)} className="text-xs font-semibold text-steel-blue hover:text-foundation-navy">
-                      {Object.keys(SERVICE_CATALOG[service as keyof typeof SERVICE_CATALOG]).every((provision) => profile.serviceProvisions.includes(`${service}::${provision}`)) ? 'Clear all' : 'Select all'}
-                    </button>
-                  </div>
-                  <div className="mt-1 grid gap-2 sm:grid-cols-2">
-                    {Object.keys(SERVICE_CATALOG[service as keyof typeof SERVICE_CATALOG]).map((provision) => {
-                      const value = `${service}::${provision}`;
-                      const selected = profile.serviceProvisions.includes(value);
-                      return (
-                        <label key={value} className="flex items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm text-concrete-grey">
-                          <input type="checkbox" checked={selected} onChange={() => setProfile({ ...profile, serviceProvisions: selected ? profile.serviceProvisions.filter((entry) => entry !== value) : [...profile.serviceProvisions, value] })} className="h-4 w-4 accent-safety-amber" />
-                          {provision}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </FieldGroup>
-              ))}
-              {profile.isPrimaryUser && <FieldGroup wide><Label>Operating locations</Label><MultiSelectDropdown options={['United Kingdom', ...UK_REGIONS, ...UK_COUNTIES].map((location) => ({ label: location, value: location }))} selected={profile.operatingLocations} onChange={(operatingLocations) => setProfile({ ...profile, operatingLocations })} placeholder="Select United Kingdom, regions, or counties" /></FieldGroup>}
+              {profile.isPrimaryUser && <FieldGroup wide><Label>Services</Label><MultiSelectDropdown options={SERVICE_NAMES.map((service) => ({ label: service, value: service }))} selected={profile.services} onChange={(services) => setProfile({ ...profile, services })} placeholder="Select services offered" /></FieldGroup>}
+              {profile.isPrimaryUser && <FieldGroup wide><Label>Operating locations</Label><MultiSelectDropdown options={[...UK_REGIONS, ...UK_COUNTIES].map((location) => ({ label: location, value: location }))} selected={profile.operatingLocations} onChange={(operatingLocations) => setProfile({ ...profile, operatingLocations })} placeholder="Select regions or counties" /></FieldGroup>}
               <FieldGroup wide><Label htmlFor="tradeTenderId">Trade Tender ID</Label><Input id="tradeTenderId" value={profile.tradeTenderId ?? 'Not assigned'} readOnly /></FieldGroup>
               <div className="sm:col-span-2"><Button onClick={saveProfile} loading={saving}>Save profile</Button></div>
             </div>

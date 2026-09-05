@@ -102,7 +102,8 @@ test('still rejects an unlisted origin when additional origins are configured', 
 });
 
 test('maps only approved roles to workspaces', () => {
-  assert.equal(workspaceForRole('USER'), '/user');
+  assert.equal(workspaceForRole('CONTRACTOR'), '/contractor');
+  assert.equal(workspaceForRole('PROVIDER'), '/provider');
   assert.equal(workspaceForRole('SUPER_USER'), '/super-user');
   assert.equal(workspaceForRole('UNKNOWN'), null);
 });

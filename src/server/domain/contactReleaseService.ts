@@ -171,14 +171,14 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
   });
   await Promise.allSettled(
     parties.map(async (party) => {
-      const recipientRole = party.id === clientId ? 'USER' : 'USER';
+      const recipientRole = party.id === clientId ? 'CONTRACTOR' : 'PROVIDER';
       const result = await sendTransactionalEmail(
         party.email,
         contactReleaseTemplate({
           quoteReference: quote.reference,
           tenderReference: quote.tender.reference,
           recipientRole,
-          workspacePath: recipientRole === 'USER' ? `/client/tenders/${quote.tenderId}` : `/retailer/tenders/${quote.tenderId}`,
+          workspacePath: recipientRole === 'CONTRACTOR' ? `/client/tenders/${quote.tenderId}` : `/retailer/tenders/${quote.tenderId}`,
         })
       ).catch(() => ({ sent: false as const }));
       await recordAuditEvent({

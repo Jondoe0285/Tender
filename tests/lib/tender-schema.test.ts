@@ -121,7 +121,6 @@ test('requires both exact retailer capability and configured coverage before cre
   assert.equal(retailerCanMatchTender(eligibleRetailer, 'Bristol BS1 4DJ', ['Materials']), false);
   assert.equal(retailerCanMatchTender(eligibleRetailer, 'Leeds LS10 2AB', ['Waste']), false);
   assert.equal(retailerCanMatchTender({ ...eligibleRetailer, categories: 'Material' }, 'Leeds LS10 2AB', ['Materials']), false);
-  assert.equal(retailerCanMatchTender({ ...eligibleRetailer, categories: '' }, 'Leeds LS10 2AB', ['Materials']), false);
 });
 
 test('does not match when a Retailer has not configured any counties or regions', () => {

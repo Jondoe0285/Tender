@@ -8,7 +8,7 @@ import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
 import { sponsoredPlacementEnabled } from '@/server/domain/sponsoredPlacementService';
 import { getClientReleaseFeeGbp } from '@/server/domain/platformSettings';
-import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getUserTenderServiceCategories, userOwnsTender } from '@/server/domain/tenderService';
+import { assertRetailerEligibleForTender, assertTenderOpenForActivity } from '@/server/domain/tenderService';
 
 export function isQuoteRetentionLocked(retentionLockedUntil: Date | null | undefined, now = new Date()): boolean {
   return retentionLockedUntil !== null && retentionLockedUntil !== undefined && retentionLockedUntil > now;
@@ -46,10 +46,9 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
     ...input.charges.map((charge, index) => ({ name: `quote item ${index + 1} description`, value: charge.description })),
   ]);
 
-  const serviceCategories = await getUserTenderServiceCategories(retailerId);
   const tender = await prisma.tender.findUniqueOrThrow({
     where: { id: tenderId },
-    include: { client: { select: { email: true } }, items: { where: { category: { in: serviceCategories } }, select: { id: true } } },
+    include: { client: { select: { email: true } }, items: { select: { id: true } } },
   });
   if (tender.supplyDate && !input.deliveryDateConfirmed) {
     throw new ValidationError('Confirm you can deliver on the requested supply date');
@@ -108,7 +107,7 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
     action: emailResult.sent ? 'QUOTE_NOTIFICATION_SENT' : 'QUOTE_NOTIFICATION_FAILED',
     targetType: 'Quote',
     targetId: quote.id,
-    metadata: { recipientRole: 'USER', reason: emailResult.sent ? undefined : emailResult.reason },
+    metadata: { recipientRole: 'CONTRACTOR', reason: emailResult.sent ? undefined : emailResult.reason },
   });
 
   return quote;
@@ -116,7 +115,8 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
 
 /** A Client may only view quotes for their own tenders. */
 export async function listQuotesForClientTender(clientId: string, tenderId: string) {
-  if (!await userOwnsTender(clientId, tenderId)) throw new ForbiddenError('Tender not found for this User');
+  const tender = await prisma.tender.findUnique({ where: { id: tenderId } });
+  if (!tender || tender.clientId !== clientId) throw new ForbiddenError('Tender not found for this Client');
 
   // Retailer contact details are never selected here — they are withheld until contact release.
   const quotes = await prisma.quote.findMany({

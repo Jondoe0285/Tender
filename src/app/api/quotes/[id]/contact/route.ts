@@ -6,7 +6,7 @@ import { getReleasedContact } from '@/server/domain/contactReleaseService';
 export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const user = await requireRole('USER', 'USER');
+    const user = await requireRole('CONTRACTOR', 'PROVIDER');
     const contact = await getReleasedContact(user.id, params.id);
     return NextResponse.json({ contact });
   } catch (error) {

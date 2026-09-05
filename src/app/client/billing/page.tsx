@@ -7,7 +7,7 @@ import { prisma } from '@/server/data/prisma';
 
 export default async function ClientBillingPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'USER') redirect('/login');
+  if (!user || user.role !== 'CONTRACTOR') redirect('/login');
 
   const payments = await prisma.payment.findMany({
     where: { userId: user.id, type: 'CLIENT_RELEASE' },

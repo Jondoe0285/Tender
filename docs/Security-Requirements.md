@@ -29,9 +29,8 @@ Only these roles are approved:
 | Role | Permitted scope |
 | --- | --- |
 | Super User | Platform administration, approved support, user and category management, pricing and feature controls, analytics, audit review, and operational monitoring. |
-| User | Own business profile, own tenders, profile-matched opportunities, paid or credited unlocks, quote submissions, received quotes, acceptance, and authorised contact release. |
-
-Where a User acts on a tender, the server shall determine whether they are its owner or a matched opportunity recipient from trusted records. A User must never unlock, quote for, or receive an opportunity notification for their own tender.
+| Contractor | Own account, own tenders, matched workflow state, received quotes, quote comparison, acceptance, and authorised contact release. |
+| Provider | Own account, own capabilities and coverage, matched summaries, paid or credited unlocks, unlocked tender details, and own quote submissions. |
 
 Requirements:
 
@@ -78,7 +77,6 @@ The platform must preserve anonymity and staged disclosure:
 - **SEC-033:** A Provider shall only access details for tenders they are matched to and have legitimately unlocked. A legitimate tender unlock may reveal every package within that same tender but shall not reveal a different tender.
 - **SEC-034:** Contractor and Provider identities shall remain anonymous to one another until the Contractor release condition is met.
 - **SEC-035:** Contact details shall be released only to the authorised Contractor and Provider after confirmed £10 Contractor Accepted Quote Release Fee payment or an explicitly approved waiver.
-- **SEC-035A:** For an eligible Professional Services interest, contact details may be released only to the matched interested User and tender owner after the server confirms the tender deadline has passed; the interest and release event shall be auditable.
 - **SEC-036:** Failed, cancelled, duplicate, replayed, refunded where release is revoked, or ambiguous payment events shall not release protected details.
 - **SEC-037:** Restricted details shall not leak through API responses, server-rendered pages, client bundles, browser storage, notification previews, email summaries, analytics, exports, logs, error pages, metadata, or attachments.
 - **SEC-038:** The server shall re-check release state on every request for protected tender, quote, attachment, or contact data.

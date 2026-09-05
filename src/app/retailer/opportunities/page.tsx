@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function NewOpportunitiesPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'USER') redirect('/login');
+  if (!user || user.role !== 'PROVIDER') redirect('/login');
 
   const [matches, unlocks, profile, unlockFeeGbp] = await Promise.all([
     listMatchedSummariesForRetailer(user.id),

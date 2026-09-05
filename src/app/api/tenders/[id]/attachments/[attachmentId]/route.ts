@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireRole } from '@/server/auth/session';
+import { requireRole, ForbiddenError } from '@/server/auth/session';
 import { toErrorResponse } from '@/server/http/errors';
 import { getTenderAttachmentForDownload } from '@/server/domain/tenderAttachmentService';
 
@@ -21,8 +21,9 @@ export async function GET(
 ) {
   const params = await props.params;
   try {
-    const user = await requireRole('USER');
-    const actor = { id: user.id };
+    const user = await requireRole('CONTRACTOR', 'PROVIDER');
+    if (user.role !== 'CONTRACTOR' && user.role !== 'PROVIDER') throw new ForbiddenError();
+    const actor = { id: user.id, role: user.role };
     const attachment = await getTenderAttachmentForDownload(params.id, params.attachmentId, actor);
     const fileName = safeDownloadFileName(attachment.fileName);
 

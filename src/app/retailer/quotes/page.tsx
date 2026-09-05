@@ -7,7 +7,7 @@ import { prisma } from '@/server/data/prisma';
 
 export default async function SubmittedQuotesPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'USER') redirect('/login');
+  if (!user || user.role !== 'PROVIDER') redirect('/login');
 
   const quotes = await prisma.quote.findMany({
     where: { retailerId: user.id },

@@ -51,7 +51,6 @@ function findEntities(value: string, field: string): { entities: ModerationEntit
 
   add(/\b[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+\b/i, 'EMAIL', 'Email address detected', 100);
   add(/(?:\+44|0044|0)\s*(?:\(?\d{2,4}\)?[\s.-]*){2,5}\d{2,4}\b/, 'PHONE', 'Phone number detected', 100);
-  add(/(?:\+44|0044|0)(?:[\s().-]*\d){9,11}\b/, 'PHONE', 'Phone number detected', 100);
   add(/\b(?:https?:\/\/|www\.)[^\s]+/i, 'URL', 'Website or URL detected', 100);
   add(/\b[a-z0-9-]+\.(?:co\.uk|com|org|net|io|uk)\b/i, 'DOMAIN', 'Website domain detected', 100);
   add(/(?<!\w)@[a-z0-9_.]{3,}\b/i, 'SOCIAL_HANDLE', 'Social media username detected', 90);

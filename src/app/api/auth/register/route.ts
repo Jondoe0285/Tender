@@ -58,7 +58,7 @@ export async function POST(request: Request) {
 
     await prisma.$transaction(async (transaction) => {
       await transaction.userRole.create({ data: { userId: existing.id, role: input.role } });
-      if (input.role === 'USER') {
+      if (input.role === 'PROVIDER') {
         await transaction.retailerProfile.create({
               data: {
                 userId: existing.id,
@@ -71,8 +71,8 @@ export async function POST(request: Request) {
               },
             });
       }
-      if (input.role === 'USER') {
-        const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', primaryUserId: existing.id } });
+      if (input.role === 'CONTRACTOR') {
+        const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, primaryUserId: existing.id } });
         await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: existing.id } });
       }
     });
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
       targetId: existing.id,
       metadata: { role: input.role },
     });
-    if (input.role === 'USER') await matchRetailerToOpenTenders(existing.id);
+    if (input.role === 'PROVIDER') await matchRetailerToOpenTenders(existing.id);
     return NextResponse.json({ status: 'workspace_added' });
   }
 
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
       contactPhone: input.contactPhone ?? null,
       termsAcceptedAt: new Date(),
       roleMemberships: { create: { role: input.role } },
-      ...(input.role === 'USER'
+      ...(input.role === 'PROVIDER'
         ? {
             retailerProfile: {
               create: {
@@ -117,8 +117,8 @@ export async function POST(request: Request) {
         : {}),
       },
     });
-    if (input.role === 'USER') {
-      const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', services: (input.categories ?? []).join(','), primaryUserId: createdUser.id } });
+    if (input.role === 'CONTRACTOR') {
+      const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, primaryUserId: createdUser.id } });
       await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: createdUser.id } });
     }
     return createdUser;
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
     targetId: user.id,
     metadata: { role: user.role },
   });
-  if (user.role === 'USER') await matchRetailerToOpenTenders(user.id);
+  if (user.role === 'PROVIDER') await matchRetailerToOpenTenders(user.id);
 
   const verificationResult = await sendVerificationEmail(user.id, user.email);
   if (!verificationResult.sent) {

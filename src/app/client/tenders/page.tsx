@@ -5,15 +5,13 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card } from '@/components/ui/Card';
 import { getCurrentUser } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
-import { getCompanyMemberIds } from '@/server/domain/tenderService';
 
 export default async function MyTendersPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'USER') redirect('/login');
+  if (!user || user.role !== 'CONTRACTOR') redirect('/login');
 
-  const memberIds = await getCompanyMemberIds(user.id);
   const tenders = await prisma.tender.findMany({
-    where: { clientId: { in: memberIds } },
+    where: { clientId: user.id },
     orderBy: { createdAt: 'desc' },
     include: { _count: { select: { quotes: true } } },
   });
@@ -22,7 +20,7 @@ export default async function MyTendersPage() {
     <AppShell role="client" title="My Tenders">
       <div className="mx-auto max-w-4xl">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <p className="max-w-xl text-sm text-concrete-grey">Every tender raised for your company, in one place.</p>
+          <p className="max-w-xl text-sm text-concrete-grey">Every tender you&rsquo;ve raised, in one place.</p>
           <LinkButton href="/client/tenders/new">Create Tender</LinkButton>
         </div>
         {tenders.length === 0 ? (

@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useEffect, useState, type ChangeEvent } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, type ChangeEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
@@ -73,7 +73,6 @@ type FormState = {
   quantityValue: string;
   quantityUnit: string;
   description: string;
-  primaryItemDescription: string;
   urgency: string;
   closingDate: string;
   supplyDate: string;
@@ -101,7 +100,6 @@ const EMPTY_FORM: FormState = {
   quantityValue: '',
   quantityUnit: '',
   description: '',
-  primaryItemDescription: '',
   urgency: '',
   closingDate: '',
   supplyDate: '',
@@ -116,32 +114,9 @@ function closingDatePreset(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-function splitQuantity(quantity: string): { quantityValue: string; quantityUnit: string } {
-  const unit = QUANTITY_UNITS.find((candidate) => quantity.endsWith(` ${candidate}`));
-  return unit ? { quantityValue: quantity.slice(0, -unit.length).trim(), quantityUnit: unit } : { quantityValue: quantity, quantityUnit: 'units' };
-}
-
-function packageLabels(service: string): { provision: string; detail: string } {
-  if (service === 'Materials') return { provision: 'Material category', detail: 'Material detail (optional)' };
-  if (service === 'Waste') return { provision: 'Waste type', detail: 'Waste detail (optional)' };
-  if (service === 'Plant Hire') return { provision: 'Plant category', detail: 'Plant detail (optional)' };
-  return { provision: 'Service provision', detail: 'Detailed provision (optional)' };
-}
-
 export default function NewTenderPage() {
-  return (
-    <Suspense fallback={<main className="min-h-screen bg-site-white p-6 text-sm text-concrete-grey">Loading tender builder...</main>}>
-      <NewTenderForm />
-    </Suspense>
-  );
-}
-
-function NewTenderForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const copyFrom = searchParams.get('copyFrom');
   const [step, setStep] = useState(1);
-  const [furthestStep, setFurthestStep] = useState(1);
   const [activePackageIndex, setActivePackageIndex] = useState(0);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [files, setFiles] = useState<File[]>([]);
@@ -150,79 +125,25 @@ function NewTenderForm() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
-  const [packagesNeedReset, setPackagesNeedReset] = useState(true);
   const [catalog, setCatalog] = useState<Record<string, Record<string, string[]>>>(() => Object.fromEntries(Object.entries(SERVICE_CATALOG).map(([service, categories]) => [service, Object.fromEntries(Object.entries(categories).map(([name, items]) => [name, [...items]]))])));
 
   const hasDetectedContactDetails = [
     getModerationMessage('description', form.description),
     ...form.items.map((item) => getModerationMessage(`item ${item.category}`, item.description)),
   ].some(Boolean);
-  const activeCategory = activePackageIndex === 0
-    ? form.category
-    : form.items[activePackageIndex - 1]?.category ?? form.category;
-  const activePackageLabels = packageLabels(activeCategory);
 
   // Restore a saved draft after mount only, so server and first client render still match.
   useEffect(() => {
-    if (copyFrom) return;
     try {
       const raw = window.localStorage.getItem(DRAFT_KEY);
       if (raw) {
         setForm((prev) => ({ ...prev, ...JSON.parse(raw) }));
         setDraftRestored(true);
-        setPackagesNeedReset(false);
       }
     } catch {
       // Corrupt or unavailable storage — start with a blank form.
     }
-  }, [copyFrom]);
-
-  useEffect(() => {
-    if (!copyFrom) return;
-    const sourceTenderId = copyFrom;
-    let cancelled = false;
-
-    async function loadTenderForRetender() {
-      const response = await fetch(`/api/tenders/${encodeURIComponent(sourceTenderId)}`);
-      if (!response.ok) throw new Error('Unable to load tender');
-      const { tender } = await response.json() as { tender: { category: string; subcategory: string; item: string | null; location: string; quantity: string; urgency: string; closingDate: string; supplyDate: string | null; requirements: string; description: string; items: { id: string; category: string; subcategory: string; item: string | null; quantity: string; description: string }[]; attachments: { id: string; fileName: string; mimeType: string }[] } };
-      const tenderItems = tender.items.length > 0 ? tender.items : [{ id: 'primary', category: tender.category, subcategory: tender.subcategory, item: tender.item, quantity: tender.quantity, description: tender.description }];
-      const primaryItem = tenderItems[0]!;
-      const primaryQuantity = splitQuantity(primaryItem.quantity);
-      const attachments = await Promise.all(tender.attachments.map(async (attachment) => {
-        const attachmentResponse = await fetch(`/api/tenders/${encodeURIComponent(sourceTenderId)}/attachments/${encodeURIComponent(attachment.id)}`);
-        if (!attachmentResponse.ok) throw new Error('Unable to copy tender attachments');
-        return new File([await attachmentResponse.blob()], attachment.fileName, { type: attachment.mimeType });
-      }));
-      if (cancelled) return;
-      setForm({
-        ...EMPTY_FORM,
-        projectName: `${primaryItem.subcategory} re-tender`,
-        selectedServices: [...new Set(tenderItems.map((item) => item.category))],
-        category: primaryItem.category,
-        subcategory: primaryItem.subcategory,
-        item: primaryItem.item ?? '',
-        location: tender.location,
-        quantityValue: primaryQuantity.quantityValue,
-        quantityUnit: primaryQuantity.quantityUnit,
-        description: tender.description,
-        primaryItemDescription: primaryItem.description,
-        urgency: tender.urgency,
-        closingDate: '',
-        supplyDate: tender.supplyDate?.slice(0, 10) ?? '',
-        requirements: tender.requirements.split(',').filter(Boolean),
-        items: tenderItems.slice(1).map((item) => {
-          const quantity = splitQuantity(item.quantity);
-          return { id: item.id, category: item.category, subcategory: item.subcategory, item: item.item ?? '', quantityValue: quantity.quantityValue, quantityUnit: quantity.quantityUnit, description: item.description };
-        }),
-      });
-      setFiles(attachments);
-      setPackagesNeedReset(false);
-    }
-
-    loadTenderForRetender().catch(() => setError('We could not prepare this tender for re-tendering.'));
-    return () => { cancelled = true; };
-  }, [copyFrom]);
+  }, []);
 
   useEffect(() => {
     fetch('/api/categories').then((response) => response.ok ? response.json() : null).then((data: { catalog?: Record<string, Record<string, string[]>> } | null) => {
@@ -256,7 +177,6 @@ function NewTenderForm() {
   }
 
   function toggleService(service: string) {
-    setPackagesNeedReset(true);
     setForm((current) => ({
       ...current,
       selectedServices: current.selectedServices.includes(service)
@@ -273,15 +193,13 @@ function NewTenderForm() {
   }
 
   function addAnotherItem() {
-    const category = activeCategory || form.selectedServices[0] || '';
-    setActivePackageIndex(form.items.length + 1);
     setForm((prev) => ({
       ...prev,
       items: [
         ...prev.items,
         {
           id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-          category,
+          category: prev.category || prev.selectedServices[0] || '',
           subcategory: '',
           item: '',
           quantityValue: '',
@@ -290,6 +208,7 @@ function NewTenderForm() {
         },
       ],
     }));
+    setActivePackageIndex((current) => current + 1);
   }
 
   function validateStep(targetStep: number): boolean {
@@ -339,7 +258,7 @@ function NewTenderForm() {
 
   function goNext() {
     if (!validateStep(step)) return;
-    if (step === 1 && packagesNeedReset) {
+    if (step === 1) {
       const [primaryService, ...additionalServices] = form.selectedServices;
       setForm((current) => ({
         ...current,
@@ -358,20 +277,12 @@ function NewTenderForm() {
           description: '',
         })),
       }));
-      setPackagesNeedReset(false);
     }
     if (step === 2 && activePackageIndex < form.items.length) {
       setActivePackageIndex((current) => current + 1);
       return;
     }
-    const nextStep = Math.min(step + 1, STEPS.length);
-    setStep(nextStep);
-    setFurthestStep((current) => Math.max(current, nextStep));
-  }
-
-  function fastTravel(targetStep: number) {
-    setErrors({});
-    setStep(targetStep);
+    setStep((current) => Math.min(current + 1, STEPS.length));
   }
 
   function goBack() {
@@ -450,7 +361,6 @@ function NewTenderForm() {
           item: form.item,
           location: form.location,
           quantity: `${form.quantityValue} ${form.quantityUnit}`.trim(),
-          itemDescription: form.primaryItemDescription,
           urgency: form.urgency,
           closingDate: form.closingDate,
           supplyDate: form.supplyDate || undefined,
@@ -499,10 +409,10 @@ function NewTenderForm() {
     <AppShell role="client" title="Create Tender">
       <div className="mx-auto max-w-2xl">
         <p className="mb-6 max-w-xl text-sm leading-relaxed text-concrete-grey">
-          {copyFrom ? 'Review the copied tender details, set a new quote deadline, and submit it as a new tender.' : 'Complete the project details, then provide requirements for each selected service. Providers only see full details once they unlock your tender.'}
+          Complete the project details, then provide requirements for each selected service. Providers only see full details once they unlock your tender.
         </p>
 
-        <Stepper steps={STEPS} currentStep={step} furthestStep={furthestStep} onStepClick={fastTravel} />
+        <Stepper steps={STEPS} currentStep={step} />
 
         {draftRestored && (
           <Card className="mb-6 flex items-center justify-between gap-4 border-l-4 border-l-steel-blue">
@@ -605,20 +515,19 @@ function NewTenderForm() {
 
         {step === 2 && (
           <Card className="flex flex-col gap-6">
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">{activeCategory} Requirements</h2>
-            <p className="text-sm text-concrete-grey">Complete this service package before moving to the next selected service.</p>
-            {activePackageIndex !== 0 && activeCategory === form.category && (
+            <h2 className="font-heading text-lg font-bold text-foundation-navy">{activePackageIndex === 0 ? form.category : form.items[activePackageIndex - 1]?.category} Requirements</h2>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-concrete-grey">Complete this service package before moving to the next selected service.</p>
               <button
                 type="button"
-                onClick={() => { setActivePackageIndex(0); setErrors({}); }}
-                className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm hover:border-steel-blue"
+                onClick={addAnotherItem}
+                className="inline-flex items-center justify-center rounded-md border border-steel-blue/40 bg-steel-blue/5 px-3 py-2 text-xs font-semibold text-steel-blue hover:bg-steel-blue/10"
               >
-                <span><span className="font-semibold text-foundation-navy">Package 1: {form.item || form.subcategory || 'Untitled package'}</span><span className="block text-xs text-concrete-grey">{form.category} {form.quantityValue && `${form.quantityValue} ${form.quantityUnit}`}</span></span>
-                <span className="text-xs font-semibold text-steel-blue">Edit</span>
+                Add another item
               </button>
-            )}
+            </div>
             {activePackageIndex === 0 && <><FieldGroup>
-              <Label htmlFor="subcategory">{activePackageLabels.provision}</Label>
+              <Label htmlFor="subcategory">Service provision</Label>
               <Combobox
                 id="subcategory"
                 name="subcategory"
@@ -631,7 +540,7 @@ function NewTenderForm() {
               {errors.subcategory && <p className="text-sm font-semibold text-attention">{errors.subcategory}</p>}
             </FieldGroup>
             <FieldGroup>
-              <Label htmlFor="item">{activePackageLabels.detail}</Label>
+              <Label htmlFor="item">Detailed provision (optional)</Label>
               <Combobox id="item" name="item" value={form.item} onChange={(value) => update('item', value)} disabled={!form.subcategory} placeholder={form.subcategory ? 'Search detailed provisions…' : 'Choose a service provision first'} groups={form.category ? [{ label: form.subcategory, options: catalog[form.category]?.[form.subcategory] ?? [] }] : []} />
               {errors.item && <p className="text-sm font-semibold text-attention">{errors.item}</p>}
             </FieldGroup>
@@ -651,35 +560,19 @@ function NewTenderForm() {
                 </Select>
                 {errors.quantityUnit && <p className="text-sm font-semibold text-attention">{errors.quantityUnit}</p>}
               </FieldGroup>
-            </div>
-            <FieldGroup>
-              <Label htmlFor="primary-item-description">Item specification (optional)</Label>
-              <Textarea id="primary-item-description" rows={3} value={form.primaryItemDescription} placeholder="Add the specification or delivery requirement for this item." onChange={(event) => update('primaryItemDescription', event.target.value)} />
-              {errors.primaryItemDescription && <p className="text-xs font-semibold text-attention">{errors.primaryItemDescription}</p>}
-            </FieldGroup>
-            </>}
+            </div></>}
             <div className="border-t border-slate-200 pt-5 sm:col-span-2">
               <p className="text-xs text-concrete-grey">Package {activePackageIndex + 1} of {form.selectedServices.length}</p>
               {form.items.length > 0 && (
                 <div className="mt-5 flex flex-col gap-4">
-                  {form.items.map((item, index) => {
-                    const isActive = index === activePackageIndex - 1;
-                    if (!isActive && item.category === activeCategory) {
-                      return (
-                        <button key={item.id} type="button" onClick={() => { setActivePackageIndex(index + 1); setErrors({}); }} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm hover:border-steel-blue">
-                          <span><span className="font-semibold text-foundation-navy">Package {index + 2}: {item.item || item.subcategory || 'Untitled package'}</span><span className="block text-xs text-concrete-grey">{item.category} {item.quantityValue && `${item.quantityValue} ${item.quantityUnit}`}</span></span>
-                          <span className="text-xs font-semibold text-steel-blue">Edit</span>
-                        </button>
-                      );
-                    }
-                    if (isActive) return (
+                  {form.items.map((item, index) => index === activePackageIndex - 1 && (
                     <div key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <p className="text-sm font-semibold text-foundation-navy">{item.category}</p>
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <FieldGroup>
-                          <Label htmlFor={`item-${index}-subcategory`}>{packageLabels(item.category).provision}</Label>
+                          <Label htmlFor={`item-${index}-subcategory`}>Service provision</Label>
                           <Combobox
                             id={`item-${index}-subcategory`}
                             name={`item-${index}-subcategory-input`}
@@ -692,7 +585,7 @@ function NewTenderForm() {
                           {errors[`item-${index}-subcategory`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-subcategory`]}</p>}
                         </FieldGroup>
                         <FieldGroup>
-                          <Label htmlFor={`item-${index}-item`}>{packageLabels(item.category).detail}</Label>
+                          <Label htmlFor={`item-${index}-item`}>Detailed provision (optional)</Label>
                           <Combobox
                             id={`item-${index}-item`}
                             name={`item-${index}-item-input`}
@@ -726,18 +619,9 @@ function NewTenderForm() {
                         {errors[`item-${index}-description`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-description`]}</p>}
                       </FieldGroup>
                     </div>
-                    );
-                    return null;
-                  })}
+                  ))}
                 </div>
               )}
-              <button
-                type="button"
-                onClick={addAnotherItem}
-                className="mt-5 inline-flex items-center justify-center self-start rounded-md border border-steel-blue/40 bg-steel-blue/5 px-3 py-2 text-xs font-semibold text-steel-blue hover:bg-steel-blue/10"
-              >
-                Add another item
-              </button>
             </div>
           </Card>
         )}
@@ -745,21 +629,19 @@ function NewTenderForm() {
         {step === 3 && (
           <Card className="flex flex-col gap-6">
             <h2 className="font-heading text-lg font-bold text-foundation-navy">Additional Requirements</h2>
-            <fieldset>
+            <fieldset className="flex flex-col gap-3">
               <legend className="text-sm font-semibold text-foundation-navy">Site, delivery and supporting requirements</legend>
-              <div className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-                {REQUIREMENT_OPTIONS.map((option) => (
-                  <label key={option} className="flex items-center gap-3 text-sm text-concrete-grey">
-                    <input
-                      type="checkbox"
-                      checked={form.requirements.includes(option)}
-                      onChange={() => toggleRequirement(option)}
-                      className="h-4 w-4 accent-safety-amber"
-                    />
-                    {option}
-                  </label>
-                ))}
-              </div>
+              {REQUIREMENT_OPTIONS.map((option) => (
+                <label key={option} className="flex items-center gap-3 text-sm text-concrete-grey">
+                  <input
+                    type="checkbox"
+                    checked={form.requirements.includes(option)}
+                    onChange={() => toggleRequirement(option)}
+                    className="h-4 w-4 accent-safety-amber"
+                  />
+                  {option}
+                </label>
+              ))}
             </fieldset>
           </Card>
         )}
@@ -804,38 +686,21 @@ function NewTenderForm() {
         {step === 5 && (
           <Card className="flex flex-col gap-5">
             <h2 className="font-heading text-lg font-bold text-foundation-navy">Review &amp; Submit</h2>
-            <ReviewSection title="Project Details" onEdit={() => setStep(1)}>
-              <dl className="grid gap-4 sm:grid-cols-2">
-                <ReviewItem label="Project name" value={form.projectName} />
-                <ReviewItem label="Selected services" value={form.selectedServices.join(', ')} />
-                <ReviewItem label="Jobsite or delivery postcode" value={form.location} />
-                <ReviewItem label="Urgency" value={form.urgency} />
-                <ReviewItem label="Closing date" value={form.closingDate} />
-                <ReviewItem label="Planned works start date" value={form.supplyDate || 'Not specified'} />
-              </dl>
-              <div className="mt-4">
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-concrete-grey">Project information</p>
-                <p className="whitespace-pre-line text-sm text-foundation-navy">{form.description || 'None'}</p>
-              </div>
-            </ReviewSection>
-            <ReviewSection title="Tender Packages" onEdit={() => { setActivePackageIndex(0); setStep(2); }}>
-              <dl className="grid gap-4 sm:grid-cols-2">
-                <ReviewItem label="Tender packages" value={`${form.items.length + 1} package(s)`} />
-                <ReviewItem label="Primary quantity" value={`${form.quantityValue} ${form.quantityUnit}`.trim()} />
-                <ReviewItem label="Primary specification" value={form.primaryItemDescription || 'None'} />
-              </dl>
-              {form.items.length > 0 && (
-                <ul className="mt-4 flex flex-col gap-2 text-sm text-foundation-navy">
-                  {form.items.map((item, index) => <li key={item.id}>{index + 2}. {item.category} / {item.subcategory} &middot; {item.quantityValue} {item.quantityUnit}</li>)}
-                </ul>
-              )}
-            </ReviewSection>
-            <ReviewSection title="Additional Requirements" onEdit={() => setStep(3)}>
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <ReviewItem label="Project name" value={form.projectName} />
+              <ReviewItem label="Selected services" value={form.selectedServices.join(', ')} />
+              <ReviewItem label="Jobsite or delivery postcode" value={form.location} />
               <ReviewItem label="Requirements" value={form.requirements.join(', ') || 'None'} />
-            </ReviewSection>
-            <ReviewSection title="Attachments" onEdit={() => setStep(4)}>
-              <ReviewItem label="Files" value={files.length > 0 ? `${files.length} file(s) selected and saved with this tender` : 'None'} />
-            </ReviewSection>
+              <ReviewItem label="Quantity" value={`${form.quantityValue} ${form.quantityUnit}`.trim()} />
+              <ReviewItem label="Urgency" value={form.urgency} />
+              <ReviewItem label="Closing date" value={form.closingDate} />
+              <ReviewItem label="Planned works start date" value={form.supplyDate || 'Not specified'} />
+              <ReviewItem label="Tender packages" value={`${form.items.length + 1} package(s)`} />
+              <ReviewItem
+                label="Attachments"
+                value={files.length > 0 ? `${files.length} file(s) selected and saved with this tender` : 'None'}
+              />
+            </dl>
             {hasDetectedContactDetails && (
               <div className="rounded-lg border border-attention/40 bg-attention/5 p-4">
                 <p className="text-sm font-semibold text-attention">Contact details were found in the tender notes.</p>
@@ -847,6 +712,22 @@ function NewTenderForm() {
                     Remove contact details
                   </button>
                 </div>
+              </div>
+            )}
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-concrete-grey">Specification</p>
+              <p className="whitespace-pre-line text-sm text-foundation-navy">{form.description}</p>
+            </div>
+            {form.items.length > 0 && (
+              <div className="border-t border-slate-200 pt-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-concrete-grey">Additional items</p>
+                <ul className="flex flex-col gap-2 text-sm text-foundation-navy">
+                  {form.items.map((item, index) => (
+                    <li key={item.id}>
+                      {index + 2}. {item.category} / {item.subcategory} &middot; {item.quantityValue} {item.quantityUnit}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </Card>
@@ -881,18 +762,6 @@ function NewTenderForm() {
         </div>
       </div>
     </AppShell>
-  );
-}
-
-function ReviewSection({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode }) {
-  return (
-    <section className="border-t border-slate-200 pt-5 first:border-t-0 first:pt-0">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="font-heading text-base font-bold text-foundation-navy">{title}</h3>
-        <button type="button" onClick={onEdit} className="text-xs font-semibold text-steel-blue hover:text-foundation-navy">Edit</button>
-      </div>
-      {children}
-    </section>
   );
 }
 

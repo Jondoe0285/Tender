@@ -6,19 +6,17 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card } from '@/components/ui/Card';
 import { getCurrentUser } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
-import { getCompanyMemberIds } from '@/server/domain/tenderService';
 
 export default async function ClientPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'USER') redirect('/login');
+  if (!user || user.role !== 'CONTRACTOR') redirect('/login');
 
-  const memberIds = await getCompanyMemberIds(user.id);
   const [openCount, quotesReceivedCount, awardedCount, recentTenders] = await Promise.all([
-    prisma.tender.count({ where: { clientId: { in: memberIds }, status: 'OPEN' } }),
-    prisma.quote.count({ where: { tender: { clientId: { in: memberIds } } } }),
-    prisma.quote.count({ where: { tender: { clientId: { in: memberIds } }, status: 'ACCEPTED' } }),
+    prisma.tender.count({ where: { clientId: user.id, status: 'OPEN' } }),
+    prisma.quote.count({ where: { tender: { clientId: user.id } } }),
+    prisma.quote.count({ where: { tender: { clientId: user.id }, status: 'ACCEPTED' } }),
     prisma.tender.findMany({
-      where: { clientId: { in: memberIds } },
+      where: { clientId: user.id },
       orderBy: { createdAt: 'desc' },
       take: 5,
       include: { _count: { select: { quotes: true } } },
@@ -36,7 +34,7 @@ export default async function ClientPage() {
       <div className="mx-auto max-w-4xl">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <p className="max-w-xl text-base leading-relaxed text-concrete-grey">
-            Raise a tender for your company, receive matching opportunities, and compare formal quotes here.
+            Raise a tender for materials, waste services, or plant hire, then compare Provider quotes here.
           </p>
           <LinkButton href="/client/tenders/new" size="lg">Create Tender</LinkButton>
         </div>

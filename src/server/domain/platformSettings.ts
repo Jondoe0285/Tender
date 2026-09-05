@@ -110,7 +110,7 @@ export async function getAdminSettings() {
     prisma.membershipTier.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.subscriptionPlan.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.categoryDefinition.findMany({ orderBy: [{ service: 'asc' }, { name: 'asc' }] }),
-    prisma.user.findMany({ where: { role: 'USER' }, select: { id: true, email: true, retailerProfile: { select: { companyName: true } }, memberships: { where: { active: true }, include: { tier: true } }, subscriptions: { where: { active: true }, include: { plan: true } } }, orderBy: { createdAt: 'asc' } }),
+    prisma.user.findMany({ where: { role: 'PROVIDER' }, select: { id: true, email: true, retailerProfile: { select: { companyName: true } }, memberships: { where: { active: true }, include: { tier: true } }, subscriptions: { where: { active: true }, include: { plan: true } } }, orderBy: { createdAt: 'asc' } }),
   ]);
   return {
     fees: {

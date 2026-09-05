@@ -51,7 +51,7 @@ test('membership purchases use the active server-side tier price and remain disa
     }
   });
 
-  const retailer = await prisma.user.create({ data: { email: `membership-billing-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Membership Billing Retailer' } });
+  const retailer = await prisma.user.create({ data: { email: `membership-billing-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Membership Billing Retailer' } });
   retailerId = retailer.id;
   const tier = await prisma.membershipTier.create({
     data: { name: `Membership billing ${suffix}`, description: 'Fictional test tier', monthlyPriceGbp: 49, freeTenderOpportunitiesPerMonth: 10, active: true },

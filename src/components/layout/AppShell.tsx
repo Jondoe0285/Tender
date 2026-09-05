@@ -7,24 +7,25 @@ import { useSession } from 'next-auth/react';
 import { AccountControls } from '@/components/layout/AccountControls';
 import { TradeTenderLogo } from '@/components/layout/TradeTenderLogo';
 import { SiteFooter } from '@/components/layout/SiteFooter';
-import { USER_NAV, SUPER_USER_NAV, ACCOUNTANT_NAV, type NavGroup } from '@/lib/navigation';
+import { CLIENT_NAV, RETAILER_NAV, SUPER_USER_NAV, ACCOUNTANT_NAV, type NavGroup } from '@/lib/navigation';
 
 type Role = 'client' | 'retailer' | 'super-user';
 
 const navByRole: Record<Role, NavGroup[]> = {
-  client: USER_NAV,
-  retailer: USER_NAV,
+  client: CLIENT_NAV,
+  retailer: RETAILER_NAV,
   'super-user': SUPER_USER_NAV,
 };
 
 const roleLabels: Record<Role, string> = {
-  client: 'User space',
-  retailer: 'User space',
+  client: 'Contractor space',
+  retailer: 'Provider space',
   'super-user': 'Super User space',
 };
 
 const workspaceOptions: Record<string, { label: string; path: string }> = {
-  USER: { label: 'User workspace', path: '/user' },
+  CLIENT: { label: 'Contractor workspace', path: '/client' },
+  RETAILER: { label: 'Provider workspace', path: '/retailer' },
   SUPER_USER: { label: 'Super User workspace', path: '/super-user' },
 };
 
@@ -40,7 +41,7 @@ function findActiveHref(pathname: string | null, groups: NavGroup[]): string | n
   return best;
 }
 
-function SidebarNav({ groups, activeHref, unreadOpportunityCount, onNavigate }: { groups: NavGroup[]; activeHref: string | null; unreadOpportunityCount: number; onNavigate?: () => void }) {
+function SidebarNav({ groups, activeHref, onNavigate }: { groups: NavGroup[]; activeHref: string | null; onNavigate?: () => void }) {
   return (
     <nav aria-label="Primary" className="flex flex-col gap-6 px-4 py-6">
       {groups.map((group, index) => (
@@ -50,25 +51,19 @@ function SidebarNav({ groups, activeHref, unreadOpportunityCount, onNavigate }: 
           )}
           {group.items.map((item) => {
             const active = item.href === activeHref;
-            const showUnreadBadge = item.href === '/user/opportunities' && unreadOpportunityCount > 0;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={onNavigate}
                 aria-current={active ? 'page' : undefined}
-                className={`flex items-center justify-between gap-3 rounded-md px-3 py-2.5 text-sm font-semibold transition-colors ${
+                className={`rounded-md px-3 py-2.5 text-sm font-semibold transition-colors ${
                   active
                     ? 'bg-safety-amber text-foundation-navy'
                     : 'text-site-white/80 hover:bg-white/10 hover:text-site-white'
                 }`}
               >
-                <span>{item.label}</span>
-                {showUnreadBadge && (
-                  <span className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-xs font-bold ${active ? 'bg-foundation-navy text-site-white' : 'bg-safety-amber text-foundation-navy'}`} aria-label={`${unreadOpportunityCount} unread tender opportunities`}>
-                    {unreadOpportunityCount > 99 ? '99+' : unreadOpportunityCount}
-                  </span>
-                )}
+                {item.label}
               </Link>
             );
           })}
@@ -83,7 +78,6 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
   const router = useRouter();
   const { data: session, update } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [unreadOpportunityCount, setUnreadOpportunityCount] = useState(0);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const isOwner = Boolean(session?.user?.isOwner);
@@ -94,14 +88,6 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
     .filter((group) => group.items.length > 0);
   const activeHref = findActiveHref(pathname, groups);
   const availableWorkspaces = (session?.user?.roles ?? []).filter((workspaceRole) => workspaceOptions[workspaceRole]);
-
-  useEffect(() => {
-    if (role === 'super-user' || session?.user?.role !== 'USER') return;
-    fetch('/api/opportunities/unread')
-      .then((response) => response.ok ? response.json() : null)
-      .then((data: { count?: number } | null) => setUnreadOpportunityCount(data?.count ?? 0))
-      .catch(() => setUnreadOpportunityCount(0));
-  }, [role, session?.user?.role]);
 
   async function switchWorkspace(event: React.ChangeEvent<HTMLSelectElement>) {
     const workspace = workspaceOptions[event.target.value];
@@ -167,7 +153,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
         <Link href="/" className="mx-4 mt-4 block bg-site-white p-2" aria-label="Trade Tender home">
           <TradeTenderLogo />
         </Link>
-        <SidebarNav groups={groups} activeHref={activeHref} unreadOpportunityCount={unreadOpportunityCount} />
+        <SidebarNav groups={groups} activeHref={activeHref} />
       </aside>
 
       {/* Mobile drawer */}
@@ -200,7 +186,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
                 &#10005;
               </button>
             </div>
-            <SidebarNav groups={groups} activeHref={activeHref} unreadOpportunityCount={unreadOpportunityCount} onNavigate={() => setMobileOpen(false)} />
+            <SidebarNav groups={groups} activeHref={activeHref} onNavigate={() => setMobileOpen(false)} />
           </aside>
         </div>
       )}
@@ -227,7 +213,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
               <label className="flex items-center gap-2 text-xs font-semibold text-concrete-grey">
                 <span className="sr-only">Switch workspace</span>
                 <select
-                  value={role === 'super-user' ? 'SUPER_USER' : 'USER'}
+                  value={role === 'client' ? 'CONTRACTOR' : role === 'retailer' ? 'PROVIDER' : 'SUPER_USER'}
                   onChange={switchWorkspace}
                   className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-foundation-navy shadow-soft focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
                 >

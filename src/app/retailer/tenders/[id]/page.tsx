@@ -48,7 +48,6 @@ export default function RetailerTenderDetailPage() {
   const [unlocking, setUnlocking] = useState(false);
   const [simulating, setSimulating] = useState(false);
   const [submittingQuote, setSubmittingQuote] = useState(false);
-  const [interestRegistered, setInterestRegistered] = useState(false);
   const [linePrices, setLinePrices] = useState<Record<string, string>>({});
   const [unavailableItemIds, setUnavailableItemIds] = useState<string[]>([]);
   const [charges, setCharges] = useState<{ id: string; description: string; priceGbp: string }[]>([]);
@@ -95,18 +94,6 @@ export default function RetailerTenderDetailPage() {
       setPendingPaymentId(data.paymentId);
       setMessage('Payment required. This environment has no Stripe keys configured — use the dev payment simulation below.');
     }
-  }
-
-  async function handleRegisterInterest() {
-    setUnlocking(true);
-    setMessage(null);
-    const response = await fetch(`/api/tenders/${params.id}/professional-interest`, { method: 'POST' });
-    setUnlocking(false);
-    if (!response.ok) {
-      setMessage((await response.json().catch(() => null))?.error ?? 'Unable to register your interest.');
-      return;
-    }
-    setInterestRegistered(true);
   }
 
   async function handleSimulatePayment() {
@@ -181,7 +168,6 @@ export default function RetailerTenderDetailPage() {
   }
 
   const full = unlocked ? (tender as TenderFull) : null;
-  const isProfessionalTender = tender.category === 'Professional Services';
   const itemsTotal = full?.items.reduce((total, item) => (
     unavailableItemIds.includes(item.id) ? total : total + Number(linePrices[item.id] || 0)
   ), 0) ?? 0;
@@ -221,13 +207,14 @@ export default function RetailerTenderDetailPage() {
 
           {!unlocked && (
             <Card>
-              <h2 className="font-heading text-lg font-bold text-foundation-navy">{isProfessionalTender ? 'Professional interest' : 'Commercial fit assessment'}</h2>
+              <h2 className="font-heading text-lg font-bold text-foundation-navy">Commercial fit assessment</h2>
               <p className="mt-2 text-sm leading-relaxed text-concrete-grey">
-                {isProfessionalTender
-                  ? 'Register your interest to be considered. No unlock fee or formal quote is required; contact details are released after the tender deadline.'
-                  : 'Unlock to see the full specification, quantity, requirements, and site details needed to prepare a quote. Client contact details remain private until a quote is accepted and the release fee is paid.'}
+                Unlock to see the full specification, quantity, requirements, and site details needed to prepare a quote.
+                Client contact details remain private until a quote is accepted and the release fee is paid.
               </p>
-              {!isProfessionalTender && <p className="mt-3 text-sm font-semibold text-steel-blue">Cost: £{tender.unlockFeeGbp ?? 0} excl. VAT, unless you have a launch credit available.</p>}
+              <p className="mt-3 text-sm font-semibold text-steel-blue">
+                Cost: £{tender.unlockFeeGbp ?? 0} excl. VAT, unless you have a launch credit available.
+              </p>
               {tender.items.length > 0 && (
                 <div className="mt-4">
                   <h3 className="text-sm font-semibold text-foundation-navy">Items requested</h3>
@@ -243,9 +230,7 @@ export default function RetailerTenderDetailPage() {
                 </div>
               )}
               {message && <p className="mb-4 mt-4 text-sm font-semibold text-attention">{message}</p>}
-              {isProfessionalTender ? (
-                interestRegistered ? <p className="mt-4 text-sm font-semibold text-approved">Interest registered. Contact details will be released after the deadline.</p> : <Button onClick={handleRegisterInterest} loading={unlocking} size="lg">Register interest</Button>
-              ) : pendingPaymentId ? (
+              {pendingPaymentId ? (
                 <Button onClick={handleSimulatePayment} loading={simulating} size="lg">
                   Simulate payment (dev)
                 </Button>
@@ -257,7 +242,7 @@ export default function RetailerTenderDetailPage() {
             </Card>
           )}
 
-          {full && !isProfessionalTender && (
+          {full && (
             <>
               <Card className="mb-6">
                 <h2 className="font-heading text-lg font-bold text-foundation-navy">Tender requirements</h2>
@@ -269,7 +254,8 @@ export default function RetailerTenderDetailPage() {
                   </div>
                 )}
                 <div className="mt-4 flex flex-col gap-4">
-                  {full.items.map((item) => (
+                  <TenderItemDetail subcategory={full.subcategory} item={null} quantity={full.quantity} description={full.description} />
+                  {full.items.slice(1).map((item) => (
                     <TenderItemDetail key={item.id} subcategory={item.subcategory} item={item.item} quantity={item.quantity} description={item.description} />
                   ))}
                 </div>

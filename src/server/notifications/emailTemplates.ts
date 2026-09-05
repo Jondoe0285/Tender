@@ -80,10 +80,10 @@ export function quoteAcceptedTemplate(input: { quoteReference: string; tenderRef
   };
 }
 
-export function contactReleaseTemplate(input: { quoteReference: string; tenderReference: string; recipientRole: 'USER' | 'USER'; workspacePath: string }): EmailTemplate {
+export function contactReleaseTemplate(input: { quoteReference: string; tenderReference: string; recipientRole: 'CONTRACTOR' | 'PROVIDER'; workspacePath: string }): EmailTemplate {
   return {
     subject: `Contact details released: ${input.tenderReference}`,
-    html: layout({ eyebrow: 'Contact release', title: 'Contact details are now available', intro: `The approved contact-release condition for ${input.tenderReference} has been confirmed.`, body: detailRows([['Tender ID', input.tenderReference], ['Quote ID', input.quoteReference], ['Recipient', input.recipientRole === 'USER' ? 'Contractor' : 'Provider'], ['Release status', 'Confirmed']]) + '<p style="font-size:14px;line-height:1.6">Trade Tender connects the parties. The final transaction, fulfilment, payment arrangements, and disputes are handled directly between Contractor and Provider.</p>', action: { label: 'View released details', href: appUrl(input.workspacePath) } }),
+    html: layout({ eyebrow: 'Contact release', title: 'Contact details are now available', intro: `The approved contact-release condition for ${input.tenderReference} has been confirmed.`, body: detailRows([['Tender ID', input.tenderReference], ['Quote ID', input.quoteReference], ['Recipient', input.recipientRole === 'CONTRACTOR' ? 'Contractor' : 'Provider'], ['Release status', 'Confirmed']]) + '<p style="font-size:14px;line-height:1.6">Trade Tender connects the parties. The final transaction, fulfilment, payment arrangements, and disputes are handled directly between Contractor and Provider.</p>', action: { label: 'View released details', href: appUrl(input.workspacePath) } }),
   };
 }
 
@@ -95,7 +95,7 @@ export function accountUpdateTemplate(input: { title: string; summary: string; a
 }
 
 export function newRegistrationTemplate(input: { role: string; email: string; contactName: string; companyName?: string }): EmailTemplate {
-  const roleLabel = input.role === 'USER' ? 'Contractor' : input.role === 'USER' ? 'Provider' : input.role;
+  const roleLabel = input.role === 'CONTRACTOR' ? 'Contractor' : input.role === 'PROVIDER' ? 'Provider' : input.role;
 
   return {
     subject: `New Trade Tender account: ${input.email}`,
@@ -142,15 +142,15 @@ export function configurationTestTemplate(input: { environment: string; sentAt: 
   };
 }
 
-export function accountCreatedByAdminTemplate(input: { role: 'USER' | 'USER'; contactName: string; companyName?: string; resetLink: string; expiresIn: string }): EmailTemplate {
+export function accountCreatedByAdminTemplate(input: { role: 'CONTRACTOR' | 'PROVIDER'; contactName: string; companyName?: string; resetLink: string; expiresIn: string }): EmailTemplate {
   return {
     subject: 'Your Trade Tender account is ready',
     html: layout({
       eyebrow: 'Account created',
       title: 'Set a password to activate your account',
-      intro: `A Trade Tender ${input.role === 'USER' ? 'Contractor' : 'Provider'} account has been created for you by the Trade Tender team.`,
+      intro: `A Trade Tender ${input.role === 'CONTRACTOR' ? 'Contractor' : 'Provider'} account has been created for you by the Trade Tender team.`,
       body: detailRows([
-        ['Account type', input.role === 'USER' ? 'Contractor' : 'Provider'],
+        ['Account type', input.role === 'CONTRACTOR' ? 'Contractor' : 'Provider'],
         ['Contact name', input.contactName],
         ...(input.companyName ? [['Business', input.companyName] as [string, string]] : []),
       ]) + `<p style="font-size:14px;line-height:1.6">Use the button below to choose your own password. The link expires in ${escapeHtml(input.expiresIn)}. No password is included in this message.</p>`,

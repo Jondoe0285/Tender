@@ -10,12 +10,10 @@ const config: Config = {
     extend: {
       colors: {
         'foundation-navy': '#0D1B2A',
-        'safety-amber': '#F28C28',
-        'steel-blue': '#2F5D7C',
-        'trade-blue': '#106FB8',
-        'site-white': '#FFFFFF',
-        'light-grey': '#F2F4F7',
-        'hi-viz-tint': '#F28C28',
+        'safety-amber': '#1D6FB8',
+        'steel-blue': '#6EB1E4',
+        'site-white': '#F2F4F7',
+        'hi-viz-tint': '#6EB1E4',
         'concrete-grey': '#6B7280',
         ink: '#0D1B2A',
         approved: '#2E7D32',

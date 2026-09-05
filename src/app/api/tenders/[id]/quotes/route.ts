@@ -10,7 +10,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
-    const user = await requireRole('USER');
+    const user = await requireRole('PROVIDER');
     const parsed = submitQuoteSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid quote details', issues: parsed.error.flatten() }, { status: 400 });
@@ -25,7 +25,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const user = await requireRole('USER');
+    const user = await requireRole('CONTRACTOR');
     const quotes = await listQuotesForClientTender(user.id, params.id);
     return NextResponse.json({ quotes });
   } catch (error) {

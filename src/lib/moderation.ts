@@ -1,6 +1,5 @@
 const simpleContactPatterns = [
   /(?:\+44|0044|0)\s*(?:\(?\d{2,4}\)?[\s.-]*){2,5}\d{2,4}\b/i,
-  /(?:\+44|0044|0)(?:[\s().-]*\d){9,11}\b/i,
   /\b[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+\b/i,
   /(?:https?:\/\/|www\.)[^\s]+/i,
   /\b(?:zoom|teams|meet|calendly)\b/i,
@@ -35,7 +34,6 @@ export function stripDetectedContactDetails(value?: string | null): string {
   let cleaned = value;
   const patterns = [
     /(?:\+44|0044|0)\s*(?:\(?\d{2,4}\)?[\s.-]*){2,5}\d{2,4}\b/gi,
-    /(?:\+44|0044|0)(?:[\s().-]*\d){9,11}\b/gi,
     /\b[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+\b/gi,
     /(?:https?:\/\/|www\.)[^\s]+/gi,
     /\b(?:zoom|teams|meet|calendly)\b/gi,

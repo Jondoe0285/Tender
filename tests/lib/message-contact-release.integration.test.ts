@@ -30,10 +30,10 @@ test('retailer messaging requires contact release even after tender unlock', asy
 
   const [client, retailer] = await Promise.all([
     prisma.user.create({
-      data: { email: clientEmail, passwordHash: 'not-used', role: 'USER', contactName: 'Integration Client' },
+      data: { email: clientEmail, passwordHash: 'not-used', role: 'CONTRACTOR', contactName: 'Integration Client' },
     }),
     prisma.user.create({
-      data: { email: retailerEmail, passwordHash: 'not-used', role: 'USER', contactName: 'Integration Retailer' },
+      data: { email: retailerEmail, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Integration Retailer' },
     }),
   ]);
   clientId = client.id;
@@ -71,7 +71,7 @@ test('retailer messaging requires contact release even after tender unlock', asy
 
   await prisma.unlock.create({ data: { tenderId, retailerId, method: 'PAID' } });
 
-  const retailerActor = { id: retailerId, role: 'USER' as const };
+  const retailerActor = { id: retailerId, role: 'PROVIDER' as const };
   await assert.rejects(
     () => listTenderMessages(tenderId, retailerActor),
     (error: unknown) => error instanceof ForbiddenError && error.message === 'Contact details must be released before messaging'
@@ -103,7 +103,7 @@ test('retailer messaging requires contact release even after tender unlock', asy
   const messages = await listTenderMessages(tenderId, retailerActor);
   assert.equal(messages.length, 1);
   assert.equal(messages[0]?.body, 'Can you confirm the delivery date?');
-  assert.equal(messages[0]?.senderRole, 'USER');
+  assert.equal(messages[0]?.senderRole, 'PROVIDER');
 });
 
 test('contact release writes a minimal immutable audit event', async (context) => {
@@ -128,8 +128,8 @@ test('contact release writes a minimal immutable audit event', async (context) =
   });
 
   const [client, retailer] = await Promise.all([
-    prisma.user.create({ data: { email: `release-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Release Client', contactPhone: '07123456789' } }),
-    prisma.user.create({ data: { email: `release-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Release Retailer', contactPhone: '07987654321' } }),
+    prisma.user.create({ data: { email: `release-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CONTRACTOR', contactName: 'Release Client', contactPhone: '07123456789' } }),
+    prisma.user.create({ data: { email: `release-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Release Retailer', contactPhone: '07987654321' } }),
   ]);
   clientId = client.id;
   retailerId = retailer.id;

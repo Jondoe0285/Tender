@@ -8,27 +8,19 @@ export default withAuth(
     const path = request.nextUrl.pathname;
 
     // The proxied request host is the internal listener, so redirect against the public origin.
-    const isClientPath = path.startsWith('/client') || path.startsWith('/contractor') || path.startsWith('/user');
+    const isClientPath = path.startsWith('/client') || path.startsWith('/contractor');
     const isRetailerPath = path.startsWith('/retailer') || path.startsWith('/provider');
 
-    if (isClientPath && role !== 'USER') {
+    if (isClientPath && role !== 'CONTRACTOR') {
       return NextResponse.redirect(appUrl('/login'));
     }
-    if (isRetailerPath && role !== 'USER') {
+    if (isRetailerPath && role !== 'PROVIDER') {
       return NextResponse.redirect(appUrl('/login'));
     }
     if (path.startsWith('/super-user') && role !== 'SUPER_USER') {
       return NextResponse.redirect(appUrl('/login'));
     }
 
-    if (path.startsWith('/user')) {
-      if (path.startsWith('/user/opportunities')) return NextResponse.rewrite(new URL(path.replace(/^\/user\/opportunities/, '/retailer/opportunities'), request.url));
-      if (path.startsWith('/user/unlocked')) return NextResponse.rewrite(new URL(path.replace(/^\/user\/unlocked/, '/retailer/unlocked'), request.url));
-      if (path.startsWith('/user/quotes')) return NextResponse.rewrite(new URL(path.replace(/^\/user\/quotes/, '/retailer/quotes'), request.url));
-      if (path.startsWith('/user/profile')) return NextResponse.rewrite(new URL(path.replace(/^\/user\/profile/, '/client/profile'), request.url));
-      if (path.startsWith('/user/billing')) return NextResponse.rewrite(new URL(path.replace(/^\/user\/billing/, '/retailer/billing'), request.url));
-      return NextResponse.rewrite(new URL(path.replace(/^\/user/, '/client'), request.url));
-    }
     if (path.startsWith('/client')) {
       return NextResponse.redirect(new URL(path.replace(/^\/client/, '/contractor'), request.url));
     }
@@ -52,5 +44,5 @@ export default withAuth(
 );
 
 export const config = {
-  matcher: ['/client/:path*', '/contractor/:path*', '/retailer/:path*', '/provider/:path*', '/user/:path*', '/super-user/:path*'],
+  matcher: ['/client/:path*', '/contractor/:path*', '/retailer/:path*', '/provider/:path*', '/super-user/:path*'],
 };

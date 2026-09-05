@@ -1,56 +1,60 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card } from '@/components/ui/Card';
 import { getCurrentUser } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
+import { SponsoredPlacementCard } from '@/components/retailer/SponsoredPlacementCard';
+import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
+import { sponsoredPlacementEnabled } from '@/server/domain/sponsoredPlacementService';
+import { listAvailableMembershipTiers } from '@/server/domain/membershipService';
+import { MembershipPackages } from '@/components/retailer/MembershipPackages';
 
-const PERIODS = {
-  '7d': { label: 'Last 7 days', days: 7 },
-  '30d': { label: 'Last 30 days', days: 30 },
-  '90d': { label: 'Last 90 days', days: 90 },
-  all: { label: 'All time', days: null },
-} as const;
-
-type Period = keyof typeof PERIODS;
-
-function getPeriodStart(period: Period): Date | undefined {
-  const days = PERIODS[period].days;
-  if (days === null) return undefined;
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date;
-}
-
-export default async function UserActivityHistoryPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+export default async function RetailerBillingPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'USER') redirect('/login');
+  if (!user || user.role !== 'PROVIDER') redirect('/login');
 
-  const requestedPeriod = (await searchParams).period;
-  const period: Period = requestedPeriod && requestedPeriod in PERIODS ? requestedPeriod as Period : '30d';
-  const periodStart = getPeriodStart(period);
-  const dateFilter = periodStart ? { gte: periodStart } : undefined;
-  const [unlocks, quotesProvided, quotesAccepted] = await Promise.all([
-    prisma.unlock.count({ where: { retailerId: user.id, ...(dateFilter ? { unlockedAt: dateFilter } : {}) } }),
-    prisma.quote.count({ where: { retailerId: user.id, ...(dateFilter ? { submittedAt: dateFilter } : {}) } }),
-    prisma.quote.count({ where: { retailerId: user.id, status: 'ACCEPTED', ...(dateFilter ? { submittedAt: dateFilter } : {}) } }),
+  const [payments, profile, placementEnabled, activePlacement, placementFeeGbp, membershipPackages] = await Promise.all([
+    prisma.payment.findMany({ where: { userId: user.id, type: { in: ['RETAILER_UNLOCK', 'SPONSORED_PLACEMENT', 'MEMBERSHIP_TIER'] } }, orderBy: { createdAt: 'desc' } }),
+    prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { launchCreditsLeft: true } }),
+    sponsoredPlacementEnabled(),
+    prisma.retailerSponsoredPlacement.findFirst({ where: { retailerId: user.id, active: true } }),
+    getPaymentFeeGbp('SPONSORED_PLACEMENT'),
+    listAvailableMembershipTiers(user.id),
   ]);
-  const metrics = [
-    { label: 'Tenders unlocked', value: unlocks },
-    { label: 'Quotes provided', value: quotesProvided },
-    { label: 'Quotes accepted', value: quotesAccepted },
-  ];
 
   return (
-    <AppShell role="retailer" title="Activity History">
+    <AppShell role="retailer" title="Billing">
       <div className="mx-auto max-w-3xl">
-        <p className="mb-6 max-w-xl text-sm text-concrete-grey">Tender activity for your selected period.</p>
-        <div className="mb-6 flex flex-wrap gap-2" aria-label="Activity period">
-          {(Object.keys(PERIODS) as Period[]).map((key) => <Link key={key} href={`/user/billing?period=${key}`} className={`rounded-md border px-3 py-2 text-sm font-semibold ${key === period ? 'border-steel-blue bg-steel-blue text-site-white' : 'border-slate-300 bg-white text-concrete-grey hover:border-steel-blue hover:text-foundation-navy'}`}>{PERIODS[key].label}</Link>)}
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          {metrics.map((metric) => <Card key={metric.label} className="border-l-4 border-l-steel-blue"><p className="font-heading text-4xl font-bold text-foundation-navy">{metric.value}</p><p className="mt-2 text-sm font-semibold text-concrete-grey">{metric.label}</p></Card>)}
-        </div>
+        <Card className="mb-6 border-l-4 border-l-steel-blue">
+          <p className="font-heading text-3xl font-bold text-foundation-navy">{profile?.launchCreditsLeft ?? 0}</p>
+          <p className="mt-2 text-sm font-medium text-concrete-grey">Launch credits remaining</p>
+        </Card>
+        <MembershipPackages enabled={membershipPackages.enabled} tiers={membershipPackages.tiers} />
+        <SponsoredPlacementCard enabled={placementEnabled} active={Boolean(activePlacement)} feeGbp={placementFeeGbp} />
+        <p className="mb-6 max-w-xl text-sm text-concrete-grey">Tender unlock fees charged once your launch credits are used.</p>
+        {payments.length === 0 ? (
+          <Card className="py-16 text-center text-sm text-concrete-grey">No billing activity is recorded for this account.</Card>
+        ) : (
+          <Card className="divide-y divide-slate-100 p-0">
+            {payments.map((payment) => (
+              <div key={payment.id} className="flex flex-wrap items-center justify-between gap-4 px-6 py-5">
+                <div>
+                  <p className="font-heading text-base font-bold text-foundation-navy">&pound;{payment.totalAmountGbp.toFixed(2)} inc. VAT</p>
+                  <p className="mt-1 text-sm text-concrete-grey">Fee: &pound;{payment.amountGbp.toFixed(2)} excl. VAT &middot; VAT: &pound;{payment.vatGbp.toFixed(2)} ({payment.vatPercentage}%)</p>
+                  <p className="mt-1 text-sm text-concrete-grey">
+                    {payment.type === 'SPONSORED_PLACEMENT' ? 'Sponsored Placement Fee' : payment.type === 'MEMBERSHIP_TIER' ? 'Membership Package' : 'Tender Unlock Fee'} &middot; {payment.createdAt.toLocaleDateString('en-GB')}
+                  </p>
+                </div>
+                <StatusBadge
+                  status={payment.status === 'CONFIRMED' ? 'approved' : payment.status === 'FAILED' ? 'attention' : 'pending'}
+                >
+                  {payment.status}
+                </StatusBadge>
+              </div>
+            ))}
+          </Card>
+        )}
       </div>
     </AppShell>
   );

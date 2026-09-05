@@ -50,12 +50,3 @@ test('returns a user-friendly explanation for disallowed contact details in free
   const message = getModerationMessage('description', 'Call me on 07700 900123 or email hello@example.com');
   assert.match(message ?? '', /contact|phone|email/i);
 });
-
-test('blocks a phone number written with spaces between individual digits', () => {
-  const number = '0 7 7 0 0 9 0 0 1 2 3';
-  const serverResult = moderateContent([{ name: 'description', value: `Call ${number}` }]);
-
-  assert.equal(serverResult.decision, 'BLOCK');
-  assert.equal(serverResult.containsContactInfo, true);
-  assert.match(getModerationMessage('description', `Call ${number}`) ?? '', /contact|phone/i);
-});

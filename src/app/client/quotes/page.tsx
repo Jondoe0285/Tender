@@ -4,15 +4,13 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card } from '@/components/ui/Card';
 import { getCurrentUser } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
-import { getCompanyMemberIds } from '@/server/domain/tenderService';
 
 export default async function QuotesReceivedPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'USER') redirect('/login');
+  if (!user || user.role !== 'CONTRACTOR') redirect('/login');
 
-  const memberIds = await getCompanyMemberIds(user.id);
   const quotes = await prisma.quote.findMany({
-    where: { tender: { clientId: { in: memberIds } } },
+    where: { tender: { clientId: user.id } },
     orderBy: { submittedAt: 'desc' },
     include: { tender: { select: { id: true, reference: true, subcategory: true } } },
   });
@@ -21,7 +19,7 @@ export default async function QuotesReceivedPage() {
     <AppShell role="client" title="Quotes Received">
       <div className="mx-auto max-w-4xl">
         <p className="mb-6 max-w-xl text-sm text-concrete-grey">
-          Every quote submitted against your company tenders, across all projects.
+          Every quote submitted against your tenders, across all projects.
         </p>
         {quotes.length === 0 ? (
           <Card className="py-16 text-center text-sm text-concrete-grey">No quotes have been received for this account.</Card>

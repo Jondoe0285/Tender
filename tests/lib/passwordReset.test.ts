@@ -19,7 +19,7 @@ test('produces a different hash for every token', () => {
 
 test('invites an admin-created account without embedding a password', () => {
   const template = accountCreatedByAdminTemplate({
-    role: 'USER',
+    role: 'PROVIDER',
     contactName: 'Sam Mason',
     companyName: 'Mason Groundworks',
     resetLink: 'https://app.example/reset-password?token=abc123',
@@ -35,7 +35,7 @@ test('invites an admin-created account without embedding a password', () => {
 
 test('escapes account details rendered into the invitation', () => {
   const template = accountCreatedByAdminTemplate({
-    role: 'USER',
+    role: 'CONTRACTOR',
     contactName: '<script>alert(1)</script>',
     resetLink: 'https://app.example/reset-password?token=abc',
     expiresIn: '24 hours',
