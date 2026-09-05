@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
-    const user = await requireRole('CONTRACTOR');
+    const user = await requireRole('USER');
     const body = await request.json().catch(() => null);
     const parsed = createTenderSchemaForCatalog(await getCategoryCatalog()).safeParse(body);
     if (!parsed.success) {
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
-    const user = await requireRole('CONTRACTOR');
+    const user = await requireRole('USER');
     const tenders = await listTendersForClient(user.id);
     return NextResponse.json({ tenders });
   } catch (error) {

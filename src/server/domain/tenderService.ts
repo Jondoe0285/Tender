@@ -4,7 +4,7 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { sendTenderOpportunityEmail, sendTenderUpdatedEmail } from '@/server/notifications/resend';
 import type { CreateTenderInput, UpdateTenderInput } from '@/lib/schemas/tender';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
-import { retailerCoversTenderLocation, getBroadLocation, getPostcodeDistrict } from '@/lib/geography';
+import { retailerCoversTenderLocation, getBroadLocation, getPostcodeDistrict, UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 import { ForbiddenError } from '@/server/auth/session';
 
 type RetailerTenderEligibilityProfile = {
@@ -13,6 +13,27 @@ type RetailerTenderEligibilityProfile = {
   regions: string;
   categories: string;
 };
+
+export async function getCompanyMemberIds(userId: string): Promise<string[]> {
+  const membership = await prisma.clientCompanyMember.findUnique({ where: { userId }, select: { companyId: true } });
+  if (!membership) return [userId];
+  const members = await prisma.clientCompanyMember.findMany({ where: { companyId: membership.companyId }, select: { userId: true } });
+  return members.map((member) => member.userId);
+}
+
+/** Returns the active tender categories a company is permitted to receive. */
+export async function getUserTenderServiceCategories(userId: string): Promise<string[]> {
+  const membership = await prisma.clientCompanyMember.findUnique({
+    where: { userId },
+    select: { company: { select: { services: true } } },
+  });
+  return membership?.company.services.split(',').map((value) => value.trim()).filter(Boolean) ?? [];
+}
+
+export async function userOwnsTender(userId: string, tenderId: string): Promise<boolean> {
+  const memberIds = await getCompanyMemberIds(userId);
+  return Boolean(await prisma.tender.findFirst({ where: { id: tenderId, clientId: { in: memberIds } }, select: { id: true } }));
+}
 
 export function retailerCanMatchTender(
   retailer: RetailerTenderEligibilityProfile,
@@ -28,9 +49,20 @@ export function getTenderPackageCategories<T extends { category: string }>(packa
   return (packages ?? []).map((pkg) => pkg.category);
 }
 
+function companyEligibility(profile: RetailerTenderEligibilityProfile, company: { services: string; operatingLocations: string }): RetailerTenderEligibilityProfile {
+  const locations = company.operatingLocations.split(',').map((value) => value.trim()).filter(Boolean);
+  return {
+    ...profile,
+    categories: company.services,
+    coverageScope: locations.includes('United Kingdom') ? 'UK' : locations.some((location) => UK_REGIONS.includes(location as typeof UK_REGIONS[number])) ? 'REGION' : 'COUNTY',
+    counties: locations.filter((location) => UK_COUNTIES.includes(location as typeof UK_COUNTIES[number])).join(','),
+    regions: locations.filter((location) => UK_REGIONS.includes(location as typeof UK_REGIONS[number])).join(','),
+  };
+}
+
 /** Rechecks the mutable retailer capability and coverage controls before paid tender activity. */
 export async function assertRetailerEligibleForTender(retailerId: string, tenderId: string): Promise<void> {
-  const [match, profile] = await Promise.all([
+  const [match, profile, membership] = await Promise.all([
     prisma.tenderMatch.findUnique({
       where: { tenderId_retailerId: { tenderId, retailerId } },
       include: { tender: { select: { location: true, items: { select: { category: true } }, packages: { select: { category: true } } } } },
@@ -39,12 +71,13 @@ export async function assertRetailerEligibleForTender(retailerId: string, tender
       where: { userId: retailerId },
       select: { coverageScope: true, counties: true, regions: true, categories: true },
     }),
+    prisma.clientCompanyMember.findUnique({ where: { userId: retailerId }, select: { company: { select: { services: true, operatingLocations: true } } } }),
   ]);
   const tenderCategories = [...new Set([
     ...getTenderPackageCategories(match?.tender.packages),
     ...match?.tender.items.map((item) => item.category) ?? [],
   ])];
-  if (!match || !profile || !retailerCanMatchTender(profile, match.tender.location, tenderCategories)) {
+  if (!match || !profile || !membership || !retailerCanMatchTender(companyEligibility(profile, membership.company), match.tender.location, tenderCategories)) {
     throw new ForbiddenError('Tender is not eligible for this Retailer');
   }
 }
@@ -67,6 +100,7 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
     { name: 'item', value: input.item },
     { name: 'location', value: input.location },
     { name: 'quantity', value: input.quantity },
+    { name: 'item specification', value: input.itemDescription ?? '' },
     { name: 'requirements', value: input.requirements.join(', ') },
     { name: 'description', value: input.description },
     ...(input.items ?? []).flatMap((item, index) => [
@@ -101,7 +135,7 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
       status: 'OPEN',
       items: {
         create: [
-          { category: input.category, subcategory: input.subcategory, item: input.item ?? null, quantity: input.quantity, description: input.description },
+          { category: input.category, subcategory: input.subcategory, item: input.item ?? null, quantity: input.quantity, description: input.itemDescription ?? '' },
           ...(input.items ?? []),
         ],
       },
@@ -128,7 +162,7 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
       closingDate: input.closingDate,
       supplyDate: input.supplyDate ?? null,
       requirements: input.requirements.join(','),
-      description: input.description,
+      description: input.itemDescription ?? '',
     },
     ...(input.items ?? []).map((item) => ({
       category: item.category,
@@ -176,16 +210,16 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
   const services = [...new Set(tenderItems.map((item) => item.category))];
   const candidateRetailers = await prisma.retailerProfile.findMany({
     where: { OR: services.map((service) => ({ categories: { contains: service } })) },
-    include: { user: { select: { email: true } } },
+    include: { user: { select: { email: true, clientCompanyMembership: { select: { company: { select: { services: true, operatingLocations: true } } } } } } },
   });
-  const matchedRetailers = candidateRetailers.filter((retailer) => retailerCanMatchTender(retailer, tender.location, services));
+  const matchedRetailers = candidateRetailers.filter((retailer) => retailer.userId !== clientId && retailer.user.clientCompanyMembership && retailerCanMatchTender(companyEligibility(retailer, retailer.user.clientCompanyMembership.company), tender.location, services));
 
   if (matchedRetailers.length > 0) {
     const clientCompany = await prisma.clientCompanyMember.findUnique({ where: { userId: clientId }, select: { company: { select: { tradeTenderId: true } } } });
     const clientTradeTenderId = clientCompany?.company.tradeTenderId ?? 'Pending assignment';
     const retailerByService = new Map<string, typeof matchedRetailers>();
     for (const service of services) {
-      retailerByService.set(service, matchedRetailers.filter((retailer) => retailer.categories.split(',').map((value) => value.trim()).includes(service)));
+      retailerByService.set(service, matchedRetailers.filter((retailer) => retailer.user.clientCompanyMembership?.company.services.split(',').map((value) => value.trim()).includes(service)));
     }
     const uniqueRetailerIds = [...new Set(matchedRetailers.map((retailer) => retailer.userId))];
     const itemMatches = tenderItems.flatMap((item) =>
@@ -205,7 +239,7 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
 
     const notifyByService = new Map<string, typeof matchedRetailers>();
     for (const service of services) {
-      notifyByService.set(service, matchedRetailers.filter((retailer) => retailer.categories.split(',').map((value) => value.trim()).includes(service)));
+      notifyByService.set(service, matchedRetailers.filter((retailer) => retailer.user.clientCompanyMembership?.company.services.split(',').map((value) => value.trim()).includes(service)));
     }
 
     await Promise.allSettled(
@@ -235,8 +269,9 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
 
 /** Updates a Contractor-owned tender in place, preserving its reference, matches, and unlock entitlement records. */
 export async function updateTender(clientId: string, tenderId: string, input: UpdateTenderInput) {
+  const companyMemberIds = await getCompanyMemberIds(clientId);
   const tender = await prisma.tender.findFirst({
-    where: { id: tenderId, clientId },
+    where: { id: tenderId, clientId: { in: companyMemberIds } },
     include: {
       items: { orderBy: { createdAt: 'asc' } },
       packages: { orderBy: { createdAt: 'asc' } },
@@ -306,7 +341,7 @@ export async function updateTender(clientId: string, tenderId: string, input: Up
   });
 
   const matchedRetailers = await prisma.user.findMany({
-    where: { id: { in: tender.matches.map((match) => match.retailerId) }, role: 'PROVIDER' },
+    where: { id: { in: tender.matches.map((match) => match.retailerId) }, role: 'USER' },
     select: { id: true, email: true },
   });
   await Promise.allSettled(matchedRetailers.map(async (retailer) => {
@@ -337,10 +372,13 @@ export async function updateTender(clientId: string, tenderId: string, input: Up
  * and geographic coverage are both required for visibility and notification.
  */
 export async function matchRetailerToOpenTenders(retailerId: string) {
-  const profile = await prisma.retailerProfile.findUnique({ where: { userId: retailerId } });
-  if (!profile) return;
+  const [profile, membership] = await Promise.all([
+    prisma.retailerProfile.findUnique({ where: { userId: retailerId } }),
+    prisma.clientCompanyMember.findUnique({ where: { userId: retailerId }, select: { company: { select: { services: true, operatingLocations: true } } } }),
+  ]);
+  if (!profile || !membership) return;
 
-  const categories = profile.categories.split(',').map((value) => value.trim()).filter(Boolean);
+  const categories = membership.company.services.split(',').map((value) => value.trim()).filter(Boolean);
   if (categories.length === 0) return;
 
   const candidateTenders = await prisma.tender.findMany({
@@ -364,9 +402,10 @@ export async function matchRetailerToOpenTenders(retailerId: string) {
   const retailer = await prisma.user.findUnique({ where: { id: retailerId }, select: { email: true } });
 
   for (const tender of candidateTenders) {
+    if (tender.clientId === retailerId) continue;
     const packageCategories = getTenderPackageCategories(tender.packages);
     const tenderCategories = [...new Set([...packageCategories, ...tender.items.map((item) => item.category)])];
-    if (!retailerCanMatchTender(profile, tender.location, tenderCategories)) continue;
+    if (!retailerCanMatchTender(companyEligibility(profile, membership.company), tender.location, tenderCategories)) continue;
     const matchingItems = tender.items.filter((item) => categories.includes(item.category));
 
     await prisma.$transaction([
@@ -408,7 +447,7 @@ export async function matchRetailerToOpenTenders(retailerId: string) {
 
 /** Own tenders only — the repository call itself enforces ownership via the where clause. */
 export function listTendersForClient(clientId: string) {
-  return prisma.tender.findMany({ where: { clientId }, orderBy: { createdAt: 'desc' } });
+  return getCompanyMemberIds(clientId).then((memberIds) => prisma.tender.findMany({ where: { clientId: { in: memberIds } }, orderBy: { createdAt: 'desc' } }));
 }
 
 export function buildRetailerTenderSummary(requirements: string | null | undefined): string[] {
@@ -419,7 +458,9 @@ export function buildRetailerTenderSummary(requirements: string | null | undefin
 /** Approved non-sensitive summary fields only (SEC-030/031) — the full free-text description
  *  remains hidden until unlock. */
 export async function listMatchedSummariesForRetailer(retailerId: string) {
-  const [matches, retailer] = await Promise.all([
+  const serviceCategories = await getUserTenderServiceCategories(retailerId);
+  if (serviceCategories.length === 0) return [];
+  const [matches, retailer, membership] = await Promise.all([
     prisma.tenderMatch.findMany({
       where: { retailerId },
       include: {
@@ -444,10 +485,17 @@ export async function listMatchedSummariesForRetailer(retailerId: string) {
       where: { userId: retailerId },
       select: { coverageScope: true, counties: true, regions: true },
     }),
+    prisma.clientCompanyMember.findUnique({ where: { userId: retailerId }, select: { company: { select: { services: true, operatingLocations: true } } } }),
   ]);
 
-  return matches.map((match) => {
-    const packageCategories = [...new Set((match.tender.packages ?? []).map((pkg) => pkg.category))];
+  return matches.filter((match) => {
+    const visiblePackages = match.tender.packages.filter((pkg) => serviceCategories.includes(pkg.category));
+    const tenderCategories = [...new Set(visiblePackages.map((pkg) => pkg.category))];
+    return match.tender.status === 'OPEN'
+      && match.tender.closingDate > new Date()
+      && Boolean(retailer && membership && retailerCanMatchTender(companyEligibility({ ...retailer, categories: '' }, membership.company), match.tender.location, tenderCategories));
+  }).map((match) => {
+    const packageCategories = [...new Set(match.tender.packages.filter((pkg) => serviceCategories.includes(pkg.category)).map((pkg) => pkg.category))];
     return {
       id: match.id,
       notifiedAt: match.notifiedAt,
@@ -455,7 +503,7 @@ export async function listMatchedSummariesForRetailer(retailerId: string) {
       tender: {
         id: match.tender.id,
         reference: match.tender.reference,
-        category: match.tender.category,
+        category: packageCategories[0] ?? match.tender.category,
         packageCategories,
         packageCount: packageCategories.length,
         location: formatRetailerSummaryLocation(match.tender.location),

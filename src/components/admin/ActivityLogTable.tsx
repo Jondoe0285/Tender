@@ -15,7 +15,7 @@ type AuditEntry = {
   actor?: {
     contactName: string | null;
     email: string | null;
-    role: 'SUPER_USER' | 'CONTRACTOR' | 'PROVIDER' | null;
+    role: 'SUPER_USER' | 'USER' | 'USER' | null;
   } | null;
 };
 

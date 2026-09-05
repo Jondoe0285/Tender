@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { createPayment } from '@/server/payments/paymentService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { ForbiddenError } from '@/server/auth/session';
-import { assertRetailerEligibleForTender, assertTenderOpenForActivity } from '@/server/domain/tenderService';
+import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getUserTenderServiceCategories } from '@/server/domain/tenderService';
 import { membershipTiersEnabled } from '@/server/domain/membershipService';
 import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
 
@@ -120,6 +120,8 @@ export async function getUnlockedTenderForRetailer(retailerId: string, tenderId:
     where: { tenderId_retailerId: { tenderId, retailerId } },
   });
   if (!unlock) throw new ForbiddenError('Tender has not been unlocked by this Retailer');
+  const serviceCategories = await getUserTenderServiceCategories(retailerId);
+  if (serviceCategories.length === 0) throw new ForbiddenError('No active company services are configured');
 
   // Client identity (clientId) is withheld even after unlock — anonymity holds until contact release (SEC-034).
   return prisma.tender.findUniqueOrThrow({
@@ -139,14 +141,16 @@ export async function getUnlockedTenderForRetailer(retailerId: string, tenderId:
       status: true,
       createdAt: true,
       attachments: {
+        where: { id: { in: [] } },
         select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
-        orderBy: { uploadedAt: 'asc' },
       },
       items: {
+        where: { category: { in: serviceCategories } },
         select: { id: true, category: true, subcategory: true, item: true, quantity: true, description: true },
         orderBy: { createdAt: 'asc' },
       },
       packages: {
+        where: { category: { in: serviceCategories } },
         select: {
           id: true,
           reference: true,

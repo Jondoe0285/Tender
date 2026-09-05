@@ -18,6 +18,7 @@ type Tender = {
   location: string;
   urgency: string;
   closingDate: string;
+  status: 'DRAFT' | 'OPEN' | 'CLOSED';
   supplyDate: string | null;
   requirements: string;
   description: string;
@@ -50,6 +51,7 @@ export default function ClientTenderDetailPage() {
   const [busyQuoteId, setBusyQuoteId] = useState<string | null>(null);
   const [pendingPayment, setPendingPayment] = useState<{ quoteId: string; paymentId: string; checkoutUrl: string | null } | null>(null);
   const [contacts, setContacts] = useState<Record<string, Contact>>({});
+  const [professionalInterests, setProfessionalInterests] = useState<Array<{ id: string; contact: Contact }>>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -66,6 +68,11 @@ export default function ClientTenderDetailPage() {
     } else if (!tender) {
       const data = await tenderResponse.json().catch(() => null);
       setLoadError(data?.error ?? 'Unable to load this tender.');
+    }
+    const interestResponse = await fetch(`/api/tenders/${params.id}/professional-interest`);
+    if (interestResponse.ok) {
+      const interestData = await interestResponse.json() as { interests?: Array<{ id: string; contact: Contact }> };
+      setProfessionalInterests(interestData.interests ?? []);
     }
     if (quotesResponse.ok) {
       const nextQuotes: Quote[] = (await quotesResponse.json()).quotes;
@@ -212,6 +219,11 @@ export default function ClientTenderDetailPage() {
           <Button variant="secondary" onClick={() => setEditing((current) => !current)}>
             {editing ? 'Cancel edit' : 'Edit tender'}
           </Button>
+          {(tender.status === 'CLOSED' || new Date(tender.closingDate).getTime() <= Date.now()) && (
+            <Link href={`/user/tenders/new?copyFrom=${encodeURIComponent(tender.id)}`} className="inline-flex h-11 items-center justify-center rounded-lg bg-safety-amber px-5 text-sm font-semibold text-foundation-navy shadow-soft hover:bg-hi-viz-tint hover:shadow-soft-md">
+              Re-tender
+            </Link>
+          )}
         </div>
         {editing ? (
           <Card className="mt-5">
@@ -300,6 +312,20 @@ export default function ClientTenderDetailPage() {
                 </ul>
               </div>
             )}
+          </Card>
+        )}
+        {professionalInterests.length > 0 && (
+          <Card className="mt-5">
+            <h3 className="font-heading text-lg font-bold text-foundation-navy">Professional interests</h3>
+            <ul className="mt-3 flex flex-col gap-3">
+              {professionalInterests.map((interest) => (
+                <li key={interest.id} className="border-l-4 border-steel-blue/40 pl-4 text-sm text-concrete-grey">
+                  <p className="font-semibold text-foundation-navy">{interest.contact.contactName}</p>
+                  <p>{interest.contact.email}</p>
+                  {interest.contact.contactPhone && <p>{interest.contact.contactPhone}</p>}
+                </li>
+              ))}
+            </ul>
           </Card>
         )}
       </section>

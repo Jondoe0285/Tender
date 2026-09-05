@@ -45,8 +45,8 @@ test('a zero-cost unlock fee waives payment and opens the tender immediately', a
   });
 
   const [client, retailer] = await Promise.all([
-    prisma.user.create({ data: { email: `zero-fee-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CONTRACTOR', contactName: 'Zero Fee Client' } }),
-    prisma.user.create({ data: { email: `zero-fee-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Zero Fee Retailer' } }),
+    prisma.user.create({ data: { email: `zero-fee-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Zero Fee Client' } }),
+    prisma.user.create({ data: { email: `zero-fee-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Zero Fee Retailer' } }),
   ]);
   clientId = client.id;
   retailerId = retailer.id;
@@ -118,8 +118,8 @@ test('an active membership allowance cannot unlock a tender while membership tie
   });
 
   const [client, retailer] = await Promise.all([
-    prisma.user.create({ data: { email: `membership-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CONTRACTOR', contactName: 'Membership Client' } }),
-    prisma.user.create({ data: { email: `membership-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Membership Retailer' } }),
+    prisma.user.create({ data: { email: `membership-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Membership Client' } }),
+    prisma.user.create({ data: { email: `membership-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Membership Retailer' } }),
   ]);
   clientId = client.id;
   retailerId = retailer.id;

@@ -6,7 +6,7 @@ import { prisma } from '@/server/data/prisma';
 export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const user = await getCurrentUser();
-  if (!user || user.role !== 'CONTRACTOR') {
+  if (!user || user.role !== 'USER') {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 

@@ -19,13 +19,13 @@ export type AccountRow = {
   releaseCreditsLeft?: number | null;
 };
 
-export function AccountManagementTable({ role, rows }: { role: 'CONTRACTOR' | 'PROVIDER'; rows: AccountRow[] }) {
+export function AccountManagementTable({ role, rows }: { role: 'USER' | 'USER'; rows: AccountRow[] }) {
   const [showCreate, setShowCreate] = useState(false);
   const [openTenderRequestsOnly, setOpenTenderRequestsOnly] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState<string | null>(null);
   const [creditInputs, setCreditInputs] = useState<Record<string, string>>(
-    Object.fromEntries(rows.map((row) => [row.id, String((role === 'PROVIDER' ? row.launchCreditsLeft : row.releaseCreditsLeft) ?? 0)]))
+    Object.fromEntries(rows.map((row) => [row.id, String((role === 'USER' ? row.launchCreditsLeft : row.releaseCreditsLeft) ?? 0)]))
   );
   const [form, setForm] = useState({
     email: '',
@@ -37,7 +37,7 @@ export function AccountManagementTable({ role, rows }: { role: 'CONTRACTOR' | 'P
     coverageAreas: '',
   });
 
-  const isRetailer = role === 'PROVIDER';
+  const isRetailer = role === 'USER';
   const visibleRows = openTenderRequestsOnly
     ? rows.filter((row) => (row.openTenderRequests ?? 0) > 0)
     : rows;
@@ -174,7 +174,7 @@ export function AccountManagementTable({ role, rows }: { role: 'CONTRACTOR' | 'P
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.12em] text-steel-blue">Operations</p>
             <p className="mt-1 max-w-xl text-sm text-concrete-grey">
-              Manage {role === 'CONTRACTOR' ? 'contractor' : 'provider'} account access, reset credentials, and status in one place.
+              Manage {role === 'USER' ? 'contractor' : 'provider'} account access, reset credentials, and status in one place.
             </p>
           </div>
           <button
@@ -182,7 +182,7 @@ export function AccountManagementTable({ role, rows }: { role: 'CONTRACTOR' | 'P
             onClick={() => setShowCreate((current) => !current)}
             className="inline-flex items-center rounded-md bg-foundation-navy px-4 py-2 text-sm font-semibold text-site-white shadow-soft transition hover:bg-foundation-navy/90"
           >
-            {showCreate ? 'Close form' : `Add ${role === 'CONTRACTOR' ? 'Contractor' : 'Provider'}`}
+            {showCreate ? 'Close form' : `Add ${role === 'USER' ? 'Contractor' : 'Provider'}`}
           </button>
         </div>
 
@@ -299,7 +299,7 @@ export function AccountManagementTable({ role, rows }: { role: 'CONTRACTOR' | 'P
                   {account.email}
                   {account.categories ? ` &middot; ${account.categories}` : ''}
                 </p>
-                {role === 'CONTRACTOR' ? (
+                {role === 'USER' ? (
                   <p className="mt-1 text-sm text-concrete-grey">{account.tenders ?? 0} tender(s) raised</p>
                 ) : (
                   <p className="mt-1 text-sm text-concrete-grey">
@@ -311,7 +311,7 @@ export function AccountManagementTable({ role, rows }: { role: 'CONTRACTOR' | 'P
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                {role === 'PROVIDER' && (
+                {role === 'USER' && (
                   <div className="flex items-center gap-2">
                     <label className="text-xs font-medium text-concrete-grey" htmlFor={`credits-${account.id}`}>
                       Launch credits
@@ -335,7 +335,7 @@ export function AccountManagementTable({ role, rows }: { role: 'CONTRACTOR' | 'P
                     </button>
                   </div>
                 )}
-                {role === 'CONTRACTOR' && (
+                {role === 'USER' && (
                   <div className="flex items-center gap-2">
                     <label className="text-xs font-medium text-concrete-grey" htmlFor={`release-credits-${account.id}`}>
                       Release credits

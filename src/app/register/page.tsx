@@ -13,7 +13,6 @@ import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [role, setRole] = useState<'CONTRACTOR' | 'PROVIDER'>('CONTRACTOR');
   const [coverageScope, setCoverageScope] = useState<'COUNTY' | 'REGION' | 'UK'>('COUNTY');
   const [counties, setCounties] = useState<string[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
@@ -38,14 +37,15 @@ export default function RegisterPage() {
         firstName: form.get('firstName'),
         lastName: form.get('lastName'),
         contactPhone: form.get('contactPhone') || undefined,
-        role,
+        role: 'USER',
         termsAccepted: form.get('termsAccepted') === 'on',
         companyName: form.get('companyName') || undefined,
-        categories: role === 'PROVIDER' ? categories : undefined,
+        branchIdentifier: form.get('branchIdentifier') || undefined,
+        categories,
         coverageAreas: form.get('coverageAreas') || undefined,
-        coverageScope: role === 'PROVIDER' ? coverageScope : undefined,
-        counties: role === 'PROVIDER' && coverageScope === 'COUNTY' ? counties : undefined,
-        regions: role === 'PROVIDER' && coverageScope === 'REGION' ? regions : undefined,
+        coverageScope,
+        counties: coverageScope === 'COUNTY' ? counties : undefined,
+        regions: coverageScope === 'REGION' ? regions : undefined,
       }),
     });
 
@@ -66,31 +66,7 @@ export default function RegisterPage() {
           <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-steel-blue">Create an account</p>
           <h1 className="font-heading text-3xl font-bold tracking-tight text-foundation-navy">Create your Trade Tender account</h1>
           <p className="mt-3 text-sm leading-relaxed text-concrete-grey">
-            Select the account type that matches your role in the construction supply chain.
-          </p>
-
-          <div className="mt-6 flex gap-2 rounded-lg bg-slate-100 p-1" role="radiogroup" aria-label="Account type">
-            {(['CONTRACTOR', 'PROVIDER'] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                role="radio"
-                aria-checked={role === option}
-                onClick={() => setRole(option)}
-                className={`flex-1 rounded-md px-4 py-2.5 text-sm font-semibold transition-colors ${
-                  role === option
-                    ? 'bg-white text-foundation-navy shadow-soft'
-                    : 'text-concrete-grey hover:text-foundation-navy'
-                }`}
-              >
-                {option === 'CONTRACTOR' ? 'Contractor' : 'Provider'}
-              </button>
-            ))}
-          </div>
-          <p className="mt-3 text-xs text-concrete-grey">
-            {role === 'CONTRACTOR'
-              ? 'For construction businesses raising requirements and comparing trade prices.'
-              : 'For providers responding to matched construction demand.'}
+            Set up your business to raise tenders and receive relevant tender opportunities.
           </p>
 
           <Card className="mt-6">
@@ -122,10 +98,13 @@ export default function RegisterPage() {
                 <Label htmlFor="companyName">Company name</Label>
                 <Input id="companyName" name="companyName" required autoComplete="organization" />
               </FieldGroup>
+              <FieldGroup>
+                <Label htmlFor="branchIdentifier">Branch or location</Label>
+                <Input id="branchIdentifier" name="branchIdentifier" required placeholder="e.g. Leeds branch or Head Office" />
+                <p className="text-xs text-concrete-grey">This distinguishes businesses with the same company name.</p>
+              </FieldGroup>
 
-              {role === 'PROVIDER' && (
-                <>
-                  <fieldset className="flex flex-col gap-2">
+              <fieldset className="flex flex-col gap-2">
                     <legend className="text-sm font-semibold text-foundation-navy">Categories you provide</legend>
                     <p className="text-xs text-concrete-grey">These categories determine which tender opportunities are matched to you.</p>
                     {CATEGORY_NAMES.map((category) => (
@@ -179,9 +158,7 @@ export default function RegisterPage() {
                     <Label htmlFor="coverageAreas">Coverage towns (optional)</Label>
                     <Input id="coverageAreas" name="coverageAreas" placeholder="e.g. Leeds, Manchester, Sheffield" />
                     <p className="text-xs text-concrete-grey">Used only to estimate distance on opportunity listings, in addition to the service areas above.</p>
-                  </FieldGroup>
-                </>
-              )}
+              </FieldGroup>
 
               <label className="flex items-start gap-3 text-sm text-concrete-grey">
                 <input type="checkbox" name="termsAccepted" required className="mt-1 h-4 w-4 accent-safety-amber" />

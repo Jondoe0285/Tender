@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/server/auth/auth';
 import { prisma } from '@/server/data/prisma';
 
-export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'CONTRACTOR' | 'PROVIDER'; roles: SessionUser['role'][]; isOwner: boolean; isAccountant: boolean };
+export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'USER' | 'USER'; roles: SessionUser['role'][]; isOwner: boolean; isAccountant: boolean };
 
 /** Resolves the authenticated user from the server-side session only — never trust client-supplied identity. */
 export async function getCurrentUser(): Promise<SessionUser | null> {

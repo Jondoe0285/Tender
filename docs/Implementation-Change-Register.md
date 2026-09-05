@@ -13,6 +13,201 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-05 - Professional Services Interest Workflow
+
+- Changed: Professional Services tender opportunities now use a Register interest action instead of a paid unlock and formal quote. The server accepts interest only for a matching company with Professional Services active and while the tender remains open.
+- Changed: the professional interest record is unique per User and tender, creates no payment, and permits contact access only after the tender deadline. The release is audit logged. Material, waste, plant, contractor-service, and other tender packages retain their existing unlock and quote controls.
+- Affects: Prisma `ProfessionalInterest` schema and migration `20260905020000_add_professional_interests`, Professional Services tender detail UI, server authorization, and interest-release audit trail. No existing quote, payment, or contact-release record is changed.
+- Environment: migration was applied only to the local development database. Staging and production migration deployment requires the documented environment approval, backup/rollback evidence, named release owner, and post-deployment validation.
+- Validation: local `npx prisma migrate deploy` applied the migration; `npx tsx --test tests/lib/professional-interest.integration.test.ts` passes (1 test); `npm run type-check` and `npm run build` pass.
+
+### 2026-09-05 - Category-Scoped Tender Opportunity Access
+
+- Changed: User opportunity summaries, pre-unlock details, unlocked tender packages, and quote lines are now limited to the active service categories in the User's company profile. For example, a Materials Supplier sees only Materials packages from a mixed tender.
+- Changed: tender-wide attachments are withheld from opportunity recipients because they cannot safely be assigned to a specific service category. Tender owners retain authorized attachment downloads.
+- Affects: tender opportunity visibility, unlocked detail, quote validation, and attachment authorization. Existing tender records, references, payment records, contact-release controls, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/tender-package-model.test.ts tests/lib/tender-attachment-access.integration.test.ts` passes (5 tests); `npm run type-check` passes.
+
+### 2026-09-05 - Company Coverage Controls Opportunity Matching
+
+- Changed: corrected tender opportunity matching to use the company profile's operating locations as the authoritative coverage source, instead of stale legacy per-user county/region settings. Company services and company locations now jointly control creation, visibility, and unlock eligibility for opportunities.
+- Affects: tender matching, opportunity visibility, and unlock eligibility only. Tender records, payment amounts, contact release, database schema, and environment configuration remain unchanged.
+- Environment: refreshed the affected local Sinclair Safety Solutions account against active tenders. No staging or production resources were changed.
+- Validation: `npx tsx --test tests/lib/tender-schema.test.ts tests/lib/client-company.test.ts` passes (34 tests); `npm run type-check` passes. Local verification confirms 5 visible eligible opportunities for the affected account.
+
+### 2026-09-05 - Automatic Opportunity Refresh After Profile Updates
+
+- Changed: saving a primary company profile now synchronizes selected services and operating locations to the matching eligibility record, then immediately evaluates active tenders for newly eligible opportunities. United Kingdom selection correctly maps to UK-wide matching coverage.
+- Affects: company profile save and active tender matching only. Existing matches, tender identifiers, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-company.test.ts` passes (6 tests); `npm run type-check` passes.
+
+### 2026-09-05 - Select All Company Service Provisions
+
+- Changed: each company service-provision group now provides a Select all action, which changes to Clear all when every provision in that service group is selected. The action affects only its own service group.
+- Affects: primary company profile selection user interface only. Stored profile values, tender matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-company.test.ts` passes (5 tests); `npm run type-check` passes.
+
+### 2026-09-05 - United Kingdom Company Operating Location
+
+- Changed: added United Kingdom as a selectable operating location in the primary company User profile, alongside individual regions and counties. The profile API validates and stores this selection.
+- Affects: company profile operating-location options only. Tender matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-company.test.ts` passes (4 tests); `npm run type-check` passes.
+
+### 2026-09-05 - Spaced Phone Number Moderation Hardening
+
+- Changed: strengthened client-side warnings and mandatory server-side content moderation to detect UK phone numbers written with separators or spaces between individual digits. Such contact information now blocks tender submission rather than relying on an AI assessment.
+- Affects: tender and message content moderation only. No database schema, payment, matching, contact-release, or environment configuration change is required.
+- Environment: no operator action required. An optional AI classifier may later add a non-authoritative review signal, but deterministic server moderation remains the required block control.
+- Validation: `npx tsx --test tests/lib/content-moderation.test.ts` passes (8 tests); `npm run type-check` passes.
+
+### 2026-09-05 - Tender Workflow Fast Travel
+
+- Changed: completed tender-builder workflow steps are now clickable in the desktop progress header. Users can jump back to any previously visited section without losing entered data; future uncompleted steps remain unavailable.
+- Affects: tender-builder progress navigation and in-memory wizard state only. Tender submission payloads, server validation, matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-tender-builder.test.ts tests/lib/stepper-fast-travel.test.ts` passes (2 tests); `npm run type-check` passes.
+
+### 2026-09-05 - Separate Project And Primary Item Specifications
+
+- Changed: separated project-wide Additional information from the primary tender item's Item specification. Project information remains attached to the parent tender; the primary item specification is now stored only on its tender item and package, matching added items.
+- Affects: tender-builder form state, create-tender input validation, moderation input, primary tender-item/package persistence, review display, re-tender prefill, and related integration fixtures. No database schema migration, matching, payment, contact-release, or environment configuration change is required.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-tender-builder.test.ts tests/lib/tender-schema.test.ts` passes (29 tests); `npx tsx --test tests/lib/tender-package-model.test.ts` passes (4 tests); `npm run type-check` passes.
+
+### 2026-09-05 - Primary Tender Item Specification Field
+
+- Changed: added the optional Item specification field to the primary tender package, matching the comments/specification input available for every added package.
+- Affects: tender-builder primary package interface only. The field uses the existing primary tender description payload and server validation; matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-tender-builder.test.ts` passes (1 test); `npm run type-check` passes.
+
+### 2026-09-05 - Grouped Tender Review Sections
+
+- Changed: organized Review and Submit into separated Project Details, Tender Packages, Additional Requirements, and Attachments sections. Each section has one Edit action that returns the User to the associated builder step.
+- Affects: tender-builder review interface and in-memory wizard navigation only. Tender submission payloads, server validation, matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-tender-builder.test.ts` passes (1 test); `npm run type-check` passes.
+
+### 2026-09-05 - Preserve Tender Data After Review Edits
+
+- Changed: returning from Review and Submit to Project Details no longer reinitializes later tender package inputs. Existing package, requirement, upload, and review data remains intact unless the User changes the selected service groups, which intentionally rebuilds the package list.
+- Affects: tender-builder in-memory wizard state only. Tender submission payloads, server validation, matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-tender-builder.test.ts` passes (1 test); `npm run type-check` passes.
+
+### 2026-09-05 - Tender Review Edit Actions
+
+- Changed: added Edit actions to every tender review item. Project inputs return to Project Details, package inputs reopen the correct package screen, requirements return to Additional Requirements, and attachments return to Upload Files.
+- Affects: tender-builder review interface and in-memory wizard navigation only. Tender submission payloads, server validation, matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-tender-builder.test.ts` passes (1 test); `npm run type-check` passes.
+
+### 2026-09-05 - Compact Additional Requirements Layout
+
+- Changed: displayed the tender Additional Requirements options in a responsive two-column grid on small and larger screens, while retaining a single column on narrow mobile screens.
+- Affects: tender-builder layout only. Tender fields, validation, matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-tender-builder.test.ts` passes (1 test); `npm run type-check` passes.
+
+### 2026-09-05 - Supply-Type-Specific Tender Labels
+
+- Changed: tender package fields now use the selected supply type in their labels. Materials uses Material category and Material detail; Waste uses Waste type and Waste detail; Plant Hire uses Plant category and Plant detail. Service-based packages retain Service provision wording.
+- Affects: tender-builder labels only. Stored tender data, validation rules, matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-tender-builder.test.ts` passes (1 test); `npm run type-check` passes.
+
+### 2026-09-05 - Separate Supply-Type Tender Screens
+
+- Changed: tender packages for different supply types remain on separate sequential requirement screens. Collapsed editable summaries are shown only for repeated items in the currently active supply type; other supply types are reached through Back and Continue. Add another item now creates an item for the active supply type.
+- Affects: tender-builder user interface and in-memory form sequencing only. Tender submission payloads, server validation, matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-tender-builder.test.ts` passes (1 test); `npm run type-check` passes.
+
+### 2026-09-05 - Collapsible Tender Package Editing
+
+- Changed: when a User adds another tender package, previously completed packages remain visible as compact headline summaries. Selecting a summary restores its editable provision, quantity, and specification fields. The Add another item action now appears below the package list and opens the newly added package.
+- Affects: tender-builder user interface only. Tender submission payloads, server validation, matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-tender-builder.test.ts` passes (1 test); `npm run type-check` passes.
+
+### 2026-09-05 - Historical Tender Re-Tender Workflow
+
+- Changed: historical or closed tender details now provide a Re-tender action. It opens the tender builder with the original tender's service packages, requirements, location, supply date, descriptions, and authorized attachment files copied into an editable form. The User must set a new quote deadline before submitting.
+- Affects: historical tender detail and tender creation workflow only. Re-tendering submits through the existing create-tender path, which assigns a new tender ID and reference, rematches eligible Users, and preserves the historical tender and its payment, quote, contact-release, and audit records unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-tender-builder.test.ts tests/lib/retender-flow.test.ts` passes (2 tests); `npm run type-check` and `npm run build` pass.
+
+### 2026-09-05 - Company Services Govern Tender Opportunities
+
+- Changed: tender opportunity visibility, unread opportunity counts, and unlock eligibility now use the company profile's active service selections as the authoritative matching categories. A company with no active services cannot receive, view, count, or unlock a tender opportunity.
+- Changed: new registrations store their selected company services in both the company profile and matching profile. Primary company profile edits keep the matching profile synchronised. Migration `20260905010000_backfill_company_services_from_primary_profile` aligns existing primary-user matching settings with the unified company profile.
+- Affects: company service profile, tender matching, opportunity listings, unread count, and unlock eligibility. No tender reference, payment amount, contact-release, database schema, or external environment configuration changed.
+- Environment: the data-only migration was applied only to the local development database. Staging and production require the documented environment-specific approval, backup/rollback evidence, named release owner, and post-deployment validation before migration deployment.
+- Validation: `npx tsx --test tests/lib/tender-schema.test.ts tests/lib/opportunity-unread-badge.test.ts` passes (29 tests); `npm run type-check` passes; local `npx prisma migrate deploy` applied the backfill migration.
+
+### 2026-09-05 - Candidate Brand Visualisation Preview
+
+- Changed: applied the uploaded candidate colour palette to the shared Tailwind tokens for local visualisation: Navy, Steel Blue, Trade Blue, Concrete Grey, Light Grey, White, and Safety Orange. The shared light-surface logo now uses the uploaded candidate horizontal lockup; the existing approved dark-background lockup remains in use on Navy surfaces.
+- Affects: visual presentation only. The approved production brand assets remain preserved in `public/images/brand/`; no user workflow, database, payment, authorization, tender matching, or environment configuration changed.
+- Environment: this is a candidate visualisation only. Do not deploy it to staging or production until the Founder approves the candidate board and logo pack as the active Brand Authority.
+- Validation: `npm run type-check` and `npm run build` pass.
+
+### 2026-09-05 - User Activity History Analytics
+
+- Changed: replaced the User-facing Billing label and commercial page with Activity History. Users can filter the period to the last 7, 30, or 90 days, or all time, and view counts for tenders unlocked, quotes provided, and quotes accepted.
+- Affects: User workspace navigation and read-only activity analytics only. Payment records, fee calculation, tender matching, unlock entitlement, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/user-activity-history.test.ts` passes (1 test); `npm run type-check` passes.
+
+### 2026-09-05 - Profile Service Label Refinement
+
+- Changed: renamed the top-level profile display labels from `Materials` to `Materials Supplier` and from `Waste` to `Waste Disposal`.
+- Affects: company profile display labels only. Stored service values, tender creation options, tender categories, matching, payment, authorization, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npm run type-check` passes.
+
+### 2026-09-05 - Candidate Brand Asset Upload Area
+
+- Changed: added `public/images/brand/candidate/` with separate `logos/` and `palette/` folders for proposed brand assets. Candidate files are deliberately isolated from the approved serving logo directory and are not referenced by the application.
+- Affects: local source-asset organisation only. No active logo, palette, user interface, database, payment, authorization, or environment configuration changed.
+- Environment: upload trial logo exports and palette reference files only to the candidate folders. Promote an asset to the approved brand directory only after brand approval and an explicit implementation change.
+- Validation: pending workspace formatting check.
+
+### 2026-09-05 - Company Service Provision Profiles
+
+- Changed: primary Users can now select second-stage provisions for each service their company offers. For example, Materials can include Cement, Concrete and Mortar or Aggregates, Sand and Stone; Contractor Services can include Groundworks and Civil Engineering.
+- Affects: the company profile, `ClientCompany.serviceProvisions`, and migration `20260905000000_add_company_service_provisions`. The server validates every saved provision belongs to a selected company service. No tender matching, payment, unlock, contact-release, or environment configuration behavior changed.
+- Environment: migration was applied only to the local development database. Staging and production migration deployment requires the documented environment approval, backup/rollback evidence, named release owner, and post-deployment validation.
+- Validation: local `npx prisma migrate deploy` applied the migration; `npx tsx --test tests/lib/client-company.test.ts` passes (3 tests); `npm run type-check` passes.
+
+### 2026-09-05 - Unread Tender Opportunities Navigation Badge
+
+- Changed: added a compact unread-count badge beside Tender Opportunities in the User left navigation and mobile navigation drawer. It counts only open tender matches the User has not yet opened, using the existing `TenderMatch.viewedAt` state.
+- Affects: authenticated User navigation and a new read-only opportunity-count endpoint. No tender data, matching decision, payment, unlock, contact-release, database schema, or environment configuration changed.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/opportunity-unread-badge.test.ts` passes (1 test); `npm run type-check` passes.
+
+### 2026-09-04 - Company-Based User Accounts And Branch Identity
+
+- Changed: made the company the operating identity for User accounts. The primary User can add additional authenticated Users under the same company, and members can view, open, edit, and receive quotes for tenders raised by any authorised colleague in that company.
+- Changed: added a required company branch/location identifier with a unique company-name-and-branch constraint. This permits legitimately duplicated business names only when the branch or location differentiates them. New company registration and primary-profile editing capture this identifier.
+- Changed: additional Users inherit the company's tender-opportunity profile when created and receive matching opportunities as a company representative. Protected attachment access now recognises company tender ownership as well as a User's personal unlock entitlement.
+- Affects: `ClientCompany` schema and migration `20260904010000_add_company_branch_identifier`, User registration/profile setup, company membership, tender and quote access, attachment access, and company regression coverage. No payment amounts, contact-release conditions, tender references, or external environment configuration changed.
+- Environment: the migration was applied and validated only against the local development database. Staging and production require the documented environment-specific approval, backup/rollback evidence, named release owner, and post-deployment validation before migration deployment.
+- Validation: local `npx prisma migrate deploy` applied the migration after a corrected legacy branch backfill; `npx tsx --test tests/lib/client-company.test.ts` passes (2 tests); `npm run type-check`, `npm test` (142 tests), and `npm run build` pass.
+
+### 2026-09-04 - Approved Two-Level User Platform
+
+- Changed: merged the operating account model into one `User` role alongside `Super User`. A User has both a tender-owning business record and a tender-opportunity profile, allowing them to create tenders, use My Tenders, maintain categories and coverage, and view Tender Opportunities matched to that profile.
+- Changed: authorization now determines access from tender ownership, matching, and stored unlock records rather than the former role split. Tender creators are excluded from their own opportunity matching; existing paid/credited unlock records remain authoritative.
+- Affects: role database enum and migration, registration, protected-route navigation, tender/attachment/message authorization, User workspace routes, profile setup, notifications, and role-related regression coverage. Existing tender, quote, payment, contact-release, and audit data is preserved.
+- Environment: apply migration `20260904000000_merge_contractor_and_provider_roles` through the approved deployment process. This run applies it only to the local development database. Staging and production require the documented environment-specific approval, backup/rollback evidence, named release owner, and post-deployment validation before application.
+- Validation: local `npx prisma migrate deploy` applied `20260904000000_merge_contractor_and_provider_roles`; `npm run type-check`, `npm test` (141 tests), and `npm run build` pass.
+
 ### 2026-09-04 - Two-Level Contractor Service Provisions
 
 - Changed: tender packages now require only the selected service group and its service provision. For example, a Contractor can submit `Contractor Services` with `Groundworks & Civil Engineering` without selecting the optional third-level detailed provision.

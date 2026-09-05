@@ -38,7 +38,14 @@ These requirements translate the approved business plan into an implementation r
 | Contractor | Creates tenders, receives and compares quotes, accepts a quote, and pays the Accepted Quote Release Fee. |
 | Provider | Manages capabilities and coverage, receives matched summaries, unlocks tenders, and submits quotes. |
 
-Only these three roles are approved. New roles or unrelated product areas require explicit business-plan approval.
+Only these two roles are approved. New roles or unrelated product areas require explicit business-plan approval.
+
+### 3.2.1 Approved 2026-09-04 Role Model Change
+
+- **Super User:** Owns platform administration, governance, user management, pricing, audit review, and operational oversight.
+- **User:** Maintains one business profile, creates and manages their own tenders, and receives profile-matched tender opportunities. A User can unlock and quote for another User's tender, but never their own tender.
+
+The platform must continue to enforce tender ownership, match eligibility, paid unlock entitlement, and contact-release conditions server-side. The former Contractor and Provider role split is retired.
 
 ### 3.3 Active Commercial Model
 
@@ -86,7 +93,7 @@ Only these three roles are approved. New roles or unrelated product areas requir
 3. The Provider uses an available launch credit or starts payment for the £10 unlock fee.
 4. The server determines eligibility, current credit status, amount, and payment state. Contractor input cannot establish unlock entitlement.
 5. Stripe payment completion is verified through a trusted server-side flow and signed webhook where applicable.
-6. After confirmed entitlement, the platform releases the full tender job and all its packages, including complete specification, relevant attachments, precise delivery or site requirements, response deadline, and project conditions. One tender unlock covers every package in that tender; no additional package unlock fee applies.
+6. After confirmed entitlement, the platform releases only the tender packages that match the User's active company service categories, including their complete specification, delivery or site requirements, response deadline, and project conditions. Tender-wide attachments remain withheld unless they can be safely scoped to the matching package. One tender unlock covers every matching package in that tender; no additional package unlock fee applies.
 7. The platform records the unlock against the tender, Provider, payment or credit event, timestamp, and any Super User override.
 8. Failed, cancelled, incomplete, or ambiguous payments do not release restricted details.
 
@@ -99,6 +106,13 @@ Only these three roles are approved. New roles or unrelated product areas requir
 5. The Contractor receives the quote in the Contractor portal.
 6. The quote lifecycle and submission event are auditable.
 7. All Provider line prices, quote totals, additional charges, and platform fees are stated excluding VAT. Applicable VAT is calculated separately for Trade Tender platform payments and recorded with the payment.
+
+### 4.5.1 Professional Services Interest Workflow
+
+1. A User matched to a Professional Services package registers interest instead of submitting a formal quote or paying a tender unlock fee.
+2. The server validates the User's Professional Services capability, matching eligibility, and the open tender deadline before recording one interest per User and tender.
+3. No contact details are released before the tender closing date.
+4. After the tender closes, the interested professional and tender owner can access each other's authorised account contact details. The release is recorded in the interest audit trail.
 
 ### 4.6 Contractor Quote Comparison and Acceptance
 
@@ -158,7 +172,7 @@ The Super User can, subject to authorization and audit logging:
 - **FR-030:** Before Provider unlock, the platform shall show only approved non-sensitive tender summary data.
 - **FR-031:** Before Provider unlock, the platform shall hide Contractor identity, contact details, precise site information, full specification, attachments, and direct communication details.
 - **FR-032:** The platform shall support limited launch credits for Providers during the initial 90-day window.
-- **FR-033:** The platform shall charge or waive the £10 Provider unlock fee according to server-controlled configuration.
+- **FR-033:** The platform shall charge or waive the £10 Provider unlock fee according to server-controlled configuration, except that Professional Services interests do not require an unlock fee.
 - **FR-034:** A confirmed Provider tender unlock shall release full tender details and every package in that tender. One unlock shall not create an additional fee for another package in the same tender.
 - **FR-035:** Contractor and Provider identities shall remain anonymous to one another until the Contractor Accepted Quote Release Fee is confirmed or an approved waiver applies.
 - **FR-036:** The platform shall charge or waive the £10 Contractor Accepted Quote Release Fee according to server-controlled configuration.
@@ -173,6 +187,7 @@ The Super User can, subject to authorization and audit logging:
 - **FR-043:** A Contractor shall be able to view and compare quotes for their own tender.
 - **FR-044:** A Contractor shall be able to accept a quote and enter the release-fee workflow.
 - **FR-045:** The platform shall retain quote lifecycle events needed for operational audit and reporting.
+- **FR-046:** Professional Services Users shall be able to register one interest per eligible tender, without a formal quote, and receive authorised contact access only after the tender deadline.
 
 ### 5.6 Payments and Stripe
 

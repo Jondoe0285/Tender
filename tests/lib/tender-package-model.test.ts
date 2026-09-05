@@ -24,7 +24,7 @@ test('a tender job can own a tender package record', async (context) => {
     data: {
       email: `package-client-${suffix}@example.test`,
       passwordHash: 'not-used',
-      role: 'CONTRACTOR',
+      role: 'USER',
       contactName: 'Package Client',
     },
   });
@@ -93,7 +93,7 @@ test('createTender creates a package record for the job and extra package items'
     data: {
       email: `package-create-${suffix}@example.test`,
       passwordHash: 'not-used',
-      role: 'CONTRACTOR',
+      role: 'USER',
       contactName: 'Package Creator',
     },
   });
@@ -150,8 +150,8 @@ test('editing a tender preserves its reference and existing Provider unlock', as
   });
 
   const [client, retailer] = await Promise.all([
-    prisma.user.create({ data: { email: `edit-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CONTRACTOR', contactName: 'Tender Editor' } }),
-    prisma.user.create({ data: { email: `edit-provider-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Tender Provider' } }),
+    prisma.user.create({ data: { email: `edit-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Tender Editor' } }),
+    prisma.user.create({ data: { email: `edit-provider-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Tender Provider' } }),
   ]);
   clientId = client.id;
   retailerId = retailer.id;
@@ -197,6 +197,7 @@ test('listMatchedSummariesForRetailer exposes package metadata for multi-package
   const suffix = randomUUID();
   let clientId: string | undefined;
   let retailerId: string | undefined;
+  let retailerCompanyId: string | undefined;
   let tenderId: string | undefined;
 
   context.after(async () => {
@@ -210,6 +211,7 @@ test('listMatchedSummariesForRetailer exposes package metadata for multi-package
     if (retailerId) {
       await prisma.retailerProfile.deleteMany({ where: { userId: retailerId } });
     }
+    if (retailerCompanyId) await prisma.clientCompany.deleteMany({ where: { id: retailerCompanyId } });
     if (clientId) {
       await prisma.moderationEvent.deleteMany({ where: { actorId: clientId } });
       await prisma.user.deleteMany({ where: { id: clientId } });
@@ -223,7 +225,7 @@ test('listMatchedSummariesForRetailer exposes package metadata for multi-package
     data: {
       email: `package-summary-client-${suffix}@example.test`,
       passwordHash: 'not-used',
-      role: 'CONTRACTOR',
+      role: 'USER',
       contactName: 'Client Summary',
     },
   });
@@ -233,11 +235,23 @@ test('listMatchedSummariesForRetailer exposes package metadata for multi-package
     data: {
       email: `package-summary-retailer-${suffix}@example.test`,
       passwordHash: 'not-used',
-      role: 'PROVIDER',
+      role: 'USER',
       contactName: 'Retailer Summary',
     },
   });
   retailerId = retailer.id;
+
+  const retailerCompany = await prisma.clientCompany.create({
+    data: {
+      companyName: 'Package Summary Retailer',
+      branchIdentifier: suffix,
+      primaryUserId: retailer.id,
+      services: 'Materials',
+      operatingLocations: 'Yorkshire and The Humber',
+      members: { create: { userId: retailer.id } },
+    },
+  });
+  retailerCompanyId = retailerCompany.id;
 
   await prisma.retailerProfile.create({
     data: {
@@ -245,7 +259,7 @@ test('listMatchedSummariesForRetailer exposes package metadata for multi-package
       companyName: 'Package Summary Retailer',
       coverageScope: 'REGION',
       regions: 'Yorkshire and The Humber',
-      categories: 'Materials, Plant Hire',
+      categories: 'Materials',
       coverageAreas: 'LS, BD, HX',
     },
   });
@@ -323,10 +337,10 @@ test('listMatchedSummariesForRetailer exposes package metadata for multi-package
   const summaries = await listMatchedSummariesForRetailer(retailer.id);
 
   assert.equal(summaries.length, 1);
-  assert.equal(summaries[0].tender.packageCount, 2);
-  assert.deepEqual(summaries[0].tender.packageCategories, ['Materials', 'Plant Hire']);
+  assert.equal(summaries[0].tender.packageCount, 1);
+  assert.deepEqual(summaries[0].tender.packageCategories, ['Materials']);
 
   await prisma.unlock.create({ data: { tenderId: tender.id, retailerId: retailer.id, method: 'CREDIT' } });
   const unlockedTender = await getUnlockedTenderForRetailer(retailer.id, tender.id);
-  assert.deepEqual(unlockedTender.packages.map((pkg) => pkg.category), ['Materials', 'Plant Hire']);
+  assert.deepEqual(unlockedTender.packages.map((pkg) => pkg.category), ['Materials']);
 });

@@ -48,6 +48,7 @@ export function createTenderSchemaForCatalog(catalog: CategoryCatalog = CATEGORI
     item: z.string().trim().min(1).optional(),
     location: z.string().trim().min(2).max(120),
     quantity: z.string().trim().min(1).max(120),
+    itemDescription: z.string().trim().max(4000).optional().default(''),
     urgency: z.enum(URGENCY_OPTIONS),
     closingDate: z.coerce.date(),
     supplyDate: z.coerce.date().optional(),

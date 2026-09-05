@@ -30,7 +30,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (user.role !== 'PROVIDER') {
+    if (user.role !== 'USER') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -82,7 +82,7 @@ export async function GET(_req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'PROVIDER') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (user.role !== 'USER') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id } });
     if (!profile) return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });

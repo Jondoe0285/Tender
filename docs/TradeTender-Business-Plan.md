@@ -7,6 +7,8 @@
 
 > **Status:** This is the baseline business plan (received 2026-09-03). The Super User has resolved the open conflicts raised on first review; see "Baseline Change Notes" at the end of this document for the decisions that govern implementation.
 
+> **Approved role-model change (2026-09-04):** The platform has two levels: Super User and User. Each User maintains one business profile, can create and manage their own tenders, and can view profile-matched tender opportunities created by other Users. Tender ownership, opportunity matching, paid unlock access, and contact-release protections remain server-enforced.
+
 ## 1. Executive Summary
 
 ### What Trade Tender Is

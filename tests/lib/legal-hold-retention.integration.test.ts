@@ -24,8 +24,8 @@ test('active legal holds exclude expired quotes and tender attachments until rel
 
   const [admin, client, retailer] = await Promise.all([
     prisma.user.create({ data: { email: `hold-admin-${suffix}@example.test`, passwordHash: 'not-used', role: 'SUPER_USER', contactName: 'Hold Admin' } }),
-    prisma.user.create({ data: { email: `hold-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CONTRACTOR', contactName: 'Hold Client' } }),
-    prisma.user.create({ data: { email: `hold-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Hold Retailer' } }),
+    prisma.user.create({ data: { email: `hold-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Hold Client' } }),
+    prisma.user.create({ data: { email: `hold-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Hold Retailer' } }),
   ]);
   adminId = admin.id;
   clientId = client.id;

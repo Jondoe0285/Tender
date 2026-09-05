@@ -11,8 +11,7 @@ datasource db {
 
 enum Role {
   SUPER_USER
-  CONTRACTOR
-  PROVIDER
+  USER
 }
 
 enum TenderStatus {
@@ -109,6 +108,7 @@ model User {
   sentTenderMessages TenderMessage[] @relation("TenderMessageSender")
   retailerMessages TenderMessage[] @relation("TenderMessageRetailer")
   clientMessages TenderMessage[] @relation("TenderMessageClient")
+  professionalInterests ProfessionalInterest[]
   moderationEvents  ModerationEvent[] @relation("ModerationActor")
   reviewedModerationEvents ModerationEvent[] @relation("ModerationReviewer")
   legalHoldsCreated LegalHold[] @relation("LegalHoldCreatedBy")
@@ -185,7 +185,9 @@ model ClientCompany {
   id            String   @id @default(cuid())
   tradeTenderId String?  @unique
   companyName   String
+  branchIdentifier String @default("Head Office")
   services      String   @default("")
+  serviceProvisions String @default("")
   operatingLocations String @default("")
   primaryUserId String   @unique
   primaryUser   User     @relation("ClientCompanyPrimary", fields: [primaryUserId], references: [id])
@@ -194,6 +196,8 @@ model ClientCompany {
   updatedAt     DateTime @updatedAt
 
   members ClientCompanyMember[]
+
+  @@unique([companyName, branchIdentifier])
 }
 
 model ClientCompanyMember {
@@ -387,6 +391,7 @@ model Tender {
   items         TenderItem[]
   attachments   TenderAttachment[]
   messages      TenderMessage[]
+  professionalInterests ProfessionalInterest[]
   legalHolds    LegalHold[] @relation("LegalHoldTender")
 }
 
@@ -633,6 +638,19 @@ model ContactReleaseAuditEvent {
 
   @@index([authorizingPaymentId])
   @@index([clientId, retailerId])
+}
+
+model ProfessionalInterest {
+  id          String   @id @default(cuid())
+  tenderId    String
+  tender      Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  retailerId  String
+  retailer    User     @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  interestedAt DateTime @default(now())
+  releasedAt  DateTime?
+
+  @@unique([tenderId, retailerId])
+  @@index([tenderId, releasedAt])
 }
 
 model AuditLog {
