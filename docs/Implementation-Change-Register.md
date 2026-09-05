@@ -13,6 +13,14 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-05 - Authorized Test Role Recovery
+
+- Approval: Founder/product owner explicitly authorized a guessed role conversion for the configured test database after restoring the staging branch to the Provider/Contractor role model. Release owner and rollback owner: Founder/product owner.
+- Changed: pending a database backup, convert the test database Role enum from `USER` back to `CONTRACTOR` and `PROVIDER`. The recovery rule is: non-Super-Users with one or more configured matching service categories become Providers; other non-Super-Users become Contractors. Super Users remain unchanged.
+- Affects: configured test database role values and `UserRole` memberships only. No production/main resource, payment setting, contact-release state, tender record, or environment secret is changed.
+- Recovery: `pg_dump` is unavailable and the claim-only Neon project cannot create a management backup branch. The migration therefore writes an in-database `RoleRecoveryBackup` record for every User and UserRole before conversion; it preserves the prior `USER` values needed to reverse this test-only recovery.
+- Validation: migration `20260905030000_restore_test_contractor_provider_roles` applied to the configured test database after two rolled-back pre-change validation attempts. `RoleRecoveryBackup` contains 20 pre-conversion values; resulting role distribution is 4 Providers, 6 Contractors, and 2 Super Users. `npm test` passes (141 tests); `npm run build` passes. Deployment/login verification remains required after the staging branch is committed and deployed.
+
 ### 2026-09-04 - Two-Level Contractor Service Provisions
 
 - Changed: tender packages now require only the selected service group and its service provision. For example, a Contractor can submit `Contractor Services` with `Groundworks & Civil Engineering` without selecting the optional third-level detailed provision.

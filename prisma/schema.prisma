@@ -645,3 +645,14 @@ model AuditLog {
   metadata   String?
   createdAt  DateTime @default(now())
 }
+
+model RoleRecoveryBackup {
+  id          String   @id @default(cuid())
+  sourceTable String
+  sourceId    String
+  userId      String
+  previousRole String
+  createdAt   DateTime @default(now())
+
+  @@unique([sourceTable, sourceId])
+}

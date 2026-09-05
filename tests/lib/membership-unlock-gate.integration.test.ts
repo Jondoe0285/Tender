@@ -22,12 +22,12 @@ test('a zero-cost unlock fee waives payment and opens the tender immediately', a
     const userIds = [clientId, retailerId].filter((id): id is string => Boolean(id));
     if (userIds.length > 0) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     if (originalMembershipTiersSetting) {
-      await prisma.platformSetting.update({ where: { id: originalMembershipTiersSetting.id }, data: { value: originalMembershipTiersSetting.value } });
+      await prisma.platformSetting.upsert({ where: { key: 'MEMBERSHIP_TIERS_ACTIVE' }, update: { value: originalMembershipTiersSetting.value }, create: { key: 'MEMBERSHIP_TIERS_ACTIVE', value: originalMembershipTiersSetting.value } });
     } else {
       await prisma.platformSetting.deleteMany({ where: { key: 'MEMBERSHIP_TIERS_ACTIVE' } });
     }
     if (originalUnlockFeeSetting) {
-      await prisma.platformSetting.update({ where: { id: originalUnlockFeeSetting.id }, data: { value: originalUnlockFeeSetting.value } });
+      await prisma.platformSetting.upsert({ where: { key: 'RETAILER_UNLOCK_FEE_GBP' }, update: { value: originalUnlockFeeSetting.value }, create: { key: 'RETAILER_UNLOCK_FEE_GBP', value: originalUnlockFeeSetting.value } });
     } else {
       await prisma.platformSetting.deleteMany({ where: { key: 'RETAILER_UNLOCK_FEE_GBP' } });
     }
