@@ -40,11 +40,11 @@ export function ExecutiveDashboard({ data }: Props) {
 
       <form method="get" className="mb-8 grid gap-4 rounded-card border border-slate-200 bg-white p-5 shadow-soft sm:grid-cols-4">
         <label className="flex flex-col gap-2 text-sm font-semibold text-foundation-navy">
-          Client
+          Contractor
           <input name="client" defaultValue={data.filters.client ?? ''} placeholder="Name or email" className="h-11 rounded-lg border border-slate-300 px-3 font-normal placeholder:text-concrete-grey/70 focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30" />
         </label>
         <label className="flex flex-col gap-2 text-sm font-semibold text-foundation-navy">
-          Retailer
+          Provider
           <input name="retailer" defaultValue={data.filters.retailer ?? ''} placeholder="Name or email" className="h-11 rounded-lg border border-slate-300 px-3 font-normal placeholder:text-concrete-grey/70 focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30" />
         </label>
         <label className="flex flex-col gap-2 text-sm font-semibold text-foundation-navy">
@@ -107,7 +107,7 @@ export function ExecutiveDashboard({ data }: Props) {
       <div className="mb-8 grid gap-5 sm:grid-cols-3 lg:grid-cols-7">
         <Metric label="New tenders" value={data.totals.newTenders} hint="Last 30 days" />
         <Metric label="Tender volume" value={data.totals.tenderVolume} hint="Filtered period" />
-        <Metric label="Retailer unlocks" value={data.totals.retailerUnlocks} hint={`${data.rates.matchRate}% of tenders`} />
+        <Metric label="Provider unlocks" value={data.totals.retailerUnlocks} hint={`${data.rates.matchRate}% of tenders`} />
         <Metric label="Quotes submitted" value={data.totals.quotesSubmitted} hint={`${data.rates.quoteRate}% after unlock`} />
         <Metric label="Accepted quotes" value={data.totals.acceptedQuotes} hint={`${data.rates.acceptanceRate}% acceptance`} />
         <Metric label="Fee revenue" value={`${money.format(data.totals.revenue)} excl. VAT`} hint="Confirmed fees" />

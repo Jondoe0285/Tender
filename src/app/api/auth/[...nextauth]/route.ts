@@ -4,7 +4,7 @@ import { createRateLimitResponse } from '@/server/http/rateLimit';
 
 const handler = NextAuth(authOptions);
 
-async function limitedHandler(request: Request, context?: { params?: Record<string, string[] | string> }) {
+async function limitedHandler(request: Request, context: { params: Promise<{ nextauth: string[] }> }) {
   // Only throttle actual credential login attempts — session/csrf/signout checks share this
   // same catch-all route and must never be blocked by a login-attempt rate limit (SEC-052 aside,
   // that previously broke sign-out once the shared budget was used up by normal session polling).

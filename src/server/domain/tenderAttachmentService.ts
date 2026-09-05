@@ -2,7 +2,7 @@ import { ForbiddenError } from '@/server/auth/session';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { prisma } from '@/server/data/prisma';
 
-type AttachmentActor = { id: string; role: 'CLIENT' | 'RETAILER' };
+type AttachmentActor = { id: string; role: 'CONTRACTOR' | 'PROVIDER' };
 
 /** Returns attachment bytes only for the owning Client or a matched Retailer with a persisted unlock. */
 export async function getTenderAttachmentForDownload(tenderId: string, attachmentId: string, actor: AttachmentActor): Promise<{ id: string; fileName: string; mimeType: string; content: Buffer }> {
@@ -10,7 +10,7 @@ export async function getTenderAttachmentForDownload(tenderId: string, attachmen
     where: {
       id: attachmentId,
       tenderId,
-      tender: actor.role === 'CLIENT'
+      tender: actor.role === 'CONTRACTOR'
         ? { clientId: actor.id }
         : {
             matches: { some: { retailerId: actor.id } },

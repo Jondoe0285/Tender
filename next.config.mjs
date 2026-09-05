@@ -4,14 +4,8 @@ import { withSentryConfig } from '@sentry/nextjs';
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  // Required for src/instrumentation.ts on Next.js 14; stable from Next.js 15.
-  experimental: {
-    instrumentationHook: true,
-  },
-  // Both run as their own gate in CI and in the Render build command. Repeating them
-  // inside `next build` doubles the work and exhausts the type-check worker's memory.
+  // TypeScript runs as its own gate in CI and the Render build command.
   typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
   async headers() {
     return [
       {

@@ -11,7 +11,8 @@ const entitlementSchema = z.object({
   active: z.boolean(),
 });
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
   // Free entitlement grants bypass the payment flow, so Accountant sub-accounts must not reach this route.
@@ -21,7 +22,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!parsed.success) return NextResponse.json({ error: 'Invalid entitlement details' }, { status: 400 });
   const input = parsed.data;
   const retailer = await prisma.user.findUnique({ where: { id: params.id }, select: { id: true, role: true } });
-  if (!retailer || retailer.role !== 'RETAILER') return NextResponse.json({ error: 'Retailer not found' }, { status: 404 });
+  if (!retailer || retailer.role !== 'PROVIDER') return NextResponse.json({ error: 'Retailer not found' }, { status: 404 });
 
   if (input.type === 'membership') {
     const tier = await prisma.membershipTier.findUnique({ where: { id: input.planId } });

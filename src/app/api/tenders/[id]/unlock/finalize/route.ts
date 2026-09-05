@@ -7,11 +7,12 @@ import { finalizeUnlockWithPayment, getUnlockedTenderForRetailer } from '@/serve
 
 const bodySchema = z.object({ paymentId: z.string().min(1) });
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
-    const user = await requireRole('RETAILER');
+    const user = await requireRole('PROVIDER');
     const parsed = bodySchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 

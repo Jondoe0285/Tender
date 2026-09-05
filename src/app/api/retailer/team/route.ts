@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (user.role !== 'RETAILER') {
+    if (user.role !== 'PROVIDER') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (user.role !== 'RETAILER') {
+    if (user.role !== 'PROVIDER') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

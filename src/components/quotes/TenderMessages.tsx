@@ -79,12 +79,12 @@ export function TenderMessages({ tenderId, quoteId, role }: TenderMessagesProps)
         <div className="mt-5 flex flex-col gap-3">
           {messages.length === 0 ? (
             <p className="rounded-lg border border-dashed border-slate-200 px-4 py-5 text-sm text-concrete-grey">
-              {role === 'retailer' ? 'Ask a question about the tender specification or quote.' : 'The Retailer has not asked a question yet.'}
+              {role === 'retailer' ? 'Ask a question about the tender specification or quote.' : 'The Provider has not asked a question yet.'}
             </p>
           ) : messages.map((item) => (
             <div key={item.id} className={`rounded-lg border px-4 py-3 ${item.isOwn ? 'border-safety-amber/40 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}>
               <div className="flex items-center justify-between gap-3 text-xs text-concrete-grey">
-                <span className="font-semibold text-foundation-navy">{item.isOwn ? 'You' : item.senderRole === 'CLIENT' ? 'Client' : 'Retailer'}</span>
+                <span className="font-semibold text-foundation-navy">{item.isOwn ? 'You' : item.senderRole === 'CONTRACTOR' ? 'Contractor' : 'Provider'}</span>
                 <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString('en-GB')}</time>
               </div>
               <p className="mt-2 whitespace-pre-line text-sm text-foundation-navy">{item.body}</p>

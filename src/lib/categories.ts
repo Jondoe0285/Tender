@@ -46,6 +46,26 @@ export const SERVICE_CATALOG = {
     'Welfare and temporary accommodation': ['Site cabins', 'Drying rooms', 'Toilets', 'Welfare units', 'Storage containers', 'Temporary offices', 'Canteen units'],
     'Transport, haulage and logistics': ['Plant trailers', 'Low loaders', 'HIAB vehicles', 'Abnormal load transport', 'Loader/securer services', 'Lifting supervisors', 'Slinger/signallers', 'Plant marshals'],
   },
+  'Contractor Services': {
+    'Groundworks & Civil Engineering': ['Groundworks, drainage, roads, utilities, concrete and civils activities'],
+    'Demolition & Enabling Works': ['Demolition, strip-out, clearance, remediation and enabling activities'],
+    'General Building & Construction': ['General building, refurbishment, structural and construction works'],
+    'Roofing & Cladding': ['Roofing, roof maintenance, cladding and rainwater systems'],
+    'Carpentry, Joinery & Fit-Out': ['Carpentry, joinery, interiors, kitchens, doors and fit-out works'],
+    'Mechanical, Plumbing & HVAC': ['Mechanical installation, plumbing, heating, ventilation and air conditioning'],
+    'Electrical, Data & Renewables': ['Electrical works, testing, data, temporary power, EV charging and renewables'],
+    'Fire, Security & Life Safety': ['Fire protection, alarms, access control, CCTV and security systems'],
+    'Finishing Trades': ['Plastering, dry lining, decoration, flooring, tiling, ceilings and partitions'],
+    'External Works & Landscaping': ['Fencing, surfacing, landscaping, grounds works and external finishing'],
+    'Facilities, Maintenance & Cleaning': ['Planned and reactive maintenance, cleaning and property support services'],
+    'Transport, Haulage & Logistics': ['Haulage, specialist transport, courier and delivery support'],
+    'Specialist Construction Services': ['Scaffolding, drilling, cutting, welding, temporary works and specialist access'],
+    'Labour & Workforce Supply': ['General labour, skilled trades, plant operators, supervisors and site management'],
+  },
+  'Professional Services': {
+    'Surveying, Design & Engineering': ['Surveying, architecture, engineering, project management and technical design'],
+    'Safety, Compliance & Consultancy': ['Health and safety, CDM, Principal Designer, quality, environmental, fire, occupational health, training and management-system consultancy'],
+  },
 } as const;
 
 export type ServiceName = keyof typeof SERVICE_CATALOG;
@@ -88,6 +108,8 @@ export function isValidSubcategory(service: string, category: string, item?: str
       Materials: ['Bricks and blocks', 'Aggregates', 'Timber', 'Insulation', 'Roofing materials', 'Plumbing and drainage materials', 'Electrical supplies', 'Other materials'],
       Waste: ['Skip hire', 'Muck away', 'Waste collection', 'Recycling and disposal', 'Other waste services'],
       'Plant Hire': ['Excavators', 'Dumpers', 'Access and scaffolding', 'Welfare units', 'Generators and power', 'Other plant hire'],
+      'Contractor Services': [],
+      'Professional Services': [],
     };
     return categoriesForService(normalised).includes(category) || legacyLabels[normalised].includes(category) || Object.values(SERVICE_CATALOG[normalised]).some((items) => items.includes(category));
   }
@@ -96,19 +118,26 @@ export function isValidSubcategory(service: string, category: string, item?: str
 
 export const URGENCY_OPTIONS = ['standard', 'urgent', 'flexible'] as const;
 export const REQUIREMENT_OPTIONS = [
+  'Site access required',
   'Delivery to site required',
+  'Collection or uplift required',
   'Driver or operator required',
   'Timed delivery required',
   'Delivery booking required',
   'Offloading required',
   'Lifting equipment required',
+  'Parking or restricted-access arrangements',
   'Site induction required',
   'PPE required',
   'CSCS-certified operative required',
   'Risk assessment (RAMS) required',
   'Proof of insurance required',
   'Waste transfer note required',
+  'Waste segregation or skip exchange required',
+  'Plant, machinery or specialist equipment required',
   'Out-of-hours access',
+  'Working windows or scheduling constraints',
+  'Pre-start survey or site visit required',
 ] as const;
 export const RETAILER_UNLOCK_FEE_GBP = 10;
 export const CLIENT_RELEASE_FEE_GBP = 10;

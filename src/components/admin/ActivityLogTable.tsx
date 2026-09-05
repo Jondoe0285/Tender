@@ -15,7 +15,7 @@ type AuditEntry = {
   actor?: {
     contactName: string | null;
     email: string | null;
-    role: 'SUPER_USER' | 'CLIENT' | 'RETAILER' | null;
+    role: 'SUPER_USER' | 'CONTRACTOR' | 'PROVIDER' | null;
   } | null;
 };
 
@@ -162,8 +162,8 @@ export function ActivityLogTable({ entries, filters }: { entries: AuditEntry[]; 
               >
                 <option value="">Any</option>
                 <option value="SUPER_USER">Super User</option>
-                <option value="CLIENT">Client</option>
-                <option value="RETAILER">Retailer</option>
+                <option value="CONTRACTOR">Client</option>
+                <option value="PROVIDER">Retailer</option>
               </select>
             </label>
             <label className="text-sm text-concrete-grey">

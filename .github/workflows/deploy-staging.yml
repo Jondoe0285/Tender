@@ -1,12 +1,12 @@
 name: Approved Deploy to Staging
 
-# Deploys a reviewed commit from main to the staging slot and records the result.
+# Deploys the approved current staging commit to the staging slot and records the result.
 # A successful record from this workflow is the only thing that unlocks a production deployment.
 on:
   workflow_dispatch:
     inputs:
       commit_sha:
-        description: 'Exact 40-character commit SHA on main to deploy'
+        description: 'Exact 40-character commit SHA at the current staging head to deploy'
         type: string
         required: true
       staging_approval_statement:
@@ -31,10 +31,10 @@ jobs:
     outputs:
       verified: ${{ steps.approval.outputs.verified }}
     steps:
-      - name: Checkout main
+      - name: Checkout staging
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: staging
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -48,6 +48,7 @@ jobs:
           node scripts/health-check/verify-deployment-approval.mjs \
             --target staging \
             --sha "${{ github.event.inputs.commit_sha }}" \
+            --staging-ref origin/staging \
             --statement "${{ github.event.inputs.staging_approval_statement }}"
 
   deploy:
@@ -58,8 +59,6 @@ jobs:
     environment: staging
     permissions:
       contents: read
-    outputs:
-      base_url: ${{ steps.target.outputs.base_url }}
     services:
       postgres:
         image: postgres:16
@@ -127,15 +126,12 @@ jobs:
           curl --fail --silent --show-error --retry 2 --retry-all-errors \
             -X POST "${RENDER_STAGING_DEPLOY_HOOK}&ref=${{ github.event.inputs.commit_sha }}"
 
-      - name: Publish the staging URL
-        id: target
-        run: echo "base_url=${{ secrets.STAGING_BASE_URL }}" >> "$GITHUB_OUTPUT"
-
   verify:
     name: Verify staging deployment
     needs: [deploy]
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: staging
     permissions:
       contents: write
     outputs:
@@ -155,9 +151,11 @@ jobs:
       - name: Run non-destructive verification
         id: checks
         continue-on-error: true
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
         run: |
           node scripts/health-check/verify-deployment.mjs \
-            --base-url "${{ needs.deploy.outputs.base_url }}" \
+            --base-url "$STAGING_BASE_URL" \
             --target staging \
             --sha "${{ github.event.inputs.commit_sha }}"
 

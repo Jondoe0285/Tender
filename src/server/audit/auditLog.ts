@@ -1,4 +1,5 @@
 import { prisma } from '@/server/data/prisma';
+import type { Prisma } from '@prisma/client';
 
 type AuditEvent = {
   actorId: string | null;
@@ -8,9 +9,11 @@ type AuditEvent = {
   metadata?: Record<string, unknown>;
 };
 
+type AuditWriter = Pick<Prisma.TransactionClient, 'auditLog'>;
+
 /** Append-only audit trail. Never store secrets or unrestricted contact details here. */
-export async function recordAuditEvent(event: AuditEvent) {
-  await prisma.auditLog.create({
+export async function recordAuditEvent(event: AuditEvent, writer: AuditWriter = prisma) {
+  await writer.auditLog.create({
     data: {
       actorId: event.actorId,
       action: event.action,

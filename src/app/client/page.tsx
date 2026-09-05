@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
 import { LinkButton } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -8,7 +9,7 @@ import { prisma } from '@/server/data/prisma';
 
 export default async function ClientPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'CLIENT') redirect('/login');
+  if (!user || user.role !== 'CONTRACTOR') redirect('/login');
 
   const [openCount, quotesReceivedCount, awardedCount, recentTenders] = await Promise.all([
     prisma.tender.count({ where: { clientId: user.id, status: 'OPEN' } }),
@@ -33,7 +34,7 @@ export default async function ClientPage() {
       <div className="mx-auto max-w-4xl">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <p className="max-w-xl text-base leading-relaxed text-concrete-grey">
-            Raise a tender for materials, waste services, or plant hire, then compare Retailer quotes here.
+            Raise a tender for materials, waste services, or plant hire, then compare Provider quotes here.
           </p>
           <LinkButton href="/client/tenders/new" size="lg">Create Tender</LinkButton>
         </div>
@@ -49,9 +50,9 @@ export default async function ClientPage() {
 
         <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
           <h2 className="font-heading text-xl font-bold text-foundation-navy">Recent tenders</h2>
-          <a href="/client/tenders" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">
+          <Link href="/client/tenders" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">
             View all tenders &rarr;
-          </a>
+          </Link>
         </div>
         {recentTenders.length === 0 ? (
           <Card className="py-16 text-center">

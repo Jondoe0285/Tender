@@ -8,7 +8,7 @@ import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
 
 export async function GET() {
   try {
-    const user = await requireRole('RETAILER');
+    const user = await requireRole('PROVIDER');
     const [enabled, activePlacement, feeGbp] = await Promise.all([
       sponsoredPlacementEnabled(),
       prisma.retailerSponsoredPlacement.findFirst({ where: { retailerId: user.id, active: true } }),
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
-    const user = await requireRole('RETAILER');
+    const user = await requireRole('PROVIDER');
     const outcome = await requestSponsoredPlacement(user.id);
     return NextResponse.json(outcome);
   } catch (error) {

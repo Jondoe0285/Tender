@@ -1,8 +1,8 @@
-export const MANAGED_ACCOUNT_ROLES = ['CLIENT', 'RETAILER'] as const;
+export const MANAGED_ACCOUNT_ROLES = ['CONTRACTOR', 'PROVIDER'] as const;
 export type ManagedAccountRole = (typeof MANAGED_ACCOUNT_ROLES)[number];
 
 export function isManagedAccountRole(role: string | undefined): role is ManagedAccountRole {
-  return role === 'CLIENT' || role === 'RETAILER';
+  return role === 'CONTRACTOR' || role === 'PROVIDER';
 }
 
 export function canManageUserAccounts(role: string | undefined): boolean {

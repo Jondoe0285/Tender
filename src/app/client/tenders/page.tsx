@@ -8,7 +8,7 @@ import { prisma } from '@/server/data/prisma';
 
 export default async function MyTendersPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'CLIENT') redirect('/login');
+  if (!user || user.role !== 'CONTRACTOR') redirect('/login');
 
   const tenders = await prisma.tender.findMany({
     where: { clientId: user.id },

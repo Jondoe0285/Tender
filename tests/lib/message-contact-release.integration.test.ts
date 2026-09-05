@@ -30,10 +30,10 @@ test('retailer messaging requires contact release even after tender unlock', asy
 
   const [client, retailer] = await Promise.all([
     prisma.user.create({
-      data: { email: clientEmail, passwordHash: 'not-used', role: 'CLIENT', contactName: 'Integration Client' },
+      data: { email: clientEmail, passwordHash: 'not-used', role: 'CONTRACTOR', contactName: 'Integration Client' },
     }),
     prisma.user.create({
-      data: { email: retailerEmail, passwordHash: 'not-used', role: 'RETAILER', contactName: 'Integration Retailer' },
+      data: { email: retailerEmail, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Integration Retailer' },
     }),
   ]);
   clientId = client.id;
@@ -71,7 +71,7 @@ test('retailer messaging requires contact release even after tender unlock', asy
 
   await prisma.unlock.create({ data: { tenderId, retailerId, method: 'PAID' } });
 
-  const retailerActor = { id: retailerId, role: 'RETAILER' as const };
+  const retailerActor = { id: retailerId, role: 'PROVIDER' as const };
   await assert.rejects(
     () => listTenderMessages(tenderId, retailerActor),
     (error: unknown) => error instanceof ForbiddenError && error.message === 'Contact details must be released before messaging'
@@ -103,7 +103,7 @@ test('retailer messaging requires contact release even after tender unlock', asy
   const messages = await listTenderMessages(tenderId, retailerActor);
   assert.equal(messages.length, 1);
   assert.equal(messages[0]?.body, 'Can you confirm the delivery date?');
-  assert.equal(messages[0]?.senderRole, 'RETAILER');
+  assert.equal(messages[0]?.senderRole, 'PROVIDER');
 });
 
 test('contact release writes a minimal immutable audit event', async (context) => {
@@ -115,9 +115,6 @@ test('contact release writes a minimal immutable audit event', async (context) =
 
   context.after(async () => {
     if (quoteId) {
-      await prisma.$executeRawUnsafe('ALTER TABLE "AuditLog" DISABLE TRIGGER audit_log_immutable');
-      await prisma.auditLog.deleteMany({ where: { targetId: quoteId } });
-      await prisma.$executeRawUnsafe('ALTER TABLE "AuditLog" ENABLE TRIGGER audit_log_immutable');
       await prisma.$executeRawUnsafe('ALTER TABLE "ContactReleaseAuditEvent" DISABLE TRIGGER contact_release_audit_event_immutable');
       await prisma.contactReleaseAuditEvent.deleteMany({ where: { quoteId } });
       await prisma.$executeRawUnsafe('ALTER TABLE "ContactReleaseAuditEvent" ENABLE TRIGGER contact_release_audit_event_immutable');
@@ -131,8 +128,8 @@ test('contact release writes a minimal immutable audit event', async (context) =
   });
 
   const [client, retailer] = await Promise.all([
-    prisma.user.create({ data: { email: `release-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CLIENT', contactName: 'Release Client', contactPhone: '07123456789' } }),
-    prisma.user.create({ data: { email: `release-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'RETAILER', contactName: 'Release Retailer', contactPhone: '07987654321' } }),
+    prisma.user.create({ data: { email: `release-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CONTRACTOR', contactName: 'Release Client', contactPhone: '07123456789' } }),
+    prisma.user.create({ data: { email: `release-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Release Retailer', contactPhone: '07987654321' } }),
   ]);
   clientId = client.id;
   retailerId = retailer.id;

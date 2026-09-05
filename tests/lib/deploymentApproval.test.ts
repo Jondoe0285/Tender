@@ -66,6 +66,22 @@ test('accepts staging branch promotion approval for the current main commit', ()
   assert.match(result.output, /Authorisation verified/);
 });
 
+test('accepts staging deployment approval for the current staging commit', () => {
+  const result = runGate([
+    '--target',
+    'staging',
+    '--statement',
+    'DEPLOY APPROVED COMMIT TO STAGING',
+    '--sha',
+    headSha(),
+    '--staging-ref',
+    'HEAD',
+  ]);
+  rmSync('docs/health-check/deployment-approval.json', { force: true });
+  assert.equal(result.code, 0);
+  assert.match(result.output, /current head of staging/);
+});
+
 test('rejects production without a staging record', () => {
   rmSync(DIR, { recursive: true, force: true });
   const result = runGate([...PROD, '--sha', headSha(), '--staging-report', 'deploy-staging-missing']);

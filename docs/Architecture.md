@@ -5,7 +5,7 @@
 
 ## 1. Architecture Intent
 
-Trade Tender is a UK construction tendering platform for three roles: Super User, Client, and Retailer. The architecture must support structured tender creation, category and geographic matching, quote submission, comparison, payment-gated detail release, and auditable contact release.
+Trade Tender is a UK construction tendering platform for three roles: Super User, Contractor, and Provider. The architecture must support structured tender creation, category and geographic matching, quote submission, comparison, payment-gated detail release, and auditable contact release.
 
 This document describes the target production architecture. The existing repository is a Next.js prototype and must not be treated as evidence that production authentication, persistence, payment integration, or security controls are complete.
 
@@ -26,8 +26,8 @@ No technology or service addition should expand the approved product scope witho
 
 ```mermaid
 flowchart LR
-    Client[Client browser] --> Web[Next.js application]
-    Retailer[Retailer browser] --> Web
+    Contractor[Contractor browser] --> Web[Next.js application]
+    Provider[Provider browser] --> Web
     Admin[Super User browser] --> Web
     Web --> Auth[Authentication and authorization]
     Web --> Domain[Server workflows]
@@ -116,13 +116,13 @@ The Super User can manage approved platform configuration, users, categories, ma
 
 A Super User override may change an approved payment or launch-credit outcome only through a documented server-side command with a reason, actor, target, timestamp, and audit event. It must not silently expose data or bypass authorization.
 
-### Client
+### Contractor
 
-Clients can access only their account, their tenders, their submitted project data, quotes returned against their tenders, and contact information released through an authorized accepted-quote payment or waiver.
+Contractors can access only their account, their tenders, their submitted project data, quotes returned against their tenders, and contact information released through an authorized accepted-quote payment or waiver.
 
-### Retailer
+### Provider
 
-Retailers can access only their account, capabilities, coverage, matched summaries, tenders they have legitimately unlocked, their submitted quotes, and contact information released through an authorized accepted-quote payment or waiver.
+Providers can access only their account, capabilities, coverage, matched summaries, tenders they have legitimately unlocked, their submitted quotes, and contact information released through an authorized accepted-quote payment or waiver.
 
 Resource IDs are never authorization. Every query must apply the authenticated principal, role, ownership, and workflow state.
 
@@ -134,15 +134,15 @@ Owns registration, login, sessions, role assignment, account status, terms accep
 
 ### Tender Management
 
-Owns tender creation, structured project elements, identifiers, lifecycle status, deadlines, attachments, and Client ownership. It emits matching and notification work only after successful validation and persistence.
+Owns tender creation, structured project elements, identifiers, lifecycle status, deadlines, attachments, and Contractor ownership. It emits matching and notification work only after successful validation and persistence.
 
 ### Matching
 
-Matches tender elements to active Retailer capabilities and geographical coverage. Matching must not reveal protected project or contact information to the matching process consumers beyond what is required for approved notification summaries.
+Matches tender elements to active Provider capabilities and geographical coverage. Matching must not reveal protected project or contact information to the matching process consumers beyond what is required for approved notification summaries.
 
 ### Unlock and Visibility
 
-Calculates whether a Retailer has a valid launch credit, verified paid unlock, or approved waiver. It is the sole domain boundary for changing tender visibility.
+Calculates whether a Provider has a valid launch credit, verified paid unlock, or approved waiver. It is the sole domain boundary for changing tender visibility.
 
 ### Quote Management
 
@@ -154,7 +154,7 @@ Owns server-controlled fee calculation, Stripe checkout creation, webhook verifi
 
 ### Contact Release
 
-Owns the final release of Client and Retailer contact details. It must query trusted payment or waiver state, authorize both parties, write the release audit event, and return only the permitted contact data.
+Owns the final release of Contractor and Provider contact details. It must query trusted payment or waiver state, authorize both parties, write the release audit event, and return only the permitted contact data.
 
 ### Audit and Monitoring
 
@@ -162,19 +162,19 @@ Owns append-only payment, unlock, quote, contact-release, authorization, adminis
 
 ### Reporting
 
-Reads authorized, minimized projections of operational data. Reports must enforce the requesting Super User’s scope and must not become an alternate path to restricted Client or Retailer details.
+Reads authorized, minimized projections of operational data. Reports must enforce the requesting Super User’s scope and must not become an alternate path to restricted Contractor or Provider details.
 
 ## 9. Visibility State Model
 
 The platform should model visibility explicitly rather than infer it from browser state.
 
-| State | Retailer can see | Client can see |
+| State | Provider can see | Contractor can see |
 | --- | --- | --- |
 | Matched summary | Approved category, broad location, headline requirement, indicative timing, non-sensitive notes | Own tender and status |
-| Retailer unlocked | Full tender information needed to quote, including approved attachments | Own tender |
-| Quote submitted | Own quote and permitted tender data | Quote comparison without Retailer contact details |
+| Provider unlocked | Full tender information needed to quote, including approved attachments | Own tender |
+| Quote submitted | Own quote and permitted tender data | Quote comparison without Provider contact details |
 | Quote accepted, payment pending | No contact release | Accepted quote, no contact release |
-| Release payment confirmed or approved waiver | Released Client contact details where authorized | Released Retailer contact details where authorized |
+| Release payment confirmed or approved waiver | Released Contractor contact details where authorized | Released Provider contact details where authorized |
 
 The API, server-rendered output, email, files, exports, caches, and client state must enforce the same model.
 
@@ -182,11 +182,11 @@ The API, server-rendered output, email, files, exports, caches, and client state
 
 ```mermaid
 sequenceDiagram
-    participant R as Retailer
+    participant R as Provider
     participant App as Next.js server
     participant S as Stripe
     participant DB as PostgreSQL
-    participant C as Client
+    participant C as Contractor
 
     R->>App: Request tender unlock
     App->>App: Authenticate, authorize, validate
@@ -197,14 +197,14 @@ sequenceDiagram
     App-->>R: Return permitted full tender details
     R->>App: Submit formal quote
     App->>DB: Validate and persist linked quote
-    App-->>C: Notify Client of quote
+    App-->>C: Notify Contractor of quote
     C->>App: Accept quote
     App->>App: Validate acceptance and release eligibility
     App->>S: Create server-controlled release-fee checkout
     S-->>App: Verified webhook event
     App->>DB: Transactionally persist payment, release, and audit event
-    App-->>C: Return released Retailer contact details
-    App-->>R: Return released Client contact details
+    App-->>C: Return released Provider contact details
+    App-->>R: Return released Contractor contact details
 ```
 
 A redirect or client success message is never sufficient proof of payment. Webhook handling must verify signatures, deduplicate events, tolerate retries and ordering differences, and derive entitlement from trusted persisted state.
@@ -214,9 +214,9 @@ A redirect or client success message is never sufficient proof of payment. Webho
 Render PostgreSQL should contain normalized, access-controlled records for:
 
 - Users, roles, sessions, terms acceptance, and account status.
-- Retailer capabilities, categories, service areas, accreditations, and preferences.
+- Provider capabilities, categories, service areas, accreditations, and preferences.
 - Tenders, project elements, locations, deadlines, statuses, and attachments.
-- Tender-Retailer matches, notifications, launch credits, unlocks, and visibility state.
+- Tender-Provider matches, notifications, launch credits, unlocks, and visibility state.
 - Quotes, quote documents, identifiers, acceptance, and retention state.
 - Payments, Stripe event references, fee configuration, refunds, waivers, and idempotency keys.
 - Contact-release events, authorizing payment or waiver references, and released-data categories.
@@ -230,7 +230,7 @@ All schema changes require a reviewed migration. Unique constraints should prote
 - Validate authenticated ownership, file size, extension, MIME type, content signature, and business context server-side.
 - Normalize names and prevent path traversal, active content, oversized archives, and unsafe previews.
 - Issue short-lived authorized download URLs only after the visibility state permits access.
-- Do not enumerate, preview, cache, or expose Retailer attachments before unlock.
+- Do not enumerate, preview, cache, or expose Provider attachments before unlock.
 - Record security-relevant upload, access, rejection, release, and deletion events.
 
 ## 13. Notifications and Background Work
@@ -301,7 +301,7 @@ Before approving an architectural change:
 The target architecture is acceptable only when:
 
 - Protected access is authenticated and authorized server-side.
-- Client and Retailer details cannot be exposed before the required confirmed payment or approved waiver.
+- Contractor and Provider details cannot be exposed before the required confirmed payment or approved waiver.
 - Stripe webhooks are verified and idempotent.
 - Database queries are parameterised and schema changes have migrations.
 - Payment and contact-release state is transactionally consistent and auditable.

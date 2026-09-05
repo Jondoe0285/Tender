@@ -14,11 +14,6 @@ test('only the owning Client or a matched unlocked Retailer can retrieve a tende
   let tenderId: string | undefined;
 
   context.after(async () => {
-    if (tenderId) {
-      await prisma.$executeRawUnsafe('ALTER TABLE "AuditLog" DISABLE TRIGGER audit_log_immutable');
-      await prisma.auditLog.deleteMany({ where: { targetType: 'TenderAttachment', metadata: { contains: tenderId } } });
-      await prisma.$executeRawUnsafe('ALTER TABLE "AuditLog" ENABLE TRIGGER audit_log_immutable');
-    }
     if (tenderId) await prisma.unlock.deleteMany({ where: { tenderId } });
     if (tenderId) await prisma.tenderMatch.deleteMany({ where: { tenderId } });
     if (tenderId) await prisma.tender.deleteMany({ where: { id: tenderId } });
@@ -27,9 +22,9 @@ test('only the owning Client or a matched unlocked Retailer can retrieve a tende
   });
 
   const [client, retailer, lockedRetailer] = await Promise.all([
-    prisma.user.create({ data: { email: `attachment-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CLIENT', contactName: 'Attachment Client' } }),
-    prisma.user.create({ data: { email: `attachment-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'RETAILER', contactName: 'Attachment Retailer' } }),
-    prisma.user.create({ data: { email: `attachment-locked-${suffix}@example.test`, passwordHash: 'not-used', role: 'RETAILER', contactName: 'Locked Retailer' } }),
+    prisma.user.create({ data: { email: `attachment-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CONTRACTOR', contactName: 'Attachment Client' } }),
+    prisma.user.create({ data: { email: `attachment-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Attachment Retailer' } }),
+    prisma.user.create({ data: { email: `attachment-locked-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Locked Retailer' } }),
   ]);
   clientId = client.id;
   retailerId = retailer.id;
@@ -56,7 +51,7 @@ test('only the owning Client or a matched unlocked Retailer can retrieve a tende
   await prisma.tenderMatch.createMany({ data: [{ tenderId, retailerId }, { tenderId, retailerId: lockedRetailerId }] });
 
   await assert.rejects(
-    () => getTenderAttachmentForDownload(tenderId!, attachmentId, { id: lockedRetailerId!, role: 'RETAILER' }),
+    () => getTenderAttachmentForDownload(tenderId!, attachmentId, { id: lockedRetailerId!, role: 'PROVIDER' }),
     (error: unknown) => error instanceof ForbiddenError
   );
   await assert.rejects(
@@ -69,9 +64,9 @@ test('only the owning Client or a matched unlocked Retailer can retrieve a tende
   const unlockedTender = await getUnlockedTenderForRetailer(retailerId, tenderId);
   assert.deepEqual(unlockedTender.attachments, [{ id: attachmentId, fileName: 'site-plan.pdf', mimeType: 'application/pdf', sizeBytes: 4 }]);
 
-  const retailerAttachment = await getTenderAttachmentForDownload(tenderId, attachmentId, { id: retailerId, role: 'RETAILER' });
+  const retailerAttachment = await getTenderAttachmentForDownload(tenderId, attachmentId, { id: retailerId, role: 'PROVIDER' });
   assert.equal(retailerAttachment.content.toString(), 'test');
-  const clientAttachment = await getTenderAttachmentForDownload(tenderId, attachmentId, { id: clientId, role: 'CLIENT' });
+  const clientAttachment = await getTenderAttachmentForDownload(tenderId, attachmentId, { id: clientId, role: 'CONTRACTOR' });
   assert.equal(clientAttachment.content.toString(), 'test');
 
   const auditEvents = await prisma.auditLog.findMany({ where: { targetId: attachmentId, action: 'TENDER_ATTACHMENT_DOWNLOADED' } });
@@ -80,7 +75,7 @@ test('only the owning Client or a matched unlocked Retailer can retrieve a tende
 
   await prisma.tenderAttachment.delete({ where: { id: attachmentId } });
   await assert.rejects(
-    () => getTenderAttachmentForDownload(tenderId, attachmentId, { id: retailerId, role: 'RETAILER' }),
+    () => getTenderAttachmentForDownload(tenderId, attachmentId, { id: retailerId, role: 'PROVIDER' }),
     (error: unknown) => error instanceof ForbiddenError
   );
 });

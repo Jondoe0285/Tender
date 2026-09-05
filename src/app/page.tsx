@@ -1,18 +1,19 @@
 import Image from 'next/image';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
+import { LandingPartners } from '@/components/layout/LandingPartners';
 import { LinkButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 
 const portals = [
   {
-    eyebrow: 'For Clients',
+    eyebrow: 'For Contractors',
     title: 'One requirement in. Competing trade prices back.',
     description:
-      'Raise a tender for materials, waste services, or plant hire, then compare formal quotes from matched Retailers in one place.',
+      'Raise a tender for materials, waste services, or plant hire, then compare formal quotes from matched Providers in one place.',
   },
   {
-    eyebrow: 'For Retailers',
+    eyebrow: 'For Providers',
     title: 'Qualified demand, clearly specified.',
     description:
       'Review matched tender opportunities by category and coverage area, unlock full details, and submit a formal quote.',
@@ -61,6 +62,7 @@ export default function HomePage() {
             </Card>
           ))}
         </section>
+        <LandingPartners />
       </main>
       <SiteFooter />
     </div>

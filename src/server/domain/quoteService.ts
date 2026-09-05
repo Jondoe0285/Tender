@@ -107,7 +107,7 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
     action: emailResult.sent ? 'QUOTE_NOTIFICATION_SENT' : 'QUOTE_NOTIFICATION_FAILED',
     targetType: 'Quote',
     targetId: quote.id,
-    metadata: { recipientRole: 'CLIENT', reason: emailResult.sent ? undefined : emailResult.reason },
+    metadata: { recipientRole: 'CONTRACTOR', reason: emailResult.sent ? undefined : emailResult.reason },
   });
 
   return quote;

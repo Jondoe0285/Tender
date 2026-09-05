@@ -13,6 +13,239 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-05 - Authorized Test Role Recovery
+
+- Approval: Founder/product owner explicitly authorized a guessed role conversion for the configured test database after restoring the staging branch to the Provider/Contractor role model. Release owner and rollback owner: Founder/product owner.
+- Changed: pending a database backup, convert the test database Role enum from `USER` back to `CONTRACTOR` and `PROVIDER`. The recovery rule is: non-Super-Users with one or more configured matching service categories become Providers; other non-Super-Users become Contractors. Super Users remain unchanged.
+- Affects: configured test database role values and `UserRole` memberships only. No production/main resource, payment setting, contact-release state, tender record, or environment secret is changed.
+- Recovery: `pg_dump` is unavailable and the claim-only Neon project cannot create a management backup branch. The migration therefore writes an in-database `RoleRecoveryBackup` record for every User and UserRole before conversion; it preserves the prior `USER` values needed to reverse this test-only recovery.
+- Validation: migration `20260905030000_restore_test_contractor_provider_roles` applied to the configured test database after two rolled-back pre-change validation attempts. `RoleRecoveryBackup` contains 20 pre-conversion values; resulting role distribution is 4 Providers, 6 Contractors, and 2 Super Users. `npm test` passes (141 tests); `npm run build` passes. Deployment/login verification remains required after the staging branch is committed and deployed.
+
+### 2026-09-04 - Two-Level Contractor Service Provisions
+
+- Changed: tender packages now require only the selected service group and its service provision. For example, a Contractor can submit `Contractor Services` with `Groundworks & Civil Engineering` without selecting the optional third-level detailed provision.
+- Affects: Contractor tender-builder labels and client-side validation plus existing tender-schema regression coverage. Server-side catalogue relationship validation, Provider matching, tender identifiers, payments, contact-release controls, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/tender-schema.test.ts tests/lib/client-tender-builder.test.ts` passes (29 tests); `npm run type-check` passes.
+
+### 2026-09-04 - Contractor Tender Detail And Edit Workflow
+
+- Changed: Contractors can now open the full tender they own, including its requirements, package specifications, and their attachments, then edit its mutable timing, location, requirements, overall information, and existing package quantities/specifications. The tender ID, tender reference, package identities, matches, quote records, and Provider unlock records remain unchanged.
+- Changed: every successful tender edit is server-authorized, server-validated, content-moderated, atomically audited, and sends every currently matched Provider a non-sensitive tender-update email. A Provider who previously unlocked the tender retains that access and is not charged again.
+- Affects: Contractor tender detail and edit workflow, matched Provider notifications, and tender audit history. No database migration, payment calculation, contact-release behavior, tender identifier, or environment configuration changed.
+- Environment: no operator action required. Update emails use the existing configured Resend sender where present; otherwise the attempted notification is recorded as skipped without exposing tender details.
+- Validation: `npx tsx --test tests/lib/tender-package-model.test.ts` passes (4 tests); `npm run type-check` passes.
+
+### 2026-09-04 - Contractor Tender Deadline Screen Removal
+
+- Changed: moved the required quote-deadline input and its preset controls into the initial Contractor project-details screen, then removed the separate duplicate deadline step. The tender builder now proceeds from additional requirements to uploads, then review and submission.
+- Affects: Contractor tender-creation workflow and its focused regression coverage only. Server-side tender deadline validation, Provider visibility, matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/client-tender-builder.test.ts` passes (1 test); `npm run type-check` passes.
+
+### 2026-09-04 - Test Fixture Isolation For Tender Workflow Release
+
+- Changed: updated the tender-builder expectation for the guided per-service package screens and made membership billing coverage explicitly set and restore its VAT fixture. The test suite no longer depends on the active staging database's mutable VAT setting.
+- Affects: automated test coverage only. No production application behavior, pricing setting, database schema, migration, payment, contact-release, or environment configuration changed.
+- Environment: no operator action required; the membership test restores the prior VAT setting after execution.
+- Validation: focused affected tests pass (3 tests); `npm test` passes (137 tests).
+
+### 2026-09-04 - Full-Tender Provider Unlock Rule
+
+- Changed: confirmed and documented the Provider unlock rule: a Provider receives only its relevant pre-unlock opportunity summary, but one confirmed tender unlock releases the full tender job and every package. The Provider can price each tender item or mark it unavailable. No additional fee applies to other packages in that tender.
+- Affects: Provider visibility and quote workflow requirements plus package-unlock regression coverage. Existing server behavior already implements one payment/unlock per tender and returns every package only after that unlock; no schema, payment calculation, or environment configuration change is required.
+- Environment: no operator action required.
+- Validation: focused `npx tsx --test tests/lib/tender-package-model.test.ts` passes (3 tests); `npm run type-check` passes.
+
+### 2026-09-04 - Restore Approved Partner Records
+
+- Changed: added a narrow idempotent restoration utility for the three approved partners: Sinclair Safety Solutions Ltd, Smart Works Civils Ltd, and HSQE Consult Hub. It creates or updates only those records as active `FOOTER` partners in the approved display order, without running the broader demo-account seed.
+- Affects: configured database `Partner` records and public partner-information/footer display. No user accounts, tender matching, quote ranking, payments, contact release, or environment configuration changed.
+- Environment: executed against the configured staging test database at the Super User's request. The partner records remain editable through Super User partner management after restoration.
+- Validation: `npm run db:restore-initial-partners` restored 3 records. Database verification confirms all 3 are active `FOOTER` partners in the order Sinclair Safety Solutions Ltd, Smart Works Civils Ltd, then HSQE Consult Hub. `npm run type-check` passes.
+
+### 2026-09-04 - Landing Page Partner Information
+
+- Changed: added a restrained landing-page partner-information band after the role workspaces. It renders only active database-managed partner records through the existing minimal public display endpoint, labels the content clearly, and states that it is separate from tender matching, quote ranking, supplier selection, and Contractor decisions.
+- Affects: public landing page and active partner display only. No partner records, matching, quote comparison, payment, contact-release, analytics, or environment configuration changed.
+- Environment: no operator action required. Super Users continue to manage active partner records and their footer display order through the existing partner administration screen.
+- Validation: focused `npx tsx --test tests/lib/site-footer-partners.test.ts` passes (2 tests); `npm run type-check` passes.
+
+### 2026-09-04 - Contractor Job-First Tender Creation
+
+- Changed: reorganized the Contractor tender form around the job before its packages. The first step now captures project name, optional additional information, jobsite/delivery postcode, and all required service groups. Each selected service initializes a package on the next step, ensuring package details drive the existing category/location Provider matching and opportunity notification process.
+- Changed: added project urgency and an optional planned works start date to the same first step, before package completion and Provider notification. The stored `urgency` and `supplyDate` fields remain server-validated; the later step now collects only the quote deadline.
+- Changed: selected services now advance through one requirements screen per package, such as Materials Requirements followed by Waste Requirements, instead of presenting all selected packages on one screen.
+- Affects: Contractor tender form and product requirements only. Existing server-side tender/package validation, Provider matching, staged visibility, payments, and notification boundaries remain unchanged.
+- Environment: no operator action, migration, or configuration change required.
+- Validation: focused `npx tsx --test tests/lib/tender-schema.test.ts` passes (28 tests); `npm run type-check` passes.
+
+### 2026-09-04 - Staging Deployment Branch Alignment
+
+- Changed: aligned the approved staging deployment gate with the direct-to-`staging` workflow. It now requires the approved SHA to be the exact current `origin/staging` head rather than the `main` head, while retaining the protected staging environment, exact approval statement, clean PostgreSQL migration replay, production build, Render deploy hook, and post-deployment verification requirements.
+- Affects: staging deployment authorization workflow only. No Render service, staging environment variable, deploy hook, database, credential, or application runtime configuration was changed.
+- Environment: an authorized Render operator must add the missing `RENDER_STAGING_DEPLOY_HOOK` secret to the GitHub `staging` environment before deployment. The hook value is not recorded in this repository. Run the approved staging workflow only with the current staging SHA and its required approval statement.
+- Validation: `npm run health:validate-workflows` and focused deployment-authorization tests pass.
+
+### 2026-09-04 - Owner Password Verification Utility
+
+- Changed: added `npm run db:verify-owner-password`, which prompts for an owner password without echoing it and compares it against the configured `PLATFORM_OWNER_EMAIL` account's existing hash. It reports only match or mismatch and never changes the user row, session state, or audit log.
+- Affects: local development diagnostic workflow only. No account password, staging or production environment resource, integration setting, credential, or deployment configuration is changed.
+- Environment: run the command in a terminal connected to the intended database. It is a non-destructive diagnostic and does not reset credentials.
+- Validation: `npm run type-check` passes. The utility prompts without echoing the supplied password and reports only whether it matches; no account state is modified.
+
+### 2026-09-04 - Preserve Existing Owner Passwords During Seeding
+
+- Changed: stopped `prisma/seed.ts` from rewriting an existing `PLATFORM_OWNER_EMAIL` account's password hash. The seed retains role and account-status normalization, but only uses `PLATFORM_OWNER_PASSWORD` when creating a missing owner account. This prevents a routine seed against an existing development database from silently replacing an operator's known password.
+- Affects: local development seed behavior and future owner password preservation only. No account password, database schema, migration, staging or production environment resource, integration setting, or deployment configuration was changed.
+- Environment: existing owner passwords are intentionally preserved. Create a new local database or use the normal authenticated reset flow to establish a different password; do not use routine seeding as a password-reset mechanism.
+- Validation: focused `npx tsx --test tests/lib/seed-owner-password.test.ts` and `npm run type-check` pass.
+
+### 2026-09-03 - High-Severity Dependency Remediation
+
+- Changed: upgraded Next.js and its matching ESLint/React toolchain from the vulnerable Next 14 release line to Next 16.3.4, React 19.2.8, ESLint 9, and the corresponding React type packages. Replaced the removed `next lint` command and legacy ESLint configuration with the supported flat configuration. Added a root dependency override for Prisma 6's vulnerable `deepmerge-ts` 7.1.5 transitive dependency, resolving it to 8.0.0 without downgrading the final Prisma 6 release.
+- Changed: completed the required Next 16 compatibility migration. Dynamic API and Super User routes now await promise-based `params`. The login page is again a Server Component and delegates its interactive form to a dedicated Client Component, preventing the database-backed async footer from being bundled into the browser and restoring the sign-in page.
+- Changed: made the shared footer client-safe for all interactive pages. It now obtains a minimal list of active footer partners from a public display-only endpoint rather than importing Prisma. This prevents Prisma from being bundled into the browser on registration, password-reset, and authenticated portal pages while retaining database-managed partner placement.
+- Affects: application build/lint toolchain and dependency lockfile only. No application workflow, database schema, migration, payment, contact-release, or staging/production environment resource changes.
+- Environment: Render already uses Node 20, which satisfies the Next 16 and Prisma runtime requirements. Local validation must use Node 20, 22, or 24; the current local Node 24 is supported by Prisma but not the repository's declared Node 20 release policy.
+- Validation: `npm audit --audit-level=high` reports zero vulnerabilities. `npm run lint` passes with two pre-existing non-blocking warnings; `npm run type-check`, `npm test` (134 passing), and `npm run build` pass. Browser checks confirm login, registration, and password-reset pages render without async Client Component errors. The configured owner credentials complete the local NextAuth callback and redirect to `/super-user`. The build reports the existing `middleware`-to-`proxy` deprecation, which requires separate route-boundary regression testing before migration.
+
+### 2026-09-03 - Staging Deployment Verification URL Repair
+
+- Changed: corrected the staging deployment workflow so its verification job reads `STAGING_BASE_URL` directly within the protected staging environment. GitHub masks that environment value and omits it when it is exposed as a cross-job output, which previously passed an empty base URL to the non-destructive verifier after Render accepted the deployment hook.
+- Affects: `.github/workflows/deploy-staging.yml` release verification only. No Render service, staging environment variable, credential, deploy hook, database, or application runtime configuration was changed.
+- Environment: no operator action or environment-resource change is required. The next approved staging deployment continues to require its existing protected-environment approval and will use the already configured `STAGING_BASE_URL` value.
+- Validation: `npm run health:validate-workflows` passes. The repair is based on failed approved staging deployment run `33648207019`, whose verifier exited before issuing any live probe because `--base-url` was empty.
+
+### 2026-09-03 - Contractor Services And Operating Locations
+
+- Changed: added company-level Contractor services and operating locations. The Contractor profile now lets the primary company user select approved tender catalogue service groups and UK counties or regions. The API validates every value server-side before storing the company-level lists; additional company users can view, but cannot change, shared company details.
+- Affects: Prisma `ClientCompany`, migration `20260903040000_add_client_company_services_and_operating_locations`, Contractor profile API and UI. No matching eligibility, tender visibility, payment, contact-release, or external environment configuration changes.
+- Environment: apply the new migration only through `prisma migrate deploy` after the required environment approval, backup/rollback evidence, and change-register release record. Existing Contractor companies receive empty lists.
+- Validation: `npx prisma validate`, `npm run db:generate`, `npm run type-check`, and local `npm run db:deploy` pass.
+
+### 2026-09-03 - Contractor And Professional Service Catalogue
+
+- Changed: added the supplied initial construction service provisions to the tender catalogue. `Contractor Services` contains fourteen selectable categories covering civil engineering through workforce supply; `Professional Services` contains surveying/design/engineering and safety/compliance/consultancy. Each category starts with its supplied provision description and can be edited or deactivated through the existing Super User category editor, with active database overrides included in Contractor tender creation and server validation.
+- Affects: Contractor tender and package selection, Provider capability matching categories, Super User category administration, and tender input validation. No schema migration, pricing, payment, contact-release, or environment configuration changes.
+- Environment: no operator action required. Super Users may refine initial provisions through the existing categories administration surface.
+- Validation: focused `npx tsx --test tests/lib/tender-schema.test.ts` passes (28 tests); `npm run type-check` passes.
+
+### 2026-09-03 - Progressive Contractor Release-Fee Third Band
+
+- Changed: extended the inactive percentage-based Contractor accepted-quote release fee with a third progressive band. The server now calculates 1% for the first £10,000, 0.5% for the next £90,000, and 0.25% for any remaining quote value, rounding the aggregate fee to whole pence. The Owner settings panel separately configures each rate. Fixed £10 release-fee mode remains the default approved active revenue model.
+- Affects: platform fee settings, Owner configuration UI, release-payment fee calculation, and focused calculation coverage. No schema migration, payment integration, payment state, contact-release entitlement, or external environment configuration changes.
+- Environment: no operator action is required while fixed fee mode remains active. An Owner must explicitly select percentage mode before new release payments use the progressive rates.
+- Validation: focused `npx tsx --test tests/lib/tender-schema.test.ts` passes (27 tests); `npm run type-check` passes.
+
+### 2026-09-03 - Phase 3 Job / Tender-Package Schema Foundation And Creation Flow
+
+- Changed: introduced the initial `TenderPackage` data model as the schema foundation for the job/tender-package rework. Each package belongs to a parent `Tender` job, has its own package reference and package-scoped fields, and is stored with the same status and lifecycle semantics as the current tender record. Existing single-package tenders remain valid; migration backfill creates one package per existing tender so no historical data is lost. The contractor tender creation path now stores a package row for the primary tender item and one row per additional package item, ensuring the job record and package rows are created together instead of leaving the schema foundation unused.
+- Affects: Prisma schema, generated client, migration `20260903030000_add_tender_packages`, `createTender` job creation, and package-first regression coverage. Matching engine, Provider unlock flow, quote flow, analytics filters, and production configuration remain pending Phase 3 work.
+- Environment: migration applies only through Prisma migration deployment. Existing tender records are preserved and backfilled into package rows in the same deploy.
+- Validation: `npx prisma validate`, `npx prisma generate`, the focused package-model regression test, `npm run type-check`, and `git diff --check` pass.
+
+### 2026-09-03 - Phase 3 Package-Aware Matching And Provider Visibility
+
+- Changed: completed the package-aware lifecycle update beyond the schema foundation. Matching eligibility now combines the parent job's package categories with line-item categories so a Provider is evaluated against the actual package mix rather than a single tender-level category bucket. The Provider opportunity summaries include package metadata (`packageCount`, `packageCategories`) so multi-package jobs are visible and ranked correctly. Unlocked tender detail and metadata now return package rows so a Provider sees the package makeup in the unlocked view instead of a legacy single-item tender description. The contractor creation flow already writes package rows for the main and additional line items during a single job submission, and the provider-side summaries now also reflect the package mix.
+- Affects: `tenderService`, `listMatchedSummariesForRetailer`, job/tender detail API responses, retailer opportunity/detail UI, and tender creation package rows. Phase 3 is treated as complete for the implemented package-model lifecycle and matching visibility work; further package-level quote and analytics refinement remains a future enhancement if the product scope expands beyond the current branch.
+- Environment: no new migration or external config changes required; this is application-layer rework only.
+- Validation: `npm run type-check` and the focused package regression test pass. The last verification run reported `3` passing tests and `0` failures.
+
+### 2026-09-03 - Phase 4 Subscription Tier Pricing Alignment
+
+- Changed: finalised the inactive default membership tier catalog so the feature is ready for later activation without changing the live revenue model. The default list now includes `Free`, `Starter`, `Growth`, `Pro`, and `Enterprise` with the approved pricing structure (`£0`, `£29`, `£49`, `£99`, and `£199` for the enterprise default). The catalog is seeded in both the runtime app and the local Prisma seed, and any missing tier row is corrected back to the approved inactive state so the feature remains off until the Super User toggles it on.
+- Affects: membership tier defaults, local seed data, and admin settings reads. No activation flag or revenue behavior is changed; `MEMBERSHIP_TIERS_ACTIVE` stays off unless explicitly toggled by the Owner.
+- Environment: no production or staging config change required. Local seed and runtime seeding remain development-only defaults, with activation still controlled by the Owner platform setting.
+- Validation: the focused membership pricing regression and the existing membership purchase gate test pass under the project test runner.
+
+### 2026-09-03 - Phase 2 Initial Partner Records
+
+- Changed: moved the approved HSQE Consult Hub logo into `public/images/HSQE_ConsultHub_Stacked_Light.png`, added migration `20260903020000_allow_partners_without_destination_url`, and seeded the three approved active footer partners idempotently: Sinclair Safety Solutions Ltd, Smart Works Civils Ltd, and HSQE Consult Hub. HSQE has no destination URL and is rendered as a non-clickable logo until one is approved; supplied partner links remain HTTPS-only.
+- Affects: local Partner schema, approved public asset, local seed data, Partner administration validation, and footer rendering. No advertising cookies, payments, tracking, tender matching, quote ranking, or supplier-selection behavior changed.
+- Environment: the nullable-destination migration and partner seed ran only against the configured local development database. Apply to staging or production only with the required approval, backup/rollback evidence, and recorded release validation.
+- Validation: `npx prisma validate`, `npm run db:generate`, `npm run db:deploy`, and `npm run db:seed` pass. Local database verification confirms all three active `FOOTER` records in sort order, with `null` only for HSQE's destination URL. Focused Partner/footer tests, `npm run type-check`, `npm run lint`, editor diagnostics, and `git diff --check` pass.
+
+### 2026-09-03 - Phase 2 Server-Rendered Footer Partners
+
+- Changed: replaced the hardcoded footer partner links with a server-rendered query of active `Partner` records scoped to the `FOOTER` display location and ordered by configured sort order then name. The footer displays the section only when active partners exist, labels it "Partner advertising", and keeps the required statement that advertising is separate from tender matching, quote ranking, supplier selection, and Contractor decisions.
+- Affects: public footer rendering and Partner database reads only. No partner records were created, no advertising settings/cookies/payments were activated, and no tender matching, quote ranking, or supplier-selection behavior changed.
+- Environment: no operator action.
+- Validation: `npm run type-check`, focused `npx tsx --test tests/lib/site-footer-partners.test.ts`, `npm run lint`, editor diagnostics, and `git diff --check` pass. `npm run build` remains blocked by the previously recorded unrelated missing `pdf-lib` files in `node_modules`.
+
+### 2026-09-03 - Phase 2 Partner Administration
+
+- Changed: added full Super User-only partner management at `/super-user/partners` and `/api/super-user/partners`. The server validates each strict create, update, activation, and reorder request, rejects cross-origin mutations, validates a complete current location ordering before changing it, and writes transaction-backed minimal audit events for every change.
+- Affects: Partner administration UI and API plus `AuditLog` records. No partner rendering, advertising placement or activation, cookies, tender matching, quote ranking, supplier selection, payments, database migration, seed data, or environment configuration changed.
+- Environment: no operator action.
+- Validation: focused `npx tsx --test tests/lib/partner-schema.test.ts`, `npm run type-check`, `npm run lint`, and `git diff --check` pass.
+
+### 2026-09-03 - Phase 2 Partner Model And Migration
+
+- Changed: added the inactive-by-default `Partner` model and PostgreSQL migration `20260903010000_add_partners`. Each partner has a unique name, approved logo path, destination URL, display location, optional campaign source, stable sort order, active status, and timestamps. The location/active/order index supports the later server-rendered placement query and Super User reorder control.
+- Affects: local database schema and generated Prisma client only. No partner records, advertising placement, Super User UI, payment behavior, cookies, or environment configuration were activated or changed.
+- Environment: migration applied only to the configured local development database through `npm run db:deploy`. Apply to staging or production only with the required approval, rollback evidence, and recorded release validation.
+- Validation: `npx prisma validate`, `npm run db:generate`, and local `npm run db:deploy` pass with no schema diagnostics.
+
+### 2026-09-03 - Phase 1 Documentation Alignment
+
+- Changed: aligned active documentation and repository instructions with the completed Contractor/Provider role terminology. Updated the Phase 1 README checklist and active product, security, architecture, readiness, brand, and advertising documentation. No application code, Prisma schema or migrations, environment resource, or historical change-register entry was changed.
+- Affects: active documentation and contributor instructions only, including current outstanding-action terminology. Technical lowercase routes, model/field identifiers, and earlier historical records remain unchanged where they are implementation or audit references.
+- Environment: no operator action.
+- Validation: active-document terminology scans confirm that any remaining Client/Retailer matches are only generic technical usage, preserved legacy route/model references, or earlier historical records. `git diff --check` passes.
+
+### 2026-09-03 - Phase 1 Persisted Role Enum Rename
+
+- Changed: renamed PostgreSQL `Role` values `CLIENT` to `CONTRACTOR` and `RETAILER` to `PROVIDER` using in-place `ALTER TYPE ... RENAME VALUE` statements in `prisma/migrations/20260903000000_rename_role_enum_values/migration.sql`. Updated `prisma/schema.prisma`, executable TypeScript role checks/types, authentication session handling, registration payload validation, administration permissions, email recipient roles, local seed data, and test fixtures. `SUPER_USER` remains unchanged. Legacy database relation/model/column names, `/api/client` and `/api/retailer` endpoints, and `/client` and `/retailer` redirect paths remain unchanged by design.
+- Affects: `User.role`, `UserRole.role`, authenticated workspace authorization, registration, role-scoped APIs, email notifications, local seed data, and tests. The enum-label rename preserves existing role-column data.
+- Environment: apply only through Prisma migration deployment, never `db push`. For local development, use the direct local-only `DATABASE_URL_UNPOOLED` connection. Do not apply this migration to staging or production without the separately required approval, backup/rollback evidence, and recorded release validation.
+- Validation: the migration applied successfully through `npm run db:deploy` to the configured local development database. `npm run db:generate`, `npm run type-check`, `npm run lint`, and `git diff --check` pass. The focused workspace/admin tests pass. The full suite has 120 passing tests; five unrelated existing integration-test failures remain because immutable `AuditLog` cleanup is rejected and placeholder local Stripe/Resend credentials cannot process external payment/email calls. No old role enum literals remain in source, local seed data, or tests.
+
+### 2026-09-03 - Phase 1 Contractor And Provider Route Aliases
+
+- Changed: added protected `/contractor` and `/provider` canonical portal aliases. Middleware applies the existing `CLIENT`/`RETAILER` role checks to both legacy and canonical prefixes, redirects authenticated legacy `/client` and `/retailer` requests to their canonical equivalents, and rewrites authorised canonical requests to the existing portal route trees. Shared navigation and role workspaces now target the canonical paths, and validated page-view tracking accepts both canonical and legacy prefixes.
+- Affects: protected portal routing, navigation, and analytics path validation. No role enum, database schema, API contract, authorization policy, payment/release control, or environment configuration changed.
+- Environment: no operator action.
+- Validation: `npm run type-check` passes. A local development server compiled the middleware; unauthenticated requests to `/contractor`, `/provider`, `/client`, and `/retailer` all returned an authentication redirect with the expected callback path. `npm run build` remains blocked by pre-existing missing `pdf-lib/es/core/objects/PDF*` files in `node_modules`, unrelated to this change.
+
+### 2026-09-03 - Phase 1 User-Facing Role Terminology
+
+- Changed: renamed user-facing Client/Retailer labels and copy to Contractor/Provider across public pages, rendered policies, shared portal navigation and workspaces, registration, Super User administration and reporting, membership UI, tender messaging, and operational email templates. Legacy `CLIENT`/`RETAILER` role values, database columns, API/query names, and `/client`/`/retailer` routes are intentionally unchanged until their dedicated later Phase 1 checklist actions.
+- Affects: user-visible application copy and outgoing notification copy only. No authorization logic, schema, API contract, environment configuration, or payment/release control changed.
+- Environment: no operator action.
+- Validation: `npm run type-check` passes after each implementation batch; `npm run lint` passes with no warnings or errors; `git diff --check` passes.
+
+### 2026-09-03 - Four Quick-Win Outstanding Actions Completed
+
+- Changed: fixed 4 small, self-contained items from the README Outstanding Actions list. Corrected the tender-creation upload copy so it no longer implies Retailers can preview attachments before unlock ([src/app/client/tenders/new/page.tsx](../src/app/client/tenders/new/page.tsx)). Replaced the plain-text initial password field on the Super User creation form with the shared `PasswordInput` reveal control ([src/components/admin/OwnerConsolePanel.tsx](../src/components/admin/OwnerConsolePanel.tsx)). Moved the quote comparison table/card breakpoint from `md` to `lg` so tablet widths use the condensed card layout instead of forcing horizontal scroll ([src/components/quotes/QuoteComparison.tsx](../src/components/quotes/QuoteComparison.tsx)). Added Escape-to-close and Tab focus trapping to the mobile navigation dialog ([src/components/layout/AppShell.tsx](../src/components/layout/AppShell.tsx)).
+- Affects: UI copy and layout only. No schema, API, or environment changes.
+- Environment: no operator action.
+- Validation: `npm run type-check` and `npm run lint` pass. No behavioral/schema change, so no new automated test was required; manual keyboard/tablet verification recommended before the next staging deploy.
+
+### 2026-09-03 - Phased Implementation Plan For New Business Plan
+
+- Changed: added a "New Business Plan Implementation Plan" section to [README.md](../README.md), breaking the 4 code-affecting baseline decisions into four sequential phases: (1) Contractor/Provider terminology rename (labels/routes first, `Role` enum migration last, as the highest-risk step), (2) active Super-User-managed partner advertising, (3) job/tender-package data model and matching engine rework, (4) subscription tier price alignment (still inactive).
+- Affects: [README.md](../README.md) only. No application code, schema, or environment configuration changed.
+- Status: planning only; no phase has started.
+- Environment: no operator action.
+- Validation: none yet; documentation only.
+
+### 2026-09-03 - Baseline Business Plan Decisions Resolved
+
+- Changed: the Super User resolved all 10 open conflicts raised against the 2026-09-03 baseline business plan. Resolved: (1) Client→Contractor/Retailer→Provider is a pure rename, no new roles; (2) job-package tender splitting is approved as specified and requires a new data model/matching engine; (3) no fee changes — current £10/£10 fees and existing fee-setting controls stay; (4) current tender/quote identifier format stays, the `JOB-YYYYMMDD` scheme is not adopted; (5) active Super-User-managed partner advertising is approved; (6) no Provider confirmation step — quote lifecycle stays a single Contractor action; (7) Retailer/Provider accounts stay self-serve, no approval gate; (8) current approved brand palette stays, the proposed Construction Navy/Safety Orange palette is not adopted; (9) the plan's Azure hosting reference is a legacy artifact — Render/Neon stays; (10) the Free £0/Starter £29/Growth £49/Pro £99/Enterprise £149–199 subscription tiers are confirmed as the future pricing model for whenever Provider subscriptions are activated (feature stays built-but-inactive until then).
+- Affects: [docs/TradeTender-Business-Plan.md](TradeTender-Business-Plan.md) (Baseline Change Notes section), [.github/copilot-instructions.md](../.github/copilot-instructions.md) (Roles section updated to Contractor/Provider terminology, rename not yet applied to code). No application code, schema, or environment configuration changed yet.
+- Status: still a planning-stage change. The role rename (item 1) and job-package data model (item 2) are large, separate implementation phases not yet started.
+- Environment: no operator action.
+- Validation: none yet; documentation only.
+
+### 2026-09-03 - New Baseline Business Plan (Contractor/Provider Model)
+
+- Changed: replaced [docs/TradeTender-Business-Plan.md](TradeTender-Business-Plan.md) with a new baseline business plan supplied by the Super User, covering a Contractor/Provider/Super User model, job-based tenders split into per-category "tender packages," a £5 Provider quote participation fee, a percentage-based (or, per an internal inconsistency in the source, fixed £10) Contractor Accepted Quote Release Fee, active Super-User-managed partner advertising, a new job/package/quote identifier scheme, and a proposed new brand colour palette.
+- Affects: no application code, schema, or environment configuration yet. Documentation only.
+- Status: **not implemented**. This is a scope-defining document only. Ten open conflicts/decisions are recorded in the "Baseline Change Notes" section at the end of the business plan and must be resolved with the Super User before implementation begins, including the role-rename scope, the tender-package data model, the fee inconsistency, and the brand-palette conflict with the existing approved Brand Guide.
+- Environment: no operator action.
+- Validation: none yet; this is a planning document change, not a code change.
+
 ### 2026-09-02 - Add HSQE Consult Hub As Third Named Partner
 
 - Changed: added HSQE Consult Hub as a third clearly labelled partner alongside Sinclair Safety Solutions Ltd and Smart Works Civils Ltd. HSQE Consult Hub does not yet have a website, so its logo is displayed without an outbound link (no `<a>` wrapper) until one is provided.

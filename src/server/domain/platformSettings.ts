@@ -7,7 +7,8 @@ const defaultSettings: Record<string, string> = {
   CLIENT_RELEASE_FEE_GBP: String(CLIENT_RELEASE_FEE_GBP),
   CLIENT_RELEASE_FEE_MODE: 'FIXED',
   CLIENT_RELEASE_PERCENTAGE_LOW: '1',
-  CLIENT_RELEASE_PERCENTAGE_HIGH: '1',
+  CLIENT_RELEASE_PERCENTAGE_HIGH: '0.5',
+  CLIENT_RELEASE_PERCENTAGE_TOP: '0.25',
   VAT_PERCENTAGE: '20',
   SPONSORED_PLACEMENT_ACTIVE: 'false',
   SPONSORED_PLACEMENT_FEE_GBP: '25',
@@ -77,9 +78,17 @@ export function buildPaymentAmounts(netAmountGbp: number, vatPercentage: number)
   };
 }
 
-export function calculatePercentageFee(quotePriceGbp: number, lowPercentage: number, highPercentage: number): number {
-  const percentage = quotePriceGbp <= 10000 ? lowPercentage : highPercentage;
-  return Math.floor(quotePriceGbp * percentage) / 100;
+export function calculatePercentageFee(quotePriceGbp: number, lowPercentage: number, highPercentage: number, topPercentage: number): number {
+  const quotePence = Math.round(quotePriceGbp * 100);
+  const firstBandPence = Math.min(quotePence, 1_000_000);
+  const secondBandPence = Math.min(Math.max(quotePence - 1_000_000, 0), 9_000_000);
+  const topBandPence = Math.max(quotePence - 10_000_000, 0);
+  const feePence = Math.round(
+    firstBandPence * (lowPercentage / 100)
+    + secondBandPence * (highPercentage / 100)
+    + topBandPence * (topPercentage / 100)
+  );
+  return feePence / 100;
 }
 
 export async function getClientReleaseFeeGbp(quotePriceGbp: number): Promise<number> {
@@ -87,7 +96,8 @@ export async function getClientReleaseFeeGbp(quotePriceGbp: number): Promise<num
   if (mode !== 'PERCENTAGE') return getPaymentFeeGbp('CLIENT_RELEASE');
   const lowPercentage = Number(await getPlatformSetting('CLIENT_RELEASE_PERCENTAGE_LOW'));
   const highPercentage = Number(await getPlatformSetting('CLIENT_RELEASE_PERCENTAGE_HIGH'));
-  return calculatePercentageFee(quotePriceGbp, lowPercentage, highPercentage);
+  const topPercentage = Number(await getPlatformSetting('CLIENT_RELEASE_PERCENTAGE_TOP'));
+  return calculatePercentageFee(quotePriceGbp, lowPercentage, highPercentage, topPercentage);
 }
 
 export async function isAdspaceActive(): Promise<boolean> {
@@ -100,7 +110,7 @@ export async function getAdminSettings() {
     prisma.membershipTier.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.subscriptionPlan.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.categoryDefinition.findMany({ orderBy: [{ service: 'asc' }, { name: 'asc' }] }),
-    prisma.user.findMany({ where: { role: 'RETAILER' }, select: { id: true, email: true, retailerProfile: { select: { companyName: true } }, memberships: { where: { active: true }, include: { tier: true } }, subscriptions: { where: { active: true }, include: { plan: true } } }, orderBy: { createdAt: 'asc' } }),
+    prisma.user.findMany({ where: { role: 'PROVIDER' }, select: { id: true, email: true, retailerProfile: { select: { companyName: true } }, memberships: { where: { active: true }, include: { tier: true } }, subscriptions: { where: { active: true }, include: { plan: true } } }, orderBy: { createdAt: 'asc' } }),
   ]);
   return {
     fees: {
@@ -109,6 +119,7 @@ export async function getAdminSettings() {
       clientReleaseMode: settings.find((setting) => setting.key === 'CLIENT_RELEASE_FEE_MODE')?.value ?? defaultSettings.CLIENT_RELEASE_FEE_MODE,
       clientReleasePercentageLow: Number(settings.find((setting) => setting.key === 'CLIENT_RELEASE_PERCENTAGE_LOW')?.value ?? defaultSettings.CLIENT_RELEASE_PERCENTAGE_LOW),
       clientReleasePercentageHigh: Number(settings.find((setting) => setting.key === 'CLIENT_RELEASE_PERCENTAGE_HIGH')?.value ?? defaultSettings.CLIENT_RELEASE_PERCENTAGE_HIGH),
+      clientReleasePercentageTop: Number(settings.find((setting) => setting.key === 'CLIENT_RELEASE_PERCENTAGE_TOP')?.value ?? defaultSettings.CLIENT_RELEASE_PERCENTAGE_TOP),
       vatPercentage: Number(settings.find((setting) => setting.key === 'VAT_PERCENTAGE')?.value ?? defaultSettings.VAT_PERCENTAGE),
       sponsoredPlacementActive: (settings.find((setting) => setting.key === 'SPONSORED_PLACEMENT_ACTIVE')?.value ?? defaultSettings.SPONSORED_PLACEMENT_ACTIVE) === 'true',
       sponsoredPlacementFeeGbp: Number(settings.find((setting) => setting.key === 'SPONSORED_PLACEMENT_FEE_GBP')?.value ?? defaultSettings.SPONSORED_PLACEMENT_FEE_GBP),

@@ -5,10 +5,12 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { ForbiddenError } from '@/server/auth/session';
 import { assertRetailerEligibleForTender, assertTenderOpenForActivity } from '@/server/domain/tenderService';
 import { membershipTiersEnabled } from '@/server/domain/membershipService';
+import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
 
 type UnlockOutcome =
   | { status: 'ALREADY_UNLOCKED' }
   | { status: 'UNLOCKED_WITH_CREDIT' }
+  | { status: 'UNLOCKED_WITHOUT_PAYMENT_REQUIRED' }
   | { status: 'PAYMENT_REQUIRED'; paymentId: string; checkoutUrl: string | null; devMode: boolean };
 
 /** Sole entry point for changing tender visibility for a Retailer (SEC-032/033). */
@@ -20,6 +22,19 @@ export async function requestUnlock(retailerId: string, tenderId: string): Promi
     where: { tenderId_retailerId: { tenderId, retailerId } },
   });
   if (existing) return { status: 'ALREADY_UNLOCKED' };
+
+  const unlockFeeGbp = await getPaymentFeeGbp('RETAILER_UNLOCK');
+  if (unlockFeeGbp <= 0) {
+    await prisma.unlock.create({ data: { tenderId, retailerId, method: 'WAIVED' } });
+    await recordAuditEvent({
+      actorId: retailerId,
+      action: 'TENDER_UNLOCKED',
+      targetType: 'Tender',
+      targetId: tenderId,
+      metadata: { method: 'WAIVED', feeGbp: 0 },
+    });
+    return { status: 'UNLOCKED_WITHOUT_PAYMENT_REQUIRED' };
+  }
 
   const profile = await prisma.retailerProfile.findUnique({ where: { userId: retailerId } });
   if (profile && profile.launchCreditsLeft > 0) {
@@ -129,6 +144,22 @@ export async function getUnlockedTenderForRetailer(retailerId: string, tenderId:
       },
       items: {
         select: { id: true, category: true, subcategory: true, item: true, quantity: true, description: true },
+        orderBy: { createdAt: 'asc' },
+      },
+      packages: {
+        select: {
+          id: true,
+          reference: true,
+          category: true,
+          subcategory: true,
+          service: true,
+          item: true,
+          quantity: true,
+          description: true,
+          urgency: true,
+          closingDate: true,
+          status: true,
+        },
         orderBy: { createdAt: 'asc' },
       },
     },

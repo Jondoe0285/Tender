@@ -8,7 +8,8 @@ import { createPasswordResetToken, PASSWORD_RESET_EXPIRY_LABEL } from '@/server/
 import { appUrl, passwordResetTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
 
@@ -90,7 +91,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   if (action === 'set-release-credits') {
-    if (user.role !== 'CLIENT') {
+    if (user.role !== 'CONTRACTOR') {
       return NextResponse.json({ error: 'Release credits only apply to Client accounts' }, { status: 400 });
     }
     const releaseCreditsLeft = Number(body?.releaseCreditsLeft);
@@ -121,7 +122,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   if (action === 'set-launch-credits') {
-    if (user.role !== 'RETAILER') {
+    if (user.role !== 'PROVIDER') {
       return NextResponse.json({ error: 'Launch credits only apply to Retailer accounts' }, { status: 400 });
     }
     const launchCreditsLeft = Number(body?.launchCreditsLeft);
@@ -148,7 +149,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
 

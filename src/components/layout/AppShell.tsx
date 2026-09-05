@@ -18,14 +18,14 @@ const navByRole: Record<Role, NavGroup[]> = {
 };
 
 const roleLabels: Record<Role, string> = {
-  client: 'Client space',
-  retailer: 'Retailer space',
+  client: 'Contractor space',
+  retailer: 'Provider space',
   'super-user': 'Super User space',
 };
 
 const workspaceOptions: Record<string, { label: string; path: string }> = {
-  CLIENT: { label: 'Client workspace', path: '/client' },
-  RETAILER: { label: 'Retailer workspace', path: '/retailer' },
+  CLIENT: { label: 'Contractor workspace', path: '/client' },
+  RETAILER: { label: 'Provider workspace', path: '/retailer' },
   SUPER_USER: { label: 'Super User workspace', path: '/super-user' },
 };
 
@@ -100,6 +100,39 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
   useEffect(() => {
     if (mobileOpen) drawerRef.current?.focus();
     else menuButtonRef.current?.focus();
+  }, [mobileOpen]);
+
+  // Escape closes the mobile drawer; Tab is trapped inside it while open.
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setMobileOpen(false);
+        return;
+      }
+      if (event.key !== 'Tab' || !drawerRef.current) return;
+
+      const focusable = drawerRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [mobileOpen]);
 
   // Records the in-app pages a signed-in user visits, for the Super User analytics profile view.
@@ -180,7 +213,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
               <label className="flex items-center gap-2 text-xs font-semibold text-concrete-grey">
                 <span className="sr-only">Switch workspace</span>
                 <select
-                  value={role === 'client' ? 'CLIENT' : role === 'retailer' ? 'RETAILER' : 'SUPER_USER'}
+                  value={role === 'client' ? 'CONTRACTOR' : role === 'retailer' ? 'PROVIDER' : 'SUPER_USER'}
                   onChange={switchWorkspace}
                   className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-foundation-navy shadow-soft focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
                 >

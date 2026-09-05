@@ -157,10 +157,31 @@ test('excludes active direct and tender legal holds from retention purge decisio
   assert.deepEqual(expiredAttachmentPurgeWhere(cutoff).tender, { legalHolds: { none: { releasedAt: null } } });
 });
 
-test('uses separate percentage bands at the £10,000 quote boundary', () => {
-  assert.equal(calculatePercentageFee(10000, 2, 4), 200);
-  assert.equal(calculatePercentageFee(10001, 2, 4), 400.04);
-  assert.equal(calculatePercentageFee(9999, 1.234, 4), 123.38);
+test('calculates progressive percentage release fees across all three bands', () => {
+  assert.equal(calculatePercentageFee(9_999.99, 1, 0.5, 0.25), 100);
+  assert.equal(calculatePercentageFee(10_000, 1, 0.5, 0.25), 100);
+  assert.equal(calculatePercentageFee(10_000.01, 1, 0.5, 0.25), 100);
+  assert.equal(calculatePercentageFee(100_000, 1, 0.5, 0.25), 550);
+  assert.equal(calculatePercentageFee(100_000.01, 1, 0.5, 0.25), 550);
+  assert.equal(calculatePercentageFee(250_000, 1, 0.5, 0.25), 925);
+  assert.equal(calculatePercentageFee(1_000_000, 1, 0.5, 0.25), 2_800);
+});
+
+test('accepts Contractor and Professional Services tender provisions', () => {
+  const contractorService = createTenderSchema.safeParse({
+    ...VALID_TENDER,
+    category: 'Contractor Services',
+    subcategory: 'Groundworks & Civil Engineering',
+  });
+  const professionalService = createTenderSchema.safeParse({
+    ...VALID_TENDER,
+    category: 'Professional Services',
+    subcategory: 'Surveying, Design & Engineering',
+    item: 'Surveying, architecture, engineering, project management and technical design',
+  });
+
+  assert.equal(contractorService.success, true);
+  assert.equal(professionalService.success, true);
 });
 
 test('calculates VAT to the nearest penny', () => {

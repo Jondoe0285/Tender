@@ -178,7 +178,7 @@ export async function getComplianceOverview(sinceDays = 30) {
       select: { id: true, reference: true, clientId: true, category: true, subcategory: true, location: true, createdAt: true },
     }),
     prisma.user.findMany({
-      where: { role: 'RETAILER', unlocks: { some: {} } },
+      where: { role: 'PROVIDER', unlocks: { some: {} } },
       select: {
         id: true,
         contactName: true,

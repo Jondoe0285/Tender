@@ -20,7 +20,7 @@ export default async function PaymentMonitoringPage() {
     <AppShell role="super-user" title="Payment Monitoring">
       <div className="mx-auto max-w-5xl">
         <p className="mb-6 max-w-xl text-sm text-concrete-grey">
-          Retailer unlock fees and Client Accepted Quote Release Fees across the platform.
+          Provider unlock fees and Contractor Accepted Quote Release Fees across the platform.
         </p>
         {payments.length === 0 ? (
           <Card className="py-16 text-center text-sm text-concrete-grey">No payment activity is recorded.</Card>
@@ -30,7 +30,7 @@ export default async function PaymentMonitoringPage() {
               <div key={payment.id} className="flex flex-wrap items-center justify-between gap-4 px-6 py-5">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">
-                    {payment.type === 'RETAILER_UNLOCK' ? 'Retailer Unlock Fee' : 'Client Release Fee'}
+                    {payment.type === 'RETAILER_UNLOCK' ? 'Provider Unlock Fee' : 'Contractor Release Fee'}
                   </p>
                   <h3 className="font-heading text-base font-bold text-foundation-navy">&pound;{payment.totalAmountGbp.toFixed(2)} inc. VAT</h3>
                   <p className="mt-1 text-sm text-concrete-grey">Fee: &pound;{payment.amountGbp.toFixed(2)} excl. VAT &middot; VAT: &pound;{payment.vatGbp.toFixed(2)} ({payment.vatPercentage}%)</p>

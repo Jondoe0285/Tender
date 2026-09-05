@@ -1,23 +1,32 @@
 import { Resend } from 'resend';
-import { tenderOpportunityTemplate, type EmailTemplate } from '@/server/notifications/emailTemplates';
+import { tenderOpportunityTemplate, tenderUpdatedTemplate, type EmailTemplate } from '@/server/notifications/emailTemplates';
+
+const PLACEHOLDER_SECRET_VALUES = new Set(['test', 'placeholder', 'changeme', 'example']);
 
 let resendClient: Resend | null = null;
 
+function hasUsableSecret(value: string | undefined): boolean {
+  const trimmed = value?.trim();
+  return Boolean(trimmed && !PLACEHOLDER_SECRET_VALUES.has(trimmed.toLowerCase()));
+}
+
 function getResendClient(): Resend | null {
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return null;
+  if (!hasUsableSecret(apiKey)) return null;
   resendClient ??= new Resend(apiKey);
   return resendClient;
 }
 
 /** No fallback: an unroutable default would silently send from an invalid domain. */
 function getFromAddress(): string | null {
-  return process.env.EMAIL_FROM?.trim() || null;
+  const from = process.env.EMAIL_FROM?.trim();
+  if (!from) return null;
+  return PLACEHOLDER_SECRET_VALUES.has(from.toLowerCase()) ? null : from;
 }
 
 /** True once both the key and sender are configured for this environment. */
 export function isEmailConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY && getFromAddress());
+  return Boolean(hasUsableSecret(process.env.RESEND_API_KEY) && getFromAddress());
 }
 
 export type TenderNotification = {
@@ -81,4 +90,9 @@ export async function sendHealthReportEmail(template: HealthReportEmail, attachm
 /** Sends only the approved pre-unlock summary; Client identity, precise site data and full specification stay private. */
 export async function sendTenderOpportunityEmail(to: string, tender: TenderNotification) {
   return sendTransactionalEmail(to, tenderOpportunityTemplate(tender));
+}
+
+/** Sends a non-sensitive update notice without altering the Provider's existing access entitlement. */
+export async function sendTenderUpdatedEmail(to: string, tender: Pick<TenderNotification, 'id' | 'reference' | 'category' | 'locationArea' | 'closingDate'>) {
+  return sendTransactionalEmail(to, tenderUpdatedTemplate(tender));
 }

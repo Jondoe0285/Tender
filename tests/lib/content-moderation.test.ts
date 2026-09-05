@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { moderateContent } from '../../src/server/moderation/contentModeration';
+import { getModerationMessage } from '../../src/lib/moderation';
 
 test('allows ordinary commercial tender content', () => {
   const result = moderateContent([
@@ -43,4 +44,9 @@ test('screens structured fields and attachment filenames', () => {
   ]);
   assert.equal(result.decision, 'BLOCK');
   assert.equal(result.entities[0]?.field, 'attachment filename');
+});
+
+test('returns a user-friendly explanation for disallowed contact details in free text', () => {
+  const message = getModerationMessage('description', 'Call me on 07700 900123 or email hello@example.com');
+  assert.match(message ?? '', /contact|phone|email/i);
 });

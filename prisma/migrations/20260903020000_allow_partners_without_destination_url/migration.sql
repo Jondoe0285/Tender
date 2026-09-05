@@ -1,0 +1,1 @@
+ALTER TABLE "Partner" ALTER COLUMN "destinationUrl" DROP NOT NULL;

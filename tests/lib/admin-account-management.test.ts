@@ -33,10 +33,10 @@ test('account management tells administrators that reset links are emailed and e
   assert.ok(source.includes('Delete account'));
 });
 
-test('Retailer management can filter accounts with matched open tender requests', () => {
+test('Provider management can filter accounts with matched open tender requests', () => {
   const source = readFileSync(tablePath, 'utf8');
 
   assert.ok(source.includes('openTenderRequestsOnly'));
-  assert.ok(source.includes('Show Retailers with open tender requests only'));
+  assert.ok(source.includes('Show Providers with open tender requests only'));
   assert.ok(source.includes("rows.filter((row) => (row.openTenderRequests ?? 0) > 0)"));
 });

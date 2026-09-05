@@ -4,11 +4,12 @@ import { toErrorResponse } from '@/server/http/errors';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { acceptQuote } from '@/server/domain/contactReleaseService';
 
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
+export async function POST(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const originError = rejectCrossOrigin(_request);
     if (originError) return originError;
-    const user = await requireRole('CLIENT');
+    const user = await requireRole('CONTRACTOR');
     const outcome = await acceptQuote(user.id, params.id);
     return NextResponse.json(outcome);
   } catch (error) {

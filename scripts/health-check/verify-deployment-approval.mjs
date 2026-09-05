@@ -55,6 +55,7 @@ function isPlaceholder(value) {
 const args = parseArgs(process.argv.slice(2));
 const target = (args.target ?? '').trim();
 const mainRef = (args['main-ref'] ?? 'origin/main').trim();
+const stagingRef = (args['staging-ref'] ?? 'origin/staging').trim();
 
 if (!Object.prototype.hasOwnProperty.call(EXPECTED_STATEMENT, target)) {
   console.error(`VERIFICATION FAILED: --target must be "staging-branch", "staging" or "production", received "${target}".`);
@@ -79,7 +80,7 @@ if (isPlaceholder(sha)) {
 } else {
   pass('Commit SHA is well formed');
 
-  // 3. The commit must exist and be an ancestor of main.
+  // 3. The commit must exist on the branch that owns the deployment target.
   let exists = true;
   try {
     git('cat-file', '-e', `${sha}^{commit}`);
@@ -91,26 +92,28 @@ if (isPlaceholder(sha)) {
     block(`Commit ${sha} does not exist in this repository.`);
   } else {
     pass('Commit exists in the repository');
+    const releaseRef = target === 'staging' ? stagingRef : mainRef;
+    const releaseBranch = target === 'staging' ? 'staging' : 'main';
     try {
-      git('rev-parse', '--verify', mainRef);
+      git('rev-parse', '--verify', releaseRef);
     } catch {
-      block(`Main reference "${mainRef}" is not available in this checkout.`);
+      block(`${releaseBranch} reference "${releaseRef}" is not available in this checkout.`);
     }
 
     try {
-      execFileSync('git', ['merge-base', '--is-ancestor', sha, mainRef], { stdio: 'ignore' });
-      pass('Commit is present on main');
+      execFileSync('git', ['merge-base', '--is-ancestor', sha, releaseRef], { stdio: 'ignore' });
+      pass(`Commit is present on ${releaseBranch}`);
     } catch {
-      block(`Commit ${sha} is not present on main. Only reviewed, merged commits may be deployed.`);
+      block(`Commit ${sha} is not present on ${releaseBranch}. Only current approved branch commits may be deployed.`);
     }
 
-    // 4. Nothing may have landed on main after the approved commit.
-    const head = git('rev-parse', mainRef);
+    // 4. Nothing may have landed on the release branch after the approved commit.
+    const head = git('rev-parse', releaseRef);
     if (head !== sha) {
-      const ahead = git('rev-list', '--count', `${sha}..${mainRef}`);
-      block(`main has advanced ${ahead} commit(s) beyond the approved commit (main is at ${head.slice(0, 12)}). The approval is stale.`);
+      const ahead = git('rev-list', '--count', `${sha}..${releaseRef}`);
+      block(`${releaseBranch} has advanced ${ahead} commit(s) beyond the approved commit (${releaseBranch} is at ${head.slice(0, 12)}). The approval is stale.`);
     } else {
-      pass('Approved commit is the current head of main; no code changed after approval');
+      pass(`Approved commit is the current head of ${releaseBranch}; no code changed after approval`);
     }
   }
 }

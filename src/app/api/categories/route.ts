@@ -4,7 +4,7 @@ import { getCategoryCatalog } from '@/server/domain/categoryService';
 
 export async function GET() {
   try {
-    await requireRole('CLIENT');
+    await requireRole('CONTRACTOR');
     return NextResponse.json({ catalog: await getCategoryCatalog() });
   } catch {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
