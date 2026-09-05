@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     const validPassword = await verifyPassword(input.password, existing.passwordHash);
     const hasRole = existing.roleMemberships.some((membership) => membership.role === input.role) || existing.role === input.role;
     if (!validPassword || existing.suspended) {
-      return NextResponse.json({ error: 'Unable to complete registration with those details' }, { status: 400 });
+      return NextResponse.json({ status: 'verification_pending' }, { status: 202 });
     }
 
     if (hasRole && !existing.emailVerifiedAt) {
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       if (!emailResult.sent) return NextResponse.json({ error: 'Unable to send verification email. Please contact support.' }, { status: 503 });
       return NextResponse.json({ status: 'verification_sent' }, { status: 202 });
     }
-    if (hasRole) return NextResponse.json({ error: 'Unable to complete registration with those details' }, { status: 400 });
+    if (hasRole) return NextResponse.json({ status: 'verification_pending' }, { status: 202 });
 
     await prisma.$transaction(async (transaction) => {
       await transaction.userRole.create({ data: { userId: existing.id, role: input.role } });
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
       metadata: { role: input.role },
     });
     if (input.role === 'USER') await matchRetailerToOpenTenders(existing.id);
-    return NextResponse.json({ status: 'workspace_added' });
+    return NextResponse.json({ status: 'verification_pending' }, { status: 202 });
   }
 
   const passwordHash = await hashPassword(input.password);

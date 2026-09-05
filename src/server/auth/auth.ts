@@ -66,7 +66,7 @@ export const authOptions: AuthOptions = {
         const roles = user.roleMemberships.length > 0
           ? user.roleMemberships.map((membership) => membership.role)
           : [user.role];
-        return { id: user.id, email: user.email, role: user.role, roles, isOwner: user.isOwner, isAccountant: user.isAccountant };
+        return { id: user.id, email: user.email, role: user.role, roles, isOwner: user.isOwner, isAccountant: user.isAccountant, sessionVersion: user.sessionVersion };
       },
     }),
   ],
@@ -78,6 +78,7 @@ export const authOptions: AuthOptions = {
         token.roles = (user as { roles: string[] }).roles;
         token.isOwner = (user as { isOwner: boolean }).isOwner;
         token.isAccountant = (user as { isAccountant: boolean }).isAccountant;
+        token.sessionVersion = (user as unknown as { sessionVersion: number }).sessionVersion;
       }
       if (trigger === 'update' && session?.role && token.id) {
         const membership = await prisma.userRole.findUnique({
@@ -95,6 +96,7 @@ export const authOptions: AuthOptions = {
         session.user.roles = (token.roles ?? [token.role]) as string[];
         session.user.isOwner = Boolean(token.isOwner);
         session.user.isAccountant = Boolean(token.isAccountant);
+        (session.user as typeof session.user & { sessionVersion?: number }).sessionVersion = Number(token.sessionVersion ?? 0);
       }
       return session;
     },

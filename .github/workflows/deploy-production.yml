@@ -196,7 +196,6 @@ jobs:
 
       - name: Run non-destructive verification
         id: checks
-        continue-on-error: true
         env:
           PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
         run: |
@@ -211,11 +210,18 @@ jobs:
             --sha "${{ github.event.inputs.commit_sha }}"
 
       - name: Upload the deployment record
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: production-deployment-record
           path: docs/health-check/deployments/
           retention-days: 90
+
+      - name: Fail when verification did not pass
+        if: steps.checks.outputs.result != 'SUCCESSFUL'
+        run: |
+          echo "::error::PRODUCTION DEPLOYMENT FAILED. Production promotion remains blocked."
+          exit 1
 
   rollback:
     name: Roll back a failed production deployment

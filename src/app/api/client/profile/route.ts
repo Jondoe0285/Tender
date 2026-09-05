@@ -155,7 +155,7 @@ export async function PATCH(request: Request) {
     if (!await verifyPassword(parsed.data.currentPassword, account.passwordHash)) {
       return NextResponse.json({ error: 'Unable to change password with those details' }, { status: 400 });
     }
-    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(parsed.data.newPassword) } });
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(parsed.data.newPassword), sessionVersion: { increment: 1 } } });
     await recordAuditEvent({ actorId: user.id, action: 'CLIENT_PASSWORD_CHANGED', targetType: 'User', targetId: user.id });
     return NextResponse.json({ status: 'updated' });
   } catch (error) {

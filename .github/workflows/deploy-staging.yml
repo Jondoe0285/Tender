@@ -150,7 +150,6 @@ jobs:
 
       - name: Run non-destructive verification
         id: checks
-        continue-on-error: true
         env:
           STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
         run: |
@@ -160,6 +159,7 @@ jobs:
             --sha "${{ github.event.inputs.commit_sha }}"
 
       - name: Upload the staging record
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: staging-deployment-record

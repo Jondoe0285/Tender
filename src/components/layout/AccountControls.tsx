@@ -1,10 +1,12 @@
 'use client';
 
 import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { LinkButton, Button } from '@/components/ui/Button';
 
 export function AccountControls() {
   const { data: session, status } = useSession();
+  const router = useRouter();
 
   if (status === 'loading') return null;
 
@@ -26,7 +28,7 @@ export function AccountControls() {
         // Falls back to a hard navigation if the sign-out request itself fails, so the user is
         // never left on a protected page believing sign-out silently did nothing.
         signOut({ callbackUrl: '/' }).catch(() => {
-          window.location.href = '/';
+          router.replace('/');
         });
       }}
     >

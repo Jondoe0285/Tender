@@ -4,8 +4,6 @@ import { withSentryConfig } from '@sentry/nextjs';
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  // TypeScript runs as its own gate in CI and the Render build command.
-  typescript: { ignoreBuildErrors: true },
   async headers() {
     return [
       {

@@ -1,7 +1,7 @@
 import Image from 'next/image';
 
 const logoSources = {
-  light: { src: '/images/brand/candidate/logos/Trade_Tender_Horizontal_Name_Logo.png', width: 500, height: 180 },
+  light: { src: '/images/brand/Trade_Tender_Horizontal_Logo.png', width: 500, height: 180 },
   dark: { src: '/images/brand/Trade_Tender_Dark_Background_Logo.png', width: 415, height: 115 },
 } as const;
 

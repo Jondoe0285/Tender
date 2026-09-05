@@ -20,10 +20,12 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       suspended: true,
       isOwner: true,
       isAccountant: true,
+      sessionVersion: true,
       roleMemberships: { select: { role: true } },
     },
   });
   if (!current || current.suspended) return null;
+  if ((session.user as typeof session.user & { sessionVersion?: number }).sessionVersion !== current.sessionVersion) return null;
 
   const roles = current.roleMemberships.length > 0
     ? current.roleMemberships.map((membership) => membership.role)

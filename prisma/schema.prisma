@@ -71,6 +71,7 @@ model User {
   passwordHash      String
   failedLoginAttempts Int    @default(0)
   loginLockedUntil  DateTime?
+  sessionVersion    Int      @default(0)
   role              Role
   isOwner           Boolean  @default(false)
   isAccountant      Boolean  @default(false)
