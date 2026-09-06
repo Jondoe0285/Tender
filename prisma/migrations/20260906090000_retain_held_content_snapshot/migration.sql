@@ -1,0 +1,1 @@
+ALTER TABLE "ModerationEvent" ADD COLUMN "reviewSnapshot" TEXT;

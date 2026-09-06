@@ -13,6 +13,7 @@ import { buildClientTradeTenderId } from '@/lib/identifiers';
 import { createRateLimitResponse } from '@/server/http/rateLimit';
 import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
 import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from '@/lib/legal/documentVersions';
+import { getPlatformSetting } from '@/server/domain/platformSettings';
 
 async function sendVerificationEmail(userId: string, email: string) {
   const token = await createEmailVerificationToken(userId);
@@ -90,6 +91,7 @@ export async function POST(request: Request) {
 
   const passwordHash = await hashPassword(input.password);
   const acceptedAt = new Date();
+  const defaultLaunchCredits = Math.max(0, Number(await getPlatformSetting('RETAILER_LAUNCH_CREDITS_DEFAULT')) || 0);
 
   const user = await prisma.$transaction(async (transaction) => {
     const createdUser = await transaction.user.create({
@@ -116,6 +118,7 @@ export async function POST(request: Request) {
                 coverageScope: input.coverageScope ?? 'COUNTY',
                 counties: (input.counties ?? []).join(','),
                 regions: (input.regions ?? []).join(','),
+                launchCreditsLeft: defaultLaunchCredits,
               },
             },
           }

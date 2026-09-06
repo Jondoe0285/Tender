@@ -38,6 +38,10 @@ export type ModerationSignal = {
   entityTypes: string[];
   reviewedAt: Date | null;
   createdAt: Date;
+  reviewSnapshot: unknown | null;
+  reviewOutcome: string | null;
+  compensationCredits: number;
+  compensationType: string | null;
 };
 
 const contactEntityTypes = ['EMAIL', 'PHONE', 'URL', 'DOMAIN', 'SOCIAL_HANDLE'];
@@ -161,6 +165,15 @@ function parseJsonArray(value: string): unknown[] {
   }
 }
 
+function parseJsonObject(value: string | null): unknown | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
 export async function getComplianceOverview(sinceDays = 30) {
   const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
 
@@ -202,6 +215,10 @@ export async function getComplianceOverview(sinceDays = 30) {
       .filter((type): type is string => Boolean(type)),
     reviewedAt: event.reviewedAt,
     createdAt: event.createdAt,
+    reviewSnapshot: parseJsonObject(event.reviewSnapshot),
+    reviewOutcome: event.reviewOutcome,
+    compensationCredits: event.compensationCredits,
+    compensationType: event.compensationType,
   }));
 
   const retailerSignals: RetailerUnlockSignal[] = retailers

@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 import type { ModerationDecision } from '@prisma/client';
 import { prisma } from '@/server/data/prisma';
+import { contentHeldNotificationTemplate } from '@/server/notifications/emailTemplates';
+import { sendTransactionalEmail } from '@/server/notifications/resend';
+import { getSupportRecipientEmail } from '@/server/domain/platformSettings';
 
 type EntityType = 'EMAIL' | 'PHONE' | 'URL' | 'DOMAIN' | 'SOCIAL_HANDLE' | 'COMPANY' | 'COMPANY_NUMBER' | 'VAT_NUMBER' | 'POSTCODE' | 'ADDRESS_HINT' | 'CONTRACT_REFERENCE' | 'OFF_PLATFORM' | 'QR_REFERENCE';
 
@@ -88,7 +91,7 @@ export function moderateContent(fields: Array<{ name: string; value: string | un
   };
 }
 
-export async function enforceContentModeration(actorId: string, contentType: string, fields: Array<{ name: string; value: string | undefined | null }>): Promise<ModerationResult> {
+export async function enforceContentModeration(actorId: string, contentType: string, fields: Array<{ name: string; value: string | undefined | null }>, reviewSnapshot?: unknown): Promise<ModerationResult> {
   const result = moderateContent(fields);
   const contentHash = createHash('sha256').update(fields.map((field) => `${field.name}:${field.value ?? ''}`).join('\n')).digest('hex');
   await prisma.moderationEvent.create({
@@ -100,8 +103,18 @@ export async function enforceContentModeration(actorId: string, contentType: str
       riskScore: result.riskScore,
       reasons: JSON.stringify(result.reasons),
       entities: JSON.stringify(result.entities.map((entity) => ({ type: entity.type, field: entity.field }))),
+      reviewSnapshot: result.decision === 'BLOCK' || result.decision === 'REVIEW' ? JSON.stringify(reviewSnapshot ?? fields) : null,
     },
   });
-  if (result.decision === 'BLOCK' || result.decision === 'REVIEW') throw new ContentModerationError(result);
+  if (result.decision === 'BLOCK' || result.decision === 'REVIEW') {
+    const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { email: true, role: true } });
+    if (actor) {
+      const contentLabel = contentType === 'TENDER_SUBMISSION' ? 'tender' : contentType === 'QUOTE_SUBMISSION' ? 'quote' : 'comment';
+      const accountPath = contentType === 'QUOTE_SUBMISSION' || contentType === 'TENDER_MESSAGE' ? '/retailer/profile' : '/client/profile';
+      const replyTo = await getSupportRecipientEmail();
+      await sendTransactionalEmail(actor.email, contentHeldNotificationTemplate({ contentLabel, reasons: result.reasons, accountPath }), { ...(replyTo ? { replyTo } : {}) }).catch(() => undefined);
+    }
+    throw new ContentModerationError(result);
+  }
   return result;
 }

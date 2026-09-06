@@ -9,7 +9,7 @@ import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
 import { sponsoredPlacementEnabled } from '@/server/domain/sponsoredPlacementService';
 import { getClientReleaseFeeGbp } from '@/server/domain/platformSettings';
-import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getUserTenderServiceCategories, userOwnsTender } from '@/server/domain/tenderService';
+import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getTenderReviewSnapshot, getUserTenderServiceCategories, userOwnsTender } from '@/server/domain/tenderService';
 
 export function isQuoteRetentionLocked(retentionLockedUntil: Date | null | undefined, now = new Date()): boolean {
   return retentionLockedUntil !== null && retentionLockedUntil !== undefined && retentionLockedUntil > now;
@@ -41,11 +41,12 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
   if (!unlock) throw new ForbiddenError('Tender has not been unlocked by this Retailer');
   await assertRetailerEligibleForTender(retailerId, tenderId);
   await assertTenderOpenForActivity(tenderId);
+  const tenderReviewSnapshot = await getTenderReviewSnapshot(tenderId);
 
   await enforceContentModeration(retailerId, 'QUOTE_SUBMISSION', [
     { name: 'delivery information', value: input.deliveryInfo },
     ...input.charges.map((charge, index) => ({ name: `quote item ${index + 1} description`, value: charge.description })),
-  ]);
+  ], { type: 'QUOTE_SUBMISSION', tender: tenderReviewSnapshot, quote: input });
 
   const serviceCategories = await getUserTenderServiceCategories(retailerId);
   const tender = await prisma.tender.findUniqueOrThrow({

@@ -1,6 +1,7 @@
 import { prisma } from '@/server/data/prisma';
 import { ForbiddenError } from '@/server/auth/session';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
+import { getTenderReviewSnapshot } from '@/server/domain/tenderService';
 
 const MAX_MESSAGE_LENGTH = 2000;
 
@@ -50,7 +51,8 @@ export async function sendTenderMessage(tenderId: string, actor: MessageActor, b
     throw new ForbiddenError('Message must be between 1 and 2,000 characters');
   }
   const thread = await resolveThread(tenderId, actor, quoteId);
-  await enforceContentModeration(actor.id, 'TENDER_MESSAGE', [{ name: 'message', value: normalizedBody }]);
+  const tenderReviewSnapshot = await getTenderReviewSnapshot(tenderId);
+  await enforceContentModeration(actor.id, 'TENDER_MESSAGE', [{ name: 'message', value: normalizedBody }], { type: 'TENDER_MESSAGE', tender: tenderReviewSnapshot, message: normalizedBody });
   return prisma.tenderMessage.create({
     data: { tenderId, retailerId: thread.retailerId, clientId: thread.clientId, senderId: actor.id, body: normalizedBody },
     select: { id: true, body: true, createdAt: true },

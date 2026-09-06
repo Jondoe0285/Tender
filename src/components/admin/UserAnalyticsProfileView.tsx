@@ -31,6 +31,8 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
   const [subscriptions, setSubscriptions] = useState(profile.subscriptions);
   const [membershipStartDate, setMembershipStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [membershipExpiryMonths, setMembershipExpiryMonths] = useState<'6' | '12'>('12');
+  const [launchCredits, setLaunchCredits] = useState(String(profile.launchCreditsLeft ?? 0));
+  const [releaseCredits, setReleaseCredits] = useState(String(profile.releaseCreditsLeft ?? 0));
   const [message, setMessage] = useState<string | null>(null);
 
   async function toggleEntitlement(type: 'membership' | 'subscription', planId: string, active: boolean) {
@@ -40,6 +42,17 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
     if (type === 'membership') setMemberships((current) => active ? [...current.filter((item) => item.tierId !== planId), { tierId: planId, name: data.assignment.tier?.name ?? 'Membership tier', assignedAt: new Date(data.assignment.assignedAt), expiresAt: data.assignment.expiresAt ? new Date(data.assignment.expiresAt) : null }] : current.filter((item) => item.tierId !== planId));
     else setSubscriptions((current) => active ? [...current, { planId, name: data.assignment.plan?.name ?? 'Subscription plan' }] : current.filter((item) => item.planId !== planId));
     setMessage('Provider option updated.');
+  }
+
+  async function saveCredits(action: 'set-launch-credits' | 'set-release-credits', value: string) {
+    const credits = Number(value);
+    if (!Number.isInteger(credits) || credits < 0) return setMessage('Credits must be a non-negative whole number.');
+    const response = await fetch(`/api/super-user/users/${profile.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...(action === 'set-launch-credits' ? { launchCreditsLeft: credits } : { releaseCreditsLeft: credits }) }) });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) return setMessage(data?.error ?? 'Unable to update credits.');
+    if (action === 'set-launch-credits') setLaunchCredits(String(data.launchCreditsLeft));
+    else setReleaseCredits(String(data.releaseCreditsLeft));
+    setMessage('Credits updated.');
   }
 
   return (
@@ -79,6 +92,25 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
         </dl>
       </Card>
 
+      <Card>
+        <form method="get" className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <Label htmlFor="activity-period">Activity history</Label>
+            <p className="mt-1 text-sm text-concrete-grey">Showing pages and actions from the selected period.</p>
+          </div>
+          <div className="flex gap-3">
+            <Select id="activity-period" name="activity" defaultValue={profile.activityPeriod} aria-label="Activity history period">
+              <option value="1d">Last 24 hours</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="90d">Last 90 days</option>
+              <option value="all">All retained activity</option>
+            </Select>
+            <Button type="submit">Apply filter</Button>
+          </div>
+        </form>
+      </Card>
+
       {profile.warnings.length > 0 && <Card>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Tender warnings</p>
         <div className="mt-4 divide-y divide-slate-100">{profile.warnings.map((warning) => <div key={warning.id} className="py-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-foundation-navy">{warning.reason}</p><StatusBadge status={warning.active ? 'attention' : 'neutral'}>{warning.active ? 'Active' : 'Inactive'}</StatusBadge></div><p className="mt-1 text-sm text-concrete-grey">{warning.tender.reference} · Issued by {warning.issuedBy.contactName} · {formatDateTime(warning.createdAt)}</p><p className="mt-2 whitespace-pre-wrap text-sm text-foundation-navy">{warning.note}</p></div>)}</div>
@@ -89,8 +121,17 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
         <p className="mt-1 text-sm text-concrete-grey">Assign active membership or subscription options to this profile. These controls are visible only in Super User account review.</p>
         {profile.availableMembershipTiers.length > 0 && <div className="mt-4 grid gap-3 sm:grid-cols-2"><div><Label htmlFor="membership-start-date">Membership start date</Label><Input id="membership-start-date" className="mt-2" type="date" value={membershipStartDate} onChange={(event) => setMembershipStartDate(event.target.value)} /></div><div><Label htmlFor="membership-expiry-months">Default expiry</Label><Select id="membership-expiry-months" className="mt-2" value={membershipExpiryMonths} onChange={(event) => setMembershipExpiryMonths(event.target.value as '6' | '12')}><option value="6">6 months</option><option value="12">12 months</option></Select></div></div>}
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {profile.availableMembershipTiers.map((tier) => { const membership = memberships.find((item) => item.tierId === tier.id); return <div key={tier.id} className="rounded-lg border border-slate-200 p-3"><Button variant={membership ? 'danger' : 'secondary'} onClick={() => void toggleEntitlement('membership', tier.id, !membership)}>{membership ? `Remove ${tier.name}` : `Assign ${tier.name}`}</Button>{membership && <p className="mt-2 text-xs text-concrete-grey">Starts {formatDateTime(membership.assignedAt)} · Expires {formatDateTime(membership.expiresAt)}</p>}</div>; })}
+          {profile.availableMembershipTiers.map((tier) => { const membership = memberships.find((item) => item.tierId === tier.id); return <div key={tier.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-foundation-navy">{tier.name}</p><StatusBadge status={tier.active ? 'approved' : 'neutral'}>{tier.active ? 'Active tier' : 'Inactive tier'}</StatusBadge></div><p className="mt-1 text-xs text-concrete-grey">£{tier.monthlyPriceGbp}/month · {tier.freeTenderOpportunitiesPerMonth} included credits · {tier.additionalCreditDiscountPercentage}% additional-credit discount</p><Button className="mt-3" variant={membership ? 'danger' : 'secondary'} disabled={!tier.active && !membership} onClick={() => void toggleEntitlement('membership', tier.id, !membership)}>{membership ? `Remove ${tier.name}` : tier.active ? `Assign ${tier.name}` : 'Activate tier in Settings first'}</Button>{membership && <p className="mt-2 text-xs text-concrete-grey">Starts {formatDateTime(membership.assignedAt)} · Expires {formatDateTime(membership.expiresAt)}</p>}</div>; })}
           {profile.availableSubscriptionPlans.map((plan) => { const active = subscriptions.some((subscription) => subscription.planId === plan.id); return <Button key={plan.id} variant={active ? 'danger' : 'secondary'} onClick={() => void toggleEntitlement('subscription', plan.id, !active)}>{active ? `Remove ${plan.name}` : `Assign ${plan.name}`}</Button>; })}
+        </div>
+      </Card>}
+
+      {(profile.launchCreditsLeft !== null || profile.releaseCreditsLeft !== null) && <Card>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Individual credit allocation</p>
+        <p className="mt-1 text-sm text-concrete-grey">Assign credits to this individual account. List-level editing is disabled.</p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          {profile.launchCreditsLeft !== null && <div><Label htmlFor="profile-launch-credits">Tender release credits</Label><div className="mt-2 flex gap-3"><Input id="profile-launch-credits" type="number" min="0" step="1" value={launchCredits} onChange={(event) => setLaunchCredits(event.target.value)} /><Button onClick={() => void saveCredits('set-launch-credits', launchCredits)}>Save</Button></div></div>}
+          {profile.releaseCreditsLeft !== null && <div><Label htmlFor="profile-release-credits">Quote acceptance release credits</Label><div className="mt-2 flex gap-3"><Input id="profile-release-credits" type="number" min="0" step="1" value={releaseCredits} onChange={(event) => setReleaseCredits(event.target.value)} /><Button onClick={() => void saveCredits('set-release-credits', releaseCredits)}>Save</Button></div></div>}
         </div>
       </Card>}
 

@@ -10,7 +10,7 @@ import { ensureDefaultMembershipTiers } from '@/server/domain/membershipService'
 const settingSchema = z.object({
   action: z.enum(['fee', 'tier', 'subscription', 'support-recipient']),
   id: z.string().optional(),
-  key: z.enum(['RETAILER_UNLOCK_FEE_GBP', 'CLIENT_RELEASE_FEE_GBP', 'CLIENT_RELEASE_FEE_MODE', 'CLIENT_RELEASE_PERCENTAGE_LOW', 'CLIENT_RELEASE_PERCENTAGE_HIGH', 'CLIENT_RELEASE_PERCENTAGE_TOP', 'VAT_PERCENTAGE', 'SPONSORED_PLACEMENT_ACTIVE', 'SPONSORED_PLACEMENT_FEE_GBP', 'MEMBERSHIP_TIERS_ACTIVE', 'ADSPACE_ACTIVE']).optional(),
+  key: z.enum(['RETAILER_UNLOCK_FEE_GBP', 'CLIENT_RELEASE_FEE_GBP', 'CLIENT_RELEASE_FEE_MODE', 'CLIENT_RELEASE_PERCENTAGE_LOW', 'CLIENT_RELEASE_PERCENTAGE_HIGH', 'CLIENT_RELEASE_PERCENTAGE_TOP', 'VAT_PERCENTAGE', 'SPONSORED_PLACEMENT_ACTIVE', 'SPONSORED_PLACEMENT_FEE_GBP', 'MEMBERSHIP_TIERS_ACTIVE', 'RETAILER_LAUNCH_CREDITS_DEFAULT', 'ADSPACE_ACTIVE']).optional(),
   value: z.union([z.number().nonnegative(), z.enum(['FIXED', 'PERCENTAGE']), z.boolean()]).optional(),
   name: z.string().trim().min(2).max(80).optional(),
   description: z.string().trim().max(500).optional(),

@@ -122,6 +122,39 @@ export function accountUpdateTemplate(input: { title: string; summary: string; a
   };
 }
 
+export function contentHeldNotificationTemplate(input: { contentLabel: string; reasons: string[]; accountPath: string }): EmailTemplate {
+  return {
+    subject: `Trade Tender update: ${input.contentLabel} held for review`,
+    html: layout({
+      eyebrow: 'Content review',
+      title: `${input.contentLabel} held for review`,
+      intro: `Your ${input.contentLabel.toLowerCase()} could not be shared or submitted because it was flagged for confidential or restricted information.`,
+      body: detailRows([
+        ['Why it was held', input.reasons.join('; ') || 'Restricted information was detected'],
+        ['Next step', 'A Super User will review the held content. Do not resend confidential information through email.'],
+      ]) + '<p style="font-size:14px;line-height:1.6">If you believe this was a mistake, reply to this email and explain why the content should be reviewed again.</p>',
+      action: { label: 'Review account activity', href: appUrl(input.accountPath) },
+    }),
+  };
+}
+
+export function contentReviewOutcomeTemplate(input: { contentLabel: string; releasedSafe: boolean; credits: number; creditType: string; reviewNote: string; accountPath: string }): EmailTemplate {
+  return {
+    subject: `Trade Tender review outcome: ${input.contentLabel}`,
+    html: layout({
+      eyebrow: 'Content review outcome',
+      title: input.releasedSafe ? `${input.contentLabel} released as safe` : `${input.contentLabel} hold confirmed`,
+      intro: input.releasedSafe ? `A Super User reviewed your held ${input.contentLabel.toLowerCase()} and marked it safe.` : `A Super User reviewed your held ${input.contentLabel.toLowerCase()} and confirmed the hold.`,
+      body: detailRows([
+        ['Outcome note', input.reviewNote],
+        ...(input.releasedSafe ? [['Compensation', `${input.credits} ${input.creditType}`] as [string, string]] : []),
+        ['Next step', input.releasedSafe ? 'The compensation credits are available for future use in your account.' : 'Please do not resend confidential information through the platform.'],
+      ]) + (input.releasedSafe ? '<p style="font-size:14px;line-height:1.6">If you believe the review outcome is still incorrect, reply to this email and explain why.</p>' : '<p style="font-size:14px;line-height:1.6">If you believe this outcome is incorrect, reply to this email and explain why.</p>'),
+      action: { label: 'Review account activity', href: appUrl(input.accountPath) },
+    }),
+  };
+}
+
 export function newRegistrationTemplate(input: { role: string; email: string; contactName: string; companyName?: string }): EmailTemplate {
   const roleLabel = input.role === 'USER' ? 'Contractor' : input.role === 'USER' ? 'Provider' : input.role;
 

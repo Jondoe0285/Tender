@@ -20,6 +20,40 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-06 - Centralised Launch Defaults And Profile Credit Allocation
+
+- Changed: inline launch-credit and release-credit editors have been removed from account list rows. Owners define the default launch-credit balance for newly created Provider profiles in Super User Settings.
+- Changed: Super Users assign an individual account's tender-release credits or quote-acceptance release credits from the protected User profile. Existing balances are preserved when the default changes.
+- Affects: platform settings, new Provider profile creation, protected User profile credit controls, account management list UI, and existing credit audit routes only. Credit consumption and payment rules remain unchanged.
+- Environment: no migration or environment configuration change is required.
+- Validation: `npm run type-check`, `npx tsx --test tests/lib/user-profile-provider-options.test.ts`, and `git diff --check` pass.
+
+### 2026-09-06 - Safe-Release Compensation For Held Content
+
+- Changed: Super Users must choose either `Confirm hold` or `Release as safe` when recording a moderation outcome. A safe release awards five existing usable credits to the submitting account: Provider profiles receive tender-unlock credits and Contractor profiles receive accepted-quote release credits.
+- Changed: compensation is awarded transactionally, recorded on the moderation event, and cannot be awarded twice for the same review. The submitting user receives an outcome email with the review note and compensation result; the configured support address remains the Reply-To destination.
+- Affects: ModerationEvent schema and migration, Super User moderation review API/UI, existing Provider/Contractor credit balances, and outcome notifications only. Held content remains subject to the recorded moderation decision and no automatic account action is taken.
+- Environment: apply migration `20260906100000_add_moderation_review_compensation` through the approved staging and production migration process before using safe-release compensation outside local development.
+- Validation: `npx prisma validate`, engine-less Prisma type generation, `npm run type-check`, existing content-moderation tests, and `git diff --check` pass.
+
+### 2026-09-06 - Retain Held Tender Drafts For Super User Review
+
+- Changed: blocked or held tender submissions, quote submissions, and tender comments now retain a complete review snapshot on the moderation event before the content is rejected, including the submitted content, associated tender fields, item/package data, and attachment content. Allowed submissions continue to retain only moderation event metadata.
+- Changed: the submitting user receives an operational email explaining that the content was held and listing the detected reason(s). Email delivery is best-effort and cannot allow held content through or alter the moderation decision.
+- Changed: held-content emails use the Owner-configured support recipient as the Reply-To address and invite the user to reply if they believe the hold was a mistake. If no recipient is configured, the email remains best-effort without a Reply-To override.
+- Changed: the protected Super User moderation panel can expand the retained tender, quote/comment, and attachment data when recording the review. Held content is not exposed to Contractors, Providers, or public routes.
+- Affects: ModerationEvent schema and migration, tender/message/quote moderation, and Super User compliance review UI only. Tender matching, ordinary tender persistence, payment, and environment configuration remain unchanged.
+- Environment: apply migration `20260906090000_retain_held_content_snapshot` through the approved staging and production migration process before relying on held-content review outside local development.
+- Validation: `npx prisma validate`, engine-less Prisma type generation, `npm run type-check`, existing content-moderation tests, and `git diff --check` pass.
+
+### 2026-09-06 - One-Day Default User Activity View
+
+- Changed: Super User account profiles now show only the previous 24 hours of page visits and audit actions by default. A protected profile filter can search the previous 7, 30, or 90 days, or all retained activity.
+- Changed: activity filtering is applied server-side before records are returned; existing authorization, retention, and record limits remain in force.
+- Affects: Super User account profile activity queries and UI only. User activity capture, retention policy, payment, tender, and environment configuration remain unchanged.
+- Environment: no migration or environment configuration change is required.
+- Validation: `npm run type-check`, `git diff --check`, and `npx tsx --test tests/lib/user-activity-period.test.ts` pass.
+
 ### 2026-09-06 - Membership Purchase Contract Terms
 
 - Changed: Provider membership purchases require a 6- or 12-month non-refundable contract selection before checkout. The selected term is persisted with the pending payment, so the Stripe confirmation path cannot lose the contract choice.

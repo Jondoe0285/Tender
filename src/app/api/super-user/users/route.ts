@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/server/data/prisma';
 import { requireFullSuperUser } from '@/server/auth/session';
+import { getPlatformSetting } from '@/server/domain/platformSettings';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { isManagedAccountRole } from '@/lib/admin-permissions';
 import { hashPassword } from '@/server/auth/password';
@@ -106,6 +107,7 @@ export async function POST(request: Request) {
   }
 
   const passwordHash = await hashPassword(input.password);
+  const defaultLaunchCredits = Math.max(0, Number(await getPlatformSetting('RETAILER_LAUNCH_CREDITS_DEFAULT')) || 0);
   const user = await prisma.user.create({
     data: {
       email: input.email,
@@ -122,6 +124,7 @@ export async function POST(request: Request) {
                 companyName: input.companyName ?? input.contactName,
                 categories: (input.categories ?? []).join(','),
                 coverageAreas: '',
+                launchCreditsLeft: defaultLaunchCredits,
               },
             },
           }

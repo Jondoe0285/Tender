@@ -17,6 +17,42 @@ type RetailerTenderEligibilityProfile = {
   categories: string;
 };
 
+export async function getTenderReviewSnapshot(tenderId: string) {
+  const tender = await prisma.tender.findUnique({
+    where: { id: tenderId },
+    include: { items: true, packages: true, attachments: true },
+  });
+  if (!tender) return null;
+  return {
+    id: tender.id,
+    reference: tender.reference,
+    clientId: tender.clientId,
+    category: tender.category,
+    subcategory: tender.subcategory,
+    service: tender.service,
+    item: tender.item,
+    location: tender.location,
+    quantity: tender.quantity,
+    urgency: tender.urgency,
+    closingDate: tender.closingDate,
+    supplyDate: tender.supplyDate,
+    requirements: tender.requirements,
+    description: tender.description,
+    status: tender.status,
+    createdAt: tender.createdAt,
+    items: tender.items,
+    packages: tender.packages,
+    attachments: tender.attachments.map((attachment) => ({
+      id: attachment.id,
+      fileName: attachment.fileName,
+      mimeType: attachment.mimeType,
+      sizeBytes: attachment.sizeBytes,
+      contentBase64: Buffer.from(attachment.content).toString('base64'),
+      uploadedAt: attachment.uploadedAt,
+    })),
+  };
+}
+
 async function notifyTenderOwnerOfHighRisk(tenderId: string) {
   const tender = await prisma.tender.findUnique({
     where: { id: tenderId },
@@ -142,7 +178,7 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
       { name: `item ${index + 1} quantity`, value: item.quantity },
     ]),
     ...(input.attachments ?? []).map((attachment, index) => ({ name: `attachment ${index + 1} filename`, value: attachment.name })),
-  ]);
+  ], { type: 'TENDER_SUBMISSION', ...input });
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
   const tendersToday = await prisma.tender.count({ where: { createdAt: { gte: startOfDay } } });

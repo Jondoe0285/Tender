@@ -1,7 +1,15 @@
 import { prisma } from '@/server/data/prisma';
 
+export type ActivityPeriod = '1d' | '7d' | '30d' | '90d' | 'all';
+
+export function getActivitySince(period: ActivityPeriod): Date | null {
+  if (period === 'all') return null;
+  const days = Number(period.slice(0, -1));
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+}
+
 /** Consolidated Super User view: profile fields, login/session analytics, recent pages, and recent actions. */
-export async function getUserAnalyticsProfile(userId: string) {
+export async function getUserAnalyticsProfile(userId: string, period: ActivityPeriod = '1d') {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -14,14 +22,17 @@ export async function getUserAnalyticsProfile(userId: string) {
   });
   if (!user) return null;
 
+  const activitySince = getActivitySince(period);
+  const activityWhere = activitySince ? { userId, createdAt: { gte: activitySince } } : { userId };
+  const auditWhere = activitySince ? { actorId: userId, createdAt: { gte: activitySince } } : { actorId: userId };
   const [pageViews, auditLogs, warnings, membershipTiers, subscriptionPlans] = await Promise.all([
     prisma.pageView.findMany({
-      where: { userId },
+      where: activityWhere,
       orderBy: { createdAt: 'desc' },
       take: 50,
     }),
     prisma.auditLog.findMany({
-      where: { actorId: userId },
+      where: auditWhere,
       orderBy: { createdAt: 'desc' },
       take: 50,
     }),
@@ -30,7 +41,7 @@ export async function getUserAnalyticsProfile(userId: string) {
       orderBy: { createdAt: 'desc' },
       select: { id: true, reason: true, note: true, active: true, createdAt: true, tender: { select: { reference: true } }, issuedBy: { select: { contactName: true } } },
     }),
-    prisma.membershipTier.findMany({ where: { active: true }, select: { id: true, name: true } }),
+    prisma.membershipTier.findMany({ orderBy: { monthlyPriceGbp: 'asc' }, select: { id: true, name: true, active: true, monthlyPriceGbp: true, freeTenderOpportunitiesPerMonth: true, additionalCreditDiscountPercentage: true } }),
     prisma.subscriptionPlan.findMany({ where: { active: true }, select: { id: true, name: true } }),
   ]);
 
@@ -50,9 +61,12 @@ export async function getUserAnalyticsProfile(userId: string) {
     totalTimeOnlineSeconds: user.totalTimeOnlineSeconds,
     company,
     address,
+    launchCreditsLeft: user.retailerProfile?.launchCreditsLeft ?? null,
+    releaseCreditsLeft: user.clientCompanyMembership?.company.releaseCreditsLeft ?? null,
     pageViews,
     auditLogs,
     warnings,
+    activityPeriod: period,
     memberships: user.memberships.map((membership) => ({ tierId: membership.tierId, name: membership.tier.name, assignedAt: membership.assignedAt, expiresAt: membership.expiresAt })),
     subscriptions: user.subscriptions.map((subscription) => ({ planId: subscription.planId, name: subscription.plan.name })),
     availableMembershipTiers: membershipTiers,

@@ -182,10 +182,15 @@ model ModerationEvent {
   riskScore    Int
   reasons      String
   entities     String
+  reviewSnapshot String?
   reviewedAt   DateTime?
   reviewedById String?
   reviewedBy   User?              @relation("ModerationReviewer", fields: [reviewedById], references: [id])
   reviewNote   String?
+  reviewOutcome String?
+  compensationAwardedAt DateTime?
+  compensationCredits Int @default(0)
+  compensationType String?
   createdAt    DateTime           @default(now())
 
   @@index([decision, createdAt])
