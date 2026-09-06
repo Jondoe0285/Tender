@@ -4,6 +4,13 @@ import { createHash } from 'node:crypto';
 import { passwordResetRequestSchema } from '../../src/lib/schemas/passwordReset';
 import { hashResetToken } from '../../src/server/auth/passwordReset';
 import { accountCreatedByAdminTemplate, passwordResetTemplate } from '../../src/server/notifications/emailTemplates';
+import { passwordSchema } from '../../src/lib/schemas/password';
+
+test('passwords require a capital letter and special character', () => {
+  assert.equal(passwordSchema.safeParse('lowercase-only-password').success, false);
+  assert.equal(passwordSchema.safeParse('NoSpecialCharacter').success, false);
+  assert.equal(passwordSchema.safeParse('ValidPassword!').success, true);
+});
 
 test('hashes reset tokens without retaining the raw token', () => {
   const token = 'a-raw-reset-token';

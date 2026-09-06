@@ -119,4 +119,5 @@ Run before opening a pull request or deploying:
 
 ```bash
 # keep this section for release validation commands as they are added
+npm run stress-test -- --base-url https://<staging-origin>
 ```

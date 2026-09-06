@@ -47,3 +47,6 @@ prisma/dev.db-journal
 # Health-check disposable databases
 health-check*.db
 prisma/health-check*.db
+
+# Stress-test reports are generated evidence and should not be committed.
+stress-test-results/

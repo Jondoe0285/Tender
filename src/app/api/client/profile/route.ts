@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { passwordSchema } from '@/lib/schemas/password';
 import { prisma } from '@/server/data/prisma';
 import { hashPassword, verifyPassword } from '@/server/auth/password';
 import { requireRole } from '@/server/auth/session';
@@ -38,13 +39,13 @@ const profileUpdateSchema = personalProfileSchema.extend({
   });
 });
 
-const passwordSchema = z.object({
+const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1).max(200),
-  newPassword: z.string().min(10).max(200),
+  newPassword: passwordSchema,
 });
 
 const additionalUserSchema = personalProfileSchema.extend({
-  password: z.string().min(10).max(200),
+  password: passwordSchema,
 });
 
 async function getClientCompanyMembership(userId: string) {
@@ -148,7 +149,7 @@ export async function PATCH(request: Request) {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
     const user = await requireRole('USER');
-    const parsed = passwordSchema.safeParse(await request.json().catch(() => null));
+    const parsed = passwordChangeSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: 'Invalid password details' }, { status: 400 });
 
     const account = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { passwordHash: true } });

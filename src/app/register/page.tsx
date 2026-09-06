@@ -92,7 +92,7 @@ export default function RegisterPage() {
               <FieldGroup>
                 <Label htmlFor="password">Password</Label>
                 <PasswordInput id="password" name="password" minLength={10} required autoComplete="new-password" />
-                <p className="text-xs text-concrete-grey">Use at least 10 characters.</p>
+                <p className="text-xs text-concrete-grey">Use 10-200 characters, including a capital letter and a special character.</p>
               </FieldGroup>
               <FieldGroup>
                 <Label htmlFor="companyName">Company name</Label>

@@ -1,8 +1,9 @@
 import { z } from 'zod';
+import { passwordSchema } from '@/lib/schemas/password';
 
 export const registerSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(200),
-  password: z.string().min(10).max(200),
+  password: passwordSchema,
   contactName: z.string().trim().min(2).max(120),
   firstName: z.string().trim().min(1).max(80).optional(),
   lastName: z.string().trim().min(1).max(80).optional(),

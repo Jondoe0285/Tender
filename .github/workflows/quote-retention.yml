@@ -13,6 +13,7 @@ jobs:
   purge-expired-quotes:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment: production
     permissions:
       contents: read
     steps:
@@ -21,6 +22,19 @@ jobs:
           RETENTION_JOB_URL: ${{ secrets.RETENTION_JOB_URL }}
           RETENTION_JOB_SECRET: ${{ secrets.RETENTION_JOB_SECRET }}
         run: |
+          set -euo pipefail
+          if [ -z "$RETENTION_JOB_URL" ]; then
+            echo "::error::RETENTION_JOB_URL is not configured. Set it to the staging or production /api/internal/retention endpoint for this workflow's environment."
+            exit 1
+          fi
+          if [[ ! "$RETENTION_JOB_URL" =~ ^https://[^[:space:]]+$ ]]; then
+            echo "::error::RETENTION_JOB_URL must be an absolute HTTPS URL without whitespace."
+            exit 1
+          fi
+          if [ -z "$RETENTION_JOB_SECRET" ]; then
+            echo "::error::RETENTION_JOB_SECRET is not configured."
+            exit 1
+          fi
           curl --fail-with-body --silent --show-error \
-            --request POST "$RETENTION_JOB_URL" \
+            --request POST --url "$RETENTION_JOB_URL" \
             --header "Authorization: Bearer $RETENTION_JOB_SECRET"

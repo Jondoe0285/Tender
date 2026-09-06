@@ -1,3 +1,5 @@
+
+The staging stress-test harness is available as `npm run stress-test`. It produces performance, security, bottleneck, failure, recommendation, coverage, and launch-readiness reports under `stress-test-results/`; it must be run against a dedicated staging target with provider telemetry and synthetic credentials supplied separately.
 # Production Release Outstanding Action List
 
 **Review date:** 2026-09-05  
