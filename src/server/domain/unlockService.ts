@@ -14,7 +14,7 @@ type UnlockOutcome =
   | { status: 'PAYMENT_REQUIRED'; paymentId: string; checkoutUrl: string | null; devMode: boolean };
 
 /** Sole entry point for changing tender visibility for a Retailer (SEC-032/033). */
-export async function requestUnlock(retailerId: string, tenderId: string): Promise<UnlockOutcome> {
+export async function requestUnlock(retailerId: string, tenderId: string, mobileReturnUrl?: string): Promise<UnlockOutcome> {
   await assertRetailerEligibleForTender(retailerId, tenderId);
   await assertTenderOpenForActivity(tenderId);
 
@@ -75,7 +75,7 @@ export async function requestUnlock(retailerId: string, tenderId: string): Promi
     }
   }
 
-  const payment = await createPayment({ type: 'RETAILER_UNLOCK', userId: retailerId, tenderId });
+  const payment = await createPayment({ type: 'RETAILER_UNLOCK', userId: retailerId, tenderId, mobileReturnUrl });
   return { status: 'PAYMENT_REQUIRED', ...payment };
 }
 

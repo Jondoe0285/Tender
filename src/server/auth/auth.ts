@@ -7,6 +7,23 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
 
+export async function authenticateCredentials(credentials: Record<string, unknown> | undefined) {
+  const email = typeof credentials?.email === 'string' ? credentials.email.trim().toLowerCase() : '';
+  const password = typeof credentials?.password === 'string' ? credentials.password : '';
+  if (!email || !password) return null;
+  const user = await prisma.user.findUnique({ where: { email }, include: { roleMemberships: { select: { role: true } } } });
+  if (!user || user.suspended || !user.emailVerifiedAt || (user.loginLockedUntil && user.loginLockedUntil > new Date())) return null;
+  if (user.loginLockedUntil) await prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, loginLockedUntil: null } });
+  if (!await verifyPassword(password, user.passwordHash)) {
+    const updated = await prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: { increment: 1 } }, select: { failedLoginAttempts: true } });
+    if (updated.failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) await prisma.user.update({ where: { id: user.id }, data: { loginLockedUntil: new Date(Date.now() + LOGIN_LOCKOUT_MS) } });
+    return null;
+  }
+  await prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, loginLockedUntil: null } });
+  const roles = user.roleMemberships.length > 0 ? user.roleMemberships.map((membership) => membership.role) : [user.role];
+  return { id: user.id, email: user.email, role: user.role, roles, isOwner: user.isOwner, isAccountant: user.isAccountant, sessionVersion: user.sessionVersion };
+}
+
 export const authOptions: AuthOptions = {
   session: { strategy: 'jwt', maxAge: 8 * 60 * 60, updateAge: 60 * 60 },
   secret: process.env.NEXTAUTH_SECRET,
@@ -21,52 +38,7 @@ export const authOptions: AuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        // Client input is untrusted: re-validate shape before touching the database.
-        const email = typeof credentials?.email === 'string' ? credentials.email.trim().toLowerCase() : '';
-        const password = typeof credentials?.password === 'string' ? credentials.password : '';
-        if (!email || !password) return null;
-
-        const user = await prisma.user.findUnique({
-          where: { email },
-          include: { roleMemberships: { select: { role: true } } },
-        });
-        if (!user || user.suspended || !user.emailVerifiedAt) return null;
-
-        const now = new Date();
-        if (user.loginLockedUntil && user.loginLockedUntil > now) return null;
-
-        if (user.loginLockedUntil) {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { failedLoginAttempts: 0, loginLockedUntil: null },
-          });
-        }
-
-        const validPassword = await verifyPassword(password, user.passwordHash);
-        if (!validPassword) {
-          const updatedUser = await prisma.user.update({
-            where: { id: user.id },
-            data: { failedLoginAttempts: { increment: 1 } },
-            select: { failedLoginAttempts: true },
-          });
-          if (updatedUser.failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
-            await prisma.user.update({
-              where: { id: user.id },
-              data: { loginLockedUntil: new Date(Date.now() + LOGIN_LOCKOUT_MS) },
-            });
-          }
-          return null;
-        }
-
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { failedLoginAttempts: 0, loginLockedUntil: null },
-        });
-
-        const roles = user.roleMemberships.length > 0
-          ? user.roleMemberships.map((membership) => membership.role)
-          : [user.role];
-        return { id: user.id, email: user.email, role: user.role, roles, isOwner: user.isOwner, isAccountant: user.isAccountant, sessionVersion: user.sessionVersion };
+        return authenticateCredentials(credentials as Record<string, unknown> | undefined);
       },
     }),
   ],

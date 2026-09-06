@@ -1,0 +1,36 @@
+{
+  "name": "trade-tender-mobile",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@expo-google-fonts/montserrat": "^0.4.2",
+    "@expo-google-fonts/source-sans-3": "^0.4.1",
+    "expo": "~57.0.20",
+    "expo-font": "~57.0.3",
+    "expo-linking": "~57.0.9",
+    "expo-secure-store": "~57.0.3",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "@types/react": "~19.2.2",
+    "tsx": "^4.23.13",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "type-check": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "build:android": "npx eas-cli@latest build --platform android --profile preview",
+    "build:ios": "npx eas-cli@latest build --platform ios --profile preview"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "private": true
+}

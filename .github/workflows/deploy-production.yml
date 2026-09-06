@@ -126,9 +126,47 @@ jobs:
           echo "previous_sha=$PREVIOUS" >> "$GITHUB_OUTPUT"
           echo "Rollback target: $PREVIOUS"
 
+  mobile-stress-test:
+    name: Mobile release readiness gate
+    needs: verify-authorisation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the approved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.commit_sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run mobile stress test
+        env:
+          ANDROID_STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          IOS_STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          MOBILE_STRESS_DEVICE_EVIDENCE: ${{ secrets.MOBILE_STRESS_DEVICE_EVIDENCE }}
+        run: npm run mobile-stress-test
+
+      - name: Upload mobile stress reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-stress-test-results
+          path: mobile-stress-test-results/
+          retention-days: 90
+
   deploy:
     name: Production deployment
-    needs: verify-authorisation
+    needs: [verify-authorisation, mobile-stress-test]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Production secrets are exposed only to this job, through the protected environment.
