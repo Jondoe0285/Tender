@@ -13,6 +13,14 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-06 - Clerk Development Application Linkage
+
+- Changed: installed the Clerk CLI, authenticated the local operator, linked this repository to the designated Clerk application, and pulled the development-only Clerk environment configuration. `@clerk/nextjs` and the root `ClerkProvider` were already present.
+- Changed: extended the application Content Security Policy to allow Clerk-hosted account scripts, session connections, frames, and the same-origin blob worker required by the hosted sign-in interface. The CSP adds `unsafe-eval` only during local `next dev` execution because React development diagnostics require it; production remains strict. Clerk telemetry remains blocked by the existing minimised `connect-src` policy.
+- Affects: local development authentication configuration only. Existing NextAuth database-backed sessions, User role memberships, suspension checks, password-reset flow, route proxy, payment/contact-release authorization, and audit logging remain the authoritative application controls.
+- Environment: Clerk development instance `ins_3IxnnKC85ooanB8HxbLvAa5G4sJ` is linked locally. No staging or production/main resource, secret, permission, user record, authentication policy, or deployment configuration was changed. A Clerk production instance must be explicitly provisioned and approved before deployment.
+- Validation: `clerk doctor --json`, `npm run type-check`, and `npm run build` pass. The local production server renders the Clerk sign-in control and sign-up link without Clerk CSP errors. Webpack development mode serves the React development CSP exception correctly; Turbopack currently crashes internally while compiling the Clerk sign-in route. The only advisory is that no production Clerk instance is configured. Full application migration remains outstanding because replacing NextAuth requires an approved user-identity and role-data migration plan.
+
 ### 2026-09-05 - Test Database Role Realignment
 
 - Changed: added migration `20260905040000_realign_test_roles_with_user_platform` to return the configured test database from the temporary Contractor/Provider recovery state to the current staging User role model. It preserves Super Users and normalizes all other role values to User.
