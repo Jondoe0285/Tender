@@ -52,7 +52,6 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
         where: { id: params.id },
         select: {
           id: true, reference: true, category: true, location: true, urgency: true, closingDate: true, status: true,
-          client: { select: { clientCompanyMembership: { select: { company: { select: { tradeTenderId: true } } } } } },
           items: { where: { category: { in: serviceCategories } }, orderBy: { createdAt: 'asc' }, select: { id: true, category: true, subcategory: true, item: true, quantity: true } },
           packages: { where: { category: { in: serviceCategories } }, orderBy: { createdAt: 'asc' }, select: { id: true, reference: true, category: true, subcategory: true, item: true, quantity: true } },
         },
@@ -60,7 +59,7 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
         getPaymentFeeGbp('RETAILER_UNLOCK'),
     ]);
     const packageCategories = [...new Set((tender.packages ?? []).map((pkg) => pkg.category))];
-    return NextResponse.json({ tender: { ...tender, category: packageCategories[0] ?? tender.category, packageCategories, packageCount: packageCategories.length, location: formatRetailerSummaryLocation(tender.location), clientTradeTenderId: tender.client.clientCompanyMembership?.company.tradeTenderId ?? null, unlockFeeGbp }, unlocked: false });
+    return NextResponse.json({ tender: { ...tender, category: packageCategories[0] ?? tender.category, packageCategories, packageCount: packageCategories.length, location: formatRetailerSummaryLocation(tender.location), unlockFeeGbp }, unlocked: false });
   } catch (error) {
     return toErrorResponse(error);
   }

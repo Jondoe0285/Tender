@@ -33,7 +33,6 @@ export type TenderNotification = {
   id: string;
   reference: string;
   category: string;
-  clientTradeTenderId: string;
   locationArea: string;
   closingDate: Date;
   requirementSummary: string;

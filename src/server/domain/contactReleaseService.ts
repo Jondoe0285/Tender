@@ -100,19 +100,22 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
   if (!quote || quote.tender.clientId !== clientId) throw new ForbiddenError('Quote not found for this Client');
   if (quote.status !== 'ACCEPTED') throw new ForbiddenError('Quote has not been accepted');
 
-  const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
-  if (!payment || payment.userId !== clientId || payment.quoteId !== quoteId || payment.type !== 'CLIENT_RELEASE' || payment.status !== 'CONFIRMED') {
-    throw new ForbiddenError('Payment is not a confirmed release payment for this Client');
-  }
-
-  const existing = await prisma.contactRelease.findUnique({ where: { quoteId } });
-  if (existing) return existing;
-
   let release;
   try {
     const releasedAt = new Date();
     const correlationId = randomUUID();
     release = await prisma.$transaction(async (transaction) => {
+      // Check payment state in the same serializable transaction that creates the release so a
+      // concurrent refund/dispute cannot leave a release authorised by stale payment state.
+      const payment = await transaction.payment.findFirst({
+        where: { id: paymentId, userId: clientId, quoteId, type: 'CLIENT_RELEASE', status: 'CONFIRMED' },
+        select: { id: true },
+      });
+      if (!payment) throw new ForbiddenError('Payment is not a confirmed release payment for this Client');
+
+      const existing = await transaction.contactRelease.findUnique({ where: { quoteId } });
+      if (existing) return existing;
+
       const createdRelease = await transaction.contactRelease.create({
         data: {
           tenderId: quote.tenderId,
@@ -155,7 +158,7 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
         },
       });
       return createdRelease;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (error) {
     // The quoteId unique constraint rejects a concurrent duplicate finalisation; return the row it created.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -196,7 +199,9 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
 
 /** Returns the counterparty's contact details only if a release event authorises this requester. */
 export async function getReleasedContact(userId: string, quoteId: string) {
-  const release = await prisma.contactRelease.findFirst({ where: { quoteId } });
+  const release = await prisma.contactRelease.findFirst({
+    where: { quoteId, authorizingPayment: { status: 'CONFIRMED' } },
+  });
   if (!release || (release.clientId !== userId && release.retailerId !== userId)) {
     throw new ForbiddenError('Contact details have not been released to this user');
   }

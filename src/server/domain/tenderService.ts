@@ -224,8 +224,6 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
   const matchedRetailers = candidateRetailers.filter((retailer) => retailer.userId !== clientId && retailer.user.clientCompanyMembership && retailerCanMatchTender(companyEligibility(retailer, retailer.user.clientCompanyMembership.company), tender.location, services));
 
   if (matchedRetailers.length > 0) {
-    const clientCompany = await prisma.clientCompanyMember.findUnique({ where: { userId: clientId }, select: { company: { select: { tradeTenderId: true } } } });
-    const clientTradeTenderId = clientCompany?.company.tradeTenderId ?? 'Pending assignment';
     const retailerByService = new Map<string, typeof matchedRetailers>();
     for (const service of services) {
       retailerByService.set(service, matchedRetailers.filter((retailer) => retailer.user.clientCompanyMembership?.company.services.split(',').map((value) => value.trim()).includes(service)));
@@ -256,7 +254,6 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
         const result = await sendTenderOpportunityEmail(retailer.user.email, {
             id: tender.id,
             reference: tender.reference,
-            clientTradeTenderId,
             category: `${item.category} / ${item.subcategory}`,
             locationArea: tender.location,
             closingDate: tender.closingDate,
@@ -432,12 +429,10 @@ export async function matchRetailerToOpenTenders(retailerId: string) {
     });
 
     if (!retailer?.email) continue;
-    const clientTradeTenderId = tender.client.clientCompanyMembership?.company.tradeTenderId ?? 'Pending assignment';
     for (const item of matchingItems) {
       const result = await sendTenderOpportunityEmail(retailer.email, {
         id: tender.id,
         reference: tender.reference,
-        clientTradeTenderId,
         category: `${item.category} / ${item.subcategory}`,
         locationArea: tender.location,
         closingDate: tender.closingDate,
@@ -484,7 +479,6 @@ export async function listMatchedSummariesForRetailer(retailerId: string) {
             status: true,
             requirements: true,
             packages: { select: { category: true } },
-            client: { select: { clientCompanyMembership: { select: { company: { select: { tradeTenderId: true } } } } } },
           },
         },
       },
@@ -519,7 +513,6 @@ export async function listMatchedSummariesForRetailer(retailerId: string) {
         urgency: match.tender.urgency,
         closingDate: match.tender.closingDate,
         status: match.tender.status,
-        clientTradeTenderId: match.tender.client.clientCompanyMembership?.company.tradeTenderId ?? null,
         requirements: buildRetailerTenderSummary(match.tender.requirements),
         categoryMatch: true,
         locationMatch: retailer ? retailerCoversTenderLocation(retailer, match.tender.location) : false,

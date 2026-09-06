@@ -13,6 +13,14 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-06 - Tender Confidentiality And Release-Reversal Hardening
+
+- Changed: removed the persistent Contractor Trade Tender ID from pre-unlock Provider API responses, opportunity summaries, Provider tender views, and notification emails. Tender references remain the only pre-unlock identifier.
+- Changed: contact release creation now checks the authorising payment inside a serializable transaction, and contact retrieval requires the authorising payment to remain confirmed. A refund or dispute therefore prevents both new and existing contact access.
+- Affects: staged tender anonymity and payment-authorised contact release only. Tender matching, pricing, quote acceptance, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/tender-opportunity-privacy.test.ts` passes (2 tests); `npx tsx --test tests/lib/payment-reversal.integration.test.ts` passes (4 tests).
+
 ### 2026-09-06 - Candidate Construction Brand Promotion
 
 - Changed: promoted the Founder-approved candidate horizontal lockup to the active serving asset and applied it to application logo surfaces. Navy footer placement now provides the required light logo panel because the approved candidate pack has no dark-background lockup.

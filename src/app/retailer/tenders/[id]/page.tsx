@@ -17,7 +17,6 @@ type TenderSummary = {
   category: string;
   packageCategories?: string[];
   packageCount?: number;
-  clientTradeTenderId: string | null;
   location: string;
   urgency: string;
   closingDate: string;
@@ -210,7 +209,6 @@ export default function RetailerTenderDetailPage() {
 
       <section className="mx-auto mt-6 max-w-2xl">
           <Card className="mb-6">
-            {tender.clientTradeTenderId && <p className="text-sm font-semibold text-steel-blue">Client Trade Tender ID: {tender.clientTradeTenderId}</p>}
             <p className="text-sm text-concrete-grey">Location: {tender.location}</p>
             {deliveryPostcode && <p className="mt-1 text-sm font-semibold text-foundation-navy">Delivery postcode: {deliveryPostcode}</p>}
             <p className="mt-1 text-sm text-concrete-grey">Urgency: {tender.urgency}</p>
