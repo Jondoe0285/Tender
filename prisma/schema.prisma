@@ -108,6 +108,10 @@ model User {
   termsVersion      String?
   privacyAcceptedAt DateTime?
   privacyVersion    String?
+  mfaEnabled        Boolean  @default(false)
+  mfaSecretEncrypted String?
+  mfaRecoveryCodesHash String?
+  mfaVerifiedAt     DateTime?
   createdAt         DateTime @default(now())
   lastLoginAt       DateTime?
   lastLogoutAt      DateTime?

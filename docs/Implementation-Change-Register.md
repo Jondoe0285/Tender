@@ -20,6 +20,21 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-06 - Privileged TOTP MFA Workflow
+
+- Changed: active NextAuth login now supports TOTP MFA for Super User accounts, with QR enrollment, encrypted secret storage, one-time recovery codes, login challenge verification, disable flow, audit events, and session invalidation when MFA settings change.
+- Changed: the protected Security page is available from the authenticated navigation. MFA is implemented against the current NextAuth authority; the staged Clerk setup remains a future authentication migration boundary.
+- Affects: User MFA schema and migration, active credentials login, protected MFA API/UI, navigation, session invalidation, and authentication audit records only. Business workflows, payment controls, and production environment configuration remain unchanged.
+- Environment: apply migration `20260906110000_add_mfa` through the approved staging and production migration process. `NEXTAUTH_SECRET` must be configured and protected because it derives the MFA encryption key.
+- Validation: `npx prisma validate`, engine-less Prisma type generation, `npm run type-check`, `npm audit --audit-level=high`, MFA helper tests, and `git diff --check` pass.
+
+### 2026-09-06 - Cyber Essentials Readiness Evidence
+
+- Changed: CI now runs a dedicated high-severity dependency audit using `npm audit --audit-level=high`.
+- Changed: added `docs/Cyber-Essentials-Readiness.md` to distinguish implemented application controls from the hosting, endpoint, account, firewall, patching, backup, and assessment evidence still required. The repository makes no Cyber Essentials certification claim.
+- Affects: CI security validation and readiness documentation only. No production resource, provider setting, credential, or environment configuration was changed.
+- Validation: local `npm audit --audit-level=high` reports zero vulnerabilities.
+
 ### 2026-09-06 - Centralised Launch Defaults And Profile Credit Allocation
 
 - Changed: inline launch-credit and release-credit editors have been removed from account list rows. Owners define the default launch-credit balance for newly created Provider profiles in Super User Settings.

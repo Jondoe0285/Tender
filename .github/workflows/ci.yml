@@ -7,6 +7,28 @@ on:
     branches: [ main, staging, development ]
 
 jobs:
+  dependency-audit:
+    name: Dependency security audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit high-severity dependencies
+        run: npm audit --audit-level=high
+
   mobile:
     name: Mobile type-check and tests
     runs-on: ubuntu-latest

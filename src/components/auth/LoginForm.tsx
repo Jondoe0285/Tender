@@ -14,6 +14,7 @@ export function LoginForm() {
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [mfaRequired, setMfaRequired] = useState(false);
   const [resetSubmitting, setResetSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -30,7 +31,13 @@ export function LoginForm() {
 
     if (result?.error) {
       setSubmitting(false);
-      setError('Incorrect email or password.');
+      if (result.error.includes('MFA_REQUIRED')) {
+        setMfaRequired(true);
+        setError('Enter the six-digit authenticator code or a recovery code.');
+      } else if (result.error.includes('MFA_INVALID')) {
+        setMfaRequired(true);
+        setError('That MFA code was not accepted. Try again.');
+      } else setError('Incorrect email or password.');
       return;
     }
     router.replace('/api/auth/workspace');
@@ -79,6 +86,10 @@ export function LoginForm() {
             <Label htmlFor="password">Password</Label>
             <PasswordInput id="password" name="password" required autoComplete="current-password" />
           </FieldGroup>
+          {mfaRequired && <FieldGroup>
+            <Label htmlFor="mfaCode">MFA code</Label>
+            <Input id="mfaCode" name="mfaCode" inputMode="numeric" autoComplete="one-time-code" placeholder="123456 or recovery code" required />
+          </FieldGroup>}
           {error && <p role="alert" className="text-sm font-semibold text-attention">{error}</p>}
           <Button type="submit" loading={submitting} size="lg" className="mt-2">Sign in</Button>
         </form>

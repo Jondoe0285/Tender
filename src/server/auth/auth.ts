@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma } from '@/server/data/prisma';
 import { verifyPassword } from '@/server/auth/password';
 import { recordAuditEvent } from '@/server/audit/auditLog';
+import { consumeRecoveryCode, decryptMfaSecret, verifyMfaCode } from '@/server/auth/mfa';
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
@@ -18,6 +19,18 @@ export async function authenticateCredentials(credentials: Record<string, unknow
     const updated = await prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: { increment: 1 } }, select: { failedLoginAttempts: true } });
     if (updated.failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) await prisma.user.update({ where: { id: user.id }, data: { loginLockedUntil: new Date(Date.now() + LOGIN_LOCKOUT_MS) } });
     return null;
+  }
+  const privileged = user.role === 'SUPER_USER' || user.isOwner;
+  if (privileged && user.mfaEnabled) {
+    const mfaCode = typeof credentials?.mfaCode === 'string' ? credentials.mfaCode.trim() : '';
+    let verified = false;
+    if (mfaCode && user.mfaSecretEncrypted) verified = await verifyMfaCode(decryptMfaSecret(user.mfaSecretEncrypted), mfaCode).catch(() => false);
+    if (!verified && mfaCode) {
+      const recovery = consumeRecoveryCode(user.mfaRecoveryCodesHash, mfaCode);
+      verified = recovery.valid;
+      if (recovery.valid) await prisma.user.update({ where: { id: user.id }, data: { mfaRecoveryCodesHash: JSON.stringify(recovery.remaining) } });
+    }
+    if (!verified) throw new Error(mfaCode ? 'MFA_INVALID' : 'MFA_REQUIRED');
   }
   await prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, loginLockedUntil: null } });
   const roles = user.roleMemberships.length > 0 ? user.roleMemberships.map((membership) => membership.role) : [user.role];

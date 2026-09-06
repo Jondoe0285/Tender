@@ -31,6 +31,16 @@
 - Never expose Contractor or Provider details before the required payment trigger.
 - Never bypass authentication, authorization, validation, payment, or other security controls.
 
+## Cyber Essentials Requirements
+
+- Treat [docs/Cyber-Essentials-Readiness.md](../docs/Cyber-Essentials-Readiness.md) as the readiness checklist; the repository is not certified and agents must never describe it as Cyber Essentials certified or compliant without an approved assessment.
+- Preserve the five Cyber Essentials control areas in every change: firewalls and network boundaries, secure configuration, security updates, user access control, and malware protection.
+- Require least privilege, strong authentication, MFA/2SV for privileged accounts where supported, secure session handling, dependency and OS patching, and high-severity vulnerability checks.
+- Do not add dependencies, services, scripts, uploads, integrations, or deployment settings that weaken secure configuration, expose secrets, bypass malware controls, or create unreviewed external access.
+- Validate uploaded files, enforce size and type limits, keep private files outside public access, and require approved malware-scanning controls before production use where file content is accepted.
+- Keep development, test, staging, and production resources and credentials separated. Do not change firewalls, cloud account settings, administrator access, MFA, operating-system patching, backups, or production resources without explicit approval, recovery evidence, and a change-register entry.
+- For security-sensitive changes, run the relevant tests, `npm run type-check`, `npm audit --audit-level=high`, and workflow validation where applicable; document outstanding operational evidence instead of assuming application code proves it.
+
 ## Environment Resource Preservation
 
 - Use local databases and local-only sandbox credentials and settings only on development and feature branches.

@@ -58,6 +58,7 @@ export const SUPER_USER_NAV: NavGroup[] = [
       { label: 'Site Settings', href: '/super-user/settings' },
       { label: 'Accountant Management', href: '/super-user/accountants' },
       { label: 'Accounting Space', href: '/super-user/accounting' },
+      { label: 'Security', href: '/account/security' },
     ],
   },
   {
