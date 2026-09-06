@@ -67,9 +67,11 @@ export function MultiSelectDropdown({
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
               setIsOpen((open) => !open);
+            } else if (event.key === 'Escape') {
+              setIsOpen(false);
             }
           }}
-          role="button"
+          role="combobox"
           tabIndex={0}
           aria-label={placeholder}
           aria-haspopup="listbox"

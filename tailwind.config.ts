@@ -15,6 +15,7 @@ const config: Config = {
         'trade-blue': '#1D6FB8',
         'site-white': '#FFFFFF',
         'light-grey': '#F2F4F7',
+        'sky-blue': '#6EB1E4',
         'hi-viz-tint': '#6EB1E4',
         'concrete-grey': '#6B7280',
         ink: '#0D1B2A',

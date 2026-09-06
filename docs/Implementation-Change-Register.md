@@ -13,6 +13,14 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-06 - Staging Integration Test Repairs
+
+- Changed: restored the approved `sky-blue` Tailwind token while preserving the existing `hi-viz-tint` compatibility alias, and completed MultiSelectDropdown combobox keyboard semantics by closing the list on Escape.
+- Changed: restored fail-closed null and suspension handling in the merged browser/mobile session resolver before checking session version or role memberships.
+- Affects: shared visual token naming, multi-select accessibility, and server-side session authorization only. Tender matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npm test` passes with 171 tests; `npm run type-check` passes; focused brand-token, multi-select, mobile-token, and session-revalidation tests pass (9 tests).
+
 ### 2026-09-06 - Clerk Development Application Linkage
 
 - Changed: installed the Clerk CLI, authenticated the local operator, linked this repository to the designated Clerk application, and pulled the development-only Clerk environment configuration. `@clerk/nextjs` and the root `ClerkProvider` were already present.
