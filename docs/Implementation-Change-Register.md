@@ -13,6 +13,14 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-06 - Candidate Construction Brand Promotion
+
+- Changed: promoted the Founder-approved candidate horizontal lockup to the active serving asset and applied it to application logo surfaces. Navy footer placement now provides the required light logo panel because the approved candidate pack has no dark-background lockup.
+- Changed: updated the active Steel Blue token to `#2F5D7C` and revised the machine-readable brand authority and source-asset record to the new Construction Edition Brand Guide.
+- Affects: application logo presentation, shared visual tokens, and brand documentation only. Authentication, authorization, tender matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required. The previous logo assets remain in the repository as non-active source material.
+- Validation: `npm run type-check` and `npx next build` pass. Browser verification confirms the candidate lockup renders in the public header and the Navy footer uses its required light panel. The standard `npm run build` could not rerun because a local development server holds the Prisma engine lock.
+
 ### 2026-09-06 - Staging Integration Test Repairs
 
 - Changed: restored the approved `sky-blue` Tailwind token while preserving the existing `hi-viz-tint` compatibility alias, and completed MultiSelectDropdown combobox keyboard semantics by closing the list on Escape.

@@ -21,7 +21,7 @@ export function SiteFooter() {
     <footer className="mt-auto border-t-4 border-safety-amber bg-foundation-navy px-6 py-10 text-sm text-site-white/75 sm:px-10">
       <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.2fr_1fr_1fr]">
         <div>
-          <div className="w-56"><TradeTenderLogo variant="dark" /></div>
+          <div className="w-56 bg-site-white p-2"><TradeTenderLogo variant="dark" /></div>
           <p className="mt-5 max-w-xl leading-relaxed">
             Trade Tender is a connection and tender-management platform. We do not supply, contract,
             broker, or guarantee the final agreement between Contractors and Providers.
@@ -30,18 +30,18 @@ export function SiteFooter() {
         <div className="border-l-0 border-site-white/15 lg:border-l lg:pl-8">
           <p className="text-xs font-semibold uppercase tracking-widest text-safety-amber">Policies</p>
           <div className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 text-xs font-semibold">
-            <a href="/policies#platform-terms" className="hover:text-hi-viz-tint">Platform terms</a>
-            <a href="/policies#client-terms" className="hover:text-hi-viz-tint">Contractor terms</a>
-            <a href="/policies#retailer-terms" className="hover:text-hi-viz-tint">Provider terms</a>
-            <a href="/policies#marketplace-disclaimer" className="hover:text-hi-viz-tint">Marketplace disclaimer</a>
-            <a href="/policies#privacy" className="hover:text-hi-viz-tint">Privacy</a>
-            <a href="/policies#cookies" className="hover:text-hi-viz-tint">Cookies</a>
-            <a href="/policies#quote-retention" className="hover:text-hi-viz-tint">Quote retention</a>
-            <a href="/policies#payments" className="hover:text-hi-viz-tint">Payments and refunds</a>
-            <a href="/policies#contact-release" className="hover:text-hi-viz-tint">Contact release</a>
-            <a href="/policies#acceptable-use" className="hover:text-hi-viz-tint">Acceptable use</a>
-            <a href="/policies#partners" className="hover:text-hi-viz-tint">Partner links</a>
-            <a href="/policies#accessibility" className="hover:text-hi-viz-tint">Accessibility</a>
+            <a href="/policies#platform-terms" className="hover:text-sky-blue">Platform terms</a>
+            <a href="/policies#client-terms" className="hover:text-sky-blue">Contractor terms</a>
+            <a href="/policies#retailer-terms" className="hover:text-sky-blue">Provider terms</a>
+            <a href="/policies#marketplace-disclaimer" className="hover:text-sky-blue">Marketplace disclaimer</a>
+            <a href="/policies#privacy" className="hover:text-sky-blue">Privacy</a>
+            <a href="/policies#cookies" className="hover:text-sky-blue">Cookies</a>
+            <a href="/policies#quote-retention" className="hover:text-sky-blue">Quote retention</a>
+            <a href="/policies#payments" className="hover:text-sky-blue">Payments and refunds</a>
+            <a href="/policies#contact-release" className="hover:text-sky-blue">Contact release</a>
+            <a href="/policies#acceptable-use" className="hover:text-sky-blue">Acceptable use</a>
+            <a href="/policies#partners" className="hover:text-sky-blue">Partner links</a>
+            <a href="/policies#accessibility" className="hover:text-sky-blue">Accessibility</a>
           </div>
         </div>
         <div className="border-l-0 border-site-white/15 md:border-l md:pl-8">
@@ -51,7 +51,7 @@ export function SiteFooter() {
               <div className="mt-4 grid max-w-md grid-cols-2 gap-3">
                 {partners.map((partner) => (
                   partner.destinationUrl ? (
-                    <a key={partner.id} href={partner.destinationUrl} target="_blank" rel="noreferrer" className="flex min-h-20 items-center bg-white p-3 outline-offset-4 hover:ring-2 hover:ring-hi-viz-tint" aria-label={`Visit ${partner.name}`}>
+                    <a key={partner.id} href={partner.destinationUrl} target="_blank" rel="noreferrer" className="flex min-h-20 items-center bg-white p-3 outline-offset-4 hover:ring-2 hover:ring-sky-blue" aria-label={`Visit ${partner.name}`}>
                       <Image src={partner.logoPath} alt={partner.name} width={512} height={192} className="h-auto w-full" />
                     </a>
                   ) : (
@@ -69,8 +69,8 @@ export function SiteFooter() {
           <div className="mt-5 border-t border-site-white/15 pt-4">
             <p className="text-xs font-semibold uppercase tracking-widest text-safety-amber">Contact us</p>
             <p className="mt-2 text-xs leading-relaxed text-site-white/70">Support for account access, platform use, payments, and technical issues.</p>
-            {support && <a href={`mailto:${support}`} className="mt-2 inline-block text-xs font-semibold text-site-white underline underline-offset-4 hover:text-hi-viz-tint">Email support</a>}
-            <a href="/policies#support" className="ml-4 text-xs font-semibold text-site-white underline underline-offset-4 hover:text-hi-viz-tint">Support policy</a>
+            {support && <a href={`mailto:${support}`} className="mt-2 inline-block text-xs font-semibold text-site-white underline underline-offset-4 hover:text-sky-blue">Email support</a>}
+            <a href="/policies#support" className="ml-4 text-xs font-semibold text-site-white underline underline-offset-4 hover:text-sky-blue">Support policy</a>
           </div>
         </div>
       </div>

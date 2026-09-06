@@ -220,7 +220,7 @@ export default function ClientTenderDetailPage() {
             {editing ? 'Cancel edit' : 'Edit tender'}
           </Button>
           {(tender.status === 'CLOSED' || new Date(tender.closingDate).getTime() <= Date.now()) && (
-            <Link href={`/user/tenders/new?copyFrom=${encodeURIComponent(tender.id)}`} className="inline-flex h-11 items-center justify-center rounded-lg bg-safety-amber px-5 text-sm font-semibold text-foundation-navy shadow-soft hover:bg-hi-viz-tint hover:shadow-soft-md">
+            <Link href={`/user/tenders/new?copyFrom=${encodeURIComponent(tender.id)}`} className="inline-flex h-11 items-center justify-center rounded-lg bg-safety-amber px-5 text-sm font-semibold text-foundation-navy shadow-soft hover:bg-sky-blue hover:shadow-soft-md">
               Re-tender
             </Link>
           )}

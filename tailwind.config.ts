@@ -11,7 +11,7 @@ const config: Config = {
       colors: {
         'foundation-navy': '#0D1B2A',
         'safety-amber': '#F28C28',
-        'steel-blue': '#6B7280',
+        'steel-blue': '#2F5D7C',
         'trade-blue': '#1D6FB8',
         'site-white': '#FFFFFF',
         'light-grey': '#F2F4F7',

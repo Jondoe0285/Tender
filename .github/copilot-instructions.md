@@ -54,7 +54,7 @@
 
 ## Brand Rules
 
-- Treat [docs/branding/Trade_Tender_Brand_Guide.pdf](../docs/branding/Trade_Tender_Brand_Guide.pdf) as the Brand Authority and [docs/branding/TradeTender-Brand-Rules.md](../docs/branding/TradeTender-Brand-Rules.md) as its machine-readable implementation companion.
+- Treat [docs/branding/Trade_Tender_Brand_Guide_Construction_Edition.pdf](../docs/branding/Trade_Tender_Brand_Guide_Construction_Edition.pdf) as the Brand Authority and [docs/branding/TradeTender-Brand-Rules.md](../docs/branding/TradeTender-Brand-Rules.md) as its machine-readable implementation companion.
 - Review both brand documents before generating React components, layouts, forms, dashboards, emails, or marketing pages.
 - Follow the branding file's colour, typography, logo, and UX standards exactly.
 - If generated UI conflicts with the branding document, the branding document takes precedence.

@@ -320,7 +320,7 @@ function DecisionActions({
   }
   if (quote.status === 'ACCEPTED' && isPendingPayment) {
     if (pendingCheckoutUrl) {
-      return <a href={pendingCheckoutUrl} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-safety-amber px-5 text-sm font-semibold text-foundation-navy shadow-soft hover:bg-hi-viz-tint">Continue payment</a>;
+      return <a href={pendingCheckoutUrl} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-safety-amber px-5 text-sm font-semibold text-foundation-navy shadow-soft hover:bg-sky-blue">Continue payment</a>;
     }
     return <Button onClick={onSimulateReleasePayment} loading={busy}>Pay release fee (dev)</Button>;
   }

@@ -1,8 +1,7 @@
 # Trade Tender Brand Rules
 
-**Source authority:** [Trade Tender Brand Guide PDF](Trade_Tender_Brand_Guide.pdf)
-**Date:** August 2026
-**Approved artwork:** `Trade_Tender_*_Logo.png` files in this directory. The application copies the approved serving variants to `public/images/brand/`.
+**Source authority:** [Trade Tender Brand Guide - Construction Edition](Trade_Tender_Brand_Guide_Construction_Edition.pdf), approved 2026-09-06. This supersedes the August 2026 Brand Guide PDF for active application branding.
+**Approved artwork:** `public/images/brand/Trade_Tender_Candidate_Horizontal_Logo.png` is the active serving lockup. The source candidate pack is retained in `public/images/brand/candidate/`.
 
 ## Brand Positioning
 
@@ -85,12 +84,13 @@ Never use excessive marketing language or imply that Trade Tender sells material
 | Navy | `#0D1B2A` | Primary brand and structural elements |
 | Trade Blue | `#1D6FB8` | Primary actions and emphasis |
 | Sky Blue | `#6EB1E4` | Supporting accent and hover states |
-| Steel Grey | `#6B7280` | Muted text and neutral UI |
+| Steel Blue | `#2F5D7C` | Supporting structural and secondary UI |
+| Concrete Grey | `#6B7280` | Muted text and neutral UI |
 | Light Grey | `#F2F4F7` | Primary background |
 
 ### 4.1 Colour Rules
 
-- Use Navy for structure and high-contrast surfaces, Trade Blue for primary actions, and Light Grey for application backgrounds.
+- Use Navy for structure and high-contrast surfaces, Trade Blue for primary actions, Steel Blue for supporting structure, and Light Grey for application backgrounds.
 - Use Sky Blue for supporting emphasis and interaction states, never as a substitute for readable body text.
 - Use Steel Grey for secondary copy and neutral UI.
 - Use functional colours consistently for status messaging.
@@ -151,7 +151,7 @@ All visual states must remain understandable when viewed without colour and must
 
 Never recolour, stretch, rotate, add shadows to, change spacing around, or recreate the logo.
 
-Use `Trade_Tender_Horizontal_Logo.png` on light navigation and header surfaces. Use `Trade_Tender_Dark_Background_Logo.png` on Navy surfaces. Use the stacked, primary, icon, blue-background, or monochrome variants only where their approved context fits. Always use approved artwork and respect clear space.
+Use `Trade_Tender_Candidate_Horizontal_Logo.png` on a light surface for navigation, headers, and Navy sections. The active candidate pack does not include a dark-background lockup, so a light panel is required when it appears on Navy. Use the stacked, primary, icon, blue-background, or monochrome variants only after a clean serving export is approved. Always use approved artwork and respect clear space.
 
 ## Icon Rules
 
