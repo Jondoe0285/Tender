@@ -13,6 +13,30 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-06 - Candidate Construction Brand Promotion
+
+- Changed: promoted the Founder-approved candidate horizontal lockup to the active serving asset and applied it to application logo surfaces. Navy footer placement now provides the required light logo panel because the approved candidate pack has no dark-background lockup.
+- Changed: updated the active Steel Blue token to `#2F5D7C` and revised the machine-readable brand authority and source-asset record to the new Construction Edition Brand Guide.
+- Affects: application logo presentation, shared visual tokens, and brand documentation only. Authentication, authorization, tender matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required. The previous logo assets remain in the repository as non-active source material.
+- Validation: `npm run type-check` and `npx next build` pass. Browser verification confirms the candidate lockup renders in the public header and the Navy footer uses its required light panel. The standard `npm run build` could not rerun because a local development server holds the Prisma engine lock.
+
+### 2026-09-06 - Staging Integration Test Repairs
+
+- Changed: restored the approved `sky-blue` Tailwind token while preserving the existing `hi-viz-tint` compatibility alias, and completed MultiSelectDropdown combobox keyboard semantics by closing the list on Escape.
+- Changed: restored fail-closed null and suspension handling in the merged browser/mobile session resolver before checking session version or role memberships.
+- Affects: shared visual token naming, multi-select accessibility, and server-side session authorization only. Tender matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npm test` passes with 171 tests; `npm run type-check` passes; focused brand-token, multi-select, mobile-token, and session-revalidation tests pass (9 tests).
+
+### 2026-09-06 - Clerk Development Application Linkage
+
+- Changed: installed the Clerk CLI, authenticated the local operator, linked this repository to the designated Clerk application, and pulled the development-only Clerk environment configuration. `@clerk/nextjs` and the root `ClerkProvider` were already present.
+- Changed: extended the application Content Security Policy to allow Clerk-hosted account scripts, session connections, frames, and the same-origin blob worker required by the hosted sign-in interface. The CSP adds `unsafe-eval` only during local `next dev` execution because React development diagnostics require it; production remains strict. Clerk telemetry remains blocked by the existing minimised `connect-src` policy.
+- Affects: local development authentication configuration only. Existing NextAuth database-backed sessions, User role memberships, suspension checks, password-reset flow, route proxy, payment/contact-release authorization, and audit logging remain the authoritative application controls.
+- Environment: Clerk development instance `ins_3IxnnKC85ooanB8HxbLvAa5G4sJ` is linked locally. No staging or production/main resource, secret, permission, user record, authentication policy, or deployment configuration was changed. A Clerk production instance must be explicitly provisioned and approved before deployment.
+- Validation: `clerk doctor --json`, `npm run type-check`, and `npm run build` pass. The local production server renders the Clerk sign-in control and sign-up link without Clerk CSP errors. Webpack development mode serves the React development CSP exception correctly; Turbopack currently crashes internally while compiling the Clerk sign-in route. The only advisory is that no production Clerk instance is configured. Full application migration remains outstanding because replacing NextAuth requires an approved user-identity and role-data migration plan.
+
 ### 2026-09-05 - Mobile Stress-Test Release Gate
 
 - Changed: added `npm run mobile-stress-test`, which assesses Android and iOS staging origins, validates the mobile security contract, consumes protected real-device evidence, and produces crash, performance, battery, security, network-resilience, recommendations, and launch-readiness reports. Production deployment now depends on this fail-closed gate and uploads its reports.

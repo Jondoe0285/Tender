@@ -40,8 +40,10 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       roleMemberships: { select: { role: true } },
     },
   });
+  if (!current || current.suspended) return null;
   if (mobileIdentity && current.sessionVersion !== mobileIdentity.authVersion) return null;
-  if (!mobileIdentity && (session.user as typeof session.user & { sessionVersion?: number }).sessionVersion !== current.sessionVersion) return null;
+  const sessionVersion = (session?.user as { sessionVersion?: number } | undefined)?.sessionVersion;
+  if (!mobileIdentity && sessionVersion !== current.sessionVersion) return null;
 
   const roles = current.roleMemberships.length > 0
     ? current.roleMemberships.map((membership) => membership.role)

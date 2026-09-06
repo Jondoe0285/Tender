@@ -1,8 +1,8 @@
-# Candidate Brand Assets
+# Candidate Brand Source Assets
 
-Upload proposed logo files and palette references in this folder.
+The candidate construction brand was approved as the primary Trade Tender brand on 2026-09-06. Its active horizontal lockup is promoted to `public/images/brand/Trade_Tender_Candidate_Horizontal_Logo.png`.
 
 - `logos/` - candidate logo exports in PNG, SVG, or WebP format.
 - `palette/` - palette swatches, source files, or a `palette.json` reference.
 
-Candidate assets are not used by the application. Move an approved serving asset into `public/images/brand/` and update the brand rules before wiring it into the user interface.
+This folder remains the source archive for approved candidate exports. Promote a clean serving asset into `public/images/brand/` and update the brand rules before wiring any additional variant into the user interface.
