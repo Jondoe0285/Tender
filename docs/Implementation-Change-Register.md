@@ -13,6 +13,20 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-06 - Owner-Scoped Payment Waivers
+
+- Changed: added Owner-only, per-user payment waivers for `RETAILER_UNLOCK` and `CLIENT_RELEASE`, with a required grant reason, optional expiry, revocation reason, and use history. Each use creates a confirmed zero-value payment linked to the waiver before granting the existing unlock or contact-release entitlement; grants, revocations, and uses are audit logged.
+- Affects: Payment Waiver schema and migration, payment entitlement services, Owner Console, and Owner-only management APIs. Waivers do not weaken authentication, eligibility, tender ownership, quote ownership, or contact-release authorization checks.
+- Environment: apply migration `20260906010000_add_payment_waivers` through the approved staging and production migration process before enabling this workflow outside local development.
+- Validation: `npx prisma validate`, `npx tsx --test tests/lib/payment-waiver.test.ts`, `npm run type-check`, and `npm run build` pass. `npm test` has 172 passing and 7 failing tests: six payment-related integration tests require the pending migrations in the test database, while one membership-pricing test fails because membership tiers are disabled.
+
+### 2026-09-06 - Support And Change Request Workflow
+
+- Changed: added authenticated User support, change, payment, and data/privacy requests; Super Users can triage and resolve requests, while only Owners can approve or reject change requests. Submission and review decisions are audit logged.
+- Affects: Support Request schema and migration, User and Super User portal navigation/screens, authenticated request APIs, and audit records. No tender, payment, contact-release, or environment resource is changed.
+- Environment: apply migration `20260906000000_add_support_requests` through the approved staging and production migration process before enabling the workflow outside local development.
+- Validation: `npx prisma validate`, `npm run type-check`, and `npx tsx --test tests/lib/support-request.test.ts` pass.
+
 ### 2026-09-06 - Tender Confidentiality And Release-Reversal Hardening
 
 - Changed: removed the persistent Contractor Trade Tender ID from pre-unlock Provider API responses, opportunity summaries, Provider tender views, and notification emails. Tender references remain the only pre-unlock identifier.

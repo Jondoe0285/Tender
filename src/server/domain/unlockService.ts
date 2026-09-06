@@ -6,6 +6,7 @@ import { ForbiddenError } from '@/server/auth/session';
 import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getUserTenderServiceCategories } from '@/server/domain/tenderService';
 import { membershipTiersEnabled } from '@/server/domain/membershipService';
 import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
+import { consumePaymentWaiver } from '@/server/domain/paymentWaiverService';
 
 type UnlockOutcome =
   | { status: 'ALREADY_UNLOCKED' }
@@ -32,6 +33,26 @@ export async function requestUnlock(retailerId: string, tenderId: string, mobile
       targetType: 'Tender',
       targetId: tenderId,
       metadata: { method: 'WAIVED', feeGbp: 0 },
+    });
+    return { status: 'UNLOCKED_WITHOUT_PAYMENT_REQUIRED' };
+  }
+
+  const waiverUse = await consumePaymentWaiver({ userId: retailerId, feeType: 'RETAILER_UNLOCK', tenderId });
+  if (waiverUse) {
+    try {
+      await prisma.unlock.create({ data: { tenderId, retailerId, method: 'WAIVED', paymentId: waiverUse.payment.id } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        return { status: 'ALREADY_UNLOCKED' };
+      }
+      throw error;
+    }
+    await recordAuditEvent({
+      actorId: retailerId,
+      action: 'TENDER_UNLOCKED',
+      targetType: 'Tender',
+      targetId: tenderId,
+      metadata: { method: 'WAIVED', paymentId: waiverUse.payment.id, paymentWaiverId: waiverUse.waiver.id },
     });
     return { status: 'UNLOCKED_WITHOUT_PAYMENT_REQUIRED' };
   }

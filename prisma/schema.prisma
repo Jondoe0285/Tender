@@ -65,6 +65,21 @@ enum ModerationDecision {
   REVIEW
 }
 
+enum SupportRequestType {
+  SUPPORT
+  CHANGE
+  PAYMENT
+  DATA_PRIVACY
+}
+
+enum SupportRequestStatus {
+  SUBMITTED
+  TRIAGED
+  APPROVED
+  REJECTED
+  RESOLVED
+}
+
 model User {
   id                String   @id @default(cuid())
   email             String   @unique
@@ -114,6 +129,11 @@ model User {
   reviewedModerationEvents ModerationEvent[] @relation("ModerationReviewer")
   legalHoldsCreated LegalHold[] @relation("LegalHoldCreatedBy")
   legalHoldsReleased LegalHold[] @relation("LegalHoldReleasedBy")
+  supportRequests SupportRequest[] @relation("SupportRequester")
+  reviewedSupportRequests SupportRequest[] @relation("SupportReviewer")
+  paymentWaivers PaymentWaiver[] @relation("PaymentWaiverUser")
+  grantedPaymentWaivers PaymentWaiver[] @relation("PaymentWaiverGrantedBy")
+  revokedPaymentWaivers PaymentWaiver[] @relation("PaymentWaiverRevokedBy")
 }
 
 model RateLimitEntry {
@@ -588,6 +608,8 @@ model Payment {
   stripeReceiptUrl      String?
   accountingRecordPath  String?
   quoteId               String?       @unique
+  paymentWaiverId       String?
+  paymentWaiver         PaymentWaiver? @relation(fields: [paymentWaiverId], references: [id], onDelete: Restrict)
   createdAt             DateTime      @default(now())
   confirmedAt           DateTime?
 
@@ -597,6 +619,8 @@ model Payment {
   sponsoredPlacement    RetailerSponsoredPlacement?
   retailerMembership    RetailerMembership?
   reversals             PaymentReversal[]
+
+  @@index([paymentWaiverId])
 }
 
 model PaymentReversal {
@@ -663,4 +687,42 @@ model AuditLog {
   targetId   String
   metadata   String?
   createdAt  DateTime @default(now())
+}
+
+model SupportRequest {
+  id          String               @id @default(cuid())
+  requesterId String
+  requester   User                 @relation("SupportRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  type        SupportRequestType
+  status      SupportRequestStatus @default(SUBMITTED)
+  title       String
+  description String
+  reviewerId  String?
+  reviewer    User?                @relation("SupportReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviewNote  String?
+  reviewedAt  DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([requesterId, createdAt])
+  @@index([status, type, createdAt])
+}
+
+model PaymentWaiver {
+  id               String      @id @default(cuid())
+  userId           String
+  user             User        @relation("PaymentWaiverUser", fields: [userId], references: [id], onDelete: Restrict)
+  feeType          PaymentType
+  reason           String
+  grantedById      String
+  grantedBy        User        @relation("PaymentWaiverGrantedBy", fields: [grantedById], references: [id], onDelete: Restrict)
+  grantedAt        DateTime    @default(now())
+  expiresAt        DateTime?
+  revokedById      String?
+  revokedBy        User?       @relation("PaymentWaiverRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
+  revokedAt        DateTime?
+  revocationReason String?
+  payments         Payment[]
+
+  @@index([userId, feeType, revokedAt, expiresAt])
 }

@@ -8,6 +8,7 @@ import { getClientReleaseFeeGbp } from '@/server/domain/platformSettings';
 import { contactReleaseTemplate, quoteAcceptedTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { getPurchasedRetentionDeadline } from '@/server/domain/retentionService';
+import { consumePaymentWaiver } from '@/server/domain/paymentWaiverService';
 
 type AcceptOutcome = { status: 'PAYMENT_REQUIRED' | 'RELEASED_WITH_CREDIT'; paymentId: string; checkoutUrl: string | null; devMode: boolean; feeGbp: number; vatGbp: number; totalAmountGbp: number; creditsLeft?: number };
 
@@ -44,6 +45,12 @@ export async function acceptQuote(clientId: string, quoteId: string, mobileRetur
   }
 
   const releaseFeeGbp = await getClientReleaseFeeGbp(quote.priceGbp);
+  const waiverUse = await consumePaymentWaiver({ userId: clientId, feeType: 'CLIENT_RELEASE', quoteId });
+  if (waiverUse) {
+    await finalizeContactRelease(clientId, quoteId, waiverUse.payment.id);
+    return { status: 'RELEASED_WITH_CREDIT', paymentId: waiverUse.payment.id, checkoutUrl: null, devMode: false, feeGbp: 0, vatGbp: 0, totalAmountGbp: 0 };
+  }
+
   const clientCompanyMembership = await prisma.clientCompanyMember.findUnique({
     where: { userId: clientId },
     select: { company: { select: { id: true, releaseCreditsLeft: true } } },

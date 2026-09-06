@@ -1,0 +1,12 @@
+'use client';
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+
+type Request = { id: string; type: string; status: string; title: string; description: string; requester: { contactName: string; email: string }; reviewer: { contactName: string } | null; reviewNote: string | null };
+export function SupportRequestQueue({ initialRequests, isOwner }: { initialRequests: Request[]; isOwner: boolean }) {
+  const [requests, setRequests] = useState(initialRequests); const [notes, setNotes] = useState<Record<string, string>>({}); const [message, setMessage] = useState<string | null>(null);
+  async function action(id: string, action: string) { const response = await fetch(`/api/super-user/support-requests/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, note: notes[id] ?? '' }) }); const data = await response.json().catch(() => null); if (!response.ok) return setMessage(data?.error ?? 'Unable to update request.'); setRequests((current) => current.map((request) => request.id === id ? { ...request, ...data.request } : request)); }
+  return <div className="mx-auto max-w-5xl space-y-4">{message && <p role="alert" className="text-sm font-semibold text-attention">{message}</p>}{requests.map((request) => <Card key={request.id}><p className="text-xs font-semibold text-steel-blue">{request.type} · {request.status}</p><h2 className="mt-1 font-heading text-lg font-bold text-foundation-navy">{request.title}</h2><p className="mt-2 text-sm text-concrete-grey">{request.description}</p><p className="mt-2 text-xs text-concrete-grey">Submitted by {request.requester.contactName}</p><textarea aria-label={`Review note for ${request.title}`} value={notes[request.id] ?? ''} onChange={(event) => setNotes((current) => ({ ...current, [request.id]: event.target.value }))} className="mt-3 w-full rounded-md border border-slate-300 p-2 text-sm" placeholder="Review note (minimum 5 characters)" /><div className="mt-3 flex flex-wrap gap-2"><Button onClick={() => action(request.id, 'triage')}>Triage</Button><Button variant="secondary" onClick={() => action(request.id, 'resolve')}>Resolve</Button>{isOwner && request.type === 'CHANGE' && <><Button onClick={() => action(request.id, 'approve')}>Approve change</Button><Button variant="danger" onClick={() => action(request.id, 'reject')}>Reject change</Button></>}</div></Card>)}</div>;
+}
