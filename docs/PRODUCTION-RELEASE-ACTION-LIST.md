@@ -26,7 +26,7 @@ This document is the detailed release review behind the summary in [Action-Track
 ### P0-C01: Add executable coverage for payment and privacy-critical workflows
 
 - **Severity:** Critical
-- **Status:** Open; confirmed missing coverage.
+- **Status:** In progress; signed webhook signature rejection, valid completion replay, paid-unlock refund revocation, and duplicate reversal delivery are covered by PostgreSQL-backed regression tests. Contact-release reversal, chargeback, partial-finalisation recovery, and out-of-order delivery coverage remain open.
 - **Evidence:** `src/app/api/webhooks/stripe/route.ts`, `src/server/payments/paymentService.ts`, `src/server/payments/paymentReversalService.ts`, `src/server/domain/unlockService.ts`, `src/server/domain/contactReleaseService.ts`; existing tests do not exercise the real webhook and finalisation paths end to end.
 - **Corrective action:** Add PostgreSQL-backed tests for Stripe signature rejection, duplicate and replayed events, retry after partial finalisation failure, out-of-order success/failure, amount and VAT mismatch, refund/dispute reversal, unlock entitlement, contact-release finalisation, and post-reversal access denial. Add privacy assertions across API responses, emails, exports, rendered output, attachments, logs, and browser state.
 - **Can complete:** Yes, including test fixtures and mocked Stripe test events.
