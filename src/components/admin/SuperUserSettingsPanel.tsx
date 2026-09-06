@@ -7,6 +7,7 @@ import { Input, Label, Select, Textarea } from '@/components/ui/Field';
 
 export type AdminSettings = {
   fees: { retailerUnlockGbp: number; clientReleaseGbp: number; clientReleaseMode: string; clientReleasePercentageLow: number; clientReleasePercentageHigh: number; clientReleasePercentageTop: number; vatPercentage: number; sponsoredPlacementActive: boolean; sponsoredPlacementFeeGbp: number; membershipTiersActive: boolean; adspaceActive: boolean };
+  supportRecipientEmail?: string | null;
   tiers: Array<{ id: string; name: string; description: string; monthlyPriceGbp: number; freeTenderOpportunitiesPerMonth: number; active: boolean }>;
   subscriptions: Array<{ id: string; name: string; description: string; annualPriceGbp: number; active: boolean }>;
   retailers: Array<{ id: string; email: string; retailerProfile: { companyName: string } | null; memberships: Array<{ tier: { name: string } }>; subscriptions: Array<{ plan: { name: string } }> }>;
@@ -20,6 +21,7 @@ type PlanType = 'tier' | 'subscription';
 export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSettings: AdminSettings; isOwner: boolean }) {
   const [settings, setSettings] = useState(initialSettings);
   const [fees, setFees] = useState(settings.fees);
+  const [supportRecipientEmail, setSupportRecipientEmail] = useState(settings.supportRecipientEmail ?? '');
   const [form, setForm] = useState({ name: '', description: '', monthlyPriceGbp: '', freeTenderOpportunitiesPerMonth: '' });
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -39,6 +41,16 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSe
       await request('/api/super-user/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'fee', key, value }) });
       setMessage('Fee updated. New payments will use this amount.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to save fee'); }
+    setSaving(false);
+  }
+
+  async function saveSupportRecipient() {
+    setSaving(true);
+    setMessage(null);
+    try {
+      await request('/api/super-user/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'support-recipient', supportRecipientEmail: supportRecipientEmail.trim() || null }) });
+      setMessage(supportRecipientEmail.trim() ? 'Support recipient updated.' : 'Support recipient cleared. New requests will not send email notifications.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to save support recipient'); }
     setSaving(false);
   }
 
@@ -106,6 +118,15 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSe
           <Card><div className="flex flex-wrap items-center justify-between gap-3"><div><Label>Advertising space</Label><p className="mt-1 text-sm text-concrete-grey">Display advertising inventory on the platform with proper governance and cookie warnings.</p></div><Button variant={fees.adspaceActive ? 'danger' : 'secondary'} disabled={locked} onClick={() => { const active = !fees.adspaceActive; setFees({ ...fees, adspaceActive: active }); void saveFee('ADSPACE_ACTIVE', active); }} loading={saving}>{fees.adspaceActive ? 'Deactivate' : 'Activate'}</Button></div></Card>
         </div>
       </section>
+
+      {isOwner && <section>
+        <h2 className="mb-4 font-heading text-lg font-bold text-foundation-navy">Support notifications</h2>
+        <Card>
+          <Label>Support recipient email</Label>
+          <div className="mt-2 flex flex-col gap-3 sm:flex-row"><Input type="email" value={supportRecipientEmail} onChange={(event) => setSupportRecipientEmail(event.target.value)} placeholder="support@example.com" /><Button onClick={saveSupportRecipient} loading={saving}>Save</Button></div>
+          <p className="mt-3 text-sm text-concrete-grey">New support requests send a minimal notification to this address. Leave blank and save to disable notifications.</p>
+        </Card>
+      </section>}
 
       <section>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="font-heading text-lg font-bold text-foundation-navy">Membership tiers</h2><Button variant={fees.membershipTiersActive ? 'danger' : 'secondary'} disabled={locked} onClick={() => { const active = !fees.membershipTiersActive; setFees({ ...fees, membershipTiersActive: active }); void saveFee('MEMBERSHIP_TIERS_ACTIVE', active); }} loading={saving}>{fees.membershipTiersActive ? 'Deactivate membership feature' : 'Activate membership feature'}</Button></div>

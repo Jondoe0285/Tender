@@ -27,6 +27,14 @@ Update it in the same change set as every applicable implementation. Do not reco
 - Environment: apply migration `20260906000000_add_support_requests` through the approved staging and production migration process before enabling the workflow outside local development.
 - Validation: `npx prisma validate`, `npm run type-check`, and `npx tsx --test tests/lib/support-request.test.ts` pass.
 
+### 2026-09-06 - Owner-Configured Support Request Notifications
+
+- Changed: Owners can configure or clear one server-validated support recipient email through Site Settings. The configured address is returned only to Owners; normal Users and non-Owner Super Users cannot read it.
+- Changed: each submitted support request attempts a Resend notification containing only request type, submission time, and an authenticated review link. Requester identity, request content, tender, contact, payment, and secret data remain excluded. Delivery is recorded as sent, failed, or skipped without storing the recipient address or provider failure detail in audit metadata.
+- Affects: Owner-only platform settings, support request notification delivery, and append-only audit records. No tender, payment, contact-release, or environment resource is changed.
+- Environment: configure the support recipient through the Owner Site Settings UI after Resend `RESEND_API_KEY` and `EMAIL_FROM` are available for the applicable environment. No secret or recipient value is committed.
+- Validation: `npx tsx --test tests/lib/support-request.test.ts`, `npm run type-check`, and `npm run build` pass.
+
 ### 2026-09-06 - Tender Confidentiality And Release-Reversal Hardening
 
 - Changed: removed the persistent Contractor Trade Tender ID from pre-unlock Provider API responses, opportunity summaries, Provider tender views, and notification emails. Tender references remain the only pre-unlock identifier.

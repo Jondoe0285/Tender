@@ -8,7 +8,7 @@ import { requireFullSuperUser, requireOwner } from '@/server/auth/session';
 import { ensureDefaultMembershipTiers } from '@/server/domain/membershipService';
 
 const settingSchema = z.object({
-  action: z.enum(['fee', 'tier', 'subscription']),
+  action: z.enum(['fee', 'tier', 'subscription', 'support-recipient']),
   id: z.string().optional(),
   key: z.enum(['RETAILER_UNLOCK_FEE_GBP', 'CLIENT_RELEASE_FEE_GBP', 'CLIENT_RELEASE_FEE_MODE', 'CLIENT_RELEASE_PERCENTAGE_LOW', 'CLIENT_RELEASE_PERCENTAGE_HIGH', 'CLIENT_RELEASE_PERCENTAGE_TOP', 'VAT_PERCENTAGE', 'SPONSORED_PLACEMENT_ACTIVE', 'SPONSORED_PLACEMENT_FEE_GBP', 'MEMBERSHIP_TIERS_ACTIVE', 'ADSPACE_ACTIVE']).optional(),
   value: z.union([z.number().nonnegative(), z.enum(['FIXED', 'PERCENTAGE']), z.boolean()]).optional(),
@@ -18,13 +18,14 @@ const settingSchema = z.object({
   monthlyPriceGbp: z.number().int().nonnegative().optional(),
   freeTenderOpportunitiesPerMonth: z.number().int().nonnegative().optional(),
   active: z.boolean().optional(),
+  supportRecipientEmail: z.string().trim().toLowerCase().email().max(254).nullable().optional(),
 });
 
 export async function GET() {
   try {
-    await requireFullSuperUser();
+    const admin = await requireFullSuperUser();
     await ensureDefaultMembershipTiers();
-    return NextResponse.json(await getAdminSettings());
+    return NextResponse.json(await getAdminSettings(admin.isOwner));
   } catch {
     return NextResponse.json({ error: 'Super User access required' }, { status: 403 });
   }
@@ -39,6 +40,18 @@ export async function PATCH(request: Request) {
   const parsed = settingSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Invalid setting details' }, { status: 400 });
   const input = parsed.data;
+
+  if (input.action === 'support-recipient') {
+    if (input.supportRecipientEmail === undefined) return NextResponse.json({ error: 'A valid support recipient email is required' }, { status: 400 });
+    const current = await prisma.platformSetting.findUnique({ where: { key: 'SUPPORT_RECIPIENT_EMAIL' } });
+    if (input.supportRecipientEmail === null) {
+      if (current) await prisma.platformSetting.delete({ where: { key: 'SUPPORT_RECIPIENT_EMAIL' } });
+    } else {
+      await prisma.platformSetting.upsert({ where: { key: 'SUPPORT_RECIPIENT_EMAIL' }, update: { value: input.supportRecipientEmail }, create: { key: 'SUPPORT_RECIPIENT_EMAIL', value: input.supportRecipientEmail } });
+    }
+    await recordAuditEvent({ actorId: admin.id, action: 'SUPPORT_RECIPIENT_UPDATED', targetType: 'PlatformSetting', targetId: 'SUPPORT_RECIPIENT_EMAIL', metadata: { configured: input.supportRecipientEmail !== null, changed: current?.value !== input.supportRecipientEmail } });
+    return NextResponse.json({ status: 'updated' });
+  }
 
   if (input.action === 'fee') {
     if (!input.key || input.value === undefined) return NextResponse.json({ error: 'Fee key and value are required' }, { status: 400 });

@@ -8,7 +8,7 @@ export default async function SiteSettingsPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== 'SUPER_USER') redirect('/login');
   if (user.isAccountant) redirect('/super-user/accounting');
-  const settings = await getAdminSettings();
+  const settings = await getAdminSettings(user.isOwner);
 
   return (
     <AppShell role="super-user" title="Site Settings">

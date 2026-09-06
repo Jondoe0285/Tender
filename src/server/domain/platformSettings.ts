@@ -46,6 +46,10 @@ export async function getPlatformSetting(key: string): Promise<string | null> {
   return setting?.value ?? defaultSettings[key] ?? null;
 }
 
+export async function getSupportRecipientEmail(): Promise<string | null> {
+  return getPlatformSetting('SUPPORT_RECIPIENT_EMAIL');
+}
+
 export async function getPaymentFeeGbp(type: PaymentType): Promise<number> {
   const key = type === 'RETAILER_UNLOCK'
     ? 'RETAILER_UNLOCK_FEE_GBP'
@@ -104,7 +108,7 @@ export async function isAdspaceActive(): Promise<boolean> {
   return await getPlatformSetting('ADSPACE_ACTIVE') === 'true';
 }
 
-export async function getAdminSettings() {
+export async function getAdminSettings(includeSupportRecipient = false) {
   const [settings, tiers, subscriptions, categoryDefinitions, retailers] = await Promise.all([
     prisma.platformSetting.findMany({ orderBy: { key: 'asc' } }),
     prisma.membershipTier.findMany({ orderBy: { createdAt: 'asc' } }),
@@ -133,5 +137,6 @@ export async function getAdminSettings() {
     retailerAnalyticsSections: Object.fromEntries(
       RETAILER_ANALYTICS_SECTION_KEYS.map((key) => [key, (settings.find((setting) => setting.key === key)?.value ?? defaultSettings[key]) === 'true'])
     ) as Record<RetailerAnalyticsSectionKey, boolean>,
+    ...(includeSupportRecipient ? { supportRecipientEmail: settings.find((setting) => setting.key === 'SUPPORT_RECIPIENT_EMAIL')?.value ?? null } : {}),
   };
 }

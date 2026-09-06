@@ -15,3 +15,19 @@ test('requires a valid reviewed action and records Owner-only change approval', 
   assert.match(service, /request\.type !== 'CHANGE' \|\| !reviewer\.isOwner/);
   assert.match(service, /SUPPORT_REQUEST_\$\{status\}/);
 });
+
+test('uses an Owner-only configured recipient and minimizes support notification data', () => {
+  const settingsRoute = readFileSync('src/app/api/super-user/settings/route.ts', 'utf8');
+  const settingsService = readFileSync('src/server/domain/platformSettings.ts', 'utf8');
+  const supportService = readFileSync('src/server/domain/supportRequestService.ts', 'utf8');
+  const templates = readFileSync('src/server/notifications/emailTemplates.ts', 'utf8');
+  assert.match(settingsRoute, /requireOwner\(\)/);
+  assert.match(settingsRoute, /rejectCrossOrigin\(request\)/);
+  assert.match(settingsRoute, /supportRecipientEmail: z\.string\(\)\.trim\(\)\.toLowerCase\(\)\.email\(\)\.max\(254\)/);
+  assert.match(settingsService, /getAdminSettings\(includeSupportRecipient = false\)/);
+  assert.match(settingsService, /includeSupportRecipient \? \{ supportRecipientEmail/);
+  assert.match(supportService, /getSupportRecipientEmail\(\)/);
+  assert.match(supportService, /SUPPORT_REQUEST_NOTIFICATION_\$\{deliveryStatus\}/);
+  assert.match(templates, /supportRequestNotificationTemplate/);
+  assert.match(templates, /intentionally excludes requester and protected tender, contact, payment, and request-detail data/);
+});

@@ -142,6 +142,23 @@ export function configurationTestTemplate(input: { environment: string; sentAt: 
   };
 }
 
+/** Deliberately excludes requester, message, tender, payment, and contact information. */
+export function supportRequestNotificationTemplate(input: { type: string; submittedAt: Date }): EmailTemplate {
+  return {
+    subject: 'New Trade Tender support request',
+    html: layout({
+      eyebrow: 'Support request',
+      title: 'A support request needs review',
+      intro: 'A signed-in user has submitted a support request.',
+      body: detailRows([
+        ['Request type', input.type],
+        ['Submitted at', input.submittedAt.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })],
+      ]) + '<p style="font-size:14px;line-height:1.6">Review the request in the authenticated Super User workspace. This email intentionally excludes requester and protected tender, contact, payment, and request-detail data.</p>',
+      action: { label: 'Review support requests', href: appUrl('/super-user/support-requests') },
+    }),
+  };
+}
+
 export function accountCreatedByAdminTemplate(input: { role: 'USER' | 'USER'; contactName: string; companyName?: string; resetLink: string; expiresIn: string }): EmailTemplate {
   return {
     subject: 'Your Trade Tender account is ready',
