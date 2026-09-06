@@ -52,6 +52,34 @@ export function tenderUpdatedTemplate(input: { id: string; reference: string; ca
   };
 }
 
+/** Keeps risk details inside the authenticated platform review rather than email. */
+export function tenderFlaggedForReviewTemplate(input: { reference: string }): EmailTemplate {
+  return {
+    subject: `Tender flagged for review: ${input.reference}`,
+    html: layout({
+      eyebrow: 'Tender review',
+      title: 'Your tender has been flagged for review',
+      intro: `Tender ${input.reference} requires a Trade Tender review before further action may be taken.`,
+      body: '<p style="font-size:14px;line-height:1.6">No action is required from you at this time. We will contact you through your account if further information is needed.</p>',
+      action: { label: 'View your tender', href: appUrl('/client/tenders') },
+    }),
+  };
+}
+
+/** Deliberately excludes user, tender, and warning details from an Owner escalation email. */
+export function tenderWarningEscalationTemplate(input: { activeWarningCount: number; reviewPath: string }): EmailTemplate {
+  return {
+    subject: 'Trade Tender warning threshold reached',
+    html: layout({
+      eyebrow: 'Account review',
+      title: 'A warning threshold needs Owner review',
+      intro: `A user has reached ${input.activeWarningCount} active tender warnings.`,
+      body: '<p style="font-size:14px;line-height:1.6">Review the protected warning and account information in the authenticated Owner workspace. Account suspension requires a separate Owner decision and has not been applied automatically.</p>',
+      action: { label: 'Review warned account', href: appUrl(input.reviewPath) },
+    }),
+  };
+}
+
 export function quoteReceivedTemplate(input: { tenderReference: string; quoteReference: string; category: string; priceGbp: number; leadTimeDays: number; reviewPath: string }): EmailTemplate {
   return {
     subject: `Quote received for ${input.tenderReference}`,

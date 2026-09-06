@@ -18,11 +18,6 @@ const portals = [
     description:
       'Review matched tender opportunities by category and coverage area, unlock full details, and submit a formal quote.',
   },
-  {
-    eyebrow: 'For Super Users',
-    title: 'Keep the marketplace running smoothly.',
-    description: 'Manage users, categories, pricing, and platform activity from one view.',
-  },
 ];
 
 export default function HomePage() {
@@ -49,7 +44,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section aria-label="Trade Tender workspaces" className="mx-auto grid max-w-6xl gap-4 px-6 py-14 sm:grid-cols-3 sm:px-10">
+        <section aria-label="Trade Tender workspaces" className="mx-auto grid max-w-6xl gap-4 px-6 py-14 sm:grid-cols-2 sm:px-10">
           {portals.map((portal) => (
             <Card key={portal.title} interactive className="flex min-h-[250px] flex-col border-t-4 border-t-steel-blue">
               <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-steel-blue">

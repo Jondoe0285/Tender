@@ -49,6 +49,10 @@ test('active legal holds exclude expired quotes and tender attachments until rel
 
   await releaseLegalHold(admin.id, tenderHold.id, 'Investigation concluded and retention may resume.');
   const deleted = await purgeExpiredUnpurchasedQuotes(new Date('2026-03-01T00:00:00.000Z'));
-  assert.deepEqual(deleted, { quotesDeleted: 1, documentsDeleted: 1 });
+  assert.equal(deleted.quotesDeleted, 1);
+  assert.equal(deleted.documentsDeleted, 1);
+  assert.equal(typeof deleted.emailVerificationTokensDeleted, 'number');
+  assert.equal(typeof deleted.passwordResetTokensDeleted, 'number');
+  assert.equal(typeof deleted.pageViewsDeleted, 'number');
   assert.equal(await prisma.auditLog.count({ where: { action: 'LEGAL_HOLD_RELEASED', targetId: tender.id } }), 1);
 });

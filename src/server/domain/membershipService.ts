@@ -29,31 +29,16 @@ export async function ensureDefaultMembershipTiers() {
     });
   }
 
-  const upToDate = await prisma.membershipTier.findMany({ where: { name: { in: DEFAULT_MEMBERSHIP_TIERS.map((tier) => tier.name) } } });
-  for (const tier of upToDate) {
-    const desired = DEFAULT_MEMBERSHIP_TIERS.find((item) => item.name === tier.name);
-    if (!desired) continue;
-    const shouldUpdate = tier.monthlyPriceGbp !== desired.monthlyPriceGbp
-      || tier.freeTenderOpportunitiesPerMonth !== desired.freeTenderOpportunitiesPerMonth
-      || tier.description !== desired.description
-      || tier.active;
-
-    if (shouldUpdate) {
-      await prisma.membershipTier.update({
-        where: { id: tier.id },
-        data: {
-          monthlyPriceGbp: desired.monthlyPriceGbp,
-          freeTenderOpportunitiesPerMonth: desired.freeTenderOpportunitiesPerMonth,
-          description: desired.description,
-          active: false,
-        },
-      });
-    }
-  }
 }
 
 export async function membershipTiersEnabled(): Promise<boolean> {
   return await getPlatformSetting('MEMBERSHIP_TIERS_ACTIVE') === 'true';
+}
+
+export function getMembershipContractExpiry(date: Date, months: 6 | 12) {
+  const result = new Date(date);
+  result.setUTCMonth(result.getUTCMonth() + months);
+  return result;
 }
 
 export async function listAvailableMembershipTiers(retailerId: string) {
@@ -61,19 +46,19 @@ export async function listAvailableMembershipTiers(retailerId: string) {
   const [enabled, tiers, memberships] = await Promise.all([
     membershipTiersEnabled(),
     prisma.membershipTier.findMany({ where: { active: true }, orderBy: { monthlyPriceGbp: 'asc' } }),
-    prisma.retailerMembership.findMany({ where: { retailerId, active: true }, select: { tierId: true } }),
+    prisma.retailerMembership.findMany({ where: { retailerId, active: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }, select: { tierId: true } }),
   ]);
   const activeTierIds = new Set(memberships.map((membership) => membership.tierId));
   return { enabled, tiers: enabled ? tiers.map((tier) => ({ ...tier, purchased: activeTierIds.has(tier.id) })) : [] };
 }
 
-export async function requestMembershipTierPurchase(retailerId: string, tierId: string) {
+export async function requestMembershipTierPurchase(retailerId: string, tierId: string, contractMonths: 6 | 12) {
   if (!await membershipTiersEnabled()) throw new ForbiddenError('Membership tiers are not active');
   const tier = await prisma.membershipTier.findUnique({ where: { id: tierId } });
   if (!tier || !tier.active) throw new ForbiddenError('Membership tier is not available');
   const existing = await prisma.retailerMembership.findUnique({ where: { retailerId_tierId: { retailerId, tierId } } });
   if (existing?.active) return { status: 'ACTIVE' as const };
-  const payment = await createPayment({ type: 'MEMBERSHIP_TIER', userId: retailerId, tierId });
+  const payment = await createPayment({ type: 'MEMBERSHIP_TIER', userId: retailerId, tierId, contractMonths });
   return { status: 'PAYMENT_REQUIRED' as const, ...payment };
 }
 
@@ -83,11 +68,13 @@ export async function finalizeMembershipTierWithPayment(retailerId: string, tier
   if (!payment || payment.userId !== retailerId || payment.tierId !== tierId || payment.type !== 'MEMBERSHIP_TIER' || payment.status !== 'CONFIRMED' || !payment.tier?.active) {
     throw new ForbiddenError('Payment is not a confirmed membership payment for this Retailer');
   }
+  const startsAt = payment.confirmedAt ?? new Date();
+  const expiresAt = getMembershipContractExpiry(startsAt, payment.contractMonths === 6 ? 6 : 12);
   const membership = await prisma.retailerMembership.upsert({
     where: { retailerId_tierId: { retailerId, tierId } },
-    update: { active: true, paymentId },
-    create: { retailerId, tierId, paymentId, active: true },
+    update: { active: true, paymentId, assignedAt: startsAt, expiresAt },
+    create: { retailerId, tierId, paymentId, active: true, assignedAt: startsAt, expiresAt },
   });
-  await recordAuditEvent({ actorId: retailerId, action: 'MEMBERSHIP_TIER_PURCHASED', targetType: 'RetailerMembership', targetId: membership.id, metadata: { tierId, paymentId } });
+  await recordAuditEvent({ actorId: retailerId, action: 'MEMBERSHIP_TIER_PURCHASED', targetType: 'RetailerMembership', targetId: membership.id, metadata: { tierId, paymentId, contractMonths: payment.contractMonths === 6 ? 6 : 12, assignedAt: startsAt.toISOString(), expiresAt: expiresAt.toISOString(), nonRefundable: true } });
   return membership;
 }

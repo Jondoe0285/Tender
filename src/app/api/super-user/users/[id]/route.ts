@@ -39,6 +39,9 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   }
 
   if (action === 'suspend') {
+    if (!admin.isOwner) {
+      return NextResponse.json({ error: 'Owner access is required to suspend an account' }, { status: 403 });
+    }
     await prisma.user.update({
       where: { id: user.id },
       data: { suspended: true },
@@ -54,6 +57,9 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   }
 
   if (action === 'activate') {
+    if (!admin.isOwner) {
+      return NextResponse.json({ error: 'Owner access is required to reactivate an account' }, { status: 403 });
+    }
     await prisma.user.update({
       where: { id: user.id },
       data: { suspended: false },

@@ -8,5 +8,5 @@ export default async function SupportPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== 'USER') redirect('/login');
   const requests = await listSupportRequestsForRequester(user.id);
-  return <AppShell role="client" title="Support requests"><SupportRequestPanel initialRequests={requests.map((request) => ({ ...request, createdAt: request.createdAt.toISOString() }))} /></AppShell>;
+  return <AppShell role="client" title="Support requests"><SupportRequestPanel initialRequests={requests.map((request) => ({ ...request, createdAt: request.createdAt.toISOString(), dueAt: request.dueAt?.toISOString() ?? null }))} /></AppShell>;
 }

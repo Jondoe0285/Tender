@@ -13,7 +13,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const parsed = supportRequestReviewSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: 'A valid action and review note are required' }, { status: 400 });
     const { id } = await props.params;
-    const supportRequest = await reviewSupportRequest(reviewer, id, parsed.data.action, parsed.data.note);
+    const supportRequest = await reviewSupportRequest(reviewer, id, parsed.data.action, parsed.data.note, parsed.data.resolutionEvidence);
     return NextResponse.json({ request: supportRequest });
   } catch (error) {
     return toErrorResponse(error);

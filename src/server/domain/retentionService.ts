@@ -2,6 +2,8 @@ import { prisma } from '@/server/data/prisma';
 
 export const UNPURCHASED_QUOTE_RETENTION_DAYS = 30;
 export const PURCHASED_DOCUMENT_RETENTION_YEARS = 5;
+export const EXPIRED_AUTH_TOKEN_RETENTION_DAYS = 30;
+export const PAGE_VIEW_RETENTION_DAYS = 90;
 
 export function getUnpurchasedQuoteCutoff(now = new Date()): Date {
   const cutoff = new Date(now);
@@ -13,6 +15,12 @@ export function getPurchasedRetentionDeadline(now = new Date()): Date {
   const deadline = new Date(now);
   deadline.setUTCFullYear(deadline.getUTCFullYear() + PURCHASED_DOCUMENT_RETENTION_YEARS);
   return deadline;
+}
+
+function getCutoff(days: number, now: Date): Date {
+  const cutoff = new Date(now);
+  cutoff.setUTCDate(cutoff.getUTCDate() - days);
+  return cutoff;
 }
 
 export function expiredQuotePurgeWhere(cutoff: Date) {
@@ -34,7 +42,7 @@ export function expiredAttachmentPurgeWhere(cutoff: Date) {
   };
 }
 
-export async function purgeExpiredUnpurchasedQuotes(now = new Date()): Promise<{ quotesDeleted: number; documentsDeleted: number }> {
+export async function purgeExpiredUnpurchasedQuotes(now = new Date()): Promise<{ quotesDeleted: number; documentsDeleted: number; emailVerificationTokensDeleted: number; passwordResetTokensDeleted: number; pageViewsDeleted: number }> {
   const cutoff = getUnpurchasedQuoteCutoff(now);
   const quotes = await prisma.quote.findMany({
     where: expiredQuotePurgeWhere(cutoff),
@@ -46,9 +54,9 @@ export async function purgeExpiredUnpurchasedQuotes(now = new Date()): Promise<{
     select: { id: true, fileName: true, tenderId: true, uploadedAt: true },
   });
 
-  if (quotes.length === 0 && attachments.length === 0) return { quotesDeleted: 0, documentsDeleted: 0 };
-
-  await prisma.$transaction(async (transaction) => {
+  const tokenCutoff = getCutoff(EXPIRED_AUTH_TOKEN_RETENTION_DAYS, now);
+  const pageViewCutoff = getCutoff(PAGE_VIEW_RETENTION_DAYS, now);
+  const operationalData = await prisma.$transaction(async (transaction) => {
     for (const quote of quotes) {
       await transaction.quote.delete({ where: { id: quote.id } });
       await transaction.auditLog.create({
@@ -73,7 +81,13 @@ export async function purgeExpiredUnpurchasedQuotes(now = new Date()): Promise<{
         },
       });
     }
+    const [emailVerificationTokens, passwordResetTokens, pageViews] = await Promise.all([
+      transaction.emailVerificationToken.deleteMany({ where: { expiresAt: { lt: tokenCutoff } } }),
+      transaction.passwordResetToken.deleteMany({ where: { expiresAt: { lt: tokenCutoff } } }),
+      transaction.pageView.deleteMany({ where: { createdAt: { lt: pageViewCutoff } } }),
+    ]);
+    return { emailVerificationTokensDeleted: emailVerificationTokens.count, passwordResetTokensDeleted: passwordResetTokens.count, pageViewsDeleted: pageViews.count };
   });
 
-  return { quotesDeleted: quotes.length, documentsDeleted: attachments.length };
+  return { quotesDeleted: quotes.length, documentsDeleted: attachments.length, ...operationalData };
 }

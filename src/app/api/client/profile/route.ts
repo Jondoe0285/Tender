@@ -58,12 +58,17 @@ async function getClientCompanyMembership(userId: string) {
 export async function GET() {
   try {
     const user = await requireRole('USER');
-    const [account, membership] = await Promise.all([
+    const [account, membership, warnings] = await Promise.all([
       prisma.user.findUniqueOrThrow({
         where: { id: user.id },
         select: { firstName: true, lastName: true, contactName: true, email: true, contactPhone: true },
       }),
       getClientCompanyMembership(user.id),
+      prisma.tenderWarning.findMany({
+        where: { recipientId: user.id, active: true },
+        select: { id: true, reason: true, note: true, createdAt: true, tender: { select: { reference: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
     ]);
 
     return NextResponse.json({
@@ -85,6 +90,7 @@ export async function GET() {
             orderBy: { createdAt: 'asc' },
           })
         : [],
+        warnings: warnings.map((warning) => ({ id: warning.id, reason: warning.reason, note: warning.note, createdAt: warning.createdAt, tenderReference: warning.tender.reference })),
     });
   } catch (error) {
     return toErrorResponse(error);

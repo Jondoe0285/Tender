@@ -2,11 +2,13 @@ import { prisma } from '@/server/data/prisma';
 import { Prisma } from '@prisma/client';
 import { buildTenderReference } from '@/lib/identifiers';
 import { recordAuditEvent } from '@/server/audit/auditLog';
-import { sendTenderOpportunityEmail, sendTenderUpdatedEmail } from '@/server/notifications/resend';
+import { sendTenderOpportunityEmail, sendTenderUpdatedEmail, sendTransactionalEmail } from '@/server/notifications/resend';
+import { tenderFlaggedForReviewTemplate } from '@/server/notifications/emailTemplates';
 import type { CreateTenderInput, UpdateTenderInput } from '@/lib/schemas/tender';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
 import { retailerCoversTenderLocation, getBroadLocation, getPostcodeDistrict, UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 import { ForbiddenError } from '@/server/auth/session';
+import { flagDuplicateTenders } from '@/server/domain/complianceMonitoringService';
 
 type RetailerTenderEligibilityProfile = {
   coverageScope: string;
@@ -14,6 +16,34 @@ type RetailerTenderEligibilityProfile = {
   regions: string;
   categories: string;
 };
+
+async function notifyTenderOwnerOfHighRisk(tenderId: string) {
+  const tender = await prisma.tender.findUnique({
+    where: { id: tenderId },
+    select: { id: true, reference: true, clientId: true, category: true, subcategory: true, location: true, createdAt: true, client: { select: { email: true } } },
+  });
+  if (!tender) return;
+
+  const since = new Date(tender.createdAt);
+  since.setUTCDate(since.getUTCDate() - 7);
+  const candidates = await prisma.tender.findMany({
+    where: { clientId: tender.clientId, category: tender.category, subcategory: tender.subcategory, location: tender.location, createdAt: { gte: since } },
+    select: { id: true, reference: true, clientId: true, category: true, subcategory: true, location: true, createdAt: true },
+  });
+  const isHighRisk = flagDuplicateTenders(candidates).some((flag) => flag.severity === 'HIGH' && flag.targetId === tender.id);
+  if (!isHighRisk) return;
+
+  const alreadyNotified = await prisma.auditLog.findFirst({ where: { action: 'TENDER_HIGH_RISK_NOTIFICATION_SENT', targetType: 'Tender', targetId: tender.id }, select: { id: true } });
+  if (alreadyNotified) return;
+  const result = await sendTransactionalEmail(tender.client.email, tenderFlaggedForReviewTemplate({ reference: tender.reference }));
+  await recordAuditEvent({
+    actorId: null,
+    action: result.sent ? 'TENDER_HIGH_RISK_NOTIFICATION_SENT' : 'TENDER_HIGH_RISK_NOTIFICATION_FAILED',
+    targetType: 'Tender',
+    targetId: tender.id,
+    metadata: { reason: result.sent ? undefined : result.reason },
+  });
+}
 
 export async function getCompanyMemberIds(userId: string): Promise<string[]> {
   const membership = await prisma.clientCompanyMember.findUnique({ where: { userId }, select: { companyId: true } });
@@ -270,6 +300,7 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
     );
   }
 
+  await notifyTenderOwnerOfHighRisk(tender.id);
   return tender;
 }
 
@@ -367,6 +398,7 @@ export async function updateTender(clientId: string, tenderId: string, input: Up
     });
   }));
 
+  await notifyTenderOwnerOfHighRisk(updatedTender.id);
   return updatedTender;
 }
 

@@ -8,11 +8,13 @@ export async function getUserAnalyticsProfile(userId: string) {
       retailerProfile: true,
       primaryClientCompany: true,
       clientCompanyMembership: { include: { company: true } },
+      memberships: { where: { active: true }, include: { tier: true } },
+      subscriptions: { where: { active: true }, include: { plan: true } },
     },
   });
   if (!user) return null;
 
-  const [pageViews, auditLogs] = await Promise.all([
+  const [pageViews, auditLogs, warnings, membershipTiers, subscriptionPlans] = await Promise.all([
     prisma.pageView.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -23,6 +25,13 @@ export async function getUserAnalyticsProfile(userId: string) {
       orderBy: { createdAt: 'desc' },
       take: 50,
     }),
+    prisma.tenderWarning.findMany({
+      where: { recipientId: userId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, reason: true, note: true, active: true, createdAt: true, tender: { select: { reference: true } }, issuedBy: { select: { contactName: true } } },
+    }),
+    prisma.membershipTier.findMany({ where: { active: true }, select: { id: true, name: true } }),
+    prisma.subscriptionPlan.findMany({ where: { active: true }, select: { id: true, name: true } }),
   ]);
 
   const company = user.retailerProfile?.companyName ?? user.primaryClientCompany?.companyName ?? user.clientCompanyMembership?.company.companyName ?? null;
@@ -43,6 +52,11 @@ export async function getUserAnalyticsProfile(userId: string) {
     address,
     pageViews,
     auditLogs,
+    warnings,
+    memberships: user.memberships.map((membership) => ({ tierId: membership.tierId, name: membership.tier.name, assignedAt: membership.assignedAt, expiresAt: membership.expiresAt })),
+    subscriptions: user.subscriptions.map((subscription) => ({ planId: subscription.planId, name: subscription.plan.name })),
+    availableMembershipTiers: membershipTiers,
+    availableSubscriptionPlans: subscriptionPlans,
   };
 }
 

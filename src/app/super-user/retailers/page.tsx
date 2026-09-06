@@ -29,6 +29,7 @@ export default async function RetailerManagementPage() {
       <p className="mb-6 max-w-xl text-sm text-concrete-grey">Registered Provider accounts and their activity.</p>
       <AccountManagementTable
         role="USER"
+        isOwner={user.isOwner}
         rows={retailers.map((retailer) => ({
           id: retailer.id,
           email: retailer.email,

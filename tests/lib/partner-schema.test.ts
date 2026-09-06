@@ -11,6 +11,7 @@ const partner = {
   displayLocation: 'FOOTER' as const,
   campaignSource: 'Autumn campaign',
   active: false,
+  expiresAt: '2099-12-31',
 };
 const firstId = 'ck12345678901234567890123';
 const secondId = 'ck12345678901234567890124';
@@ -25,6 +26,7 @@ test('rejects unsafe logo paths, non-HTTPS destinations, and duplicate partner o
   assert.equal(partnerRequestSchema.safeParse({ action: 'create', partner: { ...partner, logoPath: '/images/../private/logo.png' } }).success, false);
   assert.equal(partnerRequestSchema.safeParse({ action: 'create', partner: { ...partner, destinationUrl: 'http://northline.example' } }).success, false);
   assert.equal(partnerRequestSchema.safeParse({ action: 'reorder', displayLocation: 'FOOTER', orderedIds: [firstId, firstId] }).success, false);
+  assert.equal(partnerRequestSchema.safeParse({ action: 'create', partner: { ...partner, expiresAt: '2000-01-01' } }).success, false);
 });
 
 test('partner route requires full Super User access, cross-origin protection, and partner audit actions', () => {

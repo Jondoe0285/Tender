@@ -15,6 +15,7 @@ const partnerSelect = {
   campaignSource: true,
   sortOrder: true,
   active: true,
+  expiresAt: true,
 } as const;
 
 export async function GET() {
@@ -44,7 +45,7 @@ export async function PATCH(request: Request) {
     if (input.action === 'create') {
       const partner = await prisma.$transaction(async (transaction) => {
         const highestOrder = await transaction.partner.aggregate({ where: { displayLocation: input.partner.displayLocation }, _max: { sortOrder: true } });
-        const created = await transaction.partner.create({ data: { ...input.partner, destinationUrl: input.partner.destinationUrl ?? null, campaignSource: input.partner.campaignSource ?? null, sortOrder: (highestOrder._max.sortOrder ?? -1) + 1 }, select: partnerSelect });
+        const created = await transaction.partner.create({ data: { ...input.partner, expiresAt: input.partner.expiresAt ? new Date(`${input.partner.expiresAt}T23:59:59.999Z`) : null, destinationUrl: input.partner.destinationUrl ?? null, campaignSource: input.partner.campaignSource ?? null, sortOrder: (highestOrder._max.sortOrder ?? -1) + 1 }, select: partnerSelect });
         await recordAuditEvent({ actorId: admin.id, action: 'PARTNER_CREATED', targetType: 'Partner', targetId: created.id, metadata: partnerMetadata(created) }, transaction);
         return created;
       });
@@ -53,7 +54,7 @@ export async function PATCH(request: Request) {
 
     if (input.action === 'update') {
       const partner = await prisma.$transaction(async (transaction) => {
-        const updated = await transaction.partner.update({ where: { id: input.id }, data: { ...input.partner, destinationUrl: input.partner.destinationUrl ?? null, campaignSource: input.partner.campaignSource ?? null }, select: partnerSelect });
+        const updated = await transaction.partner.update({ where: { id: input.id }, data: { ...input.partner, expiresAt: input.partner.expiresAt ? new Date(`${input.partner.expiresAt}T23:59:59.999Z`) : null, destinationUrl: input.partner.destinationUrl ?? null, campaignSource: input.partner.campaignSource ?? null }, select: partnerSelect });
         await recordAuditEvent({ actorId: admin.id, action: 'PARTNER_UPDATED', targetType: 'Partner', targetId: updated.id, metadata: partnerMetadata(updated) }, transaction);
         return updated;
       });
@@ -89,6 +90,6 @@ export async function PATCH(request: Request) {
 
 class InvalidPartnerOrderError extends Error {}
 
-function partnerMetadata(partner: { name: string; displayLocation: string; campaignSource: string | null; active: boolean; sortOrder: number }) {
-  return { name: partner.name, displayLocation: partner.displayLocation, campaignSource: partner.campaignSource, active: partner.active, sortOrder: partner.sortOrder };
+function partnerMetadata(partner: { name: string; displayLocation: string; campaignSource: string | null; active: boolean; sortOrder: number; expiresAt: Date | null }) {
+  return { name: partner.name, displayLocation: partner.displayLocation, campaignSource: partner.campaignSource, active: partner.active, sortOrder: partner.sortOrder, expiresAt: partner.expiresAt?.toISOString() };
 }

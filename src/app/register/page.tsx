@@ -6,7 +6,7 @@ import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { CATEGORY_NAMES } from '@/lib/categories';
+import { SERVICE_CATALOG, SERVICE_NAMES } from '@/lib/categories';
 import { FieldGroup, Input, Label, PasswordInput } from '@/components/ui/Field';
 import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
 import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
@@ -16,6 +16,8 @@ export default function RegisterPage() {
   const [coverageScope, setCoverageScope] = useState<'COUNTY' | 'REGION' | 'UK'>('COUNTY');
   const [counties, setCounties] = useState<string[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
+  const [services, setServices] = useState<string[]>([]);
+  const [serviceProvisions, setServiceProvisions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -25,8 +27,6 @@ export default function RegisterPage() {
     setError(null);
 
     const form = new FormData(event.currentTarget);
-    const categories = form.getAll('categories') as string[];
-
     const response = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -39,10 +39,11 @@ export default function RegisterPage() {
         contactPhone: form.get('contactPhone') || undefined,
         role: 'USER',
         termsAccepted: form.get('termsAccepted') === 'on',
+        privacyAccepted: form.get('privacyAccepted') === 'on',
         companyName: form.get('companyName') || undefined,
         branchIdentifier: form.get('branchIdentifier') || undefined,
-        categories,
-        coverageAreas: form.get('coverageAreas') || undefined,
+        categories: services,
+        serviceProvisions,
         coverageScope,
         counties: coverageScope === 'COUNTY' ? counties : undefined,
         regions: coverageScope === 'REGION' ? regions : undefined,
@@ -107,13 +108,27 @@ export default function RegisterPage() {
               <fieldset className="flex flex-col gap-2">
                     <legend className="text-sm font-semibold text-foundation-navy">Categories you provide</legend>
                     <p className="text-xs text-concrete-grey">These categories determine which tender opportunities are matched to you.</p>
-                    {CATEGORY_NAMES.map((category) => (
+                    {SERVICE_NAMES.map((category) => (
                       <label key={category} className="flex items-center gap-3 text-sm text-concrete-grey">
-                        <input type="checkbox" name="categories" value={category} className="h-4 w-4 accent-safety-amber" />
+                        <input type="checkbox" name="categories" value={category} checked={services.includes(category)} onChange={() => setServices((current) => {
+                          const nextServices = current.includes(category) ? current.filter((service) => service !== category) : [...current, category];
+                          setServiceProvisions((provisions) => provisions.filter((entry) => nextServices.includes(entry.split('::')[0] ?? '')));
+                          return nextServices;
+                        })} className="h-4 w-4 accent-safety-amber" />
                         {category}
                       </label>
                     ))}
                   </fieldset>
+                  {services.map((service) => (
+                    <fieldset key={service} className="flex flex-col gap-2">
+                      <legend className="text-sm font-semibold text-foundation-navy">{service} provisions (optional)</legend>
+                      <p className="text-xs text-concrete-grey">Select the areas your business provides to refine your profile.</p>
+                      {Object.keys(SERVICE_CATALOG[service as keyof typeof SERVICE_CATALOG]).map((provision) => {
+                        const value = `${service}::${provision}`;
+                        return <label key={value} className="flex items-center gap-3 text-sm text-concrete-grey"><input type="checkbox" checked={serviceProvisions.includes(value)} onChange={() => setServiceProvisions((current) => current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value])} className="h-4 w-4 accent-safety-amber" />{provision}</label>;
+                      })}
+                    </fieldset>
+                  ))}
                   <FieldGroup>
                     <Label htmlFor="coverageScope">Operating area</Label>
                     <div className="flex flex-wrap gap-4">
@@ -154,15 +169,13 @@ export default function RegisterPage() {
                       />
                     </FieldGroup>
                   )}
-                  <FieldGroup>
-                    <Label htmlFor="coverageAreas">Coverage towns (optional)</Label>
-                    <Input id="coverageAreas" name="coverageAreas" placeholder="e.g. Leeds, Manchester, Sheffield" />
-                    <p className="text-xs text-concrete-grey">Used only to estimate distance on opportunity listings, in addition to the service areas above.</p>
-              </FieldGroup>
-
               <label className="flex items-start gap-3 text-sm text-concrete-grey">
                 <input type="checkbox" name="termsAccepted" required className="mt-1 h-4 w-4 accent-safety-amber" />
-                I accept the Trade Tender Terms of Use.
+                I accept the <a href="/policies#platform-terms" className="font-semibold text-steel-blue underline underline-offset-4">Trade Tender Terms of Use</a>.
+              </label>
+              <label className="flex items-start gap-3 text-sm text-concrete-grey">
+                <input type="checkbox" name="privacyAccepted" required className="mt-1 h-4 w-4 accent-safety-amber" />
+                I acknowledge the <a href="/policies#privacy" className="font-semibold text-steel-blue underline underline-offset-4">Privacy Policy</a>.
               </label>
 
               {error && (

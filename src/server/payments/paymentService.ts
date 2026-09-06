@@ -18,6 +18,11 @@ type CreatePaymentResult = {
 
 export const MOBILE_PAYMENT_RETURN_URL = 'tradetender://payment/return';
 
+export function applyPaymentDiscount(netFeeGbp: number, discountPercentage: number): number {
+  const discount = Math.min(Math.max(discountPercentage, 0), 100);
+  return Math.round(netFeeGbp * (1 - discount / 100) * 100) / 100;
+}
+
 /**
  * Creates a PENDING payment record and, when Stripe is configured, a matching Checkout Session.
  * Without Stripe keys (local/dev only) the payment stays PENDING until the dev-only confirm
@@ -28,8 +33,10 @@ export async function createPayment(params: {
   userId: string;
   tenderId?: string;
   tierId?: string;
+  contractMonths?: 6 | 12;
   quoteId?: string;
   quotePriceGbp?: number;
+  discountPercentage?: number;
   mobileReturnUrl?: string;
 }): Promise<CreatePaymentResult> {
   if (params.mobileReturnUrl !== undefined && params.mobileReturnUrl !== MOBILE_PAYMENT_RETURN_URL) {
@@ -46,6 +53,9 @@ export async function createPayment(params: {
     netFeeGbp = params.type === 'CLIENT_RELEASE' && params.quotePriceGbp !== undefined
       ? await getClientReleaseFeeGbp(params.quotePriceGbp)
       : await getPaymentFeeGbp(params.type);
+    if (params.type === 'RETAILER_UNLOCK' && params.discountPercentage !== undefined) {
+      netFeeGbp = applyPaymentDiscount(netFeeGbp, params.discountPercentage);
+    }
   }
   const vatPercentage = await getVatPercentage();
   const { amountGbp, vatGbp, totalAmountGbp, netPence, vatPence } = buildPaymentAmounts(netFeeGbp, vatPercentage);
@@ -59,6 +69,7 @@ export async function createPayment(params: {
       userId: params.userId,
       tenderId: params.tenderId,
       tierId: params.tierId,
+      contractMonths: params.contractMonths,
       quoteId: params.quoteId,
       status: 'PENDING',
     },

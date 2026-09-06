@@ -19,7 +19,7 @@ export type AccountRow = {
   releaseCreditsLeft?: number | null;
 };
 
-export function AccountManagementTable({ role, rows }: { role: 'USER' | 'USER'; rows: AccountRow[] }) {
+export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER' | 'USER'; rows: AccountRow[]; isOwner: boolean }) {
   const [showCreate, setShowCreate] = useState(false);
   const [openTenderRequestsOnly, setOpenTenderRequestsOnly] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -368,14 +368,14 @@ export function AccountManagementTable({ role, rows }: { role: 'USER' | 'USER'; 
                 >
                   View profile
                 </a>
-                <button
+                {isOwner && <button
                   type="button"
                   onClick={() => handleAction(account.id, account.suspended ? 'activate' : 'suspend')}
                   disabled={isBusy === `${account.suspended ? 'activate' : 'suspend'}-${account.id}`}
                   className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-foundation-navy transition hover:border-safety-amber hover:text-foundation-navy disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {account.suspended ? 'Activate' : 'Suspend'}
-                </button>
+                </button>}
                 <button
                   type="button"
                   onClick={() => handleAction(account.id, 'reset-password')}

@@ -1,0 +1,1 @@
+ALTER TABLE "RetailerMembership" ADD COLUMN "expiresAt" TIMESTAMP(3);

@@ -79,13 +79,13 @@ export async function POST(request: Request) {
               update: {
                 companyName: input.companyName ?? existing.contactName,
                 categories: (input.categories ?? []).join(','),
-                coverageAreas: input.coverageAreas ?? '',
+                coverageAreas: '',
               },
               create: {
                 userId: existing.id,
                 companyName: input.companyName ?? existing.contactName,
                 categories: (input.categories ?? []).join(','),
-                coverageAreas: input.coverageAreas ?? '',
+                coverageAreas: '',
               },
             }),
           ]
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
               create: {
                 companyName: input.companyName ?? input.contactName,
                 categories: (input.categories ?? []).join(','),
-                coverageAreas: input.coverageAreas ?? '',
+                coverageAreas: '',
               },
             },
           }

@@ -8,9 +8,8 @@ import { Input, Label, Select, Textarea } from '@/components/ui/Field';
 export type AdminSettings = {
   fees: { retailerUnlockGbp: number; clientReleaseGbp: number; clientReleaseMode: string; clientReleasePercentageLow: number; clientReleasePercentageHigh: number; clientReleasePercentageTop: number; vatPercentage: number; sponsoredPlacementActive: boolean; sponsoredPlacementFeeGbp: number; membershipTiersActive: boolean; adspaceActive: boolean };
   supportRecipientEmail?: string | null;
-  tiers: Array<{ id: string; name: string; description: string; monthlyPriceGbp: number; freeTenderOpportunitiesPerMonth: number; active: boolean }>;
+  tiers: Array<{ id: string; name: string; description: string; monthlyPriceGbp: number; freeTenderOpportunitiesPerMonth: number; additionalCreditDiscountPercentage: number; active: boolean }>;
   subscriptions: Array<{ id: string; name: string; description: string; annualPriceGbp: number; active: boolean }>;
-  retailers: Array<{ id: string; email: string; retailerProfile: { companyName: string } | null; memberships: Array<{ tier: { name: string } }>; subscriptions: Array<{ plan: { name: string } }> }>;
 };
 
 type MembershipTier = AdminSettings['tiers'][number];
@@ -22,7 +21,7 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSe
   const [settings, setSettings] = useState(initialSettings);
   const [fees, setFees] = useState(settings.fees);
   const [supportRecipientEmail, setSupportRecipientEmail] = useState(settings.supportRecipientEmail ?? '');
-  const [form, setForm] = useState({ name: '', description: '', monthlyPriceGbp: '', freeTenderOpportunitiesPerMonth: '' });
+  const [form, setForm] = useState({ name: '', description: '', monthlyPriceGbp: '', freeTenderOpportunitiesPerMonth: '', additionalCreditDiscountPercentage: '' });
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const locked = !isOwner;
@@ -59,11 +58,11 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSe
     setMessage(null);
     try {
       const payload = action === 'tier'
-        ? { action, name: form.name, description: form.description, monthlyPriceGbp: Number(form.monthlyPriceGbp), freeTenderOpportunitiesPerMonth: Number(form.freeTenderOpportunitiesPerMonth), active: false }
+        ? { action, name: form.name, description: form.description, monthlyPriceGbp: Number(form.monthlyPriceGbp), freeTenderOpportunitiesPerMonth: Number(form.freeTenderOpportunitiesPerMonth), additionalCreditDiscountPercentage: Number(form.additionalCreditDiscountPercentage), active: false }
         : { action, name: form.name, description: form.description, annualPriceGbp: Number(form.monthlyPriceGbp), active: false };
       const data = await request('/api/super-user/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       setSettings((current) => ({ ...current, ...(action === 'tier' ? { tiers: [...current.tiers, data.tier] } : { subscriptions: [...current.subscriptions, data.subscription] }) }));
-      setForm({ name: '', description: '', monthlyPriceGbp: '', freeTenderOpportunitiesPerMonth: '' });
+      setForm({ name: '', description: '', monthlyPriceGbp: '', freeTenderOpportunitiesPerMonth: '', additionalCreditDiscountPercentage: '' });
       setMessage(`${action === 'tier' ? 'Membership tier' : 'Annual subscription'} created inactive.`);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to save plan'); }
     setSaving(false);
@@ -77,7 +76,7 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSe
       if (action === 'tier') {
         const selected = settings.tiers.find((item) => item.id === id);
         if (!selected) throw new Error('Plan not found');
-        payload = { action, id, name: selected.name, description: selected.description, monthlyPriceGbp: selected.monthlyPriceGbp, freeTenderOpportunitiesPerMonth: selected.freeTenderOpportunitiesPerMonth, active };
+        payload = { action, id, name: selected.name, description: selected.description, monthlyPriceGbp: selected.monthlyPriceGbp, freeTenderOpportunitiesPerMonth: selected.freeTenderOpportunitiesPerMonth, additionalCreditDiscountPercentage: selected.additionalCreditDiscountPercentage, active };
       } else {
         const selected = settings.subscriptions.find((item) => item.id === id);
         if (!selected) throw new Error('Plan not found');
@@ -91,16 +90,14 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSe
     setSaving(false);
   }
 
-  async function toggleEntitlement(retailerId: string, type: 'membership' | 'subscription', planId: string, active: boolean) {
+  async function saveTier(tier: MembershipTier) {
     setSaving(true);
     setMessage(null);
     try {
-      await request(`/api/super-user/retailers/${retailerId}/entitlements`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, planId, active }) });
-      const refreshed = await request('/api/super-user/settings', { method: 'GET' }) as AdminSettings;
-      setSettings(refreshed);
-      setFees(refreshed.fees);
-      setMessage(`Provider ${active ? 'assignment activated' : 'assignment deactivated'}.`);
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to update provider assignment'); }
+      const data = await request('/api/super-user/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'tier', ...tier }) });
+      setSettings((current) => ({ ...current, tiers: current.tiers.map((item) => item.id === tier.id ? data.tier : item) }));
+      setMessage('Membership tier updated.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to update membership tier'); }
     setSaving(false);
   }
 
@@ -130,7 +127,7 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSe
 
       <section>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="font-heading text-lg font-bold text-foundation-navy">Membership tiers</h2><Button variant={fees.membershipTiersActive ? 'danger' : 'secondary'} disabled={locked} onClick={() => { const active = !fees.membershipTiersActive; setFees({ ...fees, membershipTiersActive: active }); void saveFee('MEMBERSHIP_TIERS_ACTIVE', active); }} loading={saving}>{fees.membershipTiersActive ? 'Deactivate membership feature' : 'Activate membership feature'}</Button></div>
-        <PlanList plans={settings.tiers} kind="tier" saving={saving} disabled={locked} onToggle={togglePlan} />
+        <PlanList plans={settings.tiers} kind="tier" saving={saving} disabled={locked} onToggle={togglePlan} onSaveTier={saveTier} />
       </section>
 
       <section>
@@ -141,19 +138,16 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSe
       <Card>
         <h2 className="font-heading text-lg font-bold text-foundation-navy">Add membership or subscription</h2>
         <p className="mt-1 text-sm text-concrete-grey">New options are inactive until an Owner activates them.</p>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2"><FieldGroup label="Name"><Input value={form.name} disabled={locked} onChange={(event) => setForm({ ...form, name: event.target.value })} /></FieldGroup><FieldGroup label="Monthly price (GBP, excl. VAT)"><Input type="number" min="0" value={form.monthlyPriceGbp} disabled={locked} onChange={(event) => setForm({ ...form, monthlyPriceGbp: event.target.value })} /></FieldGroup><FieldGroup label="Free tender opportunities per month"><Input type="number" min="0" value={form.freeTenderOpportunitiesPerMonth} disabled={locked} onChange={(event) => setForm({ ...form, freeTenderOpportunitiesPerMonth: event.target.value })} /></FieldGroup><FieldGroup label="Description" wide><Textarea rows={3} value={form.description} disabled={locked} onChange={(event) => setForm({ ...form, description: event.target.value })} /></FieldGroup></div>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2"><FieldGroup label="Name"><Input value={form.name} disabled={locked} onChange={(event) => setForm({ ...form, name: event.target.value })} /></FieldGroup><FieldGroup label="Monthly price (GBP, excl. VAT)"><Input type="number" min="0" value={form.monthlyPriceGbp} disabled={locked} onChange={(event) => setForm({ ...form, monthlyPriceGbp: event.target.value })} /></FieldGroup><FieldGroup label="Inclusive monthly credits"><Input type="number" min="0" value={form.freeTenderOpportunitiesPerMonth} disabled={locked} onChange={(event) => setForm({ ...form, freeTenderOpportunitiesPerMonth: event.target.value })} /></FieldGroup><FieldGroup label="Discount on additional credits (%)"><Input type="number" min="0" max="100" step="0.01" value={form.additionalCreditDiscountPercentage} disabled={locked} onChange={(event) => setForm({ ...form, additionalCreditDiscountPercentage: event.target.value })} /></FieldGroup><FieldGroup label="Description" wide><Textarea rows={3} value={form.description} disabled={locked} onChange={(event) => setForm({ ...form, description: event.target.value })} /></FieldGroup></div>
         <div className="mt-4 flex flex-wrap gap-3"><Button onClick={() => createPlan('tier')} loading={saving} disabled={locked}>Add membership tier</Button><Button variant="secondary" onClick={() => createPlan('subscription')} loading={saving} disabled={locked}>Add annual subscription</Button></div>
       </Card>
 
-      <section>
-        <h2 className="mb-4 font-heading text-lg font-bold text-foundation-navy">Apply options to Providers</h2>
-        <div className="space-y-4">{settings.retailers.map((retailer) => <Card key={retailer.id}><p className="font-semibold text-foundation-navy">{retailer.retailerProfile?.companyName ?? retailer.email}</p><p className="text-sm text-concrete-grey">{retailer.email}</p><div className="mt-4 grid gap-3 sm:grid-cols-2">{settings.tiers.map((tier) => <EntitlementButton key={tier.id} label={tier.name} active={retailer.memberships.some((item) => item.tier.name === tier.name)} disabled={!tier.active || saving} onToggle={(active) => toggleEntitlement(retailer.id, 'membership', tier.id, active)} />)}{settings.subscriptions.map((plan) => <EntitlementButton key={plan.id} label={plan.name} active={retailer.subscriptions.some((item) => item.plan.name === plan.name)} disabled={!plan.active || saving} onToggle={(active) => toggleEntitlement(retailer.id, 'subscription', plan.id, active)} />)}</div></Card>)}</div>
-      </section>
     </div>
   );
 }
 
 function FieldGroup({ label, children, wide = false }: { label: string; children: React.ReactNode; wide?: boolean }) { return <div className={wide ? 'sm:col-span-2' : ''}><Label>{label}</Label><div className="mt-2">{children}</div></div>; }
 function FieldEditor({ label, value, onChange, onSave, saving, step = '1', disabled = false }: { label: string; value: number; onChange: (value: number) => void; onSave: () => void; saving: boolean; step?: string; disabled?: boolean }) { return <div><Label>{label}</Label><div className="mt-2 flex gap-3"><Input type="number" min="0" step={step} value={value} disabled={disabled} onChange={(event) => onChange(Number(event.target.value))} /><Button onClick={onSave} loading={saving} disabled={disabled}>Save</Button></div></div>; }
-function PlanList({ plans, kind, saving, disabled = false, onToggle }: { plans: MembershipTier[] | SubscriptionPlan[]; kind: PlanType; saving: boolean; disabled?: boolean; onToggle: (kind: PlanType, id: string, active: boolean) => void }) { return <div className="space-y-3">{plans.length === 0 ? <p className="text-sm text-concrete-grey">No options created yet.</p> : plans.map((plan) => <Card key={plan.id} className="flex flex-wrap items-center justify-between gap-4"><div><p className="font-semibold text-foundation-navy">{plan.name} · £{'monthlyPriceGbp' in plan ? `${plan.monthlyPriceGbp}/month` : `${plan.annualPriceGbp}/year`} excl. VAT</p><p className="text-sm text-concrete-grey">{plan.description || 'No description'}{'freeTenderOpportunitiesPerMonth' in plan && ` · ${plan.freeTenderOpportunitiesPerMonth} free opportunities/month`}</p></div><Button variant={plan.active ? 'danger' : 'secondary'} disabled={disabled} onClick={() => onToggle(kind, plan.id, !plan.active)} loading={saving}>{plan.active ? 'Deactivate' : 'Activate'}</Button></Card>)}</div>; }
-function EntitlementButton({ label, active, disabled, onToggle }: { label: string; active: boolean; disabled: boolean; onToggle: (active: boolean) => void }) { return <Button variant={active ? 'danger' : 'secondary'} disabled={disabled} onClick={() => onToggle(!active)}>{active ? `Deactivate ${label}` : `Assign ${label}`}</Button>; }
+function PlanList({ plans, kind, saving, disabled = false, onToggle, onSaveTier }: { plans: MembershipTier[] | SubscriptionPlan[]; kind: PlanType; saving: boolean; disabled?: boolean; onToggle: (kind: PlanType, id: string, active: boolean) => void; onSaveTier?: (tier: MembershipTier) => Promise<void> }) { return <div className="space-y-3">{plans.length === 0 ? <p className="text-sm text-concrete-grey">No options created yet.</p> : plans.map((plan) => <Card key={plan.id}>{'freeTenderOpportunitiesPerMonth' in plan && onSaveTier ? <EditableTier plan={plan} saving={saving} disabled={disabled} onSave={onSaveTier} /> : <div className="flex flex-wrap items-center justify-between gap-4"><div><p className="font-semibold text-foundation-navy">{plan.name} · £{'annualPriceGbp' in plan ? `${plan.annualPriceGbp}/year` : `${plan.monthlyPriceGbp}/month`} excl. VAT</p><p className="text-sm text-concrete-grey">{plan.description || 'No description'}</p></div><Button variant={plan.active ? 'danger' : 'secondary'} disabled={disabled} onClick={() => onToggle(kind, plan.id, !plan.active)} loading={saving}>{plan.active ? 'Deactivate' : 'Activate'}</Button></div>}</Card>)}</div>; }
+
+function EditableTier({ plan, saving, disabled, onSave }: { plan: MembershipTier; saving: boolean; disabled: boolean; onSave: (tier: MembershipTier) => Promise<void> }) { const [draft, setDraft] = useState(plan); return <><div className="grid gap-3 sm:grid-cols-3"><FieldGroup label="Tier"><Input value={draft.name} disabled={disabled} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></FieldGroup><FieldGroup label="Monthly price (GBP)"><Input type="number" min="0" value={draft.monthlyPriceGbp} disabled={disabled} onChange={(event) => setDraft({ ...draft, monthlyPriceGbp: Number(event.target.value) })} /></FieldGroup><FieldGroup label="Inclusive monthly credits"><Input type="number" min="0" value={draft.freeTenderOpportunitiesPerMonth} disabled={disabled} onChange={(event) => setDraft({ ...draft, freeTenderOpportunitiesPerMonth: Number(event.target.value) })} /></FieldGroup><FieldGroup label="Additional credit discount (%)"><Input type="number" min="0" max="100" step="0.01" value={draft.additionalCreditDiscountPercentage} disabled={disabled} onChange={(event) => setDraft({ ...draft, additionalCreditDiscountPercentage: Number(event.target.value) })} /></FieldGroup><FieldGroup label="Description" wide><Textarea rows={2} value={draft.description} disabled={disabled} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></FieldGroup></div><div className="mt-4 flex flex-wrap gap-3"><Button onClick={() => void onSave(draft)} loading={saving} disabled={disabled}>Save tier</Button><Button variant={draft.active ? 'danger' : 'secondary'} disabled={disabled} onClick={() => void onSave({ ...draft, active: !draft.active })} loading={saving}>{draft.active ? 'Deactivate' : 'Activate'}</Button></div></>; }

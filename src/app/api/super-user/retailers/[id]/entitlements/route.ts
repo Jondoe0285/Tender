@@ -9,7 +9,15 @@ const entitlementSchema = z.object({
   type: z.enum(['membership', 'subscription']),
   planId: z.string().min(1),
   active: z.boolean(),
+  startDate: z.string().date().optional(),
+  expiryMonths: z.union([z.literal(6), z.literal(12)]).optional(),
 });
+
+function addCalendarMonths(date: Date, months: number) {
+  const result = new Date(date);
+  result.setUTCMonth(result.getUTCMonth() + months);
+  return result;
+}
 
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -27,8 +35,15 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   if (input.type === 'membership') {
     const tier = await prisma.membershipTier.findUnique({ where: { id: input.planId } });
     if (!tier) return NextResponse.json({ error: 'Membership tier not found' }, { status: 404 });
-    const assignment = await prisma.retailerMembership.upsert({ where: { retailerId_tierId: { retailerId: retailer.id, tierId: tier.id } }, update: { active: input.active }, create: { retailerId: retailer.id, tierId: tier.id, active: input.active } });
-    await recordAuditEvent({ actorId: admin.id, action: input.active ? 'MEMBERSHIP_ASSIGNED' : 'MEMBERSHIP_DEACTIVATED', targetType: 'RetailerMembership', targetId: assignment.id, metadata: { retailerId: retailer.id, tierId: tier.id } });
+    if (input.active && (!input.startDate || !input.expiryMonths)) return NextResponse.json({ error: 'A start date and a 6 or 12 month expiry are required' }, { status: 400 });
+    const startsAt = input.startDate ? new Date(`${input.startDate}T00:00:00.000Z`) : undefined;
+    const expiresAt = startsAt && input.expiryMonths ? addCalendarMonths(startsAt, input.expiryMonths) : undefined;
+    const assignment = await prisma.retailerMembership.upsert({
+      where: { retailerId_tierId: { retailerId: retailer.id, tierId: tier.id } },
+      update: { active: input.active, ...(startsAt && expiresAt ? { assignedAt: startsAt, expiresAt } : {}) },
+      create: { retailerId: retailer.id, tierId: tier.id, active: input.active, ...(startsAt && expiresAt ? { assignedAt: startsAt, expiresAt } : {}) },
+    });
+    await recordAuditEvent({ actorId: admin.id, action: input.active ? 'MEMBERSHIP_ASSIGNED' : 'MEMBERSHIP_DEACTIVATED', targetType: 'RetailerMembership', targetId: assignment.id, metadata: { retailerId: retailer.id, tierId: tier.id, assignedAt: assignment.assignedAt.toISOString(), expiresAt: assignment.expiresAt?.toISOString() } });
     return NextResponse.json({ assignment });
   }
 

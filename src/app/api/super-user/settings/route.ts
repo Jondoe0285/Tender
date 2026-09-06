@@ -17,6 +17,7 @@ const settingSchema = z.object({
   annualPriceGbp: z.number().int().nonnegative().optional(),
   monthlyPriceGbp: z.number().int().nonnegative().optional(),
   freeTenderOpportunitiesPerMonth: z.number().int().nonnegative().optional(),
+  additionalCreditDiscountPercentage: z.number().min(0).max(100).optional(),
   active: z.boolean().optional(),
   supportRecipientEmail: z.string().trim().toLowerCase().email().max(254).nullable().optional(),
 });
@@ -65,10 +66,10 @@ export async function PATCH(request: Request) {
   }
 
   if (input.action === 'tier') {
-    if (!input.name || input.monthlyPriceGbp === undefined || input.freeTenderOpportunitiesPerMonth === undefined) return NextResponse.json({ error: 'Name, monthly price, and monthly free opportunities are required' }, { status: 400 });
+    if (!input.name || input.monthlyPriceGbp === undefined || input.freeTenderOpportunitiesPerMonth === undefined || input.additionalCreditDiscountPercentage === undefined) return NextResponse.json({ error: 'Name, monthly price, monthly included credits, and additional-credit discount are required' }, { status: 400 });
     const tier = input.id
-      ? await prisma.membershipTier.update({ where: { id: input.id }, data: { name: input.name, description: input.description ?? '', monthlyPriceGbp: input.monthlyPriceGbp, freeTenderOpportunitiesPerMonth: input.freeTenderOpportunitiesPerMonth, ...(input.active === undefined ? {} : { active: input.active }) } })
-      : await prisma.membershipTier.create({ data: { name: input.name, description: input.description ?? '', monthlyPriceGbp: input.monthlyPriceGbp, freeTenderOpportunitiesPerMonth: input.freeTenderOpportunitiesPerMonth, active: input.active ?? false } });
+      ? await prisma.membershipTier.update({ where: { id: input.id }, data: { name: input.name, description: input.description ?? '', monthlyPriceGbp: input.monthlyPriceGbp, freeTenderOpportunitiesPerMonth: input.freeTenderOpportunitiesPerMonth, additionalCreditDiscountPercentage: input.additionalCreditDiscountPercentage, ...(input.active === undefined ? {} : { active: input.active }) } })
+      : await prisma.membershipTier.create({ data: { name: input.name, description: input.description ?? '', monthlyPriceGbp: input.monthlyPriceGbp, freeTenderOpportunitiesPerMonth: input.freeTenderOpportunitiesPerMonth, additionalCreditDiscountPercentage: input.additionalCreditDiscountPercentage, active: input.active ?? false } });
     await recordAuditEvent({ actorId: admin.id, action: input.active === false ? 'MEMBERSHIP_TIER_DEACTIVATED' : 'MEMBERSHIP_TIER_UPDATED', targetType: 'MembershipTier', targetId: tier.id, metadata: { name: tier.name, active: tier.active } });
     return NextResponse.json({ tier });
   }

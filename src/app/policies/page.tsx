@@ -26,12 +26,12 @@ const policies = [
   {
     id: 'privacy',
     title: 'Privacy Policy',
-    text: 'We use account, tender, quote, payment, and contact-release data only to operate, secure, audit, and improve the platform in accordance with applicable data-protection requirements.',
+    text: 'We use account, tender, quote, payment, contact-release, and limited operational data only to operate, secure, audit, and improve the platform. Authenticated users can submit access/export, rectification, erasure, restriction, or objection requests through Support requests; requests are reviewed by a Super User and resolved by the Owner where required.',
   },
   {
     id: 'cookies',
     title: 'Cookie Policy',
-    text: 'Essential cookies are used to provide secure sessions and reliable operation. Any optional analytics or marketing technologies require appropriate notice and consent before use.',
+    text: 'Trade Tender uses essential cookies only for secure sessions and platform operation. Optional analytics, advertising, and personalisation trackers are not deployed. Consent controls will be introduced before any optional tracker is enabled.',
   },
   {
     id: 'quote-retention',

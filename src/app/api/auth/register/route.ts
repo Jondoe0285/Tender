@@ -12,6 +12,7 @@ import { createEmailVerificationToken } from '@/server/auth/emailVerification';
 import { buildClientTradeTenderId } from '@/lib/identifiers';
 import { createRateLimitResponse } from '@/server/http/rateLimit';
 import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
+import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from '@/lib/legal/documentVersions';
 
 async function sendVerificationEmail(userId: string, email: string) {
   const token = await createEmailVerificationToken(userId);
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
                 userId: existing.id,
                 companyName: input.companyName ?? '',
                 categories: (input.categories ?? []).join(','),
-                coverageAreas: input.coverageAreas ?? '',
+                coverageAreas: '',
                 coverageScope: input.coverageScope ?? 'COUNTY',
                 counties: (input.counties ?? []).join(','),
                 regions: (input.regions ?? []).join(','),
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
             });
       }
       if (input.role === 'USER') {
-        const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', primaryUserId: existing.id } });
+        const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', services: (input.categories ?? []).join(','), serviceProvisions: (input.serviceProvisions ?? []).join(','), primaryUserId: existing.id } });
         await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: existing.id } });
       }
     });
@@ -88,6 +89,7 @@ export async function POST(request: Request) {
   }
 
   const passwordHash = await hashPassword(input.password);
+  const acceptedAt = new Date();
 
   const user = await prisma.$transaction(async (transaction) => {
     const createdUser = await transaction.user.create({
@@ -99,7 +101,10 @@ export async function POST(request: Request) {
       firstName: input.firstName ?? null,
       lastName: input.lastName ?? null,
       contactPhone: input.contactPhone ?? null,
-      termsAcceptedAt: new Date(),
+      termsAcceptedAt: acceptedAt,
+      termsVersion: CURRENT_TERMS_VERSION,
+      privacyAcceptedAt: acceptedAt,
+      privacyVersion: CURRENT_PRIVACY_VERSION,
       roleMemberships: { create: { role: input.role } },
       ...(input.role === 'USER'
         ? {
@@ -107,7 +112,7 @@ export async function POST(request: Request) {
               create: {
                 companyName: input.companyName ?? '',
                 categories: (input.categories ?? []).join(','),
-                coverageAreas: input.coverageAreas ?? '',
+                coverageAreas: '',
                 coverageScope: input.coverageScope ?? 'COUNTY',
                 counties: (input.counties ?? []).join(','),
                 regions: (input.regions ?? []).join(','),
@@ -117,8 +122,15 @@ export async function POST(request: Request) {
         : {}),
       },
     });
+    await recordAuditEvent({
+      actorId: createdUser.id,
+      action: 'LEGAL_DOCUMENTS_ACCEPTED',
+      targetType: 'User',
+      targetId: createdUser.id,
+      metadata: { termsVersion: CURRENT_TERMS_VERSION, privacyVersion: CURRENT_PRIVACY_VERSION, acceptedAt: acceptedAt.toISOString() },
+    }, transaction);
     if (input.role === 'USER') {
-      const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', services: (input.categories ?? []).join(','), primaryUserId: createdUser.id } });
+      const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', services: (input.categories ?? []).join(','), serviceProvisions: (input.serviceProvisions ?? []).join(','), primaryUserId: createdUser.id } });
       await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: createdUser.id } });
     }
     return createdUser;

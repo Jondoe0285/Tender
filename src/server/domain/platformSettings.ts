@@ -109,12 +109,11 @@ export async function isAdspaceActive(): Promise<boolean> {
 }
 
 export async function getAdminSettings(includeSupportRecipient = false) {
-  const [settings, tiers, subscriptions, categoryDefinitions, retailers] = await Promise.all([
+  const [settings, tiers, subscriptions, categoryDefinitions] = await Promise.all([
     prisma.platformSetting.findMany({ orderBy: { key: 'asc' } }),
     prisma.membershipTier.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.subscriptionPlan.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.categoryDefinition.findMany({ orderBy: [{ service: 'asc' }, { name: 'asc' }] }),
-    prisma.user.findMany({ where: { role: 'USER' }, select: { id: true, email: true, retailerProfile: { select: { companyName: true } }, memberships: { where: { active: true }, include: { tier: true } }, subscriptions: { where: { active: true }, include: { plan: true } } }, orderBy: { createdAt: 'asc' } }),
   ]);
   return {
     fees: {
@@ -133,7 +132,6 @@ export async function getAdminSettings(includeSupportRecipient = false) {
     tiers,
     subscriptions,
     categoryDefinitions: categoryDefinitions.map((category) => ({ ...category, items: JSON.parse(category.itemsJson) as string[] })),
-    retailers,
     retailerAnalyticsSections: Object.fromEntries(
       RETAILER_ANALYTICS_SECTION_KEYS.map((key) => [key, (settings.find((setting) => setting.key === key)?.value ?? defaultSettings[key]) === 'true'])
     ) as Record<RetailerAnalyticsSectionKey, boolean>,

@@ -155,7 +155,7 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
   });
   const sponsoredRetailerIds = await sponsoredPlacementEnabled()
     ? new Set((await prisma.retailerSponsoredPlacement.findMany({
-        where: { active: true, retailerId: { in: quotes.map((quote) => quote.retailerId) } },
+        where: { active: true, expiresAt: { gt: new Date() }, retailerId: { in: quotes.map((quote) => quote.retailerId) } },
         select: { retailerId: true },
       })).map((placement) => placement.retailerId))
     : new Set<string>();

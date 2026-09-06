@@ -1,11 +1,19 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { supportRequestReviewSchema, supportRequestSchema } from '../../src/lib/schemas/supportRequest';
+import { containsProhibitedSupportContent, supportRequestReviewSchema, supportRequestSchema } from '../../src/lib/schemas/supportRequest';
 
 test('validates bounded support request input', () => {
   assert.equal(supportRequestSchema.safeParse({ type: 'CHANGE', title: 'Add a request workflow', description: 'Please add an approved workflow for controlled support and change requests.' }).success, true);
   assert.equal(supportRequestSchema.safeParse({ type: 'CHANGE', title: 'No', description: 'Too short' }).success, false);
+});
+
+test('validates data-subject rights and rejects obvious sensitive support content', () => {
+  assert.equal(supportRequestSchema.safeParse({ type: 'DATA_PRIVACY', dataSubjectRight: 'ACCESS_EXPORT', title: 'Request account export', description: 'Please provide an export of the data associated with my account.' }).success, true);
+  assert.equal(supportRequestSchema.safeParse({ type: 'DATA_PRIVACY', title: 'Request account export', description: 'Please provide an export of the data associated with my account.' }).success, false);
+  assert.equal(containsProhibitedSupportContent({ title: 'Payment issue', description: 'My card number is 4242 4242 4242 4242 and should not be stored.' }), true);
+  assert.equal(containsProhibitedSupportContent({ title: 'Access issue', description: 'My password: secret value is not working in the portal.' }), true);
+  assert.equal(containsProhibitedSupportContent({ title: 'Access issue', description: 'I cannot open a tender after signing in to my account.' }), false);
 });
 
 test('requires a valid reviewed action and records Owner-only change approval', () => {
@@ -13,6 +21,8 @@ test('requires a valid reviewed action and records Owner-only change approval', 
   assert.equal(supportRequestReviewSchema.safeParse({ action: 'approve', note: 'No' }).success, false);
   const service = readFileSync('src/server/domain/supportRequestService.ts', 'utf8');
   assert.match(service, /request\.type !== 'CHANGE' \|\| !reviewer\.isOwner/);
+  assert.match(service, /Only an Owner can resolve a data protection request/);
+  assert.match(service, /Resolution evidence is required for a data protection request/);
   assert.match(service, /SUPPORT_REQUEST_\$\{status\}/);
 });
 

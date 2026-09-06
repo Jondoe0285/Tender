@@ -1,3 +1,10 @@
+### 2026-09-06 - GDPR Privacy-By-Design Hardening
+
+- Changed: registration now requires and records versioned Terms of Use and Privacy Policy acknowledgement, with a timestamp and append-only `LEGAL_DOCUMENTS_ACCEPTED` audit event. The authenticated support workflow now captures a structured data-subject right (access/export, rectification, erasure, restriction, or objection), assigns a 30-day due date, limits final resolution to the Owner with recorded resolution evidence, and audits lifecycle actions. The server rejects support submissions containing obvious passwords, payment-card numbers, email addresses, or UK phone numbers without persisting the content. The authorised retention job removes expired email-verification/password-reset tokens after 30 days and page-view telemetry after 90 days; legal holds remain applicable to their existing Tender, Quote, and TenderAttachment scope only. Public policy copy now accurately states the essential-only cookie position and that optional trackers and consent controls are not live.
+- Affects: [prisma/schema.prisma](../prisma/schema.prisma), migration `20260906020000_add_privacy_acceptance_and_data_subject_requests`, registration, support-request, retention, policy, and audit workflows.
+- Environment: no migration has been deployed and no staging/production resource, credential, integration, permission, or configuration was changed. Apply the migration only through the approved staging release process with rollback and validation evidence.
+- Validation: `npx prisma validate` and `npm run type-check` pass. Focused support-request tests pass. Prisma client engine regeneration is blocked locally by a locked `query_engine-windows.dll.node`; the generated TypeScript client remains sufficient for the successful type check. Full test and production build remain to be run after the focused changes.
+
 # Implementation Change Register
 
 This is the operational source of truth for adapting repository changes to the deployed app environments.
@@ -12,6 +19,94 @@ Update it in the same change set as every applicable implementation. Do not reco
 - Validation completed and validation still outstanding
 
 ## Current Changes
+
+### 2026-09-06 - Membership Purchase Contract Terms
+
+- Changed: Provider membership purchases require a 6- or 12-month non-refundable contract selection before checkout. The selected term is persisted with the pending payment, so the Stripe confirmation path cannot lose the contract choice.
+- Changed: membership start date is the confirmed payment time and expiry is automatically calculated from the selected calendar term. The resulting assignment dates are available in the protected Super User profile view.
+- Affects: membership purchase UI/API, Payment and RetailerMembership schema and migrations, payment confirmation, and membership audit metadata only. Membership pricing, additional-credit discounts, and environment configuration remain unchanged.
+- Environment: apply migrations `20260906070000_add_membership_assignment_expiry` and `20260906080000_add_membership_contract_term` through the approved staging and production migration process before enabling this workflow outside local development.
+- Validation: `npx prisma validate`, engine-less Prisma type generation, `npm run type-check`, `npx tsx --test tests/lib/membership-contract-term.test.ts tests/lib/membership-additional-credit-discount.test.ts`, and `git diff --check` pass.
+
+### 2026-09-06 - Membership Assignment Start And Expiry Dates
+
+- Changed: Super Users assigning a membership tier from a Provider account profile must choose a start date and a default expiry term of 6 or 12 months. The server calculates and stores the calendar expiry date.
+- Changed: active membership profiles display their start and expiry dates to authorised Super Users, and expired assignments no longer grant membership credits or benefits.
+- Affects: RetailerMembership schema and migration, protected Provider profile entitlement API/UI, membership availability, and unlock-credit eligibility only. Subscription assignments, payments, tender matching, and environment configuration remain unchanged.
+- Environment: apply migration `20260906070000_add_membership_assignment_expiry` through the approved staging and production migration process before using assignment expiry outside local development.
+- Validation: `npx prisma validate`, engine-less Prisma type generation, `npm run type-check`, and `git diff --check` pass.
+
+### 2026-09-06 - Membership Discounts On Additional Provider Unlocks
+
+- Changed: after an active membership's inclusive monthly credits are exhausted, every subsequent Provider tender unlock uses that tier's configured additional-credit discount percentage. The discount is calculated server-side when the pending payment is created and therefore applies to the stored amount, VAT calculation, and Stripe checkout amount.
+- Changed: users without an active membership, or before their inclusive credits are exhausted, continue through the existing standard unlock-credit or standard-fee path. Client input cannot choose or override the discount.
+- Affects: Provider unlock payment creation and membership allowance handling only. Membership purchases, contact release, tender matching, and environment configuration remain unchanged.
+- Environment: no additional migration or environment configuration is required beyond `20260906060000_add_membership_credit_discount`.
+- Validation: `npm run type-check` and `npx tsx --test tests/lib/membership-additional-credit-discount.test.ts` pass. Database-backed membership integration tests are blocked locally by Prisma engine/database configuration drift.
+
+### 2026-09-06 - Editable Membership Tier Credit Terms
+
+- Changed: Owners can edit each membership tier's monthly price, inclusive monthly credits, and discount percentage for additional credits from Super User Settings. New membership tiers require all three commercial values.
+- Changed: existing membership-tier values are no longer reset by default-tier bootstrap when settings are loaded. Additional-credit discount is stored for the tier and exposed to the protected Owner management surface.
+- Affects: MembershipTier schema and migration, membership default initialisation, Owner settings API/UI, and membership tier administration only. Payment, tender matching, unlock eligibility, and environment configuration remain unchanged.
+- Environment: apply migration `20260906060000_add_membership_credit_discount` through the approved staging and production migration process before using the new field outside local development.
+- Validation: `npx prisma validate` and `npm run type-check` pass. Membership integration tests remain blocked locally because the database does not contain the previously required `User.termsVersion` column. Standard Prisma engine generation remains blocked by a Windows file lock; engine-less Prisma type generation succeeded.
+
+### 2026-09-06 - Provider Options In Super User Account Profiles
+
+- Changed: membership and subscription options for Providers are now assigned from the protected Super User account-profile view for the individual User, rather than from the general Site Settings page.
+- Changed: Site Settings no longer loads Provider account or entitlement data. Provider users cannot view or manage these assignments; the existing full Super User authorization, origin validation, and audit events remain enforced by the entitlement API.
+- Affects: Super User account profile data/view, Site Settings data loading, and membership or subscription entitlement assignment only. Payment, quote ranking, tender matching, contact release, and environment configuration remain unchanged.
+- Environment: no migration or environment configuration change is required.
+- Validation: `npx tsx --test tests/lib/user-profile-provider-options.test.ts` and `npm run type-check` pass.
+
+### 2026-09-06 - Sponsored Placement One-Month Term
+
+- Changed: a confirmed sponsored-placement purchase now receives a server-calculated expiry one calendar month after the purchase date. The calculation preserves the purchase time and safely clamps month-end dates.
+- Changed: expired sponsored placements no longer appear as active in Provider status or quote-page sponsored display. Existing historic placements without an expiry remain unchanged.
+- Affects: Retailer Sponsored Placement schema and migration, confirmed payment entitlement finalisation, Provider sponsored-placement status, and quote display only. Quote ranking, tender matching, payment amount, contact release, and environment configuration remain unchanged.
+- Environment: apply migration `20260906050000_add_sponsored_placement_expiry` through the approved staging and production migration process before enabling expiry enforcement outside local development.
+- Validation: `npx prisma validate`, `npx tsx --test tests/lib/sponsored-placement-expiry.test.ts`, and `npm run type-check` pass. Local Prisma Client regeneration is blocked by a Windows query-engine file lock.
+
+### 2026-09-06 - Partner Campaign Expiry
+
+- Changed: Partner Management now accepts an optional campaign expiry date when a Super User creates or edits a partner record. A blank date keeps the partner active until manually changed or deactivated.
+- Changed: public footer partner display excludes active partners whose expiry date has passed; expired records remain available to authorised Super Users for campaign history and audit review.
+- Affects: Partner schema and migration, Super User partner management, and public footer partner display only. Tender matching, quote comparison, payment, contact release, and environment configuration remain unchanged.
+- Environment: apply migration `20260906040000_add_partner_expiry` through the approved staging and production migration process before enabling expiry enforcement outside local development.
+- Validation: `npx prisma validate`, `npx tsx --test tests/lib/partner-schema.test.ts tests/lib/site-footer-partners.test.ts` (5 tests), and `npm run type-check` pass. Local Prisma Client generation is blocked by a Windows query-engine file lock.
+
+### 2026-09-06 - High-Risk Tender Review And Warning Workflow
+
+- Changed: full Super Users can open Tender Management review pages only for tenders that still meet the existing high-severity tender-compliance criteria. Review pages exclude attachments, messages, payments, and contact-release data.
+- Changed: a full Super User may issue an append-only warning only after the server rechecks the tender's high-risk status. The recipient is derived from the tender owner; a required reason and review note are validated server-side. The warned user sees active warnings only in their own authenticated profile; authorized Super Users can see warning history in the protected account profile.
+- Changed: when a user reaches exactly three active warnings, every active Owner receives a minimal notification with an authenticated link to the warned account. The Owner-configured support recipient also receives one only when it is not already an active Owner address. No suspension is automatic; only an Owner can suspend or reactivate a User through the account-status decision path.
+- Affects: Tender Warning schema and migration, protected Super User tender review/warning APIs, user and Super User profile views, email notifications, and audit records. Tender matching, risk thresholds, payments, contact release, and environment configuration remain unchanged.
+- Environment: apply migration `20260906030000_add_tender_warnings` through the approved staging and production migration process before enabling this workflow outside local development. Resend `RESEND_API_KEY` and `EMAIL_FROM` must be configured for notification delivery. No configuration values were changed.
+- Validation: `npx prisma validate`, `npx tsx --test tests/lib/tender-warning-workflow.test.ts`, and `npm run type-check` pass. `npx prisma generate` is blocked locally by an `EPERM` lock on the Prisma Windows query-engine binary.
+
+### 2026-09-06 - High-Risk Tender Owner Notification
+
+- Changed: a tender owner receives a non-sensitive email when their tender reaches the existing high-risk near-duplicate threshold. The notification directs the owner to the authenticated workspace without exposing compliance detection details.
+- Changed: successful and failed notification attempts are audit logged and successful notifications are idempotent per tender.
+- Affects: tender creation/update notifications and audit records only. Compliance thresholds, tender visibility, payment, contact release, database schema, and environment configuration remain unchanged.
+- Environment: Resend `RESEND_API_KEY` and `EMAIL_FROM` must be configured in the applicable environment for delivery. No configuration values were changed.
+- Validation: `npx tsx --test tests/lib/tender-high-risk-notification.test.ts tests/lib/compliance-monitoring.test.ts` passes (9 tests); `npm run type-check` passes.
+
+### 2026-09-06 - High-Risk Tender Management Filter
+
+- Changed: Super User Tender Management now lists only tenders with a high-severity, tender-targeted flag from the existing 30-day compliance monitoring workflow.
+- Affects: Super User Tender Management presentation only. Tender data, compliance detection thresholds, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npx tsx --test tests/lib/tender-management-risk-filter.test.ts` and `npm run type-check` pass.
+
+### 2026-09-06 - Registration Service Provision Selection
+
+- Changed: registration now supports optional second-tier service provision selection for every selected service and validates each provision against the selected service catalogue. Deselecting a service clears its dependent provision selections.
+- Changed: removed Coverage towns from public and Super User account-creation inputs. Legacy `coverageAreas` storage remains blank for compatibility and no longer receives new registration data.
+- Affects: registration validation, initial company profile provisions, and account-creation inputs only. Existing profiles, tender matching, payments, contact release, database schema, and environment configuration remain unchanged.
+- Environment: no operator action required.
+- Validation: `npm run type-check` and `npx tsx --test tests/lib/registration-service-provisions.test.ts` pass (3 tests).
 
 ### 2026-09-06 - Owner-Scoped Payment Waivers
 

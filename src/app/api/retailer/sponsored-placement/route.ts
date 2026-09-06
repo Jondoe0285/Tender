@@ -11,10 +11,10 @@ export async function GET() {
     const user = await requireRole('USER');
     const [enabled, activePlacement, feeGbp] = await Promise.all([
       sponsoredPlacementEnabled(),
-      prisma.retailerSponsoredPlacement.findFirst({ where: { retailerId: user.id, active: true } }),
+      prisma.retailerSponsoredPlacement.findFirst({ where: { retailerId: user.id, active: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } }),
       getPaymentFeeGbp('SPONSORED_PLACEMENT'),
     ]);
-    return NextResponse.json({ enabled, active: Boolean(activePlacement), feeGbp });
+    return NextResponse.json({ enabled, active: Boolean(activePlacement), expiresAt: activePlacement?.expiresAt ?? null, feeGbp });
   } catch (error) {
     return toErrorResponse(error);
   }

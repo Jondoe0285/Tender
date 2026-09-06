@@ -23,6 +23,7 @@ export default async function ClientManagementPage() {
       <p className="mb-6 max-w-xl text-sm text-concrete-grey">Registered Contractor accounts and their tender activity.</p>
       <AccountManagementTable
         role="USER"
+        isOwner={user.isOwner}
         rows={clients.map((client) => ({
           id: client.id,
           email: client.email,
