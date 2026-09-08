@@ -122,6 +122,19 @@ export function accountUpdateTemplate(input: { title: string; summary: string; a
   };
 }
 
+export function supportRequestInformationTemplate(input: { title: string; question: string; requestPath: string }): EmailTemplate {
+  return {
+    subject: `More information needed: ${input.title}`,
+    html: layout({
+      eyebrow: 'Support request',
+      title: 'More information is needed',
+      intro: 'A Super User is reviewing your support request and needs additional information before deciding the next step.',
+      body: detailRows([['Question', input.question], ['Next step', 'Reply through your authenticated Support requests area with the requested information.']]),
+      action: { label: 'Open support requests', href: appUrl(input.requestPath) },
+    }),
+  };
+}
+
 export function contentHeldNotificationTemplate(input: { contentLabel: string; reasons: string[]; accountPath: string }): EmailTemplate {
   return {
     subject: `Trade Tender update: ${input.contentLabel} held for review`,

@@ -150,7 +150,7 @@ These cannot be proven from source code or completed by a local coding change:
 2. Register and test the production Stripe webhook, including payment confirmation, duplicate delivery, refunds, disputes, and out-of-order events.
 3. Verify the Resend production domain and send email-verification, quote, payment, release, and reversal messages.
 4. Confirm Sentry receives a scrubbed production event and that alert ownership is assigned.
-5. Schedule and observe the retention job with `RETENTION_JOB_SECRET`; record successful and failed-job evidence.
+5. Configure and observe the retention job: `RETENTION_JOB_URL` must point to the full production `/api/internal/retention` endpoint, and the production GitHub Actions `RETENTION_JOB_SECRET` must exactly match Render production `RETENTION_JOB_SECRET`; record successful and failed-job evidence.
 6. Verify protected GitHub environments, branch rules, CODEOWNERS, required checks, Render deploy hooks, and named release/rollback ownership.
 7. Verify production backups, restore procedure, recovery objectives, connection limits, scaling plan, alerts, and representative load/recovery results. The current `render.yaml` uses the free plan and does not evidence readiness for the stated 1,000-concurrent-user target.
 8. Run the complete deployed-SHA staging verification and record the exact commit, database migration result, payment/webhook evidence, audit evidence, email evidence, Sentry evidence, retention evidence, and privacy checks.

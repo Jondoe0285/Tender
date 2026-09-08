@@ -32,9 +32,11 @@ jobs:
             exit 1
           fi
           if [ -z "$RETENTION_JOB_SECRET" ]; then
-            echo "::error::RETENTION_JOB_SECRET is not configured."
+            echo "::error::RETENTION_JOB_SECRET is not configured in the production GitHub Actions environment. It must exactly match the Render production RETENTION_JOB_SECRET value."
             exit 1
           fi
+          echo "Calling the configured production retention endpoint."
           curl --fail-with-body --silent --show-error \
+            --connect-timeout 10 --max-time 120 \
             --request POST --url "$RETENTION_JOB_URL" \
             --header "Authorization: Bearer $RETENTION_JOB_SECRET"

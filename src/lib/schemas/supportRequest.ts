@@ -41,7 +41,9 @@ export const supportRequestSchema = z.object({
 });
 
 export const supportRequestReviewSchema = z.object({
-  action: z.enum(['triage', 'approve', 'reject', 'resolve']),
+  action: z.enum(['triage', 'request-info', 'approve', 'reject', 'resolve']),
   note: z.string().trim().min(5).max(1_000),
+  triageCategory: z.enum(['ACCESS', 'ACCOUNT', 'PAYMENT', 'TECHNICAL', 'PRIVACY', 'COMPLAINT', 'CHANGE']).optional(),
+  escalationLevel: z.enum(['NONE', 'STANDARD', 'URGENT', 'OWNER']).optional(),
   resolutionEvidence: z.string().trim().min(5).max(2_000).optional(),
 });

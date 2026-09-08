@@ -20,6 +20,14 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-08 - Structured Support Triage And Information Requests
+
+- Changed: Super Users can select a triage category and escalation level for each support request, record a structured triage note, and request additional information from the requester.
+- Changed: information requests move to `INFORMATION_REQUESTED`, are audit logged, and send the requester an email explaining the question with a link back to Support requests. Existing Owner-only privacy resolution and change approval rules remain enforced.
+- Affects: SupportRequest schema and migration, Super User triage API/UI, requester notifications, and audit records only. Payment, contact release, authentication, and environment configuration remain unchanged.
+- Environment: apply migration `20260908120000_add_support_triage_fields` through the approved staging and production migration process before enabling structured triage outside local development.
+- Validation: `npx prisma validate`, engine-less Prisma type generation, `npm run type-check`, and `git diff --check` pass.
+
 ### 2026-09-06 - Privileged TOTP MFA Workflow
 
 - Changed: active NextAuth login now supports TOTP MFA for Super User accounts, with QR enrollment, encrypted secret storage, one-time recovery codes, login challenge verification, disable flow, audit events, and session invalidation when MFA settings change.

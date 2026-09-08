@@ -4,7 +4,7 @@ import { ForbiddenError, ValidationError } from '@/server/auth/session';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { getSupportRecipientEmail } from '@/server/domain/platformSettings';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
-import { supportRequestNotificationTemplate } from '@/server/notifications/emailTemplates';
+import { supportRequestInformationTemplate, supportRequestNotificationTemplate } from '@/server/notifications/emailTemplates';
 
 const DATA_SUBJECT_RESPONSE_DAYS = 30;
 
@@ -45,18 +45,20 @@ export function listSupportRequestsForSuperUser() {
   return prisma.supportRequest.findMany({ orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], take: 250, include: { requester: { select: { contactName: true, email: true, role: true } }, reviewer: { select: { contactName: true } } } });
 }
 
-export async function reviewSupportRequest(reviewer: { id: string; isOwner: boolean }, requestId: string, action: 'triage' | 'approve' | 'reject' | 'resolve', note: string, resolutionEvidence?: string) {
-  const request = await prisma.supportRequest.findUnique({ where: { id: requestId } });
+export async function reviewSupportRequest(reviewer: { id: string; isOwner: boolean }, requestId: string, action: 'triage' | 'request-info' | 'approve' | 'reject' | 'resolve', note: string, resolutionEvidence?: string, triageCategory?: string, escalationLevel?: string) {
+  const request = await prisma.supportRequest.findUnique({ where: { id: requestId }, include: { requester: { select: { email: true } } } });
   if (!request) throw new ForbiddenError('Support request not found');
   if ((action === 'approve' || action === 'reject') && (request.type !== 'CHANGE' || !reviewer.isOwner)) throw new ForbiddenError('Only an Owner can approve or reject a change request');
   if (action === 'resolve' && request.status === 'APPROVED') throw new ForbiddenError('Approved change requests require an implementation record');
   if (action === 'resolve' && request.type === 'DATA_PRIVACY' && !reviewer.isOwner) throw new ForbiddenError('Only an Owner can resolve a data protection request');
   if (action === 'resolve' && request.type === 'DATA_PRIVACY' && !resolutionEvidence) throw new ValidationError('Resolution evidence is required for a data protection request');
 
-  const status: SupportRequestStatus = action === 'triage' ? 'TRIAGED' : action === 'approve' ? 'APPROVED' : action === 'reject' ? 'REJECTED' : 'RESOLVED';
-  return prisma.$transaction(async (transaction) => {
-    const updated = await transaction.supportRequest.update({ where: { id: requestId }, data: { status, reviewerId: reviewer.id, reviewNote: note, ...(action === 'resolve' && request.type === 'DATA_PRIVACY' ? { resolutionEvidence } : {}), reviewedAt: new Date() } });
-    await recordAuditEvent({ actorId: reviewer.id, action: request.type === 'DATA_PRIVACY' ? `DATA_SUBJECT_REQUEST_${status}` : `SUPPORT_REQUEST_${status}`, targetType: 'SupportRequest', targetId: requestId, metadata: { type: request.type, dataSubjectRight: request.dataSubjectRight } }, transaction);
+  const status: SupportRequestStatus = action === 'triage' ? 'TRIAGED' : action === 'request-info' ? 'INFORMATION_REQUESTED' : action === 'approve' ? 'APPROVED' : action === 'reject' ? 'REJECTED' : 'RESOLVED';
+  const updated = await prisma.$transaction(async (transaction) => {
+    const updated = await transaction.supportRequest.update({ where: { id: requestId }, data: { status, reviewerId: reviewer.id, reviewNote: note, ...(triageCategory ? { triageCategory } : {}), ...(escalationLevel ? { escalationLevel } : {}), ...(action === 'request-info' ? { informationRequestedAt: new Date() } : {}), ...(action === 'resolve' && request.type === 'DATA_PRIVACY' ? { resolutionEvidence } : {}), reviewedAt: new Date() } });
+    await recordAuditEvent({ actorId: reviewer.id, action: request.type === 'DATA_PRIVACY' ? `DATA_SUBJECT_REQUEST_${status}` : `SUPPORT_REQUEST_${status}`, targetType: 'SupportRequest', targetId: requestId, metadata: { type: request.type, dataSubjectRight: request.dataSubjectRight, triageCategory, escalationLevel } }, transaction);
     return updated;
   });
+  if (action === 'request-info') await sendTransactionalEmail(request.requester.email, supportRequestInformationTemplate({ title: request.title, question: note, requestPath: '/user/support' })).catch(() => undefined);
+  return updated;
 }

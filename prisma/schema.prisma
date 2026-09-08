@@ -75,6 +75,7 @@ enum SupportRequestType {
 enum SupportRequestStatus {
   SUBMITTED
   TRIAGED
+  INFORMATION_REQUESTED
   APPROVED
   REJECTED
   RESOLVED
@@ -747,6 +748,9 @@ model SupportRequest {
   reviewerId  String?
   reviewer    User?                @relation("SupportReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
   reviewNote  String?
+  triageCategory String?
+  escalationLevel String?
+  informationRequestedAt DateTime?
   resolutionEvidence String?
   reviewedAt  DateTime?
   createdAt   DateTime             @default(now())
