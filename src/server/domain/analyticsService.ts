@@ -103,6 +103,48 @@ export function getFinancialQuarter(date = new Date()) {
   return { start, end, label: `Q${quarterIndex + 1} ${financialYearStart}/${String(financialYearStart + 1).slice(-2)}` };
 }
 
+export type VerificationTierKey = 'INDEPENDENTLY_VERIFIED' | 'VERIFIED_BY_AI' | 'UNVERIFIED';
+
+const VERIFICATION_TIER_LABELS: Record<VerificationTierKey, string> = {
+  INDEPENDENTLY_VERIFIED: 'Independently Verified',
+  VERIFIED_BY_AI: 'Verified by Ai',
+  UNVERIFIED: 'Unverified',
+};
+
+/** Groups quotes by the submitting Provider's *current* verification status — a read-time snapshot, not the status at submission. */
+async function getVerificationBreakdown(quotes: { status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED'; retailerId: string }[]) {
+  const retailerIds = [...new Set(quotes.map((quote) => quote.retailerId))];
+  const profiles = retailerIds.length
+    ? await prisma.retailerProfile.findMany({ where: { userId: { in: retailerIds } }, select: { userId: true, verificationStatus: true, independentReviewStatus: true } })
+    : [];
+  const profileByRetailerId = new Map(profiles.map((profile) => [profile.userId, profile] as const));
+
+  const buckets: Record<VerificationTierKey, { submitted: number; accepted: number }> = {
+    INDEPENDENTLY_VERIFIED: { submitted: 0, accepted: 0 },
+    VERIFIED_BY_AI: { submitted: 0, accepted: 0 },
+    UNVERIFIED: { submitted: 0, accepted: 0 },
+  };
+
+  for (const quote of quotes) {
+    const profile = profileByRetailerId.get(quote.retailerId);
+    const tier: VerificationTierKey = profile?.independentReviewStatus === 'APPROVED'
+      ? 'INDEPENDENTLY_VERIFIED'
+      : profile?.verificationStatus === 'VERIFIED'
+        ? 'VERIFIED_BY_AI'
+        : 'UNVERIFIED';
+    buckets[tier].submitted += 1;
+    if (quote.status === 'ACCEPTED') buckets[tier].accepted += 1;
+  }
+
+  return (Object.keys(buckets) as VerificationTierKey[]).map((tier) => ({
+    tier,
+    label: VERIFICATION_TIER_LABELS[tier],
+    submitted: buckets[tier].submitted,
+    accepted: buckets[tier].accepted,
+    acceptanceRate: buckets[tier].submitted ? Math.round((buckets[tier].accepted / buckets[tier].submitted) * 100) : 0,
+  }));
+}
+
 export async function getAnalytics(filters: AnalyticsFilters = {}) {
   const tenderWhere = buildAnalyticsTenderWhere(filters);
   const tenders = (await prisma.tender.findMany({
@@ -118,7 +160,7 @@ export async function getAnalytics(filters: AnalyticsFilters = {}) {
   const financialQuarter = getFinancialQuarter();
   const [unlocks, quotes, payments, vatPayments] = await Promise.all([
     prisma.unlock.findMany({ where: { tenderId: { in: tenderIds } }, select: { tenderId: true } }),
-    prisma.quote.findMany({ where: { tenderId: { in: tenderIds } }, select: { tenderId: true, status: true } }),
+    prisma.quote.findMany({ where: { tenderId: { in: tenderIds } }, select: { tenderId: true, status: true, retailerId: true } }),
     prisma.payment.findMany({
       where: {
         status: 'CONFIRMED',
@@ -164,6 +206,7 @@ export async function getAnalytics(filters: AnalyticsFilters = {}) {
   const acceptedCount = quotes.filter((quote) => quote.status === 'ACCEPTED').length;
   const revenue = payments.reduce((sum, payment) => sum + payment.amountGbp, 0);
   const vatCollectedGbp = vatPayments.reduce((sum, payment) => sum + payment.vatGbp, 0);
+  const verificationBreakdown = await getVerificationBreakdown(quotes);
 
   return {
     filters,
@@ -185,6 +228,7 @@ export async function getAnalytics(filters: AnalyticsFilters = {}) {
     monthly: Array.from(monthMap, ([month, tenders]) => ({ month, tenders })),
     categories: Array.from(categoryMap, ([category, values]) => ({ category, ...values, acceptanceRate: values.quotes ? Math.round((values.accepted / values.quotes) * 100) : 0 })).sort((a, b) => b.tenders - a.tenders),
     regions: Array.from(regionMap, ([region, values]) => ({ region, ...values })).sort((a, b) => b.tenders - a.tenders).slice(0, 8),
+    verificationBreakdown,
   };
 }
 

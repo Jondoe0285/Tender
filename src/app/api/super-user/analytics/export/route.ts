@@ -36,6 +36,9 @@ export async function GET(request: Request) {
     [],
     ['Region', 'Tenders', 'Quotes', 'Accepted'],
     ...data.regions.map((item) => [item.region, item.tenders, item.quotes, item.accepted]),
+    [],
+    ['Verification status', 'Quotes submitted', 'Quotes accepted', 'Acceptance rate'],
+    ...data.verificationBreakdown.map((item) => [item.label, item.submitted, item.accepted, `${item.acceptanceRate}%`]),
   ];
   const csv = rows.map((row) => row.map((cell) => csvCell(cell ?? '')).join(',')).join('\n');
 

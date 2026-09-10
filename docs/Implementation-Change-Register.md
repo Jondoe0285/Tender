@@ -20,6 +20,15 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-10 - Human Review Toggle, Compliance-Score Disclaimer, And Verification Analytics
+
+- Changed: added an Owner-only `HUMAN_REVIEW_ACTIVE` toggle to Site Settings. When active (default), an AI verification request that cannot be auto-approved still queues as `PENDING` for Super User review as before. When deactivated, that same request is automatically declined instead of queuing, since no reviewer is available to decide it.
+- Changed: the Provider verification screen now shows a compliance-score disclaimer explaining that uploaded documents are scored 0-100% and that a verified status requires at least a 90% compliance score, with wording that reflects whether human review is currently active.
+- Changed: Super User Analytics now includes a "Quote acceptance by Provider verification status" breakdown showing quotes submitted, quotes accepted, and the acceptance ratio for Independently Verified, Verified by Ai, and Unverified Providers (a read-time grouping by the submitting Provider's current status), also included in the CSV export.
+- Affects: `platformSettings.ts`, the Super User settings API/panel, the verification submission route, the Provider verification screen, `analyticsService.ts`, the Executive Dashboard, and the analytics CSV export. No schema migration required — this uses the existing `PlatformSetting` key/value store. No tender matching, payment, or contact-release behavior changed.
+- Environment: no migration required; the new setting defaults to active so existing behavior is unchanged until an Owner deactivates it.
+- Validation: `npx prisma generate`, `npm run type-check`, `npm test` (196 tests), and `npm run build` pass.
+
 ### 2026-09-10 - Independent H&S Review Purchase And Verified-Status Wording
 
 - Changed: renamed the display wording of the existing document-based verification outcome from "Verified" to "Verified by Ai" on the Provider profile, verification screen, Super User account review, and Contractor quote comparison. No stored `VERIFIED` enum value changed — this is a display-only wording change.

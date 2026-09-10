@@ -17,6 +17,7 @@ const defaultSettings: Record<string, string> = {
   ADSPACE_ACTIVE: 'false',
   INDEPENDENT_REVIEW_ACTIVE: 'false',
   INDEPENDENT_REVIEW_FEE_GBP: '150',
+  HUMAN_REVIEW_ACTIVE: 'true',
   RETAILER_ANALYTICS_SECTION_TRENDS: 'true',
   RETAILER_ANALYTICS_SECTION_CATEGORY: 'true',
   RETAILER_ANALYTICS_SECTION_REGIONAL: 'true',
@@ -117,6 +118,11 @@ export async function isIndependentReviewActive(): Promise<boolean> {
   return await getPlatformSetting('INDEPENDENT_REVIEW_ACTIVE') === 'true';
 }
 
+/** Owner-controlled: when disabled, a verification request that would need a human decision is declined automatically instead of queuing for review. */
+export async function isHumanReviewActive(): Promise<boolean> {
+  return await getPlatformSetting('HUMAN_REVIEW_ACTIVE') !== 'false';
+}
+
 export async function getAdminSettings(includeSupportRecipient = false) {
   const [settings, tiers, subscriptions, categoryDefinitions] = await Promise.all([
     prisma.platformSetting.findMany({ orderBy: { key: 'asc' } }),
@@ -140,6 +146,7 @@ export async function getAdminSettings(includeSupportRecipient = false) {
       adspaceActive: (settings.find((setting) => setting.key === 'ADSPACE_ACTIVE')?.value ?? defaultSettings.ADSPACE_ACTIVE) === 'true',
       independentReviewActive: (settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_ACTIVE')?.value ?? defaultSettings.INDEPENDENT_REVIEW_ACTIVE) === 'true',
       independentReviewFeeGbp: Number(settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_FEE_GBP')?.value ?? defaultSettings.INDEPENDENT_REVIEW_FEE_GBP),
+      humanReviewActive: (settings.find((setting) => setting.key === 'HUMAN_REVIEW_ACTIVE')?.value ?? defaultSettings.HUMAN_REVIEW_ACTIVE) === 'true',
     },
     tiers,
     subscriptions,

@@ -5,15 +5,20 @@ import { rejectCrossOrigin } from '@/server/http/origin';
 import { uploadVerificationDocumentSchema } from '@/lib/schemas/verificationDocument';
 import { getOwnRetailerProfileOrThrow, listVerificationDocuments, uploadVerificationDocument } from '@/server/domain/verificationDocumentService';
 import { getApplicableVerificationDocuments } from '@/lib/verification-documents';
+import { isHumanReviewActive } from '@/server/domain/platformSettings';
 
 export async function GET() {
   try {
     const user = await requireRole('USER');
     const profile = await getOwnRetailerProfileOrThrow(user.id);
-    const documents = await listVerificationDocuments(profile.id);
+    const [documents, humanReviewActive] = await Promise.all([
+      listVerificationDocuments(profile.id),
+      isHumanReviewActive(),
+    ]);
     return NextResponse.json({
       applicableDocumentTypes: getApplicableVerificationDocuments(profile.categories).map((doc) => doc.type),
       documents,
+      humanReviewActive,
     });
   } catch (error) {
     return toErrorResponse(error);

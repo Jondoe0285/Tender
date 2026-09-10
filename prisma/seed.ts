@@ -249,7 +249,7 @@ async function main() {
     where: { userId: retailer.id },
     update: {
       companyName: 'Demo Builders Merchant Ltd',
-      categories: 'Construction Materials',
+      categories: 'Materials,Waste',
       coverageAreas: 'Birmingham',
       coverageScope: 'UK',
     },
@@ -257,7 +257,7 @@ async function main() {
       userId: retailer.id,
       masterUserId: retailer.id,
       companyName: 'Demo Builders Merchant Ltd',
-      categories: 'Construction Materials',
+      categories: 'Materials,Waste',
       coverageAreas: 'Birmingham',
       coverageScope: 'UK',
     },

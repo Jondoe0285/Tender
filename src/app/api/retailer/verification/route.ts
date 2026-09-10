@@ -6,6 +6,7 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { toErrorResponse } from '@/server/http/errors';
 import { isVerificationEligible } from '@/lib/categories';
 import { evaluateProviderVerification, markUploadedDocumentsVerified } from '@/server/domain/verificationDocumentService';
+import { isHumanReviewActive } from '@/server/domain/platformSettings';
 import { providerVerificationReviewRequiredTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 
@@ -46,6 +47,22 @@ export async function POST(request: Request) {
       });
       await markUploadedDocumentsVerified(profile.id, profile.categories, true);
       await recordAuditEvent({ actorId: user.id, action: 'PROVIDER_VERIFICATION_AUTO_APPROVED', targetType: 'User', targetId: user.id, metadata: { confidencePercent: evaluation.confidencePercent } });
+      return NextResponse.json({ verificationStatus: updated.verificationStatus, verificationRequestedAt: updated.verificationRequestedAt }, { status: 200 });
+    }
+
+    if (!await isHumanReviewActive()) {
+      const updated = await prisma.retailerProfile.update({
+        where: { userId: user.id },
+        data: {
+          verificationStatus: 'REJECTED',
+          verificationRequestedAt: now,
+          verificationDecidedAt: now,
+          verificationNote: 'Automatically declined: the document compliance score did not reach 90% and human review is not currently available.',
+          verificationConfidencePercent: evaluation.confidencePercent,
+          verificationReport: evaluation.report,
+        },
+      });
+      await recordAuditEvent({ actorId: user.id, action: 'PROVIDER_VERIFICATION_AUTO_DECLINED', targetType: 'User', targetId: user.id, metadata: { confidencePercent: evaluation.confidencePercent } });
       return NextResponse.json({ verificationStatus: updated.verificationStatus, verificationRequestedAt: updated.verificationRequestedAt }, { status: 200 });
     }
 

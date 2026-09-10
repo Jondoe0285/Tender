@@ -45,6 +45,7 @@ export default function ProviderVerificationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [humanReviewActive, setHumanReviewActive] = useState(true);
 
   async function load() {
     setLoading(true);
@@ -60,6 +61,7 @@ export default function ProviderVerificationPage() {
       const data = await documentsResponse.json();
       setApplicableTypes(data.applicableDocumentTypes);
       setDocuments(data.documents);
+      setHumanReviewActive(data.humanReviewActive);
     }
     setLoading(false);
   }
@@ -170,6 +172,15 @@ export default function ProviderVerificationPage() {
               {verificationStatus === 'VERIFIED' ? 'Verified by Ai' : verificationStatus === 'PENDING' ? 'Pending review' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : 'Unverified'}
             </StatusBadge>
           </div>
+        </Card>
+
+        <Card className="border-l-4 border-safety-amber bg-amber-50/40">
+          <p className="text-sm font-semibold text-foundation-navy">Compliance score disclaimer</p>
+          <p className="mt-2 text-sm text-concrete-grey">
+            Each uploaded document is automatically assessed and given a compliance score from 0-100%. To achieve a
+            verified status, your required documents must together be sufficient to reach a compliance score of at
+            least 90%. If a 90% compliance score cannot be achieved{humanReviewActive ? ', your request is sent for human review, and a verified status is granted only if that review is successful' : ' and human review is not currently available, a verified status will not be granted'}.
+          </p>
         </Card>
 
         {applicableDocuments.map((doc) => {
