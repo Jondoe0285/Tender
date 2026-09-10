@@ -4,7 +4,7 @@ import { authOptions } from '@/server/auth/auth';
 import { prisma } from '@/server/data/prisma';
 import { verifyMobileToken } from '@/server/auth/mobileToken';
 
-export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'USER' | 'USER'; roles: SessionUser['role'][]; isOwner: boolean; isAccountant: boolean };
+export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'USER'; roles: SessionUser['role'][]; isOwner: boolean; isAccountant: boolean };
 
 export type CurrentAccount = { id: string; email: string; role: SessionUser['role']; suspended: boolean; isOwner: boolean; isAccountant: boolean; sessionVersion: number; roleMemberships: { role: SessionUser['role'] }[] };
 

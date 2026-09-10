@@ -20,6 +20,30 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-10 - Unified User Identity And Capability Standardization
+
+- Changed: all non-Super User accounts are consistently treated as `USER`; Contractor and Provider now remain workflow capabilities backed by `ClientCompany`/`ClientCompanyMember` and `RetailerProfile`, not competing account roles. Seed accounts and Super User-created Users now provision both capability records, and seed membership/privilege normalization removes stale non-selected memberships and User owner/accountant flags.
+- Changed: Super User account management presents one unified User population with combined tender, unlock, quote, and opportunity activity. User-facing legacy Retailer wording was replaced with Provider wording in current Contractor/User surfaces, while old route and database identifiers remain compatibility boundaries.
+- Changed: Super User conversion of an existing `SUPER_USER` account into a managed User account is rejected; NextAuth role declarations and session casts now use only `SUPER_USER | USER`. Contact-release emails derive Contractor/Provider recipient wording from the party identity rather than duplicate USER role literals.
+- Changed: fixed the CI Prisma-client generation order, client profile validation feedback, and the audited payment/declaration/activity tracking repairs already present in this worktree.
+- Affects: unified User capability provisioning, seed data, authorization/session typing, User management UI, invitation/notification wording, CI workflow, client profile validation, payment declaration persistence, and Owner activity tracking. No existing compatibility URLs or capability database tables were destructively removed.
+- Environment: migration `20260910060000_persist_verification_declaration` remains required through the approved deployment process; no new migration was required for the identity/capability standardization.
+- Validation: final AI architecture/security/QA review completed; `npm run type-check`, `npm run lint` (0 errors, 2 existing warnings), `npm test` (196 tests), and `npm run build` pass.
+
+### 2026-09-10 - Client Profile Validation Feedback
+
+- Changed: client profile save validation now returns structured Zod field errors instead of discarding them behind the generic `Invalid profile details` response. The profile form displays validation messages beside the affected company, branch, services, service provisions, and operating-location controls.
+- Affects: `/api/client/profile` validation response and the Client Profile form only. No profile validation rules were relaxed and no database or environment changes were made.
+- Environment: no operator action required.
+- Validation: `npm run type-check`, `npm run lint` (0 errors, 2 existing warnings), `npm test` (196 tests), and `npm run build` pass.
+
+### 2026-09-10 - CI Prisma Client Generation Order
+
+- Changed: the CI validation job now runs `npx prisma generate` immediately after `npm ci` and before migrations, lint, type-check, tests, and build. This fixes the CI failure where TypeScript could not resolve Prisma generated types and tests reported that the Prisma client had not initialized.
+- Affects: `.github/workflows/ci.yml` validation job only. No application behavior, schema, migration, or environment resource changed.
+- Environment: no operator action required.
+- Validation: corrected order passes `npx prisma generate`, `npm run type-check`, and `npm test` (196 tests); `npm run lint` reports 0 errors and 2 existing warnings; `git diff --check` passes.
+
 ### 2026-09-10 - Owner Super User Online-Time And Activity Summary
 
 - Changed: Owners now see a per-Super-User summary at the top of the Activity Log showing sessions started, completed sessions, time online, and completed platform activity for each Super User.

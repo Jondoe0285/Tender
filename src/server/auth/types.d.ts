@@ -4,8 +4,8 @@ declare module 'next-auth' {
   interface Session {
     user: {
       id: string;
-      role: string;
-      roles: string[];
+      role: 'SUPER_USER' | 'USER';
+      roles: Array<'SUPER_USER' | 'USER'>;
       isOwner: boolean;
       isAccountant: boolean;
     } & DefaultSession['user'];
@@ -13,8 +13,8 @@ declare module 'next-auth' {
 
   interface User {
     id: string;
-    role: string;
-    roles: string[];
+    role: 'SUPER_USER' | 'USER';
+    roles: Array<'SUPER_USER' | 'USER'>;
     isOwner: boolean;
     isAccountant: boolean;
   }

@@ -58,12 +58,13 @@ async function getClientCompanyMembership(userId: string) {
 export async function GET() {
   try {
     const user = await requireRole('USER');
-    const [account, membership, warnings] = await Promise.all([
+    const [account, membership, retailerProfile, warnings] = await Promise.all([
       prisma.user.findUniqueOrThrow({
         where: { id: user.id },
         select: { firstName: true, lastName: true, contactName: true, email: true, contactPhone: true },
       }),
       getClientCompanyMembership(user.id),
+        prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { verificationStatus: true } }),
       prisma.tenderWarning.findMany({
         where: { recipientId: user.id, active: true },
         select: { id: true, reason: true, note: true, createdAt: true, tender: { select: { reference: true } } },
@@ -83,6 +84,7 @@ export async function GET() {
       operatingLocations: membership?.company.operatingLocations ? membership.company.operatingLocations.split(',').filter(Boolean) : [],
       tradeTenderId: membership?.company.tradeTenderId ?? null,
       isPrimaryUser: membership ? isPrimaryClientUser(membership.company.primaryUserId, user.id) : false,
+        verificationStatus: retailerProfile?.verificationStatus ?? null,
       additionalUsers: membership && isPrimaryClientUser(membership.company.primaryUserId, user.id)
         ? await prisma.clientCompanyMember.findMany({
             where: { companyId: membership.companyId, NOT: { userId: user.id } },
@@ -103,7 +105,9 @@ export async function PUT(request: Request) {
     if (originError) return originError;
     const user = await requireRole('USER');
     const parsed = profileUpdateSchema.safeParse(await request.json().catch(() => null));
-    if (!parsed.success) return NextResponse.json({ error: 'Invalid profile details' }, { status: 400 });
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid profile details', issues: parsed.error.flatten() }, { status: 400 });
+    }
 
     const membership = await getClientCompanyMembership(user.id);
     if (!membership) return NextResponse.json({ error: 'Client company membership is required' }, { status: 409 });

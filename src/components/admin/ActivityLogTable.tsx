@@ -163,7 +163,7 @@ export function ActivityLogTable({ entries, filters }: { entries: AuditEntry[]; 
                 <option value="">Any</option>
                 <option value="SUPER_USER">Super User</option>
                 <option value="CONTRACTOR">Client</option>
-                <option value="PROVIDER">Retailer</option>
+                <option value="PROVIDER">Provider</option>
               </select>
             </label>
             <label className="text-sm text-concrete-grey">

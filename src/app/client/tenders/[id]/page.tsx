@@ -352,7 +352,7 @@ export default function ClientTenderDetailPage() {
         {message && <p className="mb-4 text-sm font-semibold text-attention">{message}</p>}
         {quotes.length === 0 ? (
           <Card className="py-16 text-center text-sm text-concrete-grey">
-            No quotes have been submitted. Matched Retailers will appear here once they respond.
+            No quotes have been submitted. Matched Providers will appear here once they respond.
           </Card>
         ) : (
           <>

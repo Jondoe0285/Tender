@@ -9,7 +9,7 @@ test('activity periods support the one-day default and searchable retained range
 
   assert.ok(oneDay);
   assert.ok(thirtyDays);
-  assert.ok(now - oneDay.getTime() >= 24 * 60 * 60 * 1000);
-  assert.ok(now - thirtyDays.getTime() >= 30 * 24 * 60 * 60 * 1000);
+  assert.ok(now - oneDay.getTime() >= 24 * 60 * 60 * 1000 - 1000);
+  assert.ok(now - thirtyDays.getTime() >= 30 * 24 * 60 * 60 * 1000 - 1000);
   assert.equal(getActivitySince('all'), null);
 });

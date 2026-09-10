@@ -48,11 +48,15 @@ const INITIAL_PARTNERS = [
 ] as const;
 
 async function upsertRoleMembership(userId: string, role: Role) {
-  await prisma.userRole.upsert({
-    where: { userId_role: { userId, role } },
-    update: {},
-    create: { userId, role },
-  });
+  await prisma.$transaction([
+    prisma.userRole.deleteMany({ where: { userId, NOT: { role } } }),
+    prisma.userRole.upsert({
+      where: { userId_role: { userId, role } },
+      update: {},
+      create: { userId, role },
+    }),
+    ...(role === Role.USER ? [prisma.user.update({ where: { id: userId }, data: { isOwner: false, isAccountant: false } })] : []),
+  ]);
 }
 
 function trialRetailerCoverage(index: number) {
@@ -80,7 +84,7 @@ async function seedTrialRetailers(passwordHash: string) {
       where: { email: `trial-retailer-${paddedIndex}@example.test` },
       update: {
         passwordHash,
-        role: Role.PROVIDER,
+        role: Role.USER,
         contactName: `Trial Retailer ${paddedIndex}`,
         contactPhone: `07700${String(index).padStart(6, '0')}`,
         suspended: false,
@@ -90,20 +94,19 @@ async function seedTrialRetailers(passwordHash: string) {
       create: {
         email: `trial-retailer-${paddedIndex}@example.test`,
         passwordHash,
-        role: Role.PROVIDER,
+        role: Role.USER,
         contactName: `Trial Retailer ${paddedIndex}`,
         contactPhone: `07700${String(index).padStart(6, '0')}`,
         emailVerifiedAt: new Date(),
         termsAcceptedAt: new Date(),
       },
     });
-    await upsertRoleMembership(retailer.id, Role.PROVIDER);
+    await upsertRoleMembership(retailer.id, Role.USER);
     await prisma.retailerProfile.upsert({
       where: { userId: retailer.id },
       update: {
         companyName: `${coverage.coverageAreas} ${TRIAL_RETAILER_COMPANY_TYPES[index % TRIAL_RETAILER_COMPANY_TYPES.length]} ${paddedIndex}`,
         categories: services.join(','),
-        launchCreditsLeft: 3,
         ...coverage,
       },
       create: {
@@ -114,6 +117,16 @@ async function seedTrialRetailers(passwordHash: string) {
         launchCreditsLeft: 3,
         ...coverage,
       },
+    });
+    const trialCompany = await prisma.clientCompany.upsert({
+      where: { primaryUserId: retailer.id },
+      update: { companyName: `${coverage.coverageAreas} ${TRIAL_RETAILER_COMPANY_TYPES[index % TRIAL_RETAILER_COMPANY_TYPES.length]} ${paddedIndex}`, services: services.join(','), operatingLocations: 'United Kingdom' },
+      create: { companyName: `${coverage.coverageAreas} ${TRIAL_RETAILER_COMPANY_TYPES[index % TRIAL_RETAILER_COMPANY_TYPES.length]} ${paddedIndex}`, primaryUserId: retailer.id, services: services.join(','), operatingLocations: 'United Kingdom' },
+    });
+    await prisma.clientCompanyMember.upsert({
+      where: { companyId_userId: { companyId: trialCompany.id, userId: retailer.id } },
+      update: {},
+      create: { companyId: trialCompany.id, userId: retailer.id },
     });
   }
 }
@@ -193,7 +206,7 @@ async function main() {
     where: { email: 'client@example.test' },
     update: {
       passwordHash: sandboxPasswordHash,
-      role: Role.CONTRACTOR,
+      role: Role.USER,
       contactName: 'Demo Client',
       contactPhone: '07123456789',
       suspended: false,
@@ -203,14 +216,14 @@ async function main() {
     create: {
       email: 'client@example.test',
       passwordHash: sandboxPasswordHash,
-      role: Role.CONTRACTOR,
+      role: Role.USER,
       contactName: 'Demo Client',
       contactPhone: '07123456789',
       emailVerifiedAt: new Date(),
       termsAcceptedAt: new Date(),
     },
   });
-  await upsertRoleMembership(client.id, Role.CONTRACTOR);
+  await upsertRoleMembership(client.id, Role.USER);
   const clientCompany = await prisma.clientCompany.upsert({
     where: { primaryUserId: client.id },
     update: { companyName: 'Demo Construction Client Ltd' },
@@ -221,12 +234,17 @@ async function main() {
     update: {},
     create: { companyId: clientCompany.id, userId: client.id },
   });
+  await prisma.retailerProfile.upsert({
+    where: { userId: client.id },
+    update: { companyName: 'Demo Construction Client Ltd', categories: 'Materials', coverageAreas: 'Birmingham', coverageScope: 'UK' },
+    create: { userId: client.id, masterUserId: client.id, companyName: 'Demo Construction Client Ltd', categories: 'Materials', coverageAreas: 'Birmingham', coverageScope: 'UK' },
+  });
 
   const retailer = await prisma.user.upsert({
     where: { email: 'retailer@example.test' },
     update: {
       passwordHash: sandboxPasswordHash,
-      role: Role.PROVIDER,
+      role: Role.USER,
       contactName: 'Demo Retailer',
       contactPhone: '07987654321',
       suspended: false,
@@ -236,14 +254,14 @@ async function main() {
     create: {
       email: 'retailer@example.test',
       passwordHash: sandboxPasswordHash,
-      role: Role.PROVIDER,
+      role: Role.USER,
       contactName: 'Demo Retailer',
       contactPhone: '07987654321',
       emailVerifiedAt: new Date(),
       termsAcceptedAt: new Date(),
     },
   });
-  await upsertRoleMembership(retailer.id, Role.PROVIDER);
+  await upsertRoleMembership(retailer.id, Role.USER);
 
   await prisma.retailerProfile.upsert({
     where: { userId: retailer.id },
@@ -261,6 +279,16 @@ async function main() {
       coverageAreas: 'Birmingham',
       coverageScope: 'UK',
     },
+  });
+  const retailerCompany = await prisma.clientCompany.upsert({
+    where: { primaryUserId: retailer.id },
+    update: { companyName: 'Demo Builders Merchant Ltd', services: 'Materials,Waste', operatingLocations: 'Birmingham' },
+    create: { companyName: 'Demo Builders Merchant Ltd', primaryUserId: retailer.id, services: 'Materials,Waste', operatingLocations: 'Birmingham' },
+  });
+  await prisma.clientCompanyMember.upsert({
+    where: { companyId_userId: { companyId: retailerCompany.id, userId: retailer.id } },
+    update: {},
+    create: { companyId: retailerCompany.id, userId: retailer.id },
   });
 
   await seedTrialRetailers(sandboxPasswordHash);

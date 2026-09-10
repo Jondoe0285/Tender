@@ -19,7 +19,7 @@ export type AccountRow = {
   releaseCreditsLeft?: number | null;
 };
 
-export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER' | 'USER'; rows: AccountRow[]; isOwner: boolean }) {
+export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER'; rows: AccountRow[]; isOwner: boolean }) {
   const [showCreate, setShowCreate] = useState(false);
   const [openTenderRequestsOnly, setOpenTenderRequestsOnly] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -34,7 +34,6 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER' |
     coverageAreas: '',
   });
 
-  const isRetailer = role === 'USER';
   const visibleRows = openTenderRequestsOnly
     ? rows.filter((row) => (row.openTenderRequests ?? 0) > 0)
     : rows;
@@ -48,8 +47,8 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER' |
         ...form,
         role,
         contactPhone: form.contactPhone || undefined,
-        companyName: isRetailer ? form.companyName || undefined : undefined,
-        categories: isRetailer ? form.categories.split(',').map((value) => value.trim()).filter(Boolean) : undefined,
+        companyName: form.companyName || undefined,
+        categories: form.categories.split(',').map((value) => value.trim()).filter(Boolean),
         coverageAreas: form.coverageAreas || undefined,
         termsAccepted: true,
       };
@@ -121,7 +120,7 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER' |
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.12em] text-steel-blue">Operations</p>
             <p className="mt-1 max-w-xl text-sm text-concrete-grey">
-              Manage {role === 'USER' ? 'contractor' : 'provider'} account access, reset credentials, and status in one place.
+              Manage User account access, reset credentials, and status in one place.
             </p>
           </div>
           <button
@@ -129,11 +128,11 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER' |
             onClick={() => setShowCreate((current) => !current)}
             className="inline-flex items-center rounded-md bg-foundation-navy px-4 py-2 text-sm font-semibold text-site-white shadow-soft transition hover:bg-foundation-navy/90"
           >
-            {showCreate ? 'Close form' : `Add ${role === 'USER' ? 'Contractor' : 'Provider'}`}
+            {showCreate ? 'Close form' : 'Add User'}
           </button>
         </div>
 
-        {isRetailer && (
+        {(
           <label className="mt-4 flex items-center gap-2 text-sm font-medium text-foundation-navy">
             <input
               type="checkbox"
@@ -185,8 +184,7 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER' |
               />
             </label>
 
-            {isRetailer && (
-              <>
+            <>
                 <label className="text-sm text-concrete-grey md:col-span-1">
                   <span className="mb-1 block font-medium text-foundation-navy">Company name</span>
                   <input
@@ -215,7 +213,6 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER' |
                   />
                 </label>
               </>
-            )}
 
             <div className="md:col-span-2 flex justify-end">
               <button
@@ -246,15 +243,11 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER' |
                   {account.email}
                   {account.categories ? ` &middot; ${account.categories}` : ''}
                 </p>
-                {role === 'USER' ? (
-                  <p className="mt-1 text-sm text-concrete-grey">{account.tenders ?? 0} tender(s) raised</p>
-                ) : (
-                  <p className="mt-1 text-sm text-concrete-grey">
-                    {(account.unlocks ?? 0)} unlock(s) &middot; {(account.quotes ?? 0)} quote(s)
-                    {typeof account.openTenderRequests === 'number' ? ` &middot; ${account.openTenderRequests} open tender request(s)` : ''}
-                    {typeof account.launchCreditsLeft === 'number' ? ` &middot; ${account.launchCreditsLeft} credits left` : ''}
-                  </p>
-                )}
+                <p className="mt-1 text-sm text-concrete-grey">
+                  {account.tenders ?? 0} tender(s) raised &middot; {account.unlocks ?? 0} unlock(s) &middot; {account.quotes ?? 0} quote(s)
+                  {typeof account.openTenderRequests === 'number' ? ` · ${account.openTenderRequests} open tender request(s)` : ''}
+                  {typeof account.launchCreditsLeft === 'number' ? ` · ${account.launchCreditsLeft} credits left` : ''}
+                </p>
               </div>
 
               <div className="flex flex-col items-stretch gap-3 lg:items-end">

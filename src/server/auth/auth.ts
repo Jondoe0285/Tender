@@ -77,8 +77,8 @@ export const authOptions: AuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as string;
-        session.user.roles = (token.roles ?? [token.role]) as string[];
+        session.user.role = token.role as 'SUPER_USER' | 'USER';
+        session.user.roles = (token.roles ?? [token.role]) as Array<'SUPER_USER' | 'USER'>;
         session.user.isOwner = Boolean(token.isOwner);
         session.user.isAccountant = Boolean(token.isAccountant);
         (session.user as typeof session.user & { sessionVersion?: number }).sessionVersion = Number(token.sessionVersion ?? 0);
