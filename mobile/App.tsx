@@ -257,6 +257,7 @@ export default function App() {
         <View style={styles.header}>
         <Image
           accessibilityLabel="Trade Tender"
+          alt=""
           source={require('./assets/trade-tender-logo.png')}
           style={styles.logo}
           resizeMode="contain"
