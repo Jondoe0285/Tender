@@ -95,7 +95,7 @@ export default function IndependentReviewPage() {
 
           {!state?.active && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Independent review purchases are not currently available.</p>}
 
-          {state?.active && !state.eligible && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Independent review is only available for Waste, Plant Hire, Contractor Services, or Professional Services providers.</p>}
+          {state?.active && !state.eligible && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Independent review is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers.</p>}
 
           {state?.active && state.eligible && (
             <div className="mt-5 flex flex-wrap items-center justify-between gap-4">

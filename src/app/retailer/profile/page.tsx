@@ -150,7 +150,7 @@ export default function RetailerProfilePage() {
                   {profile.verificationStatus === 'PENDING' && 'Your verification request is under review. We will update your status once it has been checked.'}
                   {profile.verificationStatus === 'REJECTED' && 'Your last verification request was not approved. You can request verification again at any time.'}
                   {profile.verificationStatus === 'EXPIRED' && 'One or more of your verification documents have expired, so your verified status has been removed. Upload a replacement to restart the review.'}
-                  {profile.verificationStatus === 'UNVERIFIED' && 'Waste, Plant Hire, Contractor Services, and Professional Services providers can complete a verification check. Verified status is shown to Contractors on every quote you submit.'}
+                  {profile.verificationStatus === 'UNVERIFIED' && 'Materials, Waste, Plant Hire, Contractor Services, and Professional Services providers can complete a verification check. Verified status is shown to Contractors on every quote you submit.'}
                 </p>
               </div>
               <div className="flex items-center gap-3">

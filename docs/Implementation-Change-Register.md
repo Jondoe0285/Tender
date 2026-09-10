@@ -20,6 +20,13 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-10 - Materials Suppliers Added To Become Verified Eligibility
+
+- Changed: Materials suppliers are now eligible for the "Become Verified" AI document verification and the Independent H&S Review purchase option, alongside the existing Waste, Plant Hire, Contractor Services, and Professional Services providers. Materials suppliers only need the baseline documents (Certificate of Incorporation, Public Liability Insurance, Employers Liability Insurance, and optional SSIP accreditation) — the Waste Carriers Licence and Professional Services documents remain restricted to their respective services.
+- Affects: `VERIFICATION_ELIGIBLE_SERVICES` in `src/lib/categories.ts` and the eligibility-message copy on the Provider profile, verification submit route, and Independent H&S Review route/screen. No schema or migration change required.
+- Environment: no operator action required.
+- Validation: `npm run type-check`, `npm test` (196 tests), and `npm run build` pass.
+
 ### 2026-09-10 - Human Review Toggle, Compliance-Score Disclaimer, And Verification Analytics
 
 - Changed: added an Owner-only `HUMAN_REVIEW_ACTIVE` toggle to Site Settings. When active (default), an AI verification request that cannot be auto-approved still queues as `PENDING` for Super User review as before. When deactivated, that same request is automatically declined instead of queuing, since no reviewer is available to decide it.

@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     if (!profile) return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
 
     if (!isVerificationEligible(profile.categories)) {
-      return NextResponse.json({ error: 'Verification is only available for Waste, Plant Hire, Contractor Services, or Professional Services providers' }, { status: 403 });
+      return NextResponse.json({ error: 'Verification is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers' }, { status: 403 });
     }
     if (profile.verificationStatus === 'PENDING' || profile.verificationStatus === 'VERIFIED') {
       return NextResponse.json({ error: 'A verification request is already pending or approved for this account' }, { status: 409 });

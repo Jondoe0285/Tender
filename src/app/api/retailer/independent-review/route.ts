@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { categories: true, independentReviewStatus: true } });
     if (!profile) return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
     if (!await isIndependentReviewActive()) return NextResponse.json({ error: 'Independent review purchases are not currently available' }, { status: 403 });
-    if (!isVerificationEligible(profile.categories)) return NextResponse.json({ error: 'Independent review is only available for Waste, Plant Hire, Contractor Services, or Professional Services providers' }, { status: 403 });
+    if (!isVerificationEligible(profile.categories)) return NextResponse.json({ error: 'Independent review is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers' }, { status: 403 });
     if (profile.independentReviewStatus === 'PURCHASED' || profile.independentReviewStatus === 'APPROVED') {
       return NextResponse.json({ error: 'An independent review has already been purchased or approved for this account' }, { status: 409 });
     }
