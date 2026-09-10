@@ -1,6 +1,7 @@
 'use client';
 
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { CATEGORIES } from '@/lib/categories';
@@ -137,7 +138,7 @@ export function ExecutiveDashboard({ data }: Props) {
               <h2 className="font-heading text-lg font-bold text-foundation-navy">Tender volume</h2>
               <p className="mt-1 text-sm text-concrete-grey">Demand trend for the selected period.</p>
             </div>
-            <a href="/super-user/tenders" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">Drill down &rarr;</a>
+            <Link href="/super-user/tenders" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">Drill down &rarr;</Link>
           </div>
           <div className="h-64">
             {data.monthly.length ? <ResponsiveContainer width="100%" height="100%"><LineChart data={data.monthly}><CartesianGrid stroke="#E2E8F0" vertical={false} /><XAxis dataKey="month" tick={{ fontSize: 12 }} /><YAxis allowDecimals={false} tick={{ fontSize: 12 }} /><Tooltip /><Line type="monotone" dataKey="tenders" stroke="#1D3D5C" strokeWidth={3} dot={{ r: 3 }} /></LineChart></ResponsiveContainer> : <EmptyChart />}
@@ -150,23 +151,23 @@ export function ExecutiveDashboard({ data }: Props) {
               <h2 className="font-heading text-lg font-bold text-foundation-navy">Conversion rates</h2>
               <p className="mt-1 text-sm text-concrete-grey">Where demand progresses or falls away.</p>
             </div>
-            <a href="/super-user/analytics" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">Drill down &rarr;</a>
+            <Link href="/super-user/analytics" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">Drill down &rarr;</Link>
           </div>
           <div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={[{ name: 'Match', rate: data.rates.matchRate }, { name: 'Quote', rate: data.rates.quoteRate }, { name: 'Accept', rate: data.rates.acceptanceRate }]}><CartesianGrid stroke="#E2E8F0" vertical={false} /><XAxis dataKey="name" tick={{ fontSize: 12 }} /><YAxis domain={[0, 100]} unit="%" tick={{ fontSize: 12 }} /><Tooltip formatter={(value) => `${value}%`} /><Bar dataKey="rate" fill="#F5A524" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
         </Card>
 
         <Card>
-          <div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="font-heading text-lg font-bold text-foundation-navy">Regional activity</h2><p className="mt-1 text-sm text-concrete-grey">Locations generating the most demand.</p></div><a href="/super-user/tenders" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">View tenders &rarr;</a></div>
+          <div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="font-heading text-lg font-bold text-foundation-navy">Regional activity</h2><p className="mt-1 text-sm text-concrete-grey">Locations generating the most demand.</p></div><Link href="/super-user/tenders" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">View tenders &rarr;</Link></div>
           <div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={data.regions} layout="vertical" margin={{ left: 12, right: 12 }}><CartesianGrid stroke="#E2E8F0" horizontal={false} /><XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} /><YAxis type="category" dataKey="region" width={80} tick={{ fontSize: 12 }} /><Tooltip /><Bar dataKey="tenders" name="Tenders" fill="#1D3D5C" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer></div>
         </Card>
 
         <Card>
-          <div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="font-heading text-lg font-bold text-foundation-navy">Category performance</h2><p className="mt-1 text-sm text-concrete-grey">Demand and quote acceptance by category.</p></div><a href="/super-user/categories" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">Manage categories &rarr;</a></div>
+          <div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="font-heading text-lg font-bold text-foundation-navy">Category performance</h2><p className="mt-1 text-sm text-concrete-grey">Demand and quote acceptance by category.</p></div><Link href="/super-user/categories" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">Manage categories &rarr;</Link></div>
           <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-concrete-grey"><tr><th className="pb-3">Category</th><th className="pb-3">Tenders</th><th className="pb-3">Quotes</th><th className="pb-3">Quoted value</th><th className="pb-3">Accept</th></tr></thead><tbody className="divide-y divide-slate-100">{data.categories.map((item) => <tr key={item.category}><td className="py-3 font-semibold text-foundation-navy">{item.category}</td><td className="py-3 text-concrete-grey">{item.tenders}</td><td className="py-3 text-concrete-grey">{item.quotes}</td><td className="py-3 text-concrete-grey">{money.format(item.value)}</td><td className="py-3"><StatusBadge status={item.acceptanceRate >= 25 ? 'approved' : 'pending'}>{`${item.acceptanceRate}%`}</StatusBadge></td></tr>)}</tbody></table></div>
         </Card>
 
         <Card>
-          <div className="mb-5"><h2 className="font-heading text-lg font-bold text-foundation-navy">Quote acceptance by Provider verification status</h2><p className="mt-1 text-sm text-concrete-grey">Quotes submitted vs. accepted, grouped by the submitting Provider's current verification status.</p></div>
+          <div className="mb-5"><h2 className="font-heading text-lg font-bold text-foundation-navy">Quote acceptance by Provider verification status</h2><p className="mt-1 text-sm text-concrete-grey">Quotes submitted vs. accepted, grouped by the submitting Provider&apos;s current verification status.</p></div>
           <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-concrete-grey"><tr><th className="pb-3">Verification status</th><th className="pb-3">Quotes submitted</th><th className="pb-3">Quotes accepted</th><th className="pb-3">Ratio</th></tr></thead><tbody className="divide-y divide-slate-100">{data.verificationBreakdown.map((item) => <tr key={item.tier}><td className="py-3 font-semibold text-foundation-navy">{item.label}</td><td className="py-3 text-concrete-grey">{item.submitted}</td><td className="py-3 text-concrete-grey">{item.accepted}</td><td className="py-3"><StatusBadge status={item.acceptanceRate >= 25 ? 'approved' : 'pending'}>{`${item.accepted} / ${item.submitted} (${item.acceptanceRate}%)`}</StatusBadge></td></tr>)}</tbody></table></div>
         </Card>
       </div>

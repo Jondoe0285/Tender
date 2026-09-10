@@ -1,0 +1,1 @@
+ALTER TABLE "Quote" ADD COLUMN "verificationDeclarationAcceptedAt" TIMESTAMP(3);

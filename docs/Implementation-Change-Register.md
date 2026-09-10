@@ -20,6 +20,23 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-10 - Owner Super User Online-Time And Activity Summary
+
+- Changed: Owners now see a per-Super-User summary at the top of the Activity Log showing sessions started, completed sessions, time online, and completed platform activity for each Super User.
+- Changed: the summary uses the same Activity Log filters (search, action, target type, actor role, from, and to) and the existing append-only audit records. Time online is calculated from `USER_LOGOUT` audit metadata containing `sessionSeconds`; sessions without a recorded logout remain visible as started but are not counted as completed time.
+- Affects: `activityLogService.ts`, the Owner-visible Activity Log page, and new `SuperUserActivitySummary` UI. No schema migration or new tracking storage was required.
+- Environment: no operator action required.
+- Validation: `npm run type-check`, `npm run lint` (0 errors, 2 existing warnings), `npm test` (196 tests), and `npm run build` pass.
+
+### 2026-09-10 - Platform Audit Repairs: Payment Idempotency, Declaration Persistence, And Lint Gate
+
+- Changed: Stripe `payment_intent.payment_failed` events are now handled as PaymentIntent payloads and resolve the payment by its Stripe PaymentIntent ID instead of being cast as Checkout Sessions. Checkout success/failure transitions are idempotent, allow a failed payment to recover to confirmed success, and only run entitlement/audit/email side effects when the payment state actually changes.
+- Changed: quote acceptance now persists `verificationDeclarationAcceptedAt`, and contact release rechecks the current Provider verification state against that persisted declaration. A Provider becoming verified after quote acceptance can no longer release contacts without the required declaration.
+- Changed: repaired the lint gate by moving render-time clock reads into effects and replacing internal analytics anchors with Next.js `Link` components. Lint now reports no errors; two existing image optimization/accessibility warnings remain.
+- Affects: Stripe webhook payment reconciliation, quote/contact-release workflow, Quote schema and migration `20260910060000_persist_verification_declaration`, and affected UI lint surfaces. No production resources were changed.
+- Environment: apply migration `20260910060000_persist_verification_declaration` through the approved staging and production migration process. It has been applied only to the configured development database.
+- Validation: `npx prisma generate`, `npx prisma migrate deploy`, `npm run type-check`, `npm run lint` (0 errors, 2 existing warnings), `npm test` (196 tests), and `npm run build` pass.
+
 ### 2026-09-10 - Materials Suppliers Added To Become Verified Eligibility
 
 - Changed: Materials suppliers are now eligible for the "Become Verified" AI document verification and the Independent H&S Review purchase option, alongside the existing Waste, Plant Hire, Contractor Services, and Professional Services providers. Materials suppliers only need the baseline documents (Certificate of Incorporation, Public Liability Insurance, Employers Liability Insurance, and optional SSIP accreditation) — the Waste Carriers Licence and Professional Services documents remain restricted to their respective services.

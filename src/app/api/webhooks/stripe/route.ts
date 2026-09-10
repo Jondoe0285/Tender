@@ -80,28 +80,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   }
 
-  if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded' || event.type === 'checkout.session.async_payment_failed' || event.type === 'payment_intent.payment_failed') {
+  if (event.type === 'payment_intent.payment_failed') {
+    const paymentIntent = event.data.object as Stripe.PaymentIntent;
+    const payment = await prisma.payment.findFirst({ where: { stripePaymentIntentId: paymentIntent.id }, select: { id: true } });
+    if (!payment) return NextResponse.json({ received: true });
+    const updated = await prisma.payment.updateMany({
+      where: { id: payment.id, status: 'PENDING' },
+      data: { status: 'FAILED', stripeEventId: event.id },
+    });
+    if (updated.count > 0) {
+      await recordAuditEvent({ actorId: null, action: 'PAYMENT_FAILED', targetType: 'Payment', targetId: payment.id, metadata: { stripeEventId: event.id, type: 'PAYMENT_INTENT' } });
+    }
+    return NextResponse.json({ received: true });
+  }
+
+  if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded' || event.type === 'checkout.session.async_payment_failed') {
     const session = event.data.object as Stripe.Checkout.Session;
     const paymentId = session.metadata?.paymentId;
     if (paymentId) {
       const confirmed = event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded';
       const paymentBeforeUpdate = await prisma.payment.findUnique({ where: { id: paymentId } });
-      // A delivery can fail after recording the event but before granting its entitlement. Allow
-      // Stripe to retry that same signed event so the idempotent finalisers can resume safely.
-      if (!paymentBeforeUpdate || (paymentBeforeUpdate.stripeEventId && paymentBeforeUpdate.stripeEventId !== event.id)) {
+      if (!paymentBeforeUpdate) {
         return NextResponse.json({ received: true });
       }
-      if (confirmed && event.type !== 'payment_intent.payment_failed' && session.amount_total !== null && session.amount_total !== Math.round(paymentBeforeUpdate.totalAmountGbp * 100)) {
+      if (confirmed && session.amount_total !== null && session.amount_total !== Math.round(paymentBeforeUpdate.totalAmountGbp * 100)) {
         return NextResponse.json({ error: 'Payment amount mismatch' }, { status: 400 });
       }
       const receiptUrl = confirmed ? await getReceiptUrl(stripe, session).catch(() => null) : null;
       const updated = await prisma.payment.updateMany({
-        where: { id: paymentId, status: 'PENDING' },
+        where: { id: paymentId, status: confirmed ? { in: ['PENDING', 'FAILED'] } : 'PENDING' },
         data: confirmed
           ? { status: 'CONFIRMED', confirmedAt: new Date(), stripeEventId: event.id, stripeReceiptUrl: receiptUrl, accountingRecordPath: `accounting/stripe/${new Date().getUTCFullYear()}/${paymentId}.json` }
           : { status: 'FAILED', stripeEventId: event.id },
       });
-      if (updated.count === 0 && paymentBeforeUpdate.status !== 'CONFIRMED') return NextResponse.json({ received: true });
+      if (updated.count === 0) return NextResponse.json({ received: true });
       const payment = await prisma.payment.findUnique({
         where: { id: paymentId },
         include: {

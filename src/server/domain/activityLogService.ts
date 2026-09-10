@@ -34,6 +34,26 @@ export function parseActivityLogFilters(searchParams: Record<string, string | st
 }
 
 export async function getActivityLog(filters: ActivityLogFilters = {}) {
+  const where = buildActivityLogWhere(filters);
+
+  return prisma.auditLog.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: 250,
+    include: {
+      actor: {
+        select: {
+          id: true,
+          contactName: true,
+          email: true,
+          role: true,
+        },
+      },
+    },
+  });
+}
+
+export function buildActivityLogWhere(filters: ActivityLogFilters = {}): Prisma.AuditLogWhereInput {
   const where: Prisma.AuditLogWhereInput = {};
 
   if (filters.search) {
@@ -65,18 +85,51 @@ export async function getActivityLog(filters: ActivityLogFilters = {}) {
     };
   }
 
-  return prisma.auditLog.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    take: 250,
-    include: {
-      actor: {
-        select: {
-          contactName: true,
-          email: true,
-          role: true,
-        },
-      },
-    },
-  });
+  return where;
+}
+
+function readSessionSeconds(metadata: string | null): number {
+  if (!metadata) return 0;
+  try {
+    const parsed = JSON.parse(metadata) as { sessionSeconds?: unknown };
+    return typeof parsed.sessionSeconds === 'number' && Number.isFinite(parsed.sessionSeconds) && parsed.sessionSeconds >= 0
+      ? Math.round(parsed.sessionSeconds)
+      : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function getSuperUserActivitySummary(filters: ActivityLogFilters = {}) {
+  const [superUsers, entries] = await Promise.all([
+    prisma.user.findMany({ where: { role: 'SUPER_USER' }, select: { id: true, contactName: true, email: true }, orderBy: { contactName: 'asc' } }),
+    prisma.auditLog.findMany({
+      where: buildActivityLogWhere({ ...filters, actorRole: 'SUPER_USER' }),
+      orderBy: { createdAt: 'asc' },
+      select: { actorId: true, action: true, metadata: true },
+    }),
+  ]);
+
+  const summary = new Map(superUsers.map((user) => [user.id, {
+    ...user,
+    sessionsStarted: 0,
+    sessionsCompleted: 0,
+    timeOnlineSeconds: 0,
+    completedActivity: 0,
+  }]));
+
+  for (const entry of entries) {
+    if (!entry.actorId) continue;
+    const user = summary.get(entry.actorId);
+    if (!user) continue;
+    if (entry.action === 'USER_LOGIN') user.sessionsStarted += 1;
+    else if (entry.action === 'USER_LOGOUT') {
+      user.sessionsCompleted += 1;
+      user.timeOnlineSeconds += readSessionSeconds(entry.metadata);
+    } else {
+      user.completedActivity += 1;
+    }
+  }
+
+  return Array.from(summary.values());
 }

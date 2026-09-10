@@ -41,9 +41,11 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
   const [independentReviewStatus, setIndependentReviewStatus] = useState(profile.independentReviewStatus);
   const [decidingIndependentReview, setDecidingIndependentReview] = useState(false);
   const [independentReviewComment, setIndependentReviewComment] = useState('');
+  const [currentTime, setCurrentTime] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    setCurrentTime(Date.now());
     if (!profile.verificationEligible) return;
     fetch(`/api/super-user/retailers/${profile.id}/verification-documents`)
       .then((response) => response.ok ? response.json() : null)
@@ -169,7 +171,7 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
         {verificationDocuments.length > 0 && (
           <ul className="mt-4 divide-y divide-slate-100 border-t border-slate-100 pt-3">
             {verificationDocuments.map((document) => {
-              const expired = new Date(document.expiryDate).getTime() <= Date.now();
+              const expired = currentTime > 0 && new Date(document.expiryDate).getTime() <= currentTime;
               return (
                 <li key={document.documentType} className="flex flex-col gap-1 py-3 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-3">

@@ -636,6 +636,7 @@ model Quote {
   status       QuoteStatus @default(SUBMITTED)
   submittedAt  DateTime    @default(now())
   retentionLockedUntil DateTime?
+  verificationDeclarationAcceptedAt DateTime?
 
   releases     ContactRelease[]
   releasePayment Payment? @relation("QuoteReleasePayment")

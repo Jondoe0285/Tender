@@ -17,11 +17,16 @@ type AcceptOutcome = { status: 'PAYMENT_REQUIRED' | 'RELEASED_WITH_CREDIT'; paym
 export async function acceptQuote(clientId: string, quoteId: string, mobileReturnUrl?: string, declarationAccepted = false): Promise<AcceptOutcome> {
   const quote = await prisma.quote.findUnique({ where: { id: quoteId }, include: { tender: true, retailer: { select: { email: true } }, releasePayment: true } });
   if (!quote || quote.tender.clientId !== clientId) throw new ForbiddenError('Quote not found for this Client');
-  if (quote.status === 'SUBMITTED') {
+  if (quote.status === 'SUBMITTED' || quote.status === 'ACCEPTED') {
     await syncVerificationExpiry(quote.retailerId);
     const retailerProfile = await prisma.retailerProfile.findUnique({ where: { userId: quote.retailerId }, select: { verificationStatus: true, independentReviewStatus: true } });
-    if ((retailerProfile?.verificationStatus === 'VERIFIED' || retailerProfile?.independentReviewStatus === 'APPROVED') && !declarationAccepted) {
+    const requiresDeclaration = retailerProfile?.verificationStatus === 'VERIFIED' || retailerProfile?.independentReviewStatus === 'APPROVED';
+    if (requiresDeclaration && !quote.verificationDeclarationAcceptedAt && !declarationAccepted) {
       throw new ValidationError('You must accept the verification declaration before accepting a quote from a verified Provider');
+    }
+    if (declarationAccepted && !quote.verificationDeclarationAcceptedAt) {
+      await prisma.quote.update({ where: { id: quote.id }, data: { verificationDeclarationAcceptedAt: new Date() } });
+      await recordAuditEvent({ actorId: clientId, action: 'VERIFICATION_DECLARATION_ACCEPTED', targetType: 'Quote', targetId: quoteId, metadata: { tenderId: quote.tenderId, retailerId: quote.retailerId } });
     }
   }
   if (quote.status === 'ACCEPTED' && quote.releasePayment) {
@@ -50,15 +55,6 @@ export async function acceptQuote(clientId: string, quoteId: string, mobileRetur
       targetId: quoteId,
       metadata: { tenderId: quote.tenderId },
     });
-    if (declarationAccepted) {
-      await recordAuditEvent({
-        actorId: clientId,
-        action: 'VERIFICATION_DECLARATION_ACCEPTED',
-        targetType: 'Quote',
-        targetId: quoteId,
-        metadata: { tenderId: quote.tenderId, retailerId: quote.retailerId },
-      });
-    }
   }
 
   const releaseFeeGbp = await getClientReleaseFeeGbp(quote.priceGbp);
@@ -123,6 +119,11 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
   const quote = await prisma.quote.findUnique({ where: { id: quoteId }, include: { tender: true } });
   if (!quote || quote.tender.clientId !== clientId) throw new ForbiddenError('Quote not found for this Client');
   if (quote.status !== 'ACCEPTED') throw new ForbiddenError('Quote has not been accepted');
+  await syncVerificationExpiry(quote.retailerId);
+  const retailerProfile = await prisma.retailerProfile.findUnique({ where: { userId: quote.retailerId }, select: { verificationStatus: true, independentReviewStatus: true } });
+  if ((retailerProfile?.verificationStatus === 'VERIFIED' || retailerProfile?.independentReviewStatus === 'APPROVED') && !quote.verificationDeclarationAcceptedAt) {
+    throw new ValidationError('The verification declaration must be accepted before contact details can be released');
+  }
 
   let release;
   try {

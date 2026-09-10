@@ -46,6 +46,7 @@ export default function ProviderVerificationPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [humanReviewActive, setHumanReviewActive] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
 
   async function load() {
     setLoading(true);
@@ -63,6 +64,7 @@ export default function ProviderVerificationPage() {
       setDocuments(data.documents);
       setHumanReviewActive(data.humanReviewActive);
     }
+    setCurrentTime(Date.now());
     setLoading(false);
   }
 
@@ -142,7 +144,7 @@ export default function ProviderVerificationPage() {
 
   const applicableDocuments = VERIFICATION_DOCUMENT_TYPES.filter((doc) => applicableTypes.includes(doc.type));
   const requiredTypes = applicableDocuments.filter((doc) => doc.required).map((doc) => doc.type);
-  const now = Date.now();
+  const now = currentTime;
   const validUploadedTypes = new Set(documents.filter((doc) => new Date(doc.expiryDate).getTime() > now).map((doc) => doc.documentType));
   const requiredUploaded = requiredTypes.filter((type) => validUploadedTypes.has(type));
   const canSubmit = requiredTypes.length > 0 && requiredUploaded.length === requiredTypes.length;
