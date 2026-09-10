@@ -4,46 +4,6 @@ This file is the canonical project action tracker for Trade Tender.
 
 It is intentionally stored in the repository so it travels with the code across branches and environments, rather than living in a branch-local or environment-local document. Update this file in the same change set as the work it tracks, and keep it as the source of truth for open, in-progress, and completed actions.
 
-## New Business Plan Implementation Plan
-
-The 2026-09-03 baseline business plan resolved 10 open decisions (see the "Baseline Change Notes" section of [TradeTender-Business-Plan.md](TradeTender-Business-Plan.md)). Four of them require code changes; this is their phased delivery plan. Work top to bottom — each phase should ship, be verified in staging, and be reflected in the Implementation Change Register before the next phase starts, since later phases depend on earlier ones.
-
-### Phase 1: Contractor / Provider Terminology Rename
-
-Completed pure rename per decision #1: no new roles and no permission-model change.
-
-- [x] Rename user-facing labels and copy across portals, emails, and policies to Contractor/Provider terminology.
-- [x] Add route aliases with redirects. Introduce `/contractor` and `/provider` portal routes that render the existing `/client` and `/retailer` pages, then redirect the old paths so no existing link or bookmark breaks.
-- [x] Rename the `Role` enum in a dedicated migration (`CLIENT` → `CONTRACTOR`, `RETAILER` → `PROVIDER`), updating every `requireRole` check, seed data, and test fixture in the same change. Legacy database columns remain unchanged.
-- [x] Update all documentation (`docs/`, `.github/copilot-instructions.md`, `docs/Security-Requirements.md`, `docs/Product-Requirements.md`) for Contractor/Provider terminology now that the persisted role enum migration is complete.
-
-### Phase 2: Active Partner Advertising
-
-Approved per decision #5: move from static footer logos to a Super-User-managed system.
-
-- [x] Add a `Partner` model and migration: name, logo path, destination URL, display location, active status, and campaign source.
-- [x] Build Super User CRUD screens to create, edit, activate/deactivate, and reorder partners, audit-logged per change (matching the existing admin patterns in `/super-user`).
-- [x] Replace the hardcoded partner block in `SiteFooter.tsx` with a server-rendered list of active partners from the database, preserving the "clearly labelled as advertising" requirement and the separation from tender matching/quote ranking.
-- [x] Migrate existing partners (Sinclair Safety Solutions Ltd, Smart Works Civils Ltd, HSQE Consult Hub) into the new table as the initial seeded rows.
-
-### Phase 3: Job / Tender-Package Data Model
-
-Approved per decision #2 — the largest change: a job splits into multiple independently-matched tender packages by category.
-
-- [x] Design the schema: a `TenderPackage` model with a one-to-many relation from the job/tender, each package carrying its own category, subcategory, requirement detail, matching metadata, and lifecycle status. The existing `Tender` remains the job record and `TenderPackage` acts as the package child entity.
-- [x] Write the migration and backfill: every existing single-category tender is converted to a job with one package so historical data is preserved.
-- [x] Rework the matching engine to evaluate Providers against the job's package categories and to surface package metadata in the matching summary model.
-- [x] Update the Contractor job-creation form to create multiple package entries for a single tender job through the existing item list, matching the package-based workflow without forcing a separate tender record per package.
-- [x] Update Provider-facing views and unlock flow to expose the package mix and package categories in the job detail, opportunity summaries, and unlocked details.
-- [x] Update Super User analytics and summary reporting to include the package categories and counts that now appear in the tender job summaries.
-- [x] Add regression tests covering the package model, package-aware matching summaries, and provider-visible package metadata for multi-package jobs.
-
-### Phase 4: Subscription Tier Pricing Alignment
-
-Confirmed per decision #10 — no activation yet, just keep the inactive feature ready with the final agreed prices.
-
-- [x] Update the inactive subscription tier constants/seed data to Free £0, Starter £29, Growth £49, Pro £99, Enterprise £149–199, so the feature is correct whenever the Super User activates it. No other behavior change; `MEMBERSHIP_TIERS_ACTIVE` (or equivalent) stays off.
-
 ## Outstanding Actions
 
 Work top to bottom — production config first, then engineering debt. Items that state "implementation complete" remain open until their listed validation evidence is recorded.
@@ -63,55 +23,16 @@ The review also identifies unresolved Founder/product-owner decisions about the 
 - [ ] Verify Resend for production. Verify the sending domain, set `EMAIL_FROM`, and send an email-verification and contact-release test. Staging is already verified (2026-08-31).
 - [ ] Configure the retention job: set `RETENTION_JOB_URL` as a production GitHub Actions environment secret to the full production origin plus `/api/internal/retention`, and set the production GitHub `RETENTION_JOB_SECRET` to exactly the same random value configured as Render production `RETENTION_JOB_SECRET`. Then run the workflow manually and retain a successful run as evidence.
 - [ ] Configure Sentry for production and confirm one test event. Set browser/server DSNs and verify a scrubbed error event arrives. Staging is already verified.
-- [ ] Repair Stripe webhook finalisation before production. Implementation complete in `6377097`: retries of the same signed event resume idempotent entitlement finalisation and avoid duplicate payment/unlock audit records. Outstanding: add and run retry and partial-failure recovery tests against PostgreSQL.
-- [ ] Handle Stripe refunds and disputes. Implementation complete in `6377097`: a migration-backed reversal ledger records signed Stripe refund/dispute events, marks the payment reversed, removes paid unlock/contact-release entitlements, audits the change, and notifies affected parties. PostgreSQL regression coverage now proves paid-unlock revocation and duplicate refund-event idempotency; outstanding: add contact-release, chargeback, and out-of-order delivery coverage, apply the migration in staging, and complete provider-side verification.
-- [ ] Block pre-release Contractor-Provider messaging. Implementation complete in `6377097`: message reads and sends now require a matching confirmed `ContactRelease` at the server boundary. Outstanding: add and run release-state and obfuscated-contact regression tests.
-- [ ] Prevent expired or closed tender activity. Implementation complete in `6377097`: unlock requests, paid-unlock finalisation, and quote submission now recheck `OPEN` status and deadline server-side. Outstanding: add and run expiry and closure regression tests.
+- [ ] Handle Stripe refunds and disputes. Implementation complete in `6377097`: a migration-backed reversal ledger records signed Stripe refund/dispute events, marks the payment reversed, removes paid unlock/contact-release entitlements, audits the change, and notifies affected parties. PostgreSQL regression coverage now proves paid-unlock revocation, duplicate refund-event idempotency, contact-release reversal, chargeback (`DISPUTE`-type) reversal, and out-of-order event delivery protection. Outstanding: apply the migration in staging and complete provider-side verification.
 - [ ] Make deployment gates govern Render, not Azure. Implementation and hook configuration complete in `e676e12`: Render auto-deploy is disabled and protected staging/production workflows invoke separate Render deploy hooks for the approved SHA. Outstanding: run one approved staging deployment and verify that the recorded deployment matches the requested commit.
-- [ ] Re-run release validation against the deployed staging SHA. The current health-check record predates the staging tip. Re-run CI, PostgreSQL migration replay, workflow checks, and staging verification for the exact deployed commit; require the recorded SHA as release evidence.
+- [ ] Re-run release validation against the deployed staging SHA. The current health-check record predates the staging tip. Re-run CI, PostgreSQL migration replay, workflow checks, and staging verification for the exact deployed commit; require the recorded SHA as release evidence. This also covers verifying the already-completed Next.js 16 upgrade (`next` is now `^16.3.4` in `package.json`; local `type-check` and `build` pass) against the deployed staging environment.
 
 ### Engineering Work
 
-- [ ] Revalidate session claims and shorten session lifetime. Implementation complete in `5429973` and `20260905050000_add_session_version`: each server session lookup reloads suspension, active role membership, Owner, Accountant, and password session-version state; JWT lifetime is capped at eight hours. Outstanding: add and run session revocation and multi-role regression tests in PostgreSQL and staging.
-- [ ] Move rate limiting to shared storage and add per-account lockout. The current in-process, IP-only limiter does not protect across Render instances or deployment restarts.
-- [ ] Plan a tested Next.js 16 upgrade. Deferred: complete the dependency upgrade first in the development branch. The plan is recorded in [Implementation-Change-Register.md](Implementation-Change-Register.md); retain its Node 20, migration replay, build, and staging verification requirements before deployment.
-- [ ] Add integration/E2E tests for tender unlock, payment, webhook, contact release, and pre-payment privacy invariants. Initial PostgreSQL coverage is in `tests/lib/message-contact-release.integration.test.ts`: it verifies that a Provider with a tender unlock cannot read or send messages until the Contractor release payment is confirmed and the matching contact-release record exists. Payment, webhook, reversal, and other workflow scenarios remain outstanding.
+- [ ] Add integration/E2E tests for tender unlock, payment, webhook, contact release, and pre-payment privacy invariants. PostgreSQL coverage now exists for pre-release messaging, tender expiry/closure rejection, payment reversal/contact-release revocation, chargeback and out-of-order webhook delivery, webhook partial-failure recovery, and pre-release privacy invariants (an unlocked tender view never exposes the Contractor's identity/contact details, a Contractor's quote list never exposes the Provider's identity/contact details, and every pre-release notification email template is structurally unable to accept the counterparty's email/phone as input, in `tests/lib/pre-release-privacy-invariants.integration.test.ts` and `tests/lib/pre-release-email-template-privacy.test.ts`). Attachment access is already covered by `tests/lib/tender-attachment-access.integration.test.ts` (only the owning Contractor may download; a matched, unlocked Provider is denied). Data-subject access/export requests are handled manually by an Owner with required resolution evidence (no automated export generator exists, by design). Outstanding: rendered-output (browser DOM) assertions and a broader sweep of operational logs beyond the audit-log cases already covered.
 - [ ] Complete accessibility and real-device QA, including the mobile sidebar and first-time Contractor/Provider journeys.
-- [ ] Improve audit-log tamper resistance. Deferred: complete this migration-backed work in the development branch before promotion. Use an append-only database boundary that permits application inserts but rejects unauthorised updates and deletes, with integration coverage.
-- [ ] Complete WCAG contrast verification for all shared control states. Approved Trade Blue, Sky Blue, Steel Grey, and focus tokens are now mapped; remaining work is a full UI-state contrast audit.
-- [ ] Make Provider coverage selection keyboard accessible. The multi-select trigger is a non-focusable `div` without roles, keyboard interaction, or popup state. Replace it with a native control or complete accessible listbox pattern and test keyboard and screen-reader use.
-- [ ] Separate sponsored content from quote comparison. Sponsored Provider quotes are displayed beside price and lead-time data immediately above the decision workflow, contrary to advertising governance. Move advertising to a clearly labelled partner-information surface outside ranking and supplier selection.
-- [ ] Make high-risk staging verification mandatory. The deployment verifier can pass while payment/webhook reconciliation, audit access, email delivery, and error monitoring remain unverified. Require explicit staging attestations for each before promotion.
+- [ ] Complete WCAG contrast verification for all shared control states. Automated token-level coverage now exists in `tests/lib/wcag-contrast.test.ts` for button variants, the focus ring, and status badges. It confirms a real AA gap: the Pending (~2.97:1), Approved (~4.49:1), and Neutral (~4.27:1) status badge text colours fall below the 4.5:1 AA normal-text threshold against their own tinted background at any tint strength (the token itself is too light against white, not just the tint). Fixing this requires darkening an approved functional/status colour, which needs Brand Owner sign-off per [TradeTender-Brand-Rules.md](branding/TradeTender-Brand-Rules.md) before any change. Outstanding: Brand Owner decision on the corrected colour(s), then a full manual/axe UI-state audit covering disabled states and dark/light surfaces beyond the tokens already verified.
 - [ ] Establish production capacity and availability evidence. Free-tier Render services have no demonstrated path to the required 1,000 concurrent users. Select an appropriate plan, document connection/scaling limits, configure alerts, and pass representative load and recovery tests.
-
-## Completed
-
-<details>
-<summary>Do Now</summary>
-
-- [x] Verify staging after the database migration. Reload `/super-user` on `Tender Staging` and confirm `Tender.supplyDate` no longer raises `P2022`. The database configured in local `.env` has been migrated; confirm the Render service uses that same Neon database.
-- [x] Confirm `Tender Staging` has successfully deployed the latest `staging` commit. Inspect the Render build log. It must show `prisma migrate deploy` completing before the build. Trigger a manual deploy if no successful deploy has run.
-- [x] Confirm staging environment variables in Render. Set `DATABASE_URL` (pooled Neon URL), `DATABASE_URL_UNPOOLED` (direct Neon URL), `NEXTAUTH_SECRET`, and `NEXTAUTH_URL` to the exact staging public origin. A wrong `NEXTAUTH_URL` can redirect users to `localhost:10000`.
-- [x] Rotate the Neon database password. The current credential has been used locally and must be treated as exposed. Update both database URL variables immediately after rotation.
-- [x] Separate staging and production databases. Use distinct Neon projects or branches and distinct pooled/direct connection URLs. Do not permit staging to modify the production database.
-
-</details>
-
-<details>
-<summary>Before Production</summary>
-
-- [x] Review and merge [PR #4](https://github.com/Jondoe0285/Tender/pull/4) into `main`. It carries PostgreSQL-valid migrations, the Render redirect fix, and security fixes. `Trade Tender` deploys from `main`; `Tender Staging` deploys from `staging`. Merged 2026-08-31.
-- [x] Deploy `main` in Render and verify migrations. The build log must list all outstanding Prisma migrations as applied. If the production database differs from staging, run `npx prisma migrate deploy` with its direct URL after taking a backup. Never run `prisma db push` against production.
-
-</details>
-
-<details>
-<summary>Engineering Work</summary>
-
-- [x] Add durable object storage for attachments. Not needed: `TenderAttachment.content` is already stored as `Bytes` directly in Postgres (see `tenderService.ts`), not on Render's ephemeral filesystem.
-- [x] Implement misuse and fraud monitoring for repeated parties, unusual payment activity, and duplicate or near-duplicate tenders. Implemented in `complianceMonitoringService.ts` (confidentiality-bypass attempts, duplicate tenders, unlock-without-quote) and surfaced at `/super-user/compliance`.
-
-</details>
 
 ## Routine Checks
 

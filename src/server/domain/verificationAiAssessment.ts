@@ -13,7 +13,7 @@ export type DocumentAssessmentInput = {
   documentType: VerificationDocumentType;
   mimeType: string;
   content: Buffer;
-  expiryDate: Date;
+  expiryDate: Date | null;
   companyName: string;
   address: string | null;
 };
@@ -51,14 +51,16 @@ function extractSearchableText(content: Buffer, mimeType: string): string | null
 
 export function assessVerificationDocument(input: DocumentAssessmentInput): DocumentAssessmentResult {
   const now = new Date();
-  const daysUntilExpiry = Math.floor((input.expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+  const daysUntilExpiry = input.expiryDate ? Math.floor((input.expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)) : null;
   const isImage = input.mimeType === 'image/jpeg' || input.mimeType === 'image/png';
   const text = extractSearchableText(input.content, input.mimeType);
 
   let confidencePercent = 60;
   const notes: string[] = [];
 
-  if (daysUntilExpiry < 0) {
+  if (daysUntilExpiry === null) {
+    notes.push('This document type does not expire.');
+  } else if (daysUntilExpiry < 0) {
     confidencePercent = 0;
     notes.push('Expiry date has already passed.');
   } else {

@@ -4,6 +4,7 @@ import {
   getApplicableVerificationDocuments,
   getRequiredVerificationDocumentTypes,
   isVerificationDocumentApplicable,
+  verificationDocumentExpires,
 } from '../../src/lib/verification-documents';
 
 test('maps mandatory verification evidence to the selected services', () => {
@@ -31,4 +32,10 @@ test('does not apply service-specific documents to unrelated services', () => {
   assert.equal(isVerificationDocumentApplicable('WASTE_CARRIERS_LICENCE', ['Materials']), false);
   assert.equal(isVerificationDocumentApplicable('PROFESSIONAL_INDEMNITY_INSURANCE', ['Plant Hire']), false);
   assert.equal(isVerificationDocumentApplicable('SSIP_ACCREDITATION', ['Materials']), true);
+});
+
+test('Certificate of Incorporation does not require an expiry date, unlike other document types', () => {
+  assert.equal(verificationDocumentExpires('CERTIFICATE_OF_INCORPORATION'), false);
+  assert.equal(verificationDocumentExpires('PUBLIC_LIABILITY_INSURANCE'), true);
+  assert.equal(verificationDocumentExpires('WASTE_CARRIERS_LICENCE'), true);
 });

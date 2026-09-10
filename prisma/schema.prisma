@@ -453,7 +453,7 @@ model VerificationDocument {
   mimeType          String
   sizeBytes         Int
   content           Bytes
-  expiryDate        DateTime
+  expiryDate        DateTime?
   aiConfidencePercent Int?
   aiSummary           String? // Super User visibility only, never returned to the Provider
   aiRequiresHumanReview Boolean @default(false)

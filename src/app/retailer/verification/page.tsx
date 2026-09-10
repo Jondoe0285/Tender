@@ -6,7 +6,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { VERIFICATION_DOCUMENT_TYPES, type VerificationDocumentType } from '@/lib/verification-documents';
+import { VERIFICATION_DOCUMENT_TYPES, verificationDocumentExpires, type VerificationDocumentType } from '@/lib/verification-documents';
 import { buildSafeAttachmentName } from '@/lib/attachment-utils';
 
 type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
@@ -17,7 +17,7 @@ type UploadedDocument = {
   fileName: string;
   mimeType: string;
   sizeBytes: number;
-  expiryDate: string;
+  expiryDate: string | null;
   uploadedAt: string;
 };
 
@@ -73,8 +73,9 @@ export default function ProviderVerificationPage() {
   async function handleUpload(documentType: VerificationDocumentType) {
     const file = pendingFiles[documentType];
     const expiryDate = expiryDates[documentType];
-    if (!file || !expiryDate) {
-      setError('Choose a file and an expiry date before uploading.');
+    const expires = verificationDocumentExpires(documentType);
+    if (!file || (expires && !expiryDate)) {
+      setError(expires ? 'Choose a file and an expiry date before uploading.' : 'Choose a file before uploading.');
       return;
     }
     setUploadingType(documentType);
@@ -91,7 +92,7 @@ export default function ProviderVerificationPage() {
           mimeType: file.type || 'application/octet-stream',
           sizeBytes: file.size,
           dataBase64,
-          expiryDate,
+          ...(expires ? { expiryDate } : {}),
         }),
       });
       const data = await response.json().catch(() => null);
@@ -144,7 +145,7 @@ export default function ProviderVerificationPage() {
 
   const applicableDocuments = VERIFICATION_DOCUMENT_TYPES.filter((doc) => applicableTypes.includes(doc.type));
   const now = currentTime;
-  const validUploadedTypes = new Set(documents.filter((doc) => new Date(doc.expiryDate).getTime() > now).map((doc) => doc.documentType));
+  const validUploadedTypes = new Set(documents.filter((doc) => !doc.expiryDate || new Date(doc.expiryDate).getTime() > now).map((doc) => doc.documentType));
   const requiredUploaded = requiredTypes.filter((type) => validUploadedTypes.has(type));
   const canSubmit = requiredTypes.length > 0 && requiredUploaded.length === requiredTypes.length;
   const canEdit = REOPEN_STATUSES.includes(verificationStatus);
@@ -187,7 +188,7 @@ export default function ProviderVerificationPage() {
 
         {applicableDocuments.map((doc) => {
           const uploaded = documents.find((item) => item.documentType === doc.type);
-          const expired = uploaded ? new Date(uploaded.expiryDate).getTime() <= now : false;
+          const expired = uploaded?.expiryDate ? new Date(uploaded.expiryDate).getTime() <= now : false;
           const busy = uploadingType === doc.type;
           const pendingFile = pendingFiles[doc.type];
           return (
@@ -204,7 +205,7 @@ export default function ProviderVerificationPage() {
                   {uploaded && (
                     <p className="mt-2 text-sm text-foundation-navy">
                       <a href={`/api/retailer/verification/documents/${doc.type}`} download={uploaded.fileName} className="font-semibold text-steel-blue hover:underline">{uploaded.fileName}</a>
-                      <span className="ml-2 text-concrete-grey">({formatFileSize(uploaded.sizeBytes)}) &middot; uploaded {new Date(uploaded.uploadedAt).toLocaleDateString('en-GB')} &middot; expires {new Date(uploaded.expiryDate).toLocaleDateString('en-GB')}</span>
+                      <span className="ml-2 text-concrete-grey">({formatFileSize(uploaded.sizeBytes)}) &middot; uploaded {new Date(uploaded.uploadedAt).toLocaleDateString('en-GB')}{uploaded.expiryDate && ` \u00b7 expires ${new Date(uploaded.expiryDate).toLocaleDateString('en-GB')}`}</span>
                     </p>
                   )}
                 </div>
@@ -224,18 +225,20 @@ export default function ProviderVerificationPage() {
                       className="text-sm"
                     />
                   </label>
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="font-semibold text-foundation-navy">Expiry date</span>
-                    <input
-                      type="date"
-                      min={minExpiryDate}
-                      disabled={busy}
-                      value={expiryDates[doc.type] ?? ''}
-                      onChange={(event) => setExpiryDates((current) => ({ ...current, [doc.type]: event.target.value }))}
-                      className="rounded-lg border border-slate-300 px-3 py-2"
-                    />
-                  </label>
-                  <Button onClick={() => void handleUpload(doc.type)} loading={busy} disabled={!pendingFile || !expiryDates[doc.type]}>
+                  {doc.expires && (
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="font-semibold text-foundation-navy">Expiry date</span>
+                      <input
+                        type="date"
+                        min={minExpiryDate}
+                        disabled={busy}
+                        value={expiryDates[doc.type] ?? ''}
+                        onChange={(event) => setExpiryDates((current) => ({ ...current, [doc.type]: event.target.value }))}
+                        className="rounded-lg border border-slate-300 px-3 py-2"
+                      />
+                    </label>
+                  )}
+                  <Button onClick={() => void handleUpload(doc.type)} loading={busy} disabled={!pendingFile || (doc.expires && !expiryDates[doc.type])}>
                     {uploaded ? 'Replace evidence' : 'Upload evidence'}
                   </Button>
                   {uploaded && (

@@ -150,7 +150,7 @@ Users may:
 If you encounter inappropriate advertising, you may:
 
 1. Click "Report" on the advertising content
-2. Contact trade-tender@support.email
+2. Contact support@tradetender.co.uk
 3. Provide details of the violation
 
 Trade Tender will investigate and take action within 24-48 hours.
@@ -239,9 +239,9 @@ These terms are governed by the laws of England and Wales and subject to the exc
 
 For questions about advertising terms or practices:
 
-- Email: trade-tender@support.email
-- Legal: legal@trade-tender.co.uk
-- Data Protection Officer: dpo@trade-tender.co.uk
+- Email: support@tradetender.co.uk
+- Legal: legal@tradetender.co.uk
+- Data Protection Officer: dpo@tradetender.co.uk
 
 ---
 

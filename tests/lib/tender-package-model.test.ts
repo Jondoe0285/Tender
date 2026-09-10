@@ -121,7 +121,7 @@ test('createTender creates a package record for the job and extra package items'
   });
   tenderId = tender.id;
 
-  const packages = await prisma.tenderPackage.findMany({ where: { tenderId: tender.id }, orderBy: { createdAt: 'asc' } });
+  const packages = await prisma.tenderPackage.findMany({ where: { tenderId: tender.id }, orderBy: { reference: 'asc' } });
 
   assert.equal(packages.length, 2);
   assert.deepEqual(packages.map((pkg) => pkg.category), ['Materials', 'Plant Hire']);

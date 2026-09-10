@@ -1,12 +1,14 @@
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { supportEmail } from '@/lib/contact';
+import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from '@/lib/legal/documentVersions';
 
 const policies = [
   {
     id: 'platform-terms',
     title: 'Platform Terms and Conditions',
     text: 'These terms govern use of Trade Tender as a construction tender-management platform. Trade Tender connects Contractors and Providers but is not the supplier, contractor, broker, guarantor, or party responsible for the final transaction.',
+    version: CURRENT_TERMS_VERSION,
   },
   {
     id: 'client-terms',
@@ -32,6 +34,7 @@ const policies = [
     id: 'privacy',
     title: 'Privacy Policy',
     text: 'We use account, tender, quote, payment, contact-release, and limited operational data only to operate, secure, audit, and improve the platform. Authenticated users can submit access/export, rectification, erasure, restriction, or objection requests through Support requests; requests are reviewed by a Super User and resolved by the Owner where required.',
+    version: CURRENT_PRIVACY_VERSION,
   },
   {
     id: 'cookies',
@@ -90,6 +93,7 @@ export default function PoliciesPage() {
               <article key={policy.id} id={policy.id} className="scroll-mt-8 px-1 py-7 sm:px-4">
                 <h2 className="font-heading text-xl font-bold text-foundation-navy">{policy.title}</h2>
                 <p className="mt-3 max-w-3xl text-sm leading-relaxed text-concrete-grey">{policy.text}</p>
+                {'version' in policy && <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-concrete-grey/70">Version {policy.version}</p>}
                 {policy.id === 'support' && support && <a href={`mailto:${support}`} className="mt-4 inline-block font-semibold text-steel-blue underline underline-offset-4 hover:text-foundation-navy">{support}</a>}
               </article>
             ))}

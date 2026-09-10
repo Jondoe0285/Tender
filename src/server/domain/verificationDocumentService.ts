@@ -122,7 +122,7 @@ export async function evaluateProviderVerification(retailerProfileId: string, ca
 
   const missingOrExpiredRequiredTypes = requiredTypes.filter((type) => {
     const document = documentsByType.get(type);
-    return !document || document.expiryDate <= now;
+    return !document || document.expiryDate === null || document.expiryDate <= now;
   });
 
   if (missingOrExpiredRequiredTypes.length > 0) {

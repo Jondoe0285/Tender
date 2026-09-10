@@ -20,6 +20,65 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-10 - Pre-Release Email Template Privacy Coverage
+
+- Added: `tests/lib/pre-release-email-template-privacy.test.ts`, a static regression test asserting that every pre-release notification email template (`tenderOpportunityTemplate`, `tenderUpdatedTemplate`, `quoteReceivedTemplate`, `quoteReminderTemplate`, `quoteAcceptedTemplate`) has no `email` or phone-number parameter in its input type, so the counterparty's contact details cannot be passed into a pre-release email even by future mistake.
+- Changed: confirmed and documented in `docs/Action-Tracker.md` that attachment access privacy is already covered (`tests/lib/tender-attachment-access.integration.test.ts`: only the owning Contractor may download; a matched, unlocked Provider is denied) and that data-subject access/export requests are an intentionally manual Owner-reviewed process with required resolution evidence, not an automated export feature. Narrowed the remaining open scope of the "pre-payment privacy invariants" tracker item to rendered-output/browser assertions and a broader operational-log sweep.
+- Affects: the new test file and `docs/Action-Tracker.md` only. No application behavior change.
+- Environment: no operator action required.
+- Validation: `npm run type-check`, `npm test` (230 tests, confirmed stable across two consecutive runs), `npm run lint`, and `npm run build` pass.
+
+### 2026-09-10 - Policy Review: Version Transparency, Domain Fix, And SEC-105 Test Coverage
+
+- Changed: the public `/policies` page now displays the tracked `CURRENT_TERMS_VERSION`/`CURRENT_PRIVACY_VERSION` date under the Platform Terms and Privacy Policy sections, so users can see when those documents last changed (previously tracked only in the database and never shown to users).
+- Changed: fixed an inconsistent contact domain in `docs/adspace/ADVERTISING_TERMS.md` (`trade-tender.co.uk` / `trade-tender@support.email`) to match the canonical `tradetender.co.uk` domain already used elsewhere in the codebase (`docs/adspace/ADVERTISING_GUIDELINES.md`, `scripts/stress-test/run.mjs`). No functional or legal-content change beyond the domain correction.
+- Added: `tests/lib/policies-page-required-sections.test.ts` asserting every SEC-105-required policy section remains present on the live page and that the Terms/Privacy version display is not silently removed.
+- Affects: `src/app/policies/page.tsx`, `docs/adspace/ADVERTISING_TERMS.md`, and the new test file only. No schema, API, or pricing change.
+- Environment: no operator action required.
+- Validation: `npm run type-check`, `npm test` (229 tests), and `npm run build` pass.
+- Founder/legal decisions still required (not implemented — see conversation summary): registered legal entity name/company number/registered address for the Terms of Use; third-party sub-processor disclosure (Stripe, Resend, Sentry, database host) in the Privacy Policy; a re-acceptance flow for existing users when `CURRENT_TERMS_VERSION`/`CURRENT_PRIVACY_VERSION` changes (currently recorded only at registration); and confirmation that the dormant `ADSPACE_ACTIVE` toggle has no actual ad-serving/consent UI yet, so the detailed adspace governance documents describe a feature not yet built.
+
+### 2026-09-10 - Pre-Release Privacy Invariant Tests And WCAG Contrast Audit Tooling
+
+- Added: `tests/lib/pre-release-privacy-invariants.integration.test.ts`, a PostgreSQL-backed regression test proving `getUnlockedTenderForRetailer` never exposes the Contractor's `clientId`, email, phone, or contact name, and `listQuotesForClientTender` never exposes the Provider's `retailerId`, email, phone, or contact name before the paid contact-release step.
+- Added: `tests/lib/wcag-contrast.test.ts`, a WCAG 2.1 contrast-ratio calculator applied to the approved brand tokens for the button variants, the focus-visible ring, and the status-badge tint backgrounds. It confirms AA compliance for the button and focus-ring combinations and for the attention badge, and it documents a confirmed AA gap for the Pending (~2.97:1), Approved (~4.49:1), and Neutral (~4.27:1) status badge text colours, which fall below the 4.5:1 normal-text threshold at any tint strength because the underlying token is too light against white.
+- Changed: `docs/Action-Tracker.md` records the privacy-test progress and splits the WCAG item into completed automated token coverage plus a new, specific finding requiring Brand Owner sign-off before any status-colour is darkened (no colour was changed in this commit; changing an approved functional/status colour is a brand-governed decision, not an agent decision).
+- Affects: the two new test files and `docs/Action-Tracker.md` only. No application, schema, or colour-token change.
+- Environment: no operator action required.
+- Validation: `npm run type-check`, `npm test` (227 tests), `npm run lint`, and `npm run build` pass.
+
+### 2026-09-10 - Stripe Webhook Partial-Failure Recovery And Remaining Regression Gaps Closed
+
+- Changed: fixed a genuine gap in `src/app/api/webhooks/stripe/route.ts` found while writing its regression test: if entitlement finalisation (e.g. `finalizeUnlockWithPayment`) threw after the payment row was already updated to `CONFIRMED` but before its `PAYMENT_CONFIRMED` audit event was recorded, a Stripe retry of the same event previously did nothing (the retry's `updateMany` no longer matched `PENDING`/`FAILED` status, so it returned early without re-running finalisation). The route now checks whether this exact event was already fully processed (via the existing per-event audit-log dedup lookup) rather than relying solely on the row-count of the status transition, so a retry after a partial failure resumes the idempotent finalisers, audit, and email instead of stopping silently. Out-of-order protection (a payment already reversed) and ordinary duplicate-delivery skipping are unchanged.
+- Added: `tests/lib/content-moderation-obfuscation.test.ts` (obfuscated email/phone detection in `moderateContent`), `tests/lib/audit-log-immutability.integration.test.ts` (direct proof that `AuditLog` update/delete are rejected by the `audit_log_immutable` trigger, and that the actor-deletion `SET NULL` path is still permitted), and `tests/lib/payment-reversal-dispute-and-ordering.integration.test.ts` (a `DISPUTE`-type/chargeback reversal test, an out-of-order reversal-before-completion test, and the partial-failure resume test that exercises the route fix above).
+- Changed: removed four `docs/Action-Tracker.md` items now fully proven complete (Stripe webhook finalisation retry/partial-failure recovery, Stripe refund/dispute chargeback and out-of-order coverage, pre-release messaging obfuscated-contact detection, and audit-log tamper-resistance direct test coverage), and trimmed related wording elsewhere to match.
+- Affects: `src/app/api/webhooks/stripe/route.ts`, the four new test files, and `docs/Action-Tracker.md`. No schema, API contract, or payment/security behavior change for callers — the fix only makes an already-idempotent finalisation path resumable on retry.
+- Environment: no operator action required.
+- Validation: `npm run type-check`, `npm test` (217 tests), and `npm run build` pass.
+
+### 2026-09-10 - Action Tracker Reconciliation: Fully Completed Items Removed
+
+- Changed: reviewed every remaining `docs/Action-Tracker.md` item against the actual codebase and removed two entries proven fully complete by existing evidence: "Prevent expired or closed tender activity" (covered end-to-end by `tests/lib/tender-activity.integration.test.ts`, which rejects new activity on both expired and closed tenders) and "Make high-risk staging verification mandatory" (the `deploy-staging.yml` workflow already requires an exact `high_risk_attestation` input and `verify-deployment.mjs` fails the check when it is missing or wrong) and "Plan a tested Next.js 16 upgrade" (`package.json` already pins `next` to `^16.3.4`; local `type-check` and `build` pass), folding its remaining staging-verification need into the existing "Re-run release validation against the deployed staging SHA" item.
+- Changed: refined the wording of four partially-complete items to name the specific regression coverage that now exists versus what is still missing: Stripe webhook finalisation retry/replay (covered; partial-failure recovery still missing), Stripe refund/dispute handling (contact-release reversal now covered; chargeback/`DISPUTE`-type and out-of-order delivery coverage still missing), pre-release messaging (release-state transition now covered; obfuscated-contact-detail detection test still missing), and audit-log tamper resistance (the `AuditLog` append-only trigger already exists via migration `20260902150000_prevent_audit_log_mutation`; a direct integration test against the `AuditLog` table itself is still missing).
+- Affects: `docs/Action-Tracker.md` only. No code, schema, or production behavior change.
+- Environment: no operator action required.
+- Validation: reviewed against `tests/lib/tender-activity.integration.test.ts`, `tests/lib/payment-reversal.integration.test.ts`, `tests/lib/message-contact-release.integration.test.ts`, `.github/workflows/deploy-staging.yml`, `scripts/health-check/verify-deployment.mjs`, and `package.json`.
+
+### 2026-09-10 - Action Tracker Reconciliation And Session-Revocation Regression Coverage
+
+- Changed: added focused regression tests for the session-revocation and multi-role behavior in `resolveCurrentUser` (suspension, null session, and role-membership matching) and a PostgreSQL integration test proving that completing a password reset increments `sessionVersion` so a JWT issued before the reset no longer matches the account. Fixed a flaky package-ordering assertion in `tests/lib/tender-package-model.test.ts` that sorted by `createdAt` on rows inserted in the same batch (identical timestamps); it now sorts by the unique sequential `reference` field.
+- Changed: confirmed and removed four stale `docs/Action-Tracker.md` entries that were already implemented and covered by existing passing tests: shared-storage rate limiting with per-account lockout (`src/server/http/rateLimit.ts`, `User.failedLoginAttempts`/`loginLockedUntil`), Provider coverage keyboard accessibility (`MultiSelectDropdown.tsx`, proven by `tests/lib/multi-select-accessibility.test.ts`), and sponsored-content separation from the Contractor decision surface (`QuoteComparison.tsx`, proven by `tests/lib/quote-comparison-advertising.test.ts`). No behavior changed for these four items.
+- Affects: `tests/lib/session-role-resolution.test.ts` (new), `tests/lib/session-version-invalidation.integration.test.ts` (new), `tests/lib/tender-package-model.test.ts`, and `docs/Action-Tracker.md`. No schema, API, or production behavior change.
+- Environment: no operator action required.
+- Validation: `npm run type-check` and `npm test` (208 tests) pass.
+
+### 2026-09-10 - Certificate Of Incorporation Expiry Made Optional
+
+- Changed: Certificate of Incorporation uploads no longer require an expiry date, because the document does not expire. Every other verification document type (Public Liability Insurance, Employers Liability Insurance, Waste Carriers Licence, evidence of qualifications, Professional Indemnity Insurance, SSIP accreditation) still requires a future expiry date on upload. The Provider verification screen hides the expiry-date field for Certificate of Incorporation, and the Super User account review screen shows "Does not expire" for it instead of an expiry date.
+- Affects: `VerificationDocument.expiryDate` schema/migration `20260910080000_make_verification_document_expiry_optional`, `src/lib/verification-documents.ts`, `src/lib/schemas/verificationDocument.ts`, `src/server/domain/verificationAiAssessment.ts`, `src/server/domain/verificationDocumentService.ts`, the Provider verification screen, and the Super User account review screen. Certificate of Incorporation remains optional evidence and is never part of the required-document expiry check, so verified-status expiry synchronization is unaffected.
+- Environment: apply migration `20260910080000_make_verification_document_expiry_optional` through the approved staging and production migration process; it has been applied only to the configured development database.
+- Validation: `npx prisma generate`, `npm run type-check`, `npm test` (203 tests), and `npm run build` pass.
+
 ### 2026-09-10 - Independent Verification Safety Competency Tiers
 
 - Changed: independent H&S reviews now award a required Bronze, Silver, or Gold safety-competency tier when a Super User approves the review.

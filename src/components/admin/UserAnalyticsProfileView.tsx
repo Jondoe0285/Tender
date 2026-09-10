@@ -37,7 +37,7 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
   const [verificationStatus, setVerificationStatus] = useState(profile.verificationStatus);
   const [decidingVerification, setDecidingVerification] = useState(false);
   const [verificationComment, setVerificationComment] = useState('');
-  const [verificationDocuments, setVerificationDocuments] = useState<Array<{ documentType: VerificationDocumentType; fileName: string; sizeBytes: number; expiryDate: string; uploadedAt: string; aiConfidencePercent: number | null; aiSummary: string | null; aiRequiresHumanReview: boolean; verified: boolean }>>([]);
+  const [verificationDocuments, setVerificationDocuments] = useState<Array<{ documentType: VerificationDocumentType; fileName: string; sizeBytes: number; expiryDate: string | null; uploadedAt: string; aiConfidencePercent: number | null; aiSummary: string | null; aiRequiresHumanReview: boolean; verified: boolean }>>([]);
   const [independentReviewStatus, setIndependentReviewStatus] = useState(profile.independentReviewStatus);
   const [independentReviewTier, setIndependentReviewTier] = useState(profile.independentReviewTier);
   const [decidingIndependentReview, setDecidingIndependentReview] = useState(false);
@@ -173,7 +173,7 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
         {verificationDocuments.length > 0 && (
           <ul className="mt-4 divide-y divide-slate-100 border-t border-slate-100 pt-3">
             {verificationDocuments.map((document) => {
-              const expired = currentTime > 0 && new Date(document.expiryDate).getTime() <= currentTime;
+              const expired = currentTime > 0 && document.expiryDate !== null && new Date(document.expiryDate).getTime() <= currentTime;
               return (
                 <li key={document.documentType} className="flex flex-col gap-1 py-3 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -181,7 +181,8 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
                     <a href={`/api/super-user/retailers/${profile.id}/verification-documents/${document.documentType}`} download={document.fileName} className="font-semibold text-steel-blue hover:underline">{document.fileName}</a>
                   </div>
                   <p className="text-xs text-concrete-grey">
-                    Expires {new Date(document.expiryDate).toLocaleDateString('en-GB')}{expired && ' (expired)'} &middot; AI confidence {document.aiConfidencePercent ?? 'n/a'}% &middot; Human review required: {document.aiRequiresHumanReview ? 'yes' : 'no'}
+                    {document.expiryDate ? `Expires ${new Date(document.expiryDate).toLocaleDateString('en-GB')}${expired ? ' (expired)' : ''} \u00b7 ` : 'Does not expire \u00b7 '}
+                    AI confidence {document.aiConfidencePercent ?? 'n/a'}% &middot; Human review required: {document.aiRequiresHumanReview ? 'yes' : 'no'}
                   </p>
                   {document.aiSummary && <p className="text-xs text-concrete-grey">{document.aiSummary}</p>}
                 </li>

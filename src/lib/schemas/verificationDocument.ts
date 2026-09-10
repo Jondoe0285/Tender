@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { verifyTenderAttachment, MAX_TENDER_ATTACHMENT_BYTES } from '@/lib/attachment-utils';
-import { VERIFICATION_DOCUMENT_TYPES } from '@/lib/verification-documents';
+import { VERIFICATION_DOCUMENT_TYPES, verificationDocumentExpires, type VerificationDocumentType } from '@/lib/verification-documents';
 
 const documentTypeSchema = z.enum(VERIFICATION_DOCUMENT_TYPES.map((doc) => doc.type) as [string, ...string[]]);
 
@@ -10,10 +10,19 @@ export const uploadVerificationDocumentSchema = z.object({
   mimeType: z.string().trim().min(1).max(128),
   sizeBytes: z.number().int().nonnegative(),
   dataBase64: z.string().min(1).max(Math.ceil(MAX_TENDER_ATTACHMENT_BYTES * 4 / 3) + 4),
-  expiryDate: z.coerce.date().refine((value) => value.getTime() > Date.now(), 'Expiry date must be in the future'),
+  expiryDate: z.coerce.date().optional(),
 }).transform((document, context) => {
+  const expires = verificationDocumentExpires(document.documentType as VerificationDocumentType);
+  if (expires && (!document.expiryDate || document.expiryDate.getTime() <= Date.now())) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'Expiry date must be in the future', path: ['expiryDate'] });
+    return z.NEVER;
+  }
+  if (!expires && document.expiryDate && document.expiryDate.getTime() <= Date.now()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'Expiry date must be in the future', path: ['expiryDate'] });
+    return z.NEVER;
+  }
   try {
-    return { ...document, ...verifyTenderAttachment(document) };
+    return { ...document, expiryDate: expires ? document.expiryDate! : null, ...verifyTenderAttachment(document) };
   } catch (error) {
     context.addIssue({
       code: z.ZodIssueCode.custom,

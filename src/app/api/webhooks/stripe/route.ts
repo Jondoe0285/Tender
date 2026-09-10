@@ -113,7 +113,6 @@ export async function POST(request: Request) {
           ? { status: 'CONFIRMED', confirmedAt: new Date(), stripeEventId: event.id, stripeReceiptUrl: receiptUrl, accountingRecordPath: `accounting/stripe/${new Date().getUTCFullYear()}/${paymentId}.json` }
           : { status: 'FAILED', stripeEventId: event.id },
       });
-      if (updated.count === 0) return NextResponse.json({ received: true });
       const payment = await prisma.payment.findUnique({
         where: { id: paymentId },
         include: {
@@ -122,6 +121,17 @@ export async function POST(request: Request) {
           unlock: { select: { tender: { select: { reference: true, id: true } } } },
         },
       });
+      const paymentAuditAction = confirmed ? 'PAYMENT_CONFIRMED' : 'PAYMENT_FAILED';
+      const existingPaymentAudit = await prisma.auditLog.findFirst({
+        where: { action: paymentAuditAction, targetType: 'Payment', targetId: paymentId, metadata: { contains: event.id } },
+        select: { id: true },
+      });
+      // A retry after a partial failure (payment already marked CONFIRMED but entitlement
+      // finalisation previously threw) must resume here instead of stopping silently. Skip only
+      // when this exact event was already fully processed, or the transition genuinely did not
+      // apply (e.g. the payment was reversed out of order, or a failure event arrived stale).
+      const shouldProcess = confirmed ? payment?.status === 'CONFIRMED' && !existingPaymentAudit : updated.count > 0;
+      if (!shouldProcess) return NextResponse.json({ received: true });
       if (confirmed && payment) {
         if (payment.type === 'RETAILER_UNLOCK' && payment.tenderId) await finalizeUnlockWithPayment(payment.userId, payment.tenderId, payment.id);
         if (payment.type === 'CLIENT_RELEASE' && payment.quoteId) await finalizeContactRelease(payment.userId, payment.quoteId, payment.id);
@@ -129,11 +139,6 @@ export async function POST(request: Request) {
         if (payment.type === 'MEMBERSHIP_TIER' && payment.tierId) await finalizeMembershipTierWithPayment(payment.userId, payment.tierId, payment.id);
         if (payment.type === 'INDEPENDENT_REVIEW') await finalizeIndependentReviewWithPayment(payment.userId, payment.id);
       }
-      const paymentAuditAction = confirmed ? 'PAYMENT_CONFIRMED' : 'PAYMENT_FAILED';
-      const existingPaymentAudit = await prisma.auditLog.findFirst({
-        where: { action: paymentAuditAction, targetType: 'Payment', targetId: paymentId, metadata: { contains: event.id } },
-        select: { id: true },
-      });
       if (!existingPaymentAudit) {
         await recordAuditEvent({
           actorId: null,
