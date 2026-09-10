@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { FieldGroup, Input, Label, PasswordInput } from '@/components/ui/Field';
+import { TradeTenderLogo } from '@/components/layout/TradeTenderLogo';
 
 export function LoginForm() {
   const router = useRouter();
@@ -67,53 +68,67 @@ export function LoginForm() {
   }
 
   return (
-    <section className="mx-auto max-w-md pt-16 pb-24">
-      <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-steel-blue">Sign in</p>
-      <h1 className="font-heading text-3xl font-bold tracking-tight text-foundation-navy">Sign in to your workspace</h1>
-      {searchParams.get('verification') === 'pending' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Check your email and use the verification link to activate your account.</p>}
-      {searchParams.get('verification') === 'verified' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your email address is verified. You can now sign in.</p>}
-      {searchParams.get('verification') === 'invalid' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">This verification link is invalid or has expired. Register again with the same details to request a new link.</p>}
-      {searchParams.get('password') === 'set' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your password is set. Sign in with your new password.</p>}
-      {searchParams.get('error') === 'workspace' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">Your account is not assigned to an approved workspace.</p>}
-
-      <Card className="mt-8">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          <FieldGroup>
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" required autoComplete="email" />
-          </FieldGroup>
-          <FieldGroup>
-            <Label htmlFor="password">Password</Label>
-            <PasswordInput id="password" name="password" required autoComplete="current-password" />
-          </FieldGroup>
-          {mfaRequired && <FieldGroup>
-            <Label htmlFor="mfaCode">MFA code</Label>
-            <Input id="mfaCode" name="mfaCode" inputMode="numeric" autoComplete="one-time-code" placeholder="123456 or recovery code" required />
-          </FieldGroup>}
-          {error && <p role="alert" className="text-sm font-semibold text-attention">{error}</p>}
-          <Button type="submit" loading={submitting} size="lg" className="mt-2">Sign in</Button>
-        </form>
-      </Card>
-
-      <p className="mt-6 text-center text-sm text-concrete-grey">
-        New to Trade Tender? <a href="/register" className="font-semibold text-steel-blue hover:text-foundation-navy">Create an account</a>
-      </p>
-
-      <Card className="mt-8">
-        <form onSubmit={handlePasswordResetRequest} className="flex flex-col gap-4">
+    <section className="mx-auto max-w-5xl py-10 pb-20 sm:py-16">
+      <div className="grid overflow-hidden rounded-card border border-slate-200 bg-white shadow-soft-lg lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="flex min-h-[520px] flex-col justify-between bg-foundation-navy p-8 text-white sm:p-12">
           <div>
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">Forgotten password?</h2>
-            <p className="mt-2 text-sm text-concrete-grey">Enter your email address and we will send a reset link if the account exists.</p>
+            <div className="inline-block bg-site-white p-3"><TradeTenderLogo /></div>
+            <p className="mt-10 text-xs font-semibold uppercase tracking-[0.2em] text-sky-blue">Secure workspace access</p>
+            <h1 className="mt-4 max-w-sm font-heading text-3xl font-bold leading-tight sm:text-4xl">Connect. Compare. Construct.</h1>
+            <p className="mt-5 max-w-sm text-base leading-relaxed text-white/75">Sign in to manage tenders, compare formal quotes, and keep your construction procurement moving.</p>
           </div>
-          <FieldGroup>
-            <Label htmlFor="resetEmail">Email</Label>
-            <Input id="resetEmail" name="resetEmail" type="email" required autoComplete="email" />
-          </FieldGroup>
-          {resetEmailSent && <p role="status" className="text-sm font-semibold text-approved">If an account exists for that email, a reset link has been sent.</p>}
-          {resetError && <p role="alert" className="text-sm font-semibold text-attention">{resetError}</p>}
-          <Button type="submit" loading={resetSubmitting} variant="secondary" className="mt-1">Send reset link</Button>
-        </form>
-      </Card>
+          <p className="text-sm font-semibold text-safety-amber">Trade Tender</p>
+        </div>
+
+        <div className="bg-light-grey p-6 sm:p-10">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-steel-blue">Sign in</p>
+          <h2 className="font-heading text-3xl font-bold tracking-tight text-foundation-navy">Sign in to your workspace</h2>
+          {searchParams.get('verification') === 'pending' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Check your email and use the verification link to activate your account.</p>}
+          {searchParams.get('verification') === 'verified' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your email address is verified. You can now sign in.</p>}
+          {searchParams.get('verification') === 'invalid' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">This verification link is invalid or has expired. Register again with the same details to request a new link.</p>}
+          {searchParams.get('password') === 'set' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your password is set. Sign in with your new password.</p>}
+          {searchParams.get('error') === 'workspace' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">Your account is not assigned to an approved workspace.</p>}
+
+          <Card className="mt-8">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+              <FieldGroup>
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" name="email" type="email" required autoComplete="email" />
+              </FieldGroup>
+              <FieldGroup>
+                <Label htmlFor="password">Password</Label>
+                <PasswordInput id="password" name="password" required autoComplete="current-password" />
+              </FieldGroup>
+              {mfaRequired && <FieldGroup>
+                <Label htmlFor="mfaCode">MFA code</Label>
+                <Input id="mfaCode" name="mfaCode" inputMode="numeric" autoComplete="one-time-code" placeholder="123456 or recovery code" required />
+              </FieldGroup>}
+              {error && <p role="alert" className="text-sm font-semibold text-attention">{error}</p>}
+              <Button type="submit" loading={submitting} size="lg" className="mt-2">Sign in</Button>
+            </form>
+          </Card>
+
+          <p className="mt-6 text-center text-sm text-concrete-grey">
+            New to Trade Tender? <a href="/register" className="font-semibold text-steel-blue hover:text-foundation-navy">Create an account</a>
+          </p>
+
+          <Card className="mt-8">
+            <form onSubmit={handlePasswordResetRequest} className="flex flex-col gap-4">
+              <div>
+                <h2 className="font-heading text-lg font-bold text-foundation-navy">Forgotten password?</h2>
+                <p className="mt-2 text-sm text-concrete-grey">Enter your email address and we will send a reset link if the account exists.</p>
+              </div>
+              <FieldGroup>
+                <Label htmlFor="resetEmail">Email</Label>
+                <Input id="resetEmail" name="resetEmail" type="email" required autoComplete="email" />
+              </FieldGroup>
+              {resetEmailSent && <p role="status" className="text-sm font-semibold text-approved">If an account exists for that email, a reset link has been sent.</p>}
+              {resetError && <p role="alert" className="text-sm font-semibold text-attention">{resetError}</p>}
+              <Button type="submit" loading={resetSubmitting} variant="secondary" className="mt-1">Send reset link</Button>
+            </form>
+          </Card>
+        </div>
+      </div>
     </section>
   );
 }

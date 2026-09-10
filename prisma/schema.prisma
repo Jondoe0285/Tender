@@ -105,6 +105,12 @@ enum IndependentReviewStatus {
   DECLINED
 }
 
+enum IndependentReviewTier {
+  BRONZE
+  SILVER
+  GOLD
+}
+
 model User {
   id                String   @id @default(cuid())
   email             String   @unique
@@ -416,6 +422,7 @@ model RetailerProfile {
   verificationConfidencePercent Int?
   verificationReport      String? // AI + review summary; Super User visibility only, never returned to the Provider
   independentReviewStatus IndependentReviewStatus @default(NOT_PURCHASED)
+  independentReviewTier IndependentReviewTier?
   independentReviewPurchasedAt DateTime?
   independentReviewDecidedAt   DateTime?
   independentReviewNote        String?

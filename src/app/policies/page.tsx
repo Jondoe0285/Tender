@@ -24,6 +24,11 @@ const policies = [
     text: 'Trade Tender provides tender-management and connection tools. It does not endorse, guarantee, inspect, supply, contract for, or resolve disputes relating to Contractor-Provider transactions.',
   },
   {
+    id: 'verification-policy',
+    title: 'Provider Verification Policy',
+    text: 'Trade Tender verification is a basic assessment of legal-compliance evidence for the services a Provider declares. Automated assessment may make mistakes and is not an inspection, certification, guarantee, or substitute for client due diligence. Independent verification is completed by Sinclair Safety Solutions Ltd through the HSQE Consult Hub platform and additionally considers the Provider\'s safety competency. Bronze, Silver, and Gold describe the independent review outcome; they do not guarantee performance, workmanship, suitability, insurance validity, or the final Contractor-Provider transaction. Contractors and other clients must complete suitable independent checks before entering any formal agreement. Trade Tender accepts no liability for decisions made from a verification status.',
+  },
+  {
     id: 'privacy',
     title: 'Privacy Policy',
     text: 'We use account, tender, quote, payment, contact-release, and limited operational data only to operate, secure, audit, and improve the platform. Authenticated users can submit access/export, rectification, erasure, restriction, or objection requests through Support requests; requests are reviewed by a Super User and resolved by the Owner where required.',

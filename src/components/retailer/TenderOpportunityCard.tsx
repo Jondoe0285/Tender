@@ -18,6 +18,15 @@ function formatDeadline(closingDate: string | Date): { label: string; urgent: bo
   return { label: `Closes in ${daysLeft}d (${dateLabel})`, urgent: false };
 }
 
+function matchExplanation(data: OpportunityCardData): string {
+  const reasons = [
+    data.categoryMatch ? 'the service category matches your selected services' : null,
+    data.locationMatch ? 'the tender location is within your selected coverage area' : null,
+    data.distanceMiles != null ? `the estimated distance is ${data.distanceMiles.toFixed(0)} miles` : null,
+  ].filter((reason): reason is string => Boolean(reason));
+  return reasons.length > 0 ? `Why this is a great match: ${reasons.join('; ')}.` : 'Why this is a great match: it matches your current Provider opportunity settings.';
+}
+
 export type OpportunityCardData = {
   tenderId: string;
   reference: string;
@@ -52,7 +61,7 @@ export function TenderOpportunityCard({ data, href }: { data: OpportunityCardDat
         )}
 
         {data.strongMatch && (
-          <div className="mb-4 flex items-center gap-2">
+          <div className="mb-4 flex items-center gap-2" title={matchExplanation(data)} aria-label={matchExplanation(data)}>
             <StatusBadge status="approved">Great match</StatusBadge>
             <p className="text-sm font-semibold text-approved">Within your selected coverage area</p>
           </div>

@@ -39,6 +39,7 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
   const [verificationComment, setVerificationComment] = useState('');
   const [verificationDocuments, setVerificationDocuments] = useState<Array<{ documentType: VerificationDocumentType; fileName: string; sizeBytes: number; expiryDate: string; uploadedAt: string; aiConfidencePercent: number | null; aiSummary: string | null; aiRequiresHumanReview: boolean; verified: boolean }>>([]);
   const [independentReviewStatus, setIndependentReviewStatus] = useState(profile.independentReviewStatus);
+  const [independentReviewTier, setIndependentReviewTier] = useState(profile.independentReviewTier);
   const [decidingIndependentReview, setDecidingIndependentReview] = useState(false);
   const [independentReviewComment, setIndependentReviewComment] = useState('');
   const [currentTime, setCurrentTime] = useState(0);
@@ -66,11 +67,12 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
   async function decideIndependentReview(action: 'approve-independent-review' | 'decline-independent-review') {
     setDecidingIndependentReview(true);
     setMessage(null);
-    const response = await fetch(`/api/super-user/users/${profile.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, note: independentReviewComment || undefined }) });
+    const response = await fetch(`/api/super-user/users/${profile.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, tier: independentReviewTier || undefined, note: independentReviewComment || undefined }) });
     const data = await response.json().catch(() => null);
     setDecidingIndependentReview(false);
     if (!response.ok) return setMessage(data?.error ?? 'Unable to update independent review status.');
     setIndependentReviewStatus(data.independentReviewStatus);
+    setIndependentReviewTier(data.independentReviewTier ?? null);
     setMessage('Independent review status updated.');
   }
 
@@ -211,11 +213,18 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
             <p className="mt-1 text-sm text-concrete-grey">Purchased {profile.independentReviewPurchasedAt ? formatDateTime(profile.independentReviewPurchasedAt) : 'never'}.</p>
           </div>
           <StatusBadge status={independentReviewStatus === 'APPROVED' ? 'approved' : independentReviewStatus === 'PURCHASED' ? 'pending' : 'attention'}>
-            {independentReviewStatus === 'APPROVED' ? 'Independently Verified' : independentReviewStatus === 'PURCHASED' ? 'Awaiting review' : 'Declined'}
+            {independentReviewStatus === 'APPROVED' ? `Independently Verified${independentReviewTier ? ` · ${independentReviewTier[0] + independentReviewTier.slice(1).toLowerCase()}` : ''}` : independentReviewStatus === 'PURCHASED' ? 'Awaiting review' : 'Declined'}
           </StatusBadge>
         </div>
         {profile.independentReviewNote && <p className="mt-3 text-sm text-concrete-grey">Previous note: {profile.independentReviewNote}</p>}
         {independentReviewStatus === 'PURCHASED' && <div className="mt-4 border-t border-slate-100 pt-4">
+          <Label htmlFor="independent-review-tier">Safety competency tier</Label>
+          <Select id="independent-review-tier" className="mt-2" value={independentReviewTier ?? ''} onChange={(event) => setIndependentReviewTier(event.target.value as 'BRONZE' | 'SILVER' | 'GOLD' | null)}>
+            <option value="">Select tier before approval</option>
+            <option value="BRONZE">Bronze</option>
+            <option value="SILVER">Silver</option>
+            <option value="GOLD">Gold</option>
+          </Select>
           <Label htmlFor="independent-review-comment">Review comments</Label>
           <Textarea
             id="independent-review-comment"

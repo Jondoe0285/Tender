@@ -72,6 +72,7 @@ export async function getUserAnalyticsProfile(userId: string, period: ActivityPe
     verificationConfidencePercent: user.retailerProfile?.verificationConfidencePercent ?? null,
     verificationReport: user.retailerProfile?.verificationReport ?? null,
     independentReviewStatus: user.retailerProfile?.independentReviewStatus ?? null,
+    independentReviewTier: user.retailerProfile?.independentReviewTier ?? null,
     independentReviewPurchasedAt: user.retailerProfile?.independentReviewPurchasedAt ?? null,
     independentReviewNote: user.retailerProfile?.independentReviewNote ?? null,
     pageViews,

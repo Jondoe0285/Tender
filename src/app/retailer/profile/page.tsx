@@ -58,7 +58,7 @@ export default function RetailerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [independentReview, setIndependentReview] = useState<{ active: boolean; feeGbp: number; eligible: boolean; status: 'NOT_PURCHASED' | 'PURCHASED' | 'APPROVED' | 'DECLINED' } | null>(null);
+  const [independentReview, setIndependentReview] = useState<{ active: boolean; feeGbp: number; eligible: boolean; status: 'NOT_PURCHASED' | 'PURCHASED' | 'APPROVED' | 'DECLINED'; tier: 'BRONZE' | 'SILVER' | 'GOLD' | null } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -173,7 +173,7 @@ export default function RetailerProfilePage() {
               <div>
                 <p className="font-heading text-lg font-bold text-foundation-navy">Independent H&amp;S review</p>
                 <p className="mt-1 max-w-xl text-sm text-concrete-grey">
-                  {independentReview.status === 'APPROVED' && 'Your business is Independently Verified by a Health & Safety professional.'}
+                  {independentReview.status === 'APPROVED' && `Your business is Independently Verified${independentReview.tier ? ` at ${independentReview.tier[0] + independentReview.tier.slice(1).toLowerCase()} level` : ''} by a Health & Safety professional.`}
                   {independentReview.status === 'PURCHASED' && 'Your independent review has been purchased. A Health & Safety professional will contact you about the next steps.'}
                   {independentReview.status === 'DECLINED' && 'Your last independent review was not approved. You can purchase another review at any time.'}
                   {independentReview.status === 'NOT_PURCHASED' && `Purchase an independent review by a Health & Safety professional for £${independentReview.feeGbp} excl. VAT.`}

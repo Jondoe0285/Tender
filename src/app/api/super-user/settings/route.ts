@@ -8,7 +8,7 @@ import { requireFullSuperUser, requireOwner } from '@/server/auth/session';
 import { ensureDefaultMembershipTiers } from '@/server/domain/membershipService';
 
 const settingSchema = z.object({
-  action: z.enum(['fee', 'tier', 'subscription', 'support-recipient']),
+  action: z.enum(['fee', 'tier', 'subscription', 'support-recipient', 'verification-document']),
   id: z.string().optional(),
   key: z.enum(['RETAILER_UNLOCK_FEE_GBP', 'CLIENT_RELEASE_FEE_GBP', 'CLIENT_RELEASE_FEE_MODE', 'CLIENT_RELEASE_PERCENTAGE_LOW', 'CLIENT_RELEASE_PERCENTAGE_HIGH', 'CLIENT_RELEASE_PERCENTAGE_TOP', 'VAT_PERCENTAGE', 'SPONSORED_PLACEMENT_ACTIVE', 'SPONSORED_PLACEMENT_FEE_GBP', 'MEMBERSHIP_TIERS_ACTIVE', 'RETAILER_LAUNCH_CREDITS_DEFAULT', 'ADSPACE_ACTIVE', 'INDEPENDENT_REVIEW_ACTIVE', 'INDEPENDENT_REVIEW_FEE_GBP', 'HUMAN_REVIEW_ACTIVE']).optional(),
   value: z.union([z.number().nonnegative(), z.enum(['FIXED', 'PERCENTAGE']), z.boolean()]).optional(),
@@ -20,6 +20,7 @@ const settingSchema = z.object({
   additionalCreditDiscountPercentage: z.number().min(0).max(100).optional(),
   active: z.boolean().optional(),
   supportRecipientEmail: z.string().trim().toLowerCase().email().max(254).nullable().optional(),
+  requirements: z.record(z.string(), z.boolean()).optional(),
 });
 
 export async function GET() {
@@ -35,12 +36,20 @@ export async function GET() {
 export async function PATCH(request: Request) {
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
-  // Fees, adspace, membership tiers, and subscriptions are critical revenue settings reserved to the Owner.
-  const admin = await requireOwner().catch(() => null);
-  if (!admin) return NextResponse.json({ error: 'Owner access required' }, { status: 403 });
   const parsed = settingSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Invalid setting details' }, { status: 400 });
   const input = parsed.data;
+  const admin = input.action === 'verification-document'
+    ? await requireFullSuperUser().catch(() => null)
+    : await requireOwner().catch(() => null);
+  if (!admin) return NextResponse.json({ error: input.action === 'verification-document' ? 'Super User access required' : 'Owner access required' }, { status: 403 });
+
+  if (input.action === 'verification-document') {
+    if (!input.requirements) return NextResponse.json({ error: 'Verification document requirements are required' }, { status: 400 });
+    await prisma.platformSetting.upsert({ where: { key: 'VERIFICATION_DOCUMENT_REQUIREMENTS' }, update: { value: JSON.stringify(input.requirements) }, create: { key: 'VERIFICATION_DOCUMENT_REQUIREMENTS', value: JSON.stringify(input.requirements) } });
+    await recordAuditEvent({ actorId: admin.id, action: 'VERIFICATION_DOCUMENT_REQUIREMENTS_UPDATED', targetType: 'PlatformSetting', targetId: 'VERIFICATION_DOCUMENT_REQUIREMENTS' });
+    return NextResponse.json({ status: 'updated' });
+  }
 
   if (input.action === 'support-recipient') {
     if (input.supportRecipientEmail === undefined) return NextResponse.json({ error: 'A valid support recipient email is required' }, { status: 400 });

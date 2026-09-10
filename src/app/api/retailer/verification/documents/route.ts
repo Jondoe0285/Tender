@@ -5,18 +5,22 @@ import { rejectCrossOrigin } from '@/server/http/origin';
 import { uploadVerificationDocumentSchema } from '@/lib/schemas/verificationDocument';
 import { getOwnRetailerProfileOrThrow, listVerificationDocuments, uploadVerificationDocument } from '@/server/domain/verificationDocumentService';
 import { getApplicableVerificationDocuments } from '@/lib/verification-documents';
-import { isHumanReviewActive } from '@/server/domain/platformSettings';
+import { getVerificationDocumentRequirements, isHumanReviewActive, verificationDocumentRequirementKey } from '@/server/domain/platformSettings';
 
 export async function GET() {
   try {
     const user = await requireRole('USER');
     const profile = await getOwnRetailerProfileOrThrow(user.id);
-    const [documents, humanReviewActive] = await Promise.all([
+    const [documents, humanReviewActive, requirements] = await Promise.all([
       listVerificationDocuments(profile.id),
       isHumanReviewActive(),
+      getVerificationDocumentRequirements(),
     ]);
+    const services = profile.categories.split(',').map((value) => value.trim()).filter(Boolean);
+    const applicableDocuments = getApplicableVerificationDocuments(profile.categories);
     return NextResponse.json({
-      applicableDocumentTypes: getApplicableVerificationDocuments(profile.categories).map((doc) => doc.type),
+      applicableDocumentTypes: applicableDocuments.map((doc) => doc.type),
+      requiredDocumentTypes: applicableDocuments.filter((doc) => services.some((service) => requirements[verificationDocumentRequirementKey(service, doc.type)] === true)).map((doc) => doc.type),
       documents,
       humanReviewActive,
     });

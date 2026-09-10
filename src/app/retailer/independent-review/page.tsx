@@ -14,6 +14,7 @@ type ReviewState = {
   feeGbp: number;
   eligible: boolean;
   status: Status;
+  tier: 'BRONZE' | 'SILVER' | 'GOLD' | null;
   purchasedAt: string | null;
   decidedAt: string | null;
   note: string | null;
@@ -88,9 +89,10 @@ export default function IndependentReviewPage() {
           <h2 className="font-heading text-xl font-bold text-foundation-navy">Independent Health &amp; Safety review</h2>
           <p className="mt-2 text-sm text-concrete-grey">
             Purchase an independent review of your business by a Health &amp; Safety professional. Once purchased, a
-            Health &amp; Safety professional will contact you directly about the next steps. If your business is
-            deemed to meet the requirements, your account is marked Independently Verified and every quote you submit
-            shows a green independently-verified indicator to Contractors.
+            Health &amp; Safety professional will contact you directly about the next steps. The review considers
+            legal-compliance evidence only and does not replace a client&rsquo;s own suitable due diligence before any
+            formal agreement. If your business is deemed to meet the review requirements, your account is marked
+            Independently Verified and every quote you submit shows a green independently-verified indicator.
           </p>
 
           {!state?.active && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Independent review purchases are not currently available.</p>}
@@ -102,7 +104,7 @@ export default function IndependentReviewPage() {
               <div>
                 <p className="text-2xl font-heading font-bold text-foundation-navy">£{state.feeGbp} excl. VAT</p>
                 <StatusBadge status={state.status === 'APPROVED' ? 'approved' : state.status === 'PURCHASED' ? 'pending' : state.status === 'DECLINED' ? 'attention' : 'neutral'}>
-                  {state.status === 'APPROVED' ? 'Independently Verified' : state.status === 'PURCHASED' ? 'Awaiting review' : state.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
+                    {state.status === 'APPROVED' ? `Independently Verified${state.tier ? ` · ${state.tier[0] + state.tier.slice(1).toLowerCase()}` : ''}` : state.status === 'PURCHASED' ? 'Awaiting review' : state.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
                 </StatusBadge>
               </div>
               {(state.status === 'NOT_PURCHASED' || state.status === 'DECLINED') && !pendingPayment && (

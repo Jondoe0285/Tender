@@ -131,6 +131,17 @@ export function ExecutiveDashboard({ data }: Props) {
         </div>
       </Card>
 
+      <Card className="mb-8">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-lg font-bold text-foundation-navy">Tender detail drilldown</h2>
+            <p className="mt-1 text-sm text-concrete-grey">Individual filtered tenders with client, quote, acceptance, and value detail.</p>
+          </div>
+          <span className="text-xs font-semibold uppercase tracking-wide text-steel-blue">{data.tenderDetails.length} result{data.tenderDetails.length === 1 ? '' : 's'}</span>
+        </div>
+        {data.tenderDetails.length === 0 ? <EmptyChart /> : <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-sm"><thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-concrete-grey"><tr><th className="pb-3">Tender</th><th className="pb-3">Client</th><th className="pb-3">Category</th><th className="pb-3">Quotes</th><th className="pb-3">Accepted</th><th className="pb-3">Quoted value</th><th className="pb-3">Open</th></tr></thead><tbody className="divide-y divide-slate-100">{data.tenderDetails.map((item) => <tr key={item.id}><td className="py-3"><Link href={`/super-user/tenders/${item.id}`} className="font-semibold text-steel-blue hover:text-foundation-navy hover:underline">{item.reference}</Link><p className="text-xs text-concrete-grey">{item.location}</p></td><td className="py-3"><Link href={`/super-user/users/${item.client.id}`} className="font-semibold text-foundation-navy hover:text-steel-blue">{item.client.contactName}</Link><p className="text-xs text-concrete-grey">{item.client.email}</p></td><td className="py-3 text-concrete-grey">{item.category}</td><td className="py-3 text-concrete-grey">{item.quotes}</td><td className="py-3 text-concrete-grey">{item.acceptedQuotes}</td><td className="py-3 text-concrete-grey">{money.format(item.quotedValue)}</td><td className="py-3"><Link href={`/super-user/tenders/${item.id}`} className="font-semibold text-steel-blue hover:underline">Details</Link></td></tr>)}</tbody></table></div>}
+      </Card>
+
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
           <div className="mb-5 flex items-center justify-between gap-3">

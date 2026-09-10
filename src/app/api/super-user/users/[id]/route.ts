@@ -193,10 +193,12 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Only a purchased independent review can be decided' }, { status: 409 });
     }
     const nextStatus = action === 'approve-independent-review' ? 'APPROVED' : 'DECLINED';
+    const tier = body?.tier === 'BRONZE' || body?.tier === 'SILVER' || body?.tier === 'GOLD' ? body.tier : null;
+    if (action === 'approve-independent-review' && !tier) return NextResponse.json({ error: 'A Bronze, Silver, or Gold tier is required when approving an independent review' }, { status: 400 });
     const note = typeof body?.note === 'string' ? body.note.slice(0, 500) : null;
     await prisma.retailerProfile.update({
       where: { userId: user.id },
-      data: { independentReviewStatus: nextStatus, independentReviewDecidedAt: new Date(), independentReviewNote: note },
+      data: { independentReviewStatus: nextStatus, independentReviewTier: nextStatus === 'APPROVED' ? tier : null, independentReviewDecidedAt: new Date(), independentReviewNote: note },
     });
     await recordAuditEvent({
       actorId: admin.id,
@@ -205,7 +207,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       targetId: user.id,
       metadata: { email: user.email, note: note ?? undefined },
     });
-    return NextResponse.json({ status: 'independent-review-decided', independentReviewStatus: nextStatus });
+    return NextResponse.json({ status: 'independent-review-decided', independentReviewStatus: nextStatus, independentReviewTier: tier });
   }
 
   return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });

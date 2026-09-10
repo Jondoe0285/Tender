@@ -20,6 +20,45 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-10 - Independent Verification Safety Competency Tiers
+
+- Changed: independent H&S reviews now award a required Bronze, Silver, or Gold safety-competency tier when a Super User approves the review.
+- Changed: the tier is persisted, shown to the User and Super User, and displayed on Contractor quote badges/tooltips as `Independently Verified · Bronze`, `Silver`, or `Gold`. The tooltip explains that the H&S professional reviewed legal-compliance evidence and safety competency, while due diligence remains the client's responsibility.
+- Affects: `RetailerProfile` schema/migration `20260910070000_add_independent_review_tier`, independent review APIs/screens, Super User review controls, quote data and badges. No payment or contact-release rules changed.
+- Environment: apply migration `20260910070000_add_independent_review_tier` through the approved deployment process; it has been applied only to the configured development database.
+- Validation: type-check, focused policy tests, full tests (200), build, and diff validation pass.
+
+### 2026-09-10 - Editable Super User Verification Requirement Matrix
+
+- Changed: added an editable Verification Document Requirements matrix to Super User Settings. Super Users can activate or deactivate the mandatory requirement for each applicable document/service combination.
+- Changed: the effective matrix is used server-side by verification submission, compliance-score evaluation, and expiry synchronization. Mandatory documents remain the 90% gate; applicable optional documents are reviewed only when voluntarily uploaded.
+- Affects: `PlatformSetting` requirement storage, Super User settings UI/API, verification document API response, verification evaluation, expiry synchronization, and the verification policy tests. No database migration required.
+- Environment: no operator action required; the default matrix preserves the current service-mapped requirements until changed by a Super User.
+- Validation: type-check, lint (0 errors, 2 existing warnings), full tests (200 passing after a transient first-run failure), build, and diff validation pass.
+
+### 2026-09-10 - Service-Mapped Verification Documents And Review Scope
+
+- Changed: verification documents are now mapped to the services a User provides. Public Liability Insurance is mandatory for Materials, Waste, Plant Hire, Contractor Services, and Professional Services; Waste Carriers Licence is mandatory only for Waste; Professional Qualifications and Professional Indemnity Insurance are mandatory only for Professional Services. Certificate of Incorporation and Employers Liability Insurance are applicable but optional because they depend on legal-entity and employment circumstances. SSIP remains optional across services.
+- Changed: verification evaluation uses mandatory documents as the 90% compliance gate and includes only applicable documents that were actually uploaded in the AI/human review report. Non-applicable and unuploaded document slots are not reviewed.
+- Added: focused tests cover service mapping, legal/employment-dependent optional documents, and unrelated service exclusions.
+- Affects: `src/lib/verification-documents.ts`, verification evaluation, and focused verification policy tests. No database migration required.
+- Environment: no operator action required.
+- Validation: type-check, lint (0 errors, 2 existing warnings), focused policy tests (3), full tests (200), build, and diff validation pass.
+
+### 2026-09-10 - PDF Verification Upload False-Positive Repair
+
+- Changed: narrowed active-PDF detection to complete PDF name tokens instead of arbitrary byte substrings. Legitimate certificates containing ordinary text such as `JS` or `AA` are now accepted, while actual `/OpenAction`, `/JavaScript`, `/JS`, `/AA`, embedded-file, launch, RichMedia, and XFA tokens remain blocked.
+- Affects: shared attachment validation used by tender and verification-document uploads, plus focused attachment regression coverage. No security control was removed; this reduces false positives while preserving active-content rejection.
+- Environment: no operator action required.
+- Validation: focused attachment tests pass (4 tests), full tests pass (197 tests), type-check passes, build passes, and `git diff --check` passes.
+
+### 2026-09-10 - Service Provision Serialization Repair
+
+- Changed: fixed profile saves failing with `Select valid provisions for the services offered by your company` when a provision name contained commas, such as `Carpentry, Joinery & Fit-Out`. Existing comma-delimited records are reconstructed from the selected service catalogue; new profile saves and registrations store provisions as JSON arrays.
+- Affects: unified client profile API and registration provisioning only. Validation rules remain unchanged; blank unchecked boxes were not the cause.
+- Environment: no migration required. Existing affected records are normalized when their profile is next saved.
+- Validation: the reported account's legacy provision string reconstructs to 15 valid entries; `npm run type-check`, `npm run lint` (0 errors, 2 warnings), `npm test` (196 tests), `npm run build`, and `git diff --check` pass.
+
 ### 2026-09-10 - Unified User Identity And Capability Standardization
 
 - Changed: all non-Super User accounts are consistently treated as `USER`; Contractor and Provider now remain workflow capabilities backed by `ClientCompany`/`ClientCompanyMember` and `RetailerProfile`, not competing account roles. Seed accounts and Super User-created Users now provision both capability records, and seed membership/privilege normalization removes stale non-selected memberships and User owner/accountant flags.

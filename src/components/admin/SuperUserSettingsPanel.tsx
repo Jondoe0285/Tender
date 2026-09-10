@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input, Label, Select, Textarea } from '@/components/ui/Field';
+import { SERVICE_NAMES } from '@/lib/categories';
+import { VERIFICATION_DOCUMENT_TYPES } from '@/lib/verification-documents';
 
 export type AdminSettings = {
-  fees: { retailerUnlockGbp: number; clientReleaseGbp: number; clientReleaseMode: string; clientReleasePercentageLow: number; clientReleasePercentageHigh: number; clientReleasePercentageTop: number; vatPercentage: number; sponsoredPlacementActive: boolean; sponsoredPlacementFeeGbp: number; membershipTiersActive: boolean; retailerLaunchCreditsDefault: number; adspaceActive: boolean; independentReviewActive: boolean; independentReviewFeeGbp: number; humanReviewActive: boolean };
+  fees: { retailerUnlockGbp: number; clientReleaseGbp: number; clientReleaseMode: string; clientReleasePercentageLow: number; clientReleasePercentageHigh: number; clientReleasePercentageTop: number; vatPercentage: number; sponsoredPlacementActive: boolean; sponsoredPlacementFeeGbp: number; membershipTiersActive: boolean; retailerLaunchCreditsDefault: number; adspaceActive: boolean; independentReviewActive: boolean; independentReviewFeeGbp: number; humanReviewActive: boolean; verificationDocumentRequirements: Array<[string, boolean]> };
   supportRecipientEmail?: string | null;
   tiers: Array<{ id: string; name: string; description: string; monthlyPriceGbp: number; freeTenderOpportunitiesPerMonth: number; additionalCreditDiscountPercentage: number; active: boolean }>;
   subscriptions: Array<{ id: string; name: string; description: string; annualPriceGbp: number; active: boolean }>;
@@ -20,6 +22,7 @@ type PlanType = 'tier' | 'subscription';
 export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSettings: AdminSettings; isOwner: boolean }) {
   const [settings, setSettings] = useState(initialSettings);
   const [fees, setFees] = useState(settings.fees);
+  const [verificationRequirements, setVerificationRequirements] = useState<Record<string, boolean>>(Object.fromEntries(settings.fees.verificationDocumentRequirements));
   const [supportRecipientEmail, setSupportRecipientEmail] = useState(settings.supportRecipientEmail ?? '');
   const [form, setForm] = useState({ name: '', description: '', monthlyPriceGbp: '', freeTenderOpportunitiesPerMonth: '', additionalCreditDiscountPercentage: '' });
   const [message, setMessage] = useState<string | null>(null);
@@ -50,6 +53,17 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSe
       await request('/api/super-user/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'support-recipient', supportRecipientEmail: supportRecipientEmail.trim() || null }) });
       setMessage(supportRecipientEmail.trim() ? 'Support recipient updated.' : 'Support recipient cleared. New requests will not send email notifications.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to save support recipient'); }
+    setSaving(false);
+  }
+
+  async function saveVerificationRequirements(next: Record<string, boolean>) {
+    setSaving(true);
+    setMessage(null);
+    try {
+      await request('/api/super-user/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'verification-document', requirements: next }) });
+      setVerificationRequirements(next);
+      setMessage('Verification document requirements updated.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to save verification requirements'); }
     setSaving(false);
   }
 
@@ -116,6 +130,17 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSe
           <Card><div className="flex flex-wrap items-center justify-between gap-3"><div><Label>Advertising space</Label><p className="mt-1 text-sm text-concrete-grey">Display advertising inventory on the platform with proper governance and cookie warnings.</p></div><Button variant={fees.adspaceActive ? 'danger' : 'secondary'} disabled={locked} onClick={() => { const active = !fees.adspaceActive; setFees({ ...fees, adspaceActive: active }); void saveFee('ADSPACE_ACTIVE', active); }} loading={saving}>{fees.adspaceActive ? 'Deactivate' : 'Activate'}</Button></div></Card>
           <Card><div className="flex flex-wrap items-center justify-between gap-3"><div><Label>Independent H&amp;S review</Label><p className="mt-1 text-sm text-concrete-grey">Lets a Provider purchase an independent review by a Health &amp; Safety professional.</p></div><Button variant={fees.independentReviewActive ? 'danger' : 'secondary'} disabled={locked} onClick={() => { const active = !fees.independentReviewActive; setFees({ ...fees, independentReviewActive: active }); void saveFee('INDEPENDENT_REVIEW_ACTIVE', active); }} loading={saving}>{fees.independentReviewActive ? 'Deactivate' : 'Activate'}</Button></div><div className="mt-4"><FieldEditor label="Independent review price (excl. VAT)" value={fees.independentReviewFeeGbp} onChange={(value) => setFees({ ...fees, independentReviewFeeGbp: value })} onSave={() => saveFee('INDEPENDENT_REVIEW_FEE_GBP', fees.independentReviewFeeGbp)} saving={saving} disabled={locked} /></div></Card>
           <Card><div className="flex flex-wrap items-center justify-between gap-3"><div><Label>Provider verification human review</Label><p className="mt-1 text-sm text-concrete-grey">When active, an AI verification request that cannot be auto-approved queues for Super User review. When deactivated, it is automatically declined instead of queuing.</p></div><Button variant={fees.humanReviewActive ? 'danger' : 'secondary'} disabled={locked} onClick={() => { const active = !fees.humanReviewActive; setFees({ ...fees, humanReviewActive: active }); void saveFee('HUMAN_REVIEW_ACTIVE', active); }} loading={saving}>{fees.humanReviewActive ? 'Deactivate' : 'Activate'}</Button></div></Card>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-4 font-heading text-lg font-bold text-foundation-navy">Verification document requirements</h2>
+        <p className="mb-4 max-w-3xl text-sm text-concrete-grey">Activate or deactivate mandatory document requirements for each service. Applicability remains service-specific; optional documents can still be uploaded voluntarily.</p>
+        <div className="grid gap-5 sm:grid-cols-2">
+          {SERVICE_NAMES.map((service) => {
+            const documents = VERIFICATION_DOCUMENT_TYPES.filter((document) => document.appliesTo === 'all' || document.appliesTo.includes(service));
+            return <Card key={service}><h3 className="font-heading text-base font-bold text-foundation-navy">{service}</h3><div className="mt-3 space-y-3">{documents.map((document) => { const key = `${service}:${document.type}`; const required = verificationRequirements[key] === true; return <label key={key} className="flex items-start gap-3 text-sm text-concrete-grey"><input type="checkbox" checked={required} disabled={locked || saving} onChange={(event) => { const next = { ...verificationRequirements, [key]: event.target.checked }; void saveVerificationRequirements(next); }} className="mt-1 h-4 w-4 accent-safety-amber" /><span><span className="font-semibold text-foundation-navy">{document.label}</span><span className="block text-xs">{required ? 'Required for this service' : 'Optional for this service'}</span></span></label>; })}</div></Card>;
+          })}
         </div>
       </section>
 

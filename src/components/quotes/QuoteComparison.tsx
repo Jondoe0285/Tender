@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -22,14 +23,17 @@ type Quote = {
   providerVerificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
   verifiedDocumentLabels: string[];
   independentlyVerified: boolean;
+  independentReviewTier: 'BRONZE' | 'SILVER' | 'GOLD' | null;
 };
 
-function ProviderVerificationBadge({ status, verifiedDocumentLabels, independentlyVerified }: { status: Quote['providerVerificationStatus']; verifiedDocumentLabels: string[]; independentlyVerified: boolean }) {
+function ProviderVerificationBadge({ status, verifiedDocumentLabels, independentlyVerified, independentReviewTier }: { status: Quote['providerVerificationStatus']; verifiedDocumentLabels: string[]; independentlyVerified: boolean; independentReviewTier: Quote['independentReviewTier'] }) {
   if (independentlyVerified) {
-    return <span title="This company has undergone an independent verification by a Health & Safety professional and has been deemed to meet the requirements to achieve the verification."><StatusBadge status="approved">Independently Verified</StatusBadge></span>;
+    const tier = independentReviewTier;
+    const label = `Independently Verified${tier ? ` · ${tier[0] + tier.slice(1).toLowerCase()}` : ''}`;
+    return <span title={`Sinclair Safety Solutions Ltd completed the independent review through the HSQE Consult Hub platform, assessing legal-compliance evidence and safety competency${tier ? ` at ${tier[0] + tier.slice(1).toLowerCase()} level` : ''}. This does not replace your own due diligence before any formal agreement.`}><StatusBadge status="approved">{label}</StatusBadge></span>;
   }
   if (status === 'VERIFIED') {
-    const title = verifiedDocumentLabels.length > 0 ? `Verified documents: ${verifiedDocumentLabels.join(', ')}` : 'Verified by Ai';
+    const title = verifiedDocumentLabels.length > 0 ? `Automated legal-compliance evidence reviewed: ${verifiedDocumentLabels.join(', ')}. AI may make mistakes; complete your own due diligence.` : 'Automated legal-compliance assessment only. AI may make mistakes; complete your own due diligence.';
     return <span title={title}><StatusBadge status="approved">Verified by Ai</StatusBadge></span>;
   }
   if (status === 'PENDING') return <StatusBadge status="pending">Verification pending</StatusBadge>;
@@ -90,6 +94,17 @@ export function QuoteComparison({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-concrete-grey">Compare {quotes.length} formal quote{quotes.length === 1 ? '' : 's'} side by side.</p>
         <p className="text-xs text-concrete-grey">Select a column heading to sort</p>
+      </div>
+
+      <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Verification key</p>
+        <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
+          <div><StatusBadge status="neutral">Unverified Provider</StatusBadge><p className="mt-2 text-concrete-grey">No approved verification evidence is recorded.</p></div>
+          <div><StatusBadge status="approved">Verified by Ai</StatusBadge><p className="mt-2 text-concrete-grey">Automated legal-compliance evidence assessment passed; AI can make mistakes.</p></div>
+          <div><StatusBadge status="approved">Independently Verified</StatusBadge><p className="mt-2 text-concrete-grey">A Health &amp; Safety professional reviewed the legal-compliance evidence.</p></div>
+        </div>
+        <p className="mt-3 text-xs text-concrete-grey">These statuses do not replace your own suitable due diligence before entering a formal agreement.</p>
+        <Link href="/policies#verification-policy" className="mt-2 inline-block text-xs font-semibold text-steel-blue hover:text-foundation-navy">Read the detailed verification policy</Link>
       </div>
 
       <div className="hidden overflow-x-auto rounded-card border border-slate-200 bg-white shadow-soft lg:block">
@@ -186,7 +201,7 @@ function QuoteRow({
       <td className="px-5 py-5">
         <p className="font-semibold text-foundation-navy">{quote.reference}</p>
         <StatusBadge status={quote.status === 'ACCEPTED' ? 'approved' : 'neutral'}>{quote.status}</StatusBadge>
-        <div className="mt-2"><ProviderVerificationBadge status={quote.providerVerificationStatus} verifiedDocumentLabels={quote.verifiedDocumentLabels} independentlyVerified={quote.independentlyVerified} /></div>
+        <div className="mt-2"><ProviderVerificationBadge status={quote.providerVerificationStatus} verifiedDocumentLabels={quote.verifiedDocumentLabels} independentlyVerified={quote.independentlyVerified} independentReviewTier={quote.independentReviewTier} /></div>
       </td>
       <td className="px-5 py-5">
         <p className="font-heading text-xl font-bold text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
@@ -235,7 +250,7 @@ function QuoteCard({
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">{quote.reference}</p>
           <p className="mt-1 font-heading text-2xl font-bold text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
-          <div className="mt-2"><ProviderVerificationBadge status={quote.providerVerificationStatus} verifiedDocumentLabels={quote.verifiedDocumentLabels} independentlyVerified={quote.independentlyVerified} /></div>
+          <div className="mt-2"><ProviderVerificationBadge status={quote.providerVerificationStatus} verifiedDocumentLabels={quote.verifiedDocumentLabels} independentlyVerified={quote.independentlyVerified} independentReviewTier={quote.independentReviewTier} /></div>
         </div>
         <StatusBadge status={quote.status === 'ACCEPTED' ? 'approved' : 'neutral'}>{quote.status}</StatusBadge>
       </div>
@@ -345,7 +360,7 @@ function DecisionActions({
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-foundation-navy/50 p-4">
             <Card className="max-w-lg">
               <h3 className="font-heading text-lg font-bold text-foundation-navy">Before you proceed</h3>
-<p className="mt-3 text-sm text-concrete-grey">Trade Tender has completed reasonable measures to verify this Provider&rsquo;s registered business, insurance, and accreditation evidence. You retain full responsibility for your own due diligence before entering into any agreement, and Trade Tender accepts no liability for the Provider&rsquo;s work, conduct, or the outcome of your engagement with them.</p>
+            <p className="mt-3 text-sm text-concrete-grey">Trade Tender&rsquo;s automated review assesses legal-compliance evidence only and may make mistakes. You retain full responsibility for suitable independent due diligence before entering any formal agreement, and Trade Tender accepts no liability for the Provider&rsquo;s work, conduct, or the outcome of your engagement with them.</p>
               <label className="mt-4 flex items-start gap-3 text-sm text-foundation-navy">
                 <input type="checkbox" checked={declarationChecked} onChange={(event) => setDeclarationChecked(event.target.checked)} className="mt-1 h-4 w-4 accent-safety-amber" />
                 I have read and accept this declaration.

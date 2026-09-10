@@ -23,6 +23,7 @@ type AnalyticsTender = {
   category: string;
   location: string;
   createdAt: Date;
+  client: { id: string; contactName: string; email: string };
   _count: { matches: number; unlocks: number; quotes: number };
   quotes: { status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED'; priceGbp: number }[];
 };
@@ -152,6 +153,7 @@ export async function getAnalytics(filters: AnalyticsFilters = {}) {
     orderBy: { createdAt: 'asc' },
     include: {
       _count: { select: { matches: true, unlocks: true, quotes: true } },
+      client: { select: { id: true, contactName: true, email: true } },
       quotes: { select: { status: true, priceGbp: true } },
     },
   })) as AnalyticsTender[];
@@ -207,6 +209,17 @@ export async function getAnalytics(filters: AnalyticsFilters = {}) {
   const revenue = payments.reduce((sum, payment) => sum + payment.amountGbp, 0);
   const vatCollectedGbp = vatPayments.reduce((sum, payment) => sum + payment.vatGbp, 0);
   const verificationBreakdown = await getVerificationBreakdown(quotes);
+  const tenderDetails = tenders.map((tender) => ({
+    id: tender.id,
+    reference: tender.reference,
+    client: tender.client,
+    category: tender.category,
+    location: tender.location,
+    createdAt: tender.createdAt,
+    quotes: tender._count.quotes,
+    acceptedQuotes: tender.quotes.filter((quote) => quote.status === 'ACCEPTED').length,
+    quotedValue: tender.quotes.reduce((sum, quote) => sum + quote.priceGbp, 0),
+  }));
 
   return {
     filters,
@@ -229,6 +242,7 @@ export async function getAnalytics(filters: AnalyticsFilters = {}) {
     categories: Array.from(categoryMap, ([category, values]) => ({ category, ...values, acceptanceRate: values.quotes ? Math.round((values.accepted / values.quotes) * 100) : 0 })).sort((a, b) => b.tenders - a.tenders),
     regions: Array.from(regionMap, ([region, values]) => ({ region, ...values })).sort((a, b) => b.tenders - a.tenders).slice(0, 8),
     verificationBreakdown,
+    tenderDetails,
   };
 }
 

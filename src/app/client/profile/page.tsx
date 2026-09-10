@@ -43,6 +43,7 @@ export default function ClientProfilePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [additionalUserErrors, setAdditionalUserErrors] = useState<Record<string, string>>({});
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '' });
   const [additionalUser, setAdditionalUser] = useState({ firstName: '', lastName: '', email: '', phoneNumber: '', password: '' });
   const [showAdditionalUser, setShowAdditionalUser] = useState(false);
@@ -97,12 +98,15 @@ export default function ClientProfilePage() {
   async function addAdditionalUser() {
     setSaving(true);
     setMessage(null);
+    setAdditionalUserErrors({});
     const response = await fetch('/api/client/profile', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(additionalUser),
     });
     setSaving(false);
     if (!response.ok) {
-      setMessage((await response.json().catch(() => null))?.error ?? 'Unable to add additional user.');
+      const data = await response.json().catch(() => null) as { error?: string; issues?: { fieldErrors?: Record<string, string[]> } } | null;
+      setAdditionalUserErrors(Object.fromEntries(Object.entries(data?.issues?.fieldErrors ?? {}).map(([key, messages]) => [key, messages[0] ?? 'Invalid value'])));
+      setMessage(data?.error ?? 'Unable to add additional user.');
       return;
     }
     setAdditionalUser({ firstName: '', lastName: '', email: '', phoneNumber: '', password: '' });
@@ -198,7 +202,7 @@ export default function ClientProfilePage() {
           </Card>}
           {profile.isPrimaryUser && <Card>
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5"><div><h2 className="font-heading text-xl font-bold text-foundation-navy">Additional users</h2><p className="mt-1 text-sm text-concrete-grey">Additional users can update only their own personal details and password.</p></div><Button variant="secondary" onClick={() => setShowAdditionalUser(!showAdditionalUser)}>{showAdditionalUser ? 'Close' : 'Add user'}</Button></div>
-            {showAdditionalUser && <div className="mt-6 grid gap-5 rounded-lg border-l-4 border-safety-amber bg-amber-50/50 p-4 sm:grid-cols-2"><FieldGroup><Label htmlFor="additionalFirstName">First name</Label><Input id="additionalFirstName" value={additionalUser.firstName} onChange={(event) => setAdditionalUser({ ...additionalUser, firstName: event.target.value })} /></FieldGroup><FieldGroup><Label htmlFor="additionalLastName">Last name</Label><Input id="additionalLastName" value={additionalUser.lastName} onChange={(event) => setAdditionalUser({ ...additionalUser, lastName: event.target.value })} /></FieldGroup><FieldGroup><Label htmlFor="additionalEmail">Email address</Label><Input id="additionalEmail" type="email" value={additionalUser.email} onChange={(event) => setAdditionalUser({ ...additionalUser, email: event.target.value })} /></FieldGroup><FieldGroup><Label htmlFor="additionalPhone">Phone number</Label><Input id="additionalPhone" type="tel" value={additionalUser.phoneNumber} onChange={(event) => setAdditionalUser({ ...additionalUser, phoneNumber: event.target.value })} /></FieldGroup><FieldGroup wide><Label htmlFor="additionalPassword">Temporary password</Label><PasswordInput id="additionalPassword" minLength={10} value={additionalUser.password} onChange={(event) => setAdditionalUser({ ...additionalUser, password: event.target.value })} /><p className="mt-1 text-xs text-concrete-grey">Use 10-200 characters, including a capital letter and a special character.</p></FieldGroup><div className="sm:col-span-2"><Button onClick={addAdditionalUser} loading={saving}>Add user</Button></div></div>}
+            {showAdditionalUser && <div className="mt-6 grid gap-5 rounded-lg border-l-4 border-safety-amber bg-amber-50/50 p-4 sm:grid-cols-2"><FieldGroup><Label htmlFor="additionalFirstName">First name</Label><Input id="additionalFirstName" value={additionalUser.firstName} onChange={(event) => setAdditionalUser({ ...additionalUser, firstName: event.target.value })} />{additionalUserErrors.firstName && <p className="text-sm text-attention">{additionalUserErrors.firstName}</p>}</FieldGroup><FieldGroup><Label htmlFor="additionalLastName">Last name</Label><Input id="additionalLastName" value={additionalUser.lastName} onChange={(event) => setAdditionalUser({ ...additionalUser, lastName: event.target.value })} />{additionalUserErrors.lastName && <p className="text-sm text-attention">{additionalUserErrors.lastName}</p>}</FieldGroup><FieldGroup><Label htmlFor="additionalEmail">Email address</Label><Input id="additionalEmail" type="email" value={additionalUser.email} onChange={(event) => setAdditionalUser({ ...additionalUser, email: event.target.value })} />{additionalUserErrors.email && <p className="text-sm text-attention">{additionalUserErrors.email}</p>}</FieldGroup><FieldGroup><Label htmlFor="additionalPhone">Phone number</Label><Input id="additionalPhone" type="tel" value={additionalUser.phoneNumber} onChange={(event) => setAdditionalUser({ ...additionalUser, phoneNumber: event.target.value })} />{additionalUserErrors.phoneNumber && <p className="text-sm text-attention">{additionalUserErrors.phoneNumber}</p>}</FieldGroup><FieldGroup wide><Label htmlFor="additionalPassword">Temporary password</Label><PasswordInput id="additionalPassword" minLength={10} value={additionalUser.password} onChange={(event) => setAdditionalUser({ ...additionalUser, password: event.target.value })} /><p className="mt-1 text-xs text-concrete-grey">Use 10-200 characters, including a capital letter and a special character.</p>{additionalUserErrors.password && <p className="text-sm text-attention">{additionalUserErrors.password}</p>}</FieldGroup><div className="sm:col-span-2"><Button onClick={addAdditionalUser} loading={saving}>Add user</Button></div></div>}
             <div className="mt-6 divide-y divide-slate-100">{profile.additionalUsers.length === 0 ? <p className="py-5 text-sm text-concrete-grey">No additional users.</p> : profile.additionalUsers.map(({ id, user }) => <div key={id} className="py-4"><p className="font-semibold text-foundation-navy">{user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.contactName}</p><p className="text-sm text-concrete-grey">{user.email}</p></div>)}</div>
           </Card>}
         </>}

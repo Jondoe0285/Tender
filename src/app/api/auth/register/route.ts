@@ -14,6 +14,7 @@ import { createRateLimitResponse } from '@/server/http/rateLimit';
 import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
 import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from '@/lib/legal/documentVersions';
 import { getPlatformSetting } from '@/server/domain/platformSettings';
+import { serialiseServiceProvisions } from '@/lib/service-provisions';
 
 async function sendVerificationEmail(userId: string, email: string) {
   const token = await createEmailVerificationToken(userId);
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
             });
       }
       if (input.role === 'USER') {
-        const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', services: (input.categories ?? []).join(','), serviceProvisions: (input.serviceProvisions ?? []).join(','), primaryUserId: existing.id } });
+        const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', services: (input.categories ?? []).join(','), serviceProvisions: serialiseServiceProvisions(input.serviceProvisions ?? []), primaryUserId: existing.id } });
         await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: existing.id } });
       }
     });
@@ -136,7 +137,7 @@ export async function POST(request: Request) {
       metadata: { termsVersion: CURRENT_TERMS_VERSION, privacyVersion: CURRENT_PRIVACY_VERSION, acceptedAt: acceptedAt.toISOString() },
     }, transaction);
     if (input.role === 'USER') {
-      const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', services: (input.categories ?? []).join(','), serviceProvisions: (input.serviceProvisions ?? []).join(','), primaryUserId: createdUser.id } });
+      const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', services: (input.categories ?? []).join(','), serviceProvisions: serialiseServiceProvisions(input.serviceProvisions ?? []), primaryUserId: createdUser.id } });
       await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: createdUser.id } });
     }
     return createdUser;

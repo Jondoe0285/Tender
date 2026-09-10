@@ -43,6 +43,7 @@ type Quote = {
   providerVerificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
   verifiedDocumentLabels: string[];
   independentlyVerified: boolean;
+  independentReviewTier: 'BRONZE' | 'SILVER' | 'GOLD' | null;
 };
 
 type Contact = { contactName: string; contactPhone: string | null; email: string };

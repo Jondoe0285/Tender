@@ -11,6 +11,8 @@ import { toErrorResponse } from '@/server/http/errors';
 import { SERVICE_CATALOG, SERVICE_NAMES } from '@/lib/categories';
 import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
+import { parseServiceProvisions, serialiseServiceProvisions } from '@/lib/service-provisions';
+import { Prisma } from '@prisma/client';
 
 const COMPANY_OPERATING_LOCATIONS = ['United Kingdom', ...UK_COUNTIES, ...UK_REGIONS] as const;
 
@@ -80,7 +82,7 @@ export async function GET() {
       companyName: membership?.company.companyName ?? null,
       branchIdentifier: membership?.company.branchIdentifier ?? null,
       services: membership?.company.services ? membership.company.services.split(',').filter(Boolean) : [],
-      serviceProvisions: membership?.company.serviceProvisions ? membership.company.serviceProvisions.split(',').filter(Boolean) : [],
+      serviceProvisions: parseServiceProvisions(membership?.company.serviceProvisions, membership?.company.services.split(',').filter(Boolean) ?? []),
       operatingLocations: membership?.company.operatingLocations ? membership.company.operatingLocations.split(',').filter(Boolean) : [],
       tradeTenderId: membership?.company.tradeTenderId ?? null,
       isPrimaryUser: membership ? isPrimaryClientUser(membership.company.primaryUserId, user.id) : false,
@@ -130,7 +132,7 @@ export async function PUT(request: Request) {
         },
       }),
       ...(parsed.data.companyName !== undefined || parsed.data.branchIdentifier !== undefined || parsed.data.services !== undefined || parsed.data.serviceProvisions !== undefined || parsed.data.operatingLocations !== undefined
-        ? [prisma.clientCompany.update({ where: { id: membership.companyId }, data: { ...(parsed.data.companyName !== undefined ? { companyName: parsed.data.companyName } : {}), ...(parsed.data.branchIdentifier !== undefined ? { branchIdentifier: parsed.data.branchIdentifier } : {}), ...(parsed.data.services !== undefined ? { services: parsed.data.services.join(',') } : {}), ...(parsed.data.serviceProvisions !== undefined ? { serviceProvisions: parsed.data.serviceProvisions.join(',') } : {}), ...(parsed.data.operatingLocations !== undefined ? { operatingLocations: parsed.data.operatingLocations.join(',') } : {}) } })]
+        ? [prisma.clientCompany.update({ where: { id: membership.companyId }, data: { ...(parsed.data.companyName !== undefined ? { companyName: parsed.data.companyName } : {}), ...(parsed.data.branchIdentifier !== undefined ? { branchIdentifier: parsed.data.branchIdentifier } : {}), ...(parsed.data.services !== undefined ? { services: parsed.data.services.join(',') } : {}), ...(parsed.data.serviceProvisions !== undefined ? { serviceProvisions: serialiseServiceProvisions(parsed.data.serviceProvisions) } : {}), ...(parsed.data.operatingLocations !== undefined ? { operatingLocations: parsed.data.operatingLocations.join(',') } : {}) } })]
         : []),
       ...(parsed.data.services !== undefined
         ? [prisma.retailerProfile.updateMany({ where: { userId: user.id }, data: { categories: parsed.data.services.join(',') } })]
@@ -180,14 +182,14 @@ export async function POST(request: Request) {
     if (originError) return originError;
     const user = await requireRole('USER');
     const parsed = additionalUserSchema.safeParse(await request.json().catch(() => null));
-    if (!parsed.success) return NextResponse.json({ error: 'Invalid additional user details' }, { status: 400 });
+    if (!parsed.success) return NextResponse.json({ error: 'Invalid additional user details', issues: parsed.error.flatten() }, { status: 400 });
 
     const membership = await getClientCompanyMembership(user.id);
     if (!membership || !isPrimaryClientUser(membership.company.primaryUserId, user.id)) {
       return NextResponse.json({ error: 'Only the primary user can add additional users' }, { status: 403 });
     }
     const existing = await prisma.user.findUnique({ where: { email: parsed.data.email }, select: { id: true } });
-    if (existing) return NextResponse.json({ error: 'Unable to add a user with those details' }, { status: 409 });
+    if (existing) return NextResponse.json({ error: 'A User with that email address already exists' }, { status: 409 });
 
     const opportunityProfile = await prisma.retailerProfile.findUnique({
       where: { userId: user.id },
@@ -215,6 +217,9 @@ export async function POST(request: Request) {
     if (opportunityProfile) await matchRetailerToOpenTenders(additionalUser.id);
     return NextResponse.json({ user: additionalUser }, { status: 201 });
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: 'A User with those details already exists' }, { status: 409 });
+    }
     return toErrorResponse(error);
   }
 }

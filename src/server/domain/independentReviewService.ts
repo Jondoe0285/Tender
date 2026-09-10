@@ -10,7 +10,7 @@ export async function finalizeIndependentReviewWithPayment(userId: string, payme
   if (profile.independentReviewStatus === 'NOT_PURCHASED' || profile.independentReviewStatus === 'DECLINED') {
     await prisma.retailerProfile.update({
       where: { userId },
-      data: { independentReviewStatus: 'PURCHASED', independentReviewPurchasedAt: new Date(), independentReviewDecidedAt: null, independentReviewNote: null },
+      data: { independentReviewStatus: 'PURCHASED', independentReviewTier: null, independentReviewPurchasedAt: new Date(), independentReviewDecidedAt: null, independentReviewNote: null },
     });
   }
   await recordAuditEvent({ actorId: userId, action: 'INDEPENDENT_REVIEW_PURCHASED', targetType: 'RetailerProfile', targetId: profile.id, metadata: { paymentId } });

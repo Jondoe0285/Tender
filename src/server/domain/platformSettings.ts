@@ -1,6 +1,8 @@
 import type { PaymentType } from '@prisma/client';
 import { prisma } from '@/server/data/prisma';
 import { CLIENT_RELEASE_FEE_GBP, RETAILER_UNLOCK_FEE_GBP } from '@/lib/categories';
+import { SERVICE_NAMES } from '@/lib/categories';
+import { VERIFICATION_DOCUMENT_TYPES, type VerificationDocumentType } from '@/lib/verification-documents';
 
 const defaultSettings: Record<string, string> = {
   RETAILER_UNLOCK_FEE_GBP: String(RETAILER_UNLOCK_FEE_GBP),
@@ -18,6 +20,7 @@ const defaultSettings: Record<string, string> = {
   INDEPENDENT_REVIEW_ACTIVE: 'false',
   INDEPENDENT_REVIEW_FEE_GBP: '150',
   HUMAN_REVIEW_ACTIVE: 'true',
+  VERIFICATION_DOCUMENT_REQUIREMENTS: '{}',
   RETAILER_ANALYTICS_SECTION_TRENDS: 'true',
   RETAILER_ANALYTICS_SECTION_CATEGORY: 'true',
   RETAILER_ANALYTICS_SECTION_REGIONAL: 'true',
@@ -123,12 +126,39 @@ export async function isHumanReviewActive(): Promise<boolean> {
   return await getPlatformSetting('HUMAN_REVIEW_ACTIVE') !== 'false';
 }
 
+export type VerificationDocumentRequirementKey = `${string}:${VerificationDocumentType}`;
+
+export function verificationDocumentRequirementKey(service: string, documentType: VerificationDocumentType): VerificationDocumentRequirementKey {
+  return `${service}:${documentType}`;
+}
+
+export function defaultVerificationDocumentRequirements(): Record<string, boolean> {
+  return Object.fromEntries(
+    SERVICE_NAMES.flatMap((service) => VERIFICATION_DOCUMENT_TYPES
+      .filter((document) => document.appliesTo === 'all' || document.appliesTo.includes(service))
+      .map((document) => [verificationDocumentRequirementKey(service, document.type), document.required]))
+  );
+}
+
+export async function getVerificationDocumentRequirements(): Promise<Record<string, boolean>> {
+  const configured = await getPlatformSetting('VERIFICATION_DOCUMENT_REQUIREMENTS');
+  let overrides: Record<string, boolean> = {};
+  try {
+    const parsed = JSON.parse(configured ?? '{}');
+    if (parsed && typeof parsed === 'object') overrides = parsed as Record<string, boolean>;
+  } catch {
+    overrides = {};
+  }
+  return { ...defaultVerificationDocumentRequirements(), ...overrides };
+}
+
 export async function getAdminSettings(includeSupportRecipient = false) {
-  const [settings, tiers, subscriptions, categoryDefinitions] = await Promise.all([
+  const [settings, tiers, subscriptions, categoryDefinitions, verificationDocumentRequirements] = await Promise.all([
     prisma.platformSetting.findMany({ orderBy: { key: 'asc' } }),
     prisma.membershipTier.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.subscriptionPlan.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.categoryDefinition.findMany({ orderBy: [{ service: 'asc' }, { name: 'asc' }] }),
+    getVerificationDocumentRequirements(),
   ]);
   return {
     fees: {
@@ -147,6 +177,7 @@ export async function getAdminSettings(includeSupportRecipient = false) {
       independentReviewActive: (settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_ACTIVE')?.value ?? defaultSettings.INDEPENDENT_REVIEW_ACTIVE) === 'true',
       independentReviewFeeGbp: Number(settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_FEE_GBP')?.value ?? defaultSettings.INDEPENDENT_REVIEW_FEE_GBP),
       humanReviewActive: (settings.find((setting) => setting.key === 'HUMAN_REVIEW_ACTIVE')?.value ?? defaultSettings.HUMAN_REVIEW_ACTIVE) === 'true',
+      verificationDocumentRequirements: Object.entries(verificationDocumentRequirements),
     },
     tiers,
     subscriptions,

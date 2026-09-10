@@ -55,7 +55,6 @@ export const SUPER_USER_NAV: NavGroup[] = [
     items: [
       { label: 'Categories', href: '/super-user/categories' },
       { label: 'Partner Management', href: '/super-user/partners' },
-      { label: 'Site Settings', href: '/super-user/settings' },
       { label: 'Accountant Management', href: '/super-user/accountants' },
       { label: 'Accounting Space', href: '/super-user/accounting' },
       { label: 'Security', href: '/account/security' },

@@ -37,6 +37,7 @@ function formatFileSize(sizeBytes: number) {
 export default function ProviderVerificationPage() {
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>('UNVERIFIED');
   const [applicableTypes, setApplicableTypes] = useState<VerificationDocumentType[]>([]);
+  const [requiredTypes, setRequiredTypes] = useState<VerificationDocumentType[]>([]);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [pendingFiles, setPendingFiles] = useState<Record<string, File>>({});
   const [expiryDates, setExpiryDates] = useState<Record<string, string>>({});
@@ -45,7 +46,6 @@ export default function ProviderVerificationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [humanReviewActive, setHumanReviewActive] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
 
   async function load() {
@@ -61,8 +61,8 @@ export default function ProviderVerificationPage() {
     if (documentsResponse.ok) {
       const data = await documentsResponse.json();
       setApplicableTypes(data.applicableDocumentTypes);
+      setRequiredTypes(data.requiredDocumentTypes);
       setDocuments(data.documents);
-      setHumanReviewActive(data.humanReviewActive);
     }
     setCurrentTime(Date.now());
     setLoading(false);
@@ -143,7 +143,6 @@ export default function ProviderVerificationPage() {
   }
 
   const applicableDocuments = VERIFICATION_DOCUMENT_TYPES.filter((doc) => applicableTypes.includes(doc.type));
-  const requiredTypes = applicableDocuments.filter((doc) => doc.required).map((doc) => doc.type);
   const now = currentTime;
   const validUploadedTypes = new Set(documents.filter((doc) => new Date(doc.expiryDate).getTime() > now).map((doc) => doc.documentType));
   const requiredUploaded = requiredTypes.filter((type) => validUploadedTypes.has(type));
@@ -179,9 +178,10 @@ export default function ProviderVerificationPage() {
         <Card className="border-l-4 border-safety-amber bg-amber-50/40">
           <p className="text-sm font-semibold text-foundation-navy">Compliance score disclaimer</p>
           <p className="mt-2 text-sm text-concrete-grey">
-            Each uploaded document is automatically assessed and given a compliance score from 0-100%. To achieve a
-            verified status, your required documents must together be sufficient to reach a compliance score of at
-            least 90%. If a 90% compliance score cannot be achieved{humanReviewActive ? ', your request is sent for human review, and a verified status is granted only if that review is successful' : ' and human review is not currently available, a verified status will not be granted'}.
+            The automated review assesses legal-compliance evidence only and may make mistakes. Each uploaded document
+            receives a compliance score from 0-100%. To achieve a verified status, the required documents must together
+            reach at least 90%. Trade Tender does not replace client due diligence, and clients must carry out suitable
+            checks before entering any formal agreement.
           </p>
         </Card>
 
@@ -196,7 +196,7 @@ export default function ProviderVerificationPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-heading text-base font-bold text-foundation-navy">{doc.label}</h3>
-                    <span className="text-xs font-semibold uppercase tracking-wide text-concrete-grey">{doc.required ? 'Required' : 'Optional'}</span>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-concrete-grey">{requiredTypes.includes(doc.type) ? 'Required' : 'Optional'}</span>
                     {uploaded && !expired && <StatusBadge status="approved">Uploaded</StatusBadge>}
                     {uploaded && expired && <StatusBadge status="attention">Expired</StatusBadge>}
                   </div>

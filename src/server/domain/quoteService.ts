@@ -165,10 +165,10 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
     : new Set<string>();
   const verificationProfiles = await prisma.retailerProfile.findMany({
     where: { userId: { in: quotes.map((quote) => quote.retailerId) } },
-    select: { id: true, userId: true, verificationStatus: true, independentReviewStatus: true },
+    select: { id: true, userId: true, verificationStatus: true, independentReviewStatus: true, independentReviewTier: true },
   });
   const verificationByRetailerId = new Map(verificationProfiles.map((profile) => [profile.userId, profile.verificationStatus] as const));
-  const independentlyVerifiedRetailerIds = new Set(verificationProfiles.filter((profile) => profile.independentReviewStatus === 'APPROVED').map((profile) => profile.userId));
+  const independentTierByRetailerId = new Map(verificationProfiles.filter((profile) => profile.independentReviewStatus === 'APPROVED').map((profile) => [profile.userId, profile.independentReviewTier] as const));
   const verifiedDocumentsByRetailerId = new Map(await Promise.all(
     verificationProfiles
       .filter((profile) => profile.verificationStatus === 'VERIFIED')
@@ -183,6 +183,7 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
     releaseFeeGbp: await getClientReleaseFeeGbp(quote.priceGbp),
     providerVerificationStatus: verificationByRetailerId.get(retailerId) ?? 'UNVERIFIED',
     verifiedDocumentLabels: verifiedDocumentsByRetailerId.get(retailerId) ?? [],
-    independentlyVerified: independentlyVerifiedRetailerIds.has(retailerId),
+    independentlyVerified: independentTierByRetailerId.has(retailerId),
+    independentReviewTier: independentTierByRetailerId.get(retailerId) ?? null,
   })));
 }

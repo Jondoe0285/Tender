@@ -1,9 +1,10 @@
 import { prisma } from '@/server/data/prisma';
 import { ForbiddenError } from '@/server/auth/session';
 import { recordAuditEvent } from '@/server/audit/auditLog';
-import { getRequiredVerificationDocumentTypes, isVerificationDocumentApplicable, VERIFICATION_DOCUMENT_TYPES, type VerificationDocumentType } from '@/lib/verification-documents';
+import { getApplicableVerificationDocuments, isVerificationDocumentApplicable, VERIFICATION_DOCUMENT_TYPES, type VerificationDocumentType } from '@/lib/verification-documents';
 import type { UploadVerificationDocumentInput } from '@/lib/schemas/verificationDocument';
 import { assessVerificationDocument } from '@/server/domain/verificationAiAssessment';
+import { getVerificationDocumentRequirements, verificationDocumentRequirementKey } from '@/server/domain/platformSettings';
 
 export async function getOwnRetailerProfileOrThrow(userId: string) {
   const profile = await prisma.retailerProfile.findUnique({ where: { userId } });
@@ -108,9 +109,15 @@ export type VerificationEvaluation = {
 
 /** Aggregates the per-document AI assessments into one decision: auto-approve, or send for human review. */
 export async function evaluateProviderVerification(retailerProfileId: string, categories: string): Promise<VerificationEvaluation> {
-  const requiredTypes = getRequiredVerificationDocumentTypes(categories);
+  const requirements = await getVerificationDocumentRequirements();
+  const services = categories.split(',').map((value) => value.trim()).filter(Boolean);
+  const requiredTypes = getApplicableVerificationDocuments(categories)
+    .filter((document) => services.some((service) => requirements[verificationDocumentRequirementKey(service, document.type)] === true))
+    .map((document) => document.type);
   const documents = await prisma.verificationDocument.findMany({ where: { retailerProfileId } });
-  const documentsByType = new Map(documents.map((document) => [document.documentType, document] as const));
+  const applicableTypes = new Set(getApplicableVerificationDocuments(categories).map((document) => document.type));
+  const reviewDocuments = documents.filter((document) => applicableTypes.has(document.documentType));
+  const documentsByType = new Map(reviewDocuments.map((document) => [document.documentType, document] as const));
   const now = new Date();
 
   const missingOrExpiredRequiredTypes = requiredTypes.filter((type) => {
@@ -129,15 +136,17 @@ export async function evaluateProviderVerification(retailerProfileId: string, ca
   }
 
   const requiredDocuments = requiredTypes.map((type) => documentsByType.get(type)!);
-  const confidencePercent = requiredDocuments.length > 0
-    ? Math.min(...requiredDocuments.map((document) => document.aiConfidencePercent ?? 0))
+  const documentsForScore = requiredDocuments.length > 0 ? requiredDocuments : reviewDocuments;
+  const confidencePercent = documentsForScore.length > 0
+    ? Math.min(...documentsForScore.map((document) => document.aiConfidencePercent ?? 0))
     : 0;
-  const requiresHumanReview = confidencePercent < 90 || requiredDocuments.some((document) => document.aiRequiresHumanReview);
+  const requiresHumanReview = confidencePercent < 90 || reviewDocuments.some((document) => document.aiRequiresHumanReview);
 
   const report = [
+    'Basic legal eligibility assessment for the services declared by this User.',
     `Overall AI confidence score: ${confidencePercent}%.`,
     `Human review required: ${requiresHumanReview ? 'yes' : 'no'}.`,
-    ...requiredDocuments.map((document) => `- ${document.documentType}: ${document.aiSummary ?? 'No assessment recorded.'}`),
+    ...reviewDocuments.map((document) => `- ${document.documentType}: ${document.aiSummary ?? 'No assessment recorded.'}`),
   ].join('\n');
 
   return { canProceed: true, requiresHumanReview, confidencePercent, report, missingOrExpiredRequiredTypes: [] };
@@ -158,9 +167,13 @@ export async function syncVerificationExpiryForUserIds(userIds: string[]): Promi
   });
   if (profiles.length === 0) return;
   const now = new Date();
+  const requirements = await getVerificationDocumentRequirements();
 
   for (const profile of profiles) {
-    const requiredTypes = getRequiredVerificationDocumentTypes(profile.categories);
+    const services = profile.categories.split(',').map((value) => value.trim()).filter(Boolean);
+    const requiredTypes = getApplicableVerificationDocuments(profile.categories)
+      .filter((document) => services.some((service) => requirements[verificationDocumentRequirementKey(service, document.type)] === true))
+      .map((document) => document.type);
     const expired = await prisma.verificationDocument.findFirst({
       where: { retailerProfileId: profile.id, documentType: { in: requiredTypes }, expiryDate: { lte: now } },
       select: { documentType: true },

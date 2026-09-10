@@ -1,0 +1,23 @@
+import { SERVICE_CATALOG, type ServiceName } from '@/lib/categories';
+
+export function parseServiceProvisions(value: string | null | undefined, services: readonly string[]): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed) && parsed.every((entry) => typeof entry === 'string')) return parsed;
+  } catch {
+    // Legacy records used commas as separators, so reconstruct complete catalogue values below.
+  }
+
+  return services.flatMap((service) => {
+    const catalogue = SERVICE_CATALOG[service as ServiceName];
+    if (!catalogue) return [];
+    return Object.keys(catalogue)
+      .map((provision) => `${service}::${provision}`)
+      .filter((entry) => value.includes(entry));
+  });
+}
+
+export function serialiseServiceProvisions(values: readonly string[]): string {
+  return JSON.stringify([...new Set(values)]);
+}

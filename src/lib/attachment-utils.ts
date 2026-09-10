@@ -9,16 +9,7 @@ type VerifiedTenderAttachment = {
 
 // A flat character class (no repeated group) avoids V8 regex stack overflows on large decoded files.
 const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
-const PDF_ACTIVE_CONTENT_MARKERS = [
-  '/AA',
-  '/EmbeddedFile',
-  '/JavaScript',
-  '/JS',
-  '/Launch',
-  '/OpenAction',
-  '/RichMedia',
-  '/XFA',
-];
+const PDF_ACTIVE_CONTENT_PATTERN = /\/(?:AA|EmbeddedFile|JavaScript|JS|Launch|OpenAction|RichMedia|XFA)(?=[\s/<>()\[\]{}]|$)/;
 
 function hasFileExtension(fileName: string, extensions: readonly string[]): boolean {
   const extension = fileName.slice(fileName.lastIndexOf('.')).toLowerCase();
@@ -56,7 +47,7 @@ export function verifyTenderAttachment(input: { name: string; mimeType: string; 
     throw new Error('Attachment filename does not match its verified file type');
   }
 
-  if (detectedMimeType === 'application/pdf' && PDF_ACTIVE_CONTENT_MARKERS.some((marker) => bytes.includes(Buffer.from(marker, 'ascii')))) {
+  if (detectedMimeType === 'application/pdf' && PDF_ACTIVE_CONTENT_PATTERN.test(bytes.toString('latin1'))) {
     throw new Error('Active PDF content is not allowed');
   }
 
