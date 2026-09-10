@@ -141,3 +141,11 @@ export const REQUIREMENT_OPTIONS = [
 ] as const;
 export const RETAILER_UNLOCK_FEE_GBP = 10;
 export const CLIENT_RELEASE_FEE_GBP = 10;
+
+/** Services eligible for the Provider verification process (materials suppliers are not eligible). */
+export const VERIFICATION_ELIGIBLE_SERVICES: ServiceName[] = ['Waste', 'Plant Hire', 'Contractor Services', 'Professional Services'];
+
+export function isVerificationEligible(categories: string | string[] | null | undefined): boolean {
+  const values = Array.isArray(categories) ? categories : (categories ?? '').split(',').map((value) => value.trim()).filter(Boolean);
+  return values.some((value) => VERIFICATION_ELIGIBLE_SERVICES.includes(value as ServiceName));
+}

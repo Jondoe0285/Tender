@@ -1,4 +1,6 @@
 import { prisma } from '@/server/data/prisma';
+import { isVerificationEligible } from '@/lib/categories';
+import { syncVerificationExpiry } from '@/server/domain/verificationDocumentService';
 
 export type ActivityPeriod = '1d' | '7d' | '30d' | '90d' | 'all';
 
@@ -10,6 +12,7 @@ export function getActivitySince(period: ActivityPeriod): Date | null {
 
 /** Consolidated Super User view: profile fields, login/session analytics, recent pages, and recent actions. */
 export async function getUserAnalyticsProfile(userId: string, period: ActivityPeriod = '1d') {
+  await syncVerificationExpiry(userId);
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -63,6 +66,14 @@ export async function getUserAnalyticsProfile(userId: string, period: ActivityPe
     address,
     launchCreditsLeft: user.retailerProfile?.launchCreditsLeft ?? null,
     releaseCreditsLeft: user.clientCompanyMembership?.company.releaseCreditsLeft ?? null,
+    verificationStatus: user.retailerProfile?.verificationStatus ?? null,
+    verificationEligible: user.retailerProfile ? isVerificationEligible(user.retailerProfile.categories) : false,
+    verificationRequestedAt: user.retailerProfile?.verificationRequestedAt ?? null,
+    verificationConfidencePercent: user.retailerProfile?.verificationConfidencePercent ?? null,
+    verificationReport: user.retailerProfile?.verificationReport ?? null,
+    independentReviewStatus: user.retailerProfile?.independentReviewStatus ?? null,
+    independentReviewPurchasedAt: user.retailerProfile?.independentReviewPurchasedAt ?? null,
+    independentReviewNote: user.retailerProfile?.independentReviewNote ?? null,
     pageViews,
     auditLogs,
     warnings,

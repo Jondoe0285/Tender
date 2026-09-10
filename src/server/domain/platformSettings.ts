@@ -15,6 +15,8 @@ const defaultSettings: Record<string, string> = {
   MEMBERSHIP_TIERS_ACTIVE: 'false',
   RETAILER_LAUNCH_CREDITS_DEFAULT: '3',
   ADSPACE_ACTIVE: 'false',
+  INDEPENDENT_REVIEW_ACTIVE: 'false',
+  INDEPENDENT_REVIEW_FEE_GBP: '150',
   RETAILER_ANALYTICS_SECTION_TRENDS: 'true',
   RETAILER_ANALYTICS_SECTION_CATEGORY: 'true',
   RETAILER_ANALYTICS_SECTION_REGIONAL: 'true',
@@ -56,7 +58,9 @@ export async function getPaymentFeeGbp(type: PaymentType): Promise<number> {
     ? 'RETAILER_UNLOCK_FEE_GBP'
     : type === 'SPONSORED_PLACEMENT'
       ? 'SPONSORED_PLACEMENT_FEE_GBP'
-      : 'CLIENT_RELEASE_FEE_GBP';
+      : type === 'INDEPENDENT_REVIEW'
+        ? 'INDEPENDENT_REVIEW_FEE_GBP'
+        : 'CLIENT_RELEASE_FEE_GBP';
   const value = Number(await getPlatformSetting(key));
   return Number.isInteger(value) && value >= 0 ? value : Number(defaultSettings[key]);
 }
@@ -109,6 +113,10 @@ export async function isAdspaceActive(): Promise<boolean> {
   return await getPlatformSetting('ADSPACE_ACTIVE') === 'true';
 }
 
+export async function isIndependentReviewActive(): Promise<boolean> {
+  return await getPlatformSetting('INDEPENDENT_REVIEW_ACTIVE') === 'true';
+}
+
 export async function getAdminSettings(includeSupportRecipient = false) {
   const [settings, tiers, subscriptions, categoryDefinitions] = await Promise.all([
     prisma.platformSetting.findMany({ orderBy: { key: 'asc' } }),
@@ -130,6 +138,8 @@ export async function getAdminSettings(includeSupportRecipient = false) {
       membershipTiersActive: (settings.find((setting) => setting.key === 'MEMBERSHIP_TIERS_ACTIVE')?.value ?? defaultSettings.MEMBERSHIP_TIERS_ACTIVE) === 'true',
       retailerLaunchCreditsDefault: Number(settings.find((setting) => setting.key === 'RETAILER_LAUNCH_CREDITS_DEFAULT')?.value ?? defaultSettings.RETAILER_LAUNCH_CREDITS_DEFAULT),
       adspaceActive: (settings.find((setting) => setting.key === 'ADSPACE_ACTIVE')?.value ?? defaultSettings.ADSPACE_ACTIVE) === 'true',
+      independentReviewActive: (settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_ACTIVE')?.value ?? defaultSettings.INDEPENDENT_REVIEW_ACTIVE) === 'true',
+      independentReviewFeeGbp: Number(settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_FEE_GBP')?.value ?? defaultSettings.INDEPENDENT_REVIEW_FEE_GBP),
     },
     tiers,
     subscriptions,

@@ -40,6 +40,9 @@ type Quote = {
   submittedAt: string;
   sponsoredPlacementActive?: boolean;
   releaseFeeGbp: number;
+  providerVerificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
+  verifiedDocumentLabels: string[];
+  independentlyVerified: boolean;
 };
 
 type Contact = { contactName: string; contactPhone: string | null; email: string };
@@ -106,10 +109,14 @@ export default function ClientTenderDetailPage() {
     }
   }
 
-  async function handleAccept(quoteId: string) {
+  async function handleAccept(quoteId: string, declarationAccepted = false) {
     setBusyQuoteId(quoteId);
     setMessage(null);
-    const response = await fetch(`/api/quotes/${quoteId}/accept`, { method: 'POST' });
+    const response = await fetch(`/api/quotes/${quoteId}/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ declarationAccepted }),
+    });
     const data = await response.json();
     setBusyQuoteId(null);
 

@@ -10,6 +10,8 @@ import { enforceContentModeration } from '@/server/moderation/contentModeration'
 import { sponsoredPlacementEnabled } from '@/server/domain/sponsoredPlacementService';
 import { getClientReleaseFeeGbp } from '@/server/domain/platformSettings';
 import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getTenderReviewSnapshot, getUserTenderServiceCategories, userOwnsTender } from '@/server/domain/tenderService';
+import { syncVerificationExpiryForUserIds } from '@/server/domain/verificationDocumentService';
+import { VERIFICATION_DOCUMENT_TYPES } from '@/lib/verification-documents';
 
 export function isQuoteRetentionLocked(retentionLockedUntil: Date | null | undefined, now = new Date()): boolean {
   return retentionLockedUntil !== null && retentionLockedUntil !== undefined && retentionLockedUntil > now;
@@ -154,15 +156,33 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
     },
     orderBy: { submittedAt: 'asc' },
   });
+  await syncVerificationExpiryForUserIds(quotes.map((quote) => quote.retailerId));
   const sponsoredRetailerIds = await sponsoredPlacementEnabled()
     ? new Set((await prisma.retailerSponsoredPlacement.findMany({
         where: { active: true, expiresAt: { gt: new Date() }, retailerId: { in: quotes.map((quote) => quote.retailerId) } },
         select: { retailerId: true },
       })).map((placement) => placement.retailerId))
     : new Set<string>();
+  const verificationProfiles = await prisma.retailerProfile.findMany({
+    where: { userId: { in: quotes.map((quote) => quote.retailerId) } },
+    select: { id: true, userId: true, verificationStatus: true, independentReviewStatus: true },
+  });
+  const verificationByRetailerId = new Map(verificationProfiles.map((profile) => [profile.userId, profile.verificationStatus] as const));
+  const independentlyVerifiedRetailerIds = new Set(verificationProfiles.filter((profile) => profile.independentReviewStatus === 'APPROVED').map((profile) => profile.userId));
+  const verifiedDocumentsByRetailerId = new Map(await Promise.all(
+    verificationProfiles
+      .filter((profile) => profile.verificationStatus === 'VERIFIED')
+      .map(async (profile) => {
+        const verifiedDocuments = await prisma.verificationDocument.findMany({ where: { retailerProfileId: profile.id, verified: true }, select: { documentType: true } });
+        return [profile.userId, verifiedDocuments.map((document) => VERIFICATION_DOCUMENT_TYPES.find((doc) => doc.type === document.documentType)?.label ?? document.documentType)] as const;
+      })
+  ));
   return Promise.all(quotes.map(async ({ retailerId, ...quote }) => ({
     ...quote,
     sponsoredPlacementActive: sponsoredRetailerIds.has(retailerId),
     releaseFeeGbp: await getClientReleaseFeeGbp(quote.priceGbp),
+    providerVerificationStatus: verificationByRetailerId.get(retailerId) ?? 'UNVERIFIED',
+    verifiedDocumentLabels: verifiedDocumentsByRetailerId.get(retailerId) ?? [],
+    independentlyVerified: independentlyVerifiedRetailerIds.has(retailerId),
   })));
 }

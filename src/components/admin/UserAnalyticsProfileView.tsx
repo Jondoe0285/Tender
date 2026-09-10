@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/Button';
-import { Input, Label, Select } from '@/components/ui/Field';
+import { Input, Label, Select, Textarea } from '@/components/ui/Field';
 import type { UserAnalyticsProfile } from '@/server/domain/userProfileService';
+import { VERIFICATION_DOCUMENT_TYPES, type VerificationDocumentType } from '@/lib/verification-documents';
 
 function formatDateTime(value: Date | null) {
   if (!value) return 'Never';
@@ -33,7 +34,43 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
   const [membershipExpiryMonths, setMembershipExpiryMonths] = useState<'6' | '12'>('12');
   const [launchCredits, setLaunchCredits] = useState(String(profile.launchCreditsLeft ?? 0));
   const [releaseCredits, setReleaseCredits] = useState(String(profile.releaseCreditsLeft ?? 0));
+  const [verificationStatus, setVerificationStatus] = useState(profile.verificationStatus);
+  const [decidingVerification, setDecidingVerification] = useState(false);
+  const [verificationComment, setVerificationComment] = useState('');
+  const [verificationDocuments, setVerificationDocuments] = useState<Array<{ documentType: VerificationDocumentType; fileName: string; sizeBytes: number; expiryDate: string; uploadedAt: string; aiConfidencePercent: number | null; aiSummary: string | null; aiRequiresHumanReview: boolean; verified: boolean }>>([]);
+  const [independentReviewStatus, setIndependentReviewStatus] = useState(profile.independentReviewStatus);
+  const [decidingIndependentReview, setDecidingIndependentReview] = useState(false);
+  const [independentReviewComment, setIndependentReviewComment] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!profile.verificationEligible) return;
+    fetch(`/api/super-user/retailers/${profile.id}/verification-documents`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => { if (data) setVerificationDocuments(data.documents); });
+  }, [profile.id, profile.verificationEligible]);
+
+  async function decideVerification(action: 'approve-verification' | 'reject-verification') {
+    setDecidingVerification(true);
+    setMessage(null);
+    const response = await fetch(`/api/super-user/users/${profile.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, note: verificationComment || undefined }) });
+    const data = await response.json().catch(() => null);
+    setDecidingVerification(false);
+    if (!response.ok) return setMessage(data?.error ?? 'Unable to update verification status.');
+    setVerificationStatus(data.verificationStatus);
+    setMessage('Verification status updated.');
+  }
+
+  async function decideIndependentReview(action: 'approve-independent-review' | 'decline-independent-review') {
+    setDecidingIndependentReview(true);
+    setMessage(null);
+    const response = await fetch(`/api/super-user/users/${profile.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, note: independentReviewComment || undefined }) });
+    const data = await response.json().catch(() => null);
+    setDecidingIndependentReview(false);
+    if (!response.ok) return setMessage(data?.error ?? 'Unable to update independent review status.');
+    setIndependentReviewStatus(data.independentReviewStatus);
+    setMessage('Independent review status updated.');
+  }
 
   async function toggleEntitlement(type: 'membership' | 'subscription', planId: string, active: boolean) {
     const response = await fetch(`/api/super-user/retailers/${profile.id}/entitlements`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, planId, active, ...(type === 'membership' && active ? { startDate: membershipStartDate, expiryMonths: Number(membershipExpiryMonths) } : {}) }) });
@@ -110,6 +147,88 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
           </div>
         </form>
       </Card>
+
+      {profile.verificationEligible && <Card>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Provider verification</p>
+            <p className="mt-1 text-sm text-concrete-grey">Requested {profile.verificationRequestedAt ? formatDateTime(profile.verificationRequestedAt) : 'never'}.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <StatusBadge status={verificationStatus === 'VERIFIED' ? 'approved' : verificationStatus === 'PENDING' ? 'pending' : verificationStatus === 'REJECTED' || verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
+              {verificationStatus === 'VERIFIED' ? 'Verified by Ai' : verificationStatus === 'PENDING' ? 'Pending review' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : 'Unverified'}
+            </StatusBadge>
+          </div>
+        </div>
+        {profile.verificationConfidencePercent !== null && (
+          <p className="mt-3 text-sm text-concrete-grey">AI confidence score: <span className="font-semibold text-foundation-navy">{profile.verificationConfidencePercent}%</span></p>
+        )}
+        {profile.verificationReport && (
+          <pre className="mt-3 whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-foundation-navy">{profile.verificationReport}</pre>
+        )}
+        {verificationDocuments.length > 0 && (
+          <ul className="mt-4 divide-y divide-slate-100 border-t border-slate-100 pt-3">
+            {verificationDocuments.map((document) => {
+              const expired = new Date(document.expiryDate).getTime() <= Date.now();
+              return (
+                <li key={document.documentType} className="flex flex-col gap-1 py-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span className="font-semibold text-foundation-navy">{VERIFICATION_DOCUMENT_TYPES.find((doc) => doc.type === document.documentType)?.label ?? document.documentType}</span>
+                    <a href={`/api/super-user/retailers/${profile.id}/verification-documents/${document.documentType}`} download={document.fileName} className="font-semibold text-steel-blue hover:underline">{document.fileName}</a>
+                  </div>
+                  <p className="text-xs text-concrete-grey">
+                    Expires {new Date(document.expiryDate).toLocaleDateString('en-GB')}{expired && ' (expired)'} &middot; AI confidence {document.aiConfidencePercent ?? 'n/a'}% &middot; Human review required: {document.aiRequiresHumanReview ? 'yes' : 'no'}
+                  </p>
+                  {document.aiSummary && <p className="text-xs text-concrete-grey">{document.aiSummary}</p>}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {verificationStatus === 'PENDING' && <div className="mt-4 border-t border-slate-100 pt-4">
+          <Label htmlFor="verification-comment">Review comments</Label>
+          <Textarea
+            id="verification-comment"
+            value={verificationComment}
+            onChange={(event) => setVerificationComment(event.target.value)}
+            rows={3}
+            placeholder="Optional comments recorded with this decision"
+            className="mt-2"
+          />
+          <div className="mt-3 flex gap-3">
+            <Button onClick={() => void decideVerification('approve-verification')} loading={decidingVerification}>Approve</Button>
+            <Button variant="danger" onClick={() => void decideVerification('reject-verification')} loading={decidingVerification}>Reject</Button>
+          </div>
+        </div>}
+      </Card>}
+
+      {profile.verificationEligible && independentReviewStatus !== null && independentReviewStatus !== 'NOT_PURCHASED' && <Card>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Independent H&amp;S review</p>
+            <p className="mt-1 text-sm text-concrete-grey">Purchased {profile.independentReviewPurchasedAt ? formatDateTime(profile.independentReviewPurchasedAt) : 'never'}.</p>
+          </div>
+          <StatusBadge status={independentReviewStatus === 'APPROVED' ? 'approved' : independentReviewStatus === 'PURCHASED' ? 'pending' : 'attention'}>
+            {independentReviewStatus === 'APPROVED' ? 'Independently Verified' : independentReviewStatus === 'PURCHASED' ? 'Awaiting review' : 'Declined'}
+          </StatusBadge>
+        </div>
+        {profile.independentReviewNote && <p className="mt-3 text-sm text-concrete-grey">Previous note: {profile.independentReviewNote}</p>}
+        {independentReviewStatus === 'PURCHASED' && <div className="mt-4 border-t border-slate-100 pt-4">
+          <Label htmlFor="independent-review-comment">Review comments</Label>
+          <Textarea
+            id="independent-review-comment"
+            value={independentReviewComment}
+            onChange={(event) => setIndependentReviewComment(event.target.value)}
+            rows={3}
+            placeholder="Optional comments recorded with this decision"
+            className="mt-2"
+          />
+          <div className="mt-3 flex gap-3">
+            <Button onClick={() => void decideIndependentReview('approve-independent-review')} loading={decidingIndependentReview}>Approve</Button>
+            <Button variant="danger" onClick={() => void decideIndependentReview('decline-independent-review')} loading={decidingIndependentReview}>Decline</Button>
+          </div>
+        </div>}
+      </Card>}
 
       {profile.warnings.length > 0 && <Card>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Tender warnings</p>

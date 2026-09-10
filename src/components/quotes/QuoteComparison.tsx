@@ -19,7 +19,23 @@ type Quote = {
   submittedAt: string;
   sponsoredPlacementActive?: boolean;
   releaseFeeGbp: number;
+  providerVerificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
+  verifiedDocumentLabels: string[];
+  independentlyVerified: boolean;
 };
+
+function ProviderVerificationBadge({ status, verifiedDocumentLabels, independentlyVerified }: { status: Quote['providerVerificationStatus']; verifiedDocumentLabels: string[]; independentlyVerified: boolean }) {
+  if (independentlyVerified) {
+    return <span title="This company has undergone an independent verification by a Health & Safety professional and has been deemed to meet the requirements to achieve the verification."><StatusBadge status="approved">Independently Verified</StatusBadge></span>;
+  }
+  if (status === 'VERIFIED') {
+    const title = verifiedDocumentLabels.length > 0 ? `Verified documents: ${verifiedDocumentLabels.join(', ')}` : 'Verified by Ai';
+    return <span title={title}><StatusBadge status="approved">Verified by Ai</StatusBadge></span>;
+  }
+  if (status === 'PENDING') return <StatusBadge status="pending">Verification pending</StatusBadge>;
+  if (status === 'EXPIRED') return <span title="This Provider's verification lapsed because a document expired."><StatusBadge status="attention">Verification expired</StatusBadge></span>;
+  return <StatusBadge status="neutral">Unverified Provider</StatusBadge>;
+}
 
 type SortKey = 'priceGbp' | 'leadTimeDays' | 'validityDays' | 'submittedAt';
 
@@ -29,7 +45,7 @@ type QuoteComparisonProps = {
   pendingPayment: { quoteId: string; paymentId: string } | null;
   pendingCheckoutUrl?: string | null;
   busyQuoteId: string | null;
-  onAccept: (quoteId: string) => void;
+  onAccept: (quoteId: string, declarationAccepted?: boolean) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
 };
@@ -166,10 +182,11 @@ function QuoteRow({
   pendingCheckoutUrl,
 }: QuoteRowProps) {
   return (
-    <tr className="align-top">
+    <tr className={`align-top ${quote.independentlyVerified ? 'bg-approved/5' : ''}`}>
       <td className="px-5 py-5">
         <p className="font-semibold text-foundation-navy">{quote.reference}</p>
         <StatusBadge status={quote.status === 'ACCEPTED' ? 'approved' : 'neutral'}>{quote.status}</StatusBadge>
+        <div className="mt-2"><ProviderVerificationBadge status={quote.providerVerificationStatus} verifiedDocumentLabels={quote.verifiedDocumentLabels} independentlyVerified={quote.independentlyVerified} /></div>
       </td>
       <td className="px-5 py-5">
         <p className="font-heading text-xl font-bold text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
@@ -213,11 +230,12 @@ function QuoteCard({
   pendingCheckoutUrl,
 }: QuoteRowProps) {
   return (
-    <Card interactive>
+    <Card interactive className={quote.independentlyVerified ? 'border-approved/40 bg-approved/5' : ''}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">{quote.reference}</p>
           <p className="mt-1 font-heading text-2xl font-bold text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
+          <div className="mt-2"><ProviderVerificationBadge status={quote.providerVerificationStatus} verifiedDocumentLabels={quote.verifiedDocumentLabels} independentlyVerified={quote.independentlyVerified} /></div>
         </div>
         <StatusBadge status={quote.status === 'ACCEPTED' ? 'approved' : 'neutral'}>{quote.status}</StatusBadge>
       </div>
@@ -252,7 +270,7 @@ type QuoteRowProps = {
   contact?: Contact;
   isPendingPayment: boolean;
   busy: boolean;
-  onAccept: (quoteId: string) => void;
+  onAccept: (quoteId: string, declarationAccepted?: boolean) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
   pendingCheckoutUrl?: string | null;
@@ -310,13 +328,37 @@ function DecisionActions({
   contact?: Contact;
   isPendingPayment: boolean;
   busy: boolean;
-  onAccept: (quoteId: string) => void;
+  onAccept: (quoteId: string, declarationAccepted?: boolean) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
   pendingCheckoutUrl?: string | null;
 }) {
+  const [showDeclaration, setShowDeclaration] = useState(false);
+  const [declarationChecked, setDeclarationChecked] = useState(false);
+
   if (quote.status === 'SUBMITTED') {
-    return <Button onClick={() => onAccept(quote.id)} loading={busy}>Accept quote · £{quote.releaseFeeGbp} excl. VAT release fee</Button>;
+    const requiresDeclaration = quote.providerVerificationStatus === 'VERIFIED' || quote.independentlyVerified;
+    return (
+      <>
+        <Button onClick={() => requiresDeclaration ? setShowDeclaration(true) : onAccept(quote.id)} loading={busy}>Accept quote · £{quote.releaseFeeGbp} excl. VAT release fee</Button>
+        {showDeclaration && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-foundation-navy/50 p-4">
+            <Card className="max-w-lg">
+              <h3 className="font-heading text-lg font-bold text-foundation-navy">Before you proceed</h3>
+<p className="mt-3 text-sm text-concrete-grey">Trade Tender has completed reasonable measures to verify this Provider&rsquo;s registered business, insurance, and accreditation evidence. You retain full responsibility for your own due diligence before entering into any agreement, and Trade Tender accepts no liability for the Provider&rsquo;s work, conduct, or the outcome of your engagement with them.</p>
+              <label className="mt-4 flex items-start gap-3 text-sm text-foundation-navy">
+                <input type="checkbox" checked={declarationChecked} onChange={(event) => setDeclarationChecked(event.target.checked)} className="mt-1 h-4 w-4 accent-safety-amber" />
+                I have read and accept this declaration.
+              </label>
+              <div className="mt-5 flex justify-end gap-3">
+                <Button variant="secondary" onClick={() => { setShowDeclaration(false); setDeclarationChecked(false); }}>Cancel</Button>
+                <Button disabled={!declarationChecked} loading={busy} onClick={() => { setShowDeclaration(false); onAccept(quote.id, true); }}>Accept &amp; proceed</Button>
+              </div>
+            </Card>
+          </div>
+        )}
+      </>
+    );
   }
   if (quote.status === 'ACCEPTED' && isPendingPayment) {
     if (pendingCheckoutUrl) {

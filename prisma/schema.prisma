@@ -43,6 +43,7 @@ enum PaymentType {
   CLIENT_RELEASE
   SPONSORED_PLACEMENT
   MEMBERSHIP_TIER
+  INDEPENDENT_REVIEW
 }
 
 enum PaymentStatus {
@@ -87,6 +88,21 @@ enum DataSubjectRequestRight {
   ERASURE
   RESTRICTION
   OBJECTION
+}
+
+enum ProviderVerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum IndependentReviewStatus {
+  NOT_PURCHASED
+  PURCHASED
+  APPROVED
+  DECLINED
 }
 
 model User {
@@ -393,10 +409,53 @@ model RetailerProfile {
   coverageAreas     String                // comma-separated postcode areas / towns, used for distance estimates only
   accreditations    String?
   launchCreditsLeft Int                   @default(3)
+  verificationStatus     ProviderVerificationStatus @default(UNVERIFIED)
+  verificationRequestedAt DateTime?
+  verificationDecidedAt   DateTime?
+  verificationNote        String?
+  verificationConfidencePercent Int?
+  verificationReport      String? // AI + review summary; Super User visibility only, never returned to the Provider
+  independentReviewStatus IndependentReviewStatus @default(NOT_PURCHASED)
+  independentReviewPurchasedAt DateTime?
+  independentReviewDecidedAt   DateTime?
+  independentReviewNote        String?
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @default(now())
 
   teamMembers       RetailerTeamMember[]
+  verificationDocuments VerificationDocument[]
+}
+
+enum ProviderVerificationDocumentType {
+  CERTIFICATE_OF_INCORPORATION
+  PUBLIC_LIABILITY_INSURANCE
+  EMPLOYERS_LIABILITY_INSURANCE
+  WASTE_CARRIERS_LICENCE
+  PROFESSIONAL_QUALIFICATIONS
+  PROFESSIONAL_INDEMNITY_INSURANCE
+  SSIP_ACCREDITATION
+}
+
+/** One uploaded evidence file per document type/slot; re-uploading replaces the prior file for that slot. */
+model VerificationDocument {
+  id                String                           @id @default(cuid())
+  retailerProfileId String
+  retailerProfile   RetailerProfile                  @relation(fields: [retailerProfileId], references: [id], onDelete: Cascade)
+  documentType      ProviderVerificationDocumentType
+  fileName          String
+  mimeType          String
+  sizeBytes         Int
+  content           Bytes
+  expiryDate        DateTime
+  aiConfidencePercent Int?
+  aiSummary           String? // Super User visibility only, never returned to the Provider
+  aiRequiresHumanReview Boolean @default(false)
+  aiAssessedAt          DateTime?
+  verified              Boolean @default(false) // set true for every applicable document present at the moment the profile is approved
+  uploadedAt        DateTime                         @default(now())
+  updatedAt         DateTime                         @updatedAt
+
+  @@unique([retailerProfileId, documentType])
 }
 
 model RetailerTeamMember {

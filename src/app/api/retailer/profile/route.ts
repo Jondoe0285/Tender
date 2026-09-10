@@ -4,6 +4,8 @@ import { isSameOriginRequest } from '@/server/http/origin';
 import { prisma } from '@/server/data/prisma';
 import { z } from 'zod';
 import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
+import { isVerificationEligible } from '@/lib/categories';
+import { syncVerificationExpiry } from '@/server/domain/verificationDocumentService';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,7 +67,8 @@ export async function PUT(req: NextRequest) {
     // matching otherwise only runs once, at tender creation time.
     await matchRetailerToOpenTenders(user.id);
 
-    return NextResponse.json(updated, { status: 200 });
+    const { verificationReport: _verificationReport, verificationConfidencePercent: _verificationConfidencePercent, ...publicProfile } = updated;
+    return NextResponse.json({ ...publicProfile, verificationEligible: isVerificationEligible(updated.categories) }, { status: 200 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -84,9 +87,12 @@ export async function GET(_req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'USER') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+    await syncVerificationExpiry(user.id);
     const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id } });
     if (!profile) return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
-    return NextResponse.json(profile, { status: 200 });
+    // The AI assessment report and confidence score are Super User review material only.
+    const { verificationReport: _verificationReport, verificationConfidencePercent: _verificationConfidencePercent, ...publicProfile } = profile;
+    return NextResponse.json({ ...publicProfile, verificationEligible: isVerificationEligible(profile.categories) }, { status: 200 });
   } catch (error) {
     console.error('Error fetching retailer profile:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

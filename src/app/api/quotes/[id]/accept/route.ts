@@ -10,7 +10,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
     const user = await requireRole('USER');
-    const outcome = await acceptQuote(user.id, params.id, request.headers.get('x-mobile-payment-return') ?? undefined);
+    const body = await request.json().catch(() => null);
+    const declarationAccepted = body?.declarationAccepted === true;
+    const outcome = await acceptQuote(user.id, params.id, request.headers.get('x-mobile-payment-return') ?? undefined, declarationAccepted);
     return NextResponse.json(outcome);
   } catch (error) {
     return toErrorResponse(error);

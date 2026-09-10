@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Input, Label, Textarea, FieldGroup } from '@/components/ui/Field';
 import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
 import { CATEGORIES } from '@/lib/categories';
@@ -17,6 +19,8 @@ type TeamMember = {
   user: { email: string; contactName: string };
 };
 
+type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
+
 type Profile = {
   id: string;
   companyName: string;
@@ -27,6 +31,8 @@ type Profile = {
   regions: string;
   categories: string;
   masterUserId: string | null;
+  verificationStatus: VerificationStatus;
+  verificationEligible: boolean;
 };
 
 const permissions = [
@@ -52,16 +58,18 @@ export default function RetailerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [independentReview, setIndependentReview] = useState<{ active: boolean; feeGbp: number; eligible: boolean; status: 'NOT_PURCHASED' | 'PURCHASED' | 'APPROVED' | 'DECLINED' } | null>(null);
 
   async function load() {
     setLoading(true);
-    const [profileResponse, teamResponse] = await Promise.all([fetch('/api/retailer/profile'), fetch('/api/retailer/team')]);
+    const [profileResponse, teamResponse, independentReviewResponse] = await Promise.all([fetch('/api/retailer/profile'), fetch('/api/retailer/team'), fetch('/api/retailer/independent-review')]);
     if (profileResponse.ok) {
       const data: Profile = await profileResponse.json();
       setProfile(data);
       setForm({ companyName: data.companyName, companyNumber: data.companyNumber ?? '', address: data.address ?? '', coverageScope: data.coverageScope, counties: splitValues(data.counties), regions: splitValues(data.regions), categories: splitValues(data.categories), masterUserId: data.masterUserId ?? '' });
     }
     if (teamResponse.ok) setTeamMembers(await teamResponse.json());
+    if (independentReviewResponse.ok) setIndependentReview(await independentReviewResponse.json());
     setLoading(false);
   }
 
@@ -132,6 +140,56 @@ export default function RetailerProfilePage() {
     <AppShell role="retailer" title="Profile">
       <div className="mx-auto max-w-4xl space-y-6">
         {message && <p role="status" className="rounded-lg border border-steel-blue/20 bg-steel-blue/5 px-4 py-3 text-sm text-steel-blue">{message}</p>}
+        {profile.verificationEligible && (
+          <Card className="border-l-4 border-safety-amber bg-amber-50/40">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="font-heading text-lg font-bold text-foundation-navy">Provider verification</p>
+                <p className="mt-1 max-w-xl text-sm text-concrete-grey">
+                  {profile.verificationStatus === 'VERIFIED' && 'Your business is verified. This is shown to Contractors on every quote you submit.'}
+                  {profile.verificationStatus === 'PENDING' && 'Your verification request is under review. We will update your status once it has been checked.'}
+                  {profile.verificationStatus === 'REJECTED' && 'Your last verification request was not approved. You can request verification again at any time.'}
+                  {profile.verificationStatus === 'EXPIRED' && 'One or more of your verification documents have expired, so your verified status has been removed. Upload a replacement to restart the review.'}
+                  {profile.verificationStatus === 'UNVERIFIED' && 'Waste, Plant Hire, Contractor Services, and Professional Services providers can complete a verification check. Verified status is shown to Contractors on every quote you submit.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <StatusBadge status={profile.verificationStatus === 'VERIFIED' ? 'approved' : profile.verificationStatus === 'PENDING' ? 'pending' : profile.verificationStatus === 'REJECTED' || profile.verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
+                  {profile.verificationStatus === 'VERIFIED' ? 'Verified by Ai' : profile.verificationStatus === 'PENDING' ? 'Pending review' : profile.verificationStatus === 'REJECTED' ? 'Not approved' : profile.verificationStatus === 'EXPIRED' ? 'Expired' : 'Unverified'}
+                </StatusBadge>
+                {(profile.verificationStatus === 'UNVERIFIED' || profile.verificationStatus === 'REJECTED' || profile.verificationStatus === 'EXPIRED') && (
+                  <Link href="/retailer/verification"><Button>Become Verified</Button></Link>
+                )}
+                {(profile.verificationStatus === 'PENDING' || profile.verificationStatus === 'VERIFIED') && (
+                  <Link href="/retailer/verification" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">View documents</Link>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
+        {independentReview?.active && independentReview.eligible && (
+          <Card className="border-l-4 border-approved bg-approved/5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="font-heading text-lg font-bold text-foundation-navy">Independent H&amp;S review</p>
+                <p className="mt-1 max-w-xl text-sm text-concrete-grey">
+                  {independentReview.status === 'APPROVED' && 'Your business is Independently Verified by a Health & Safety professional.'}
+                  {independentReview.status === 'PURCHASED' && 'Your independent review has been purchased. A Health & Safety professional will contact you about the next steps.'}
+                  {independentReview.status === 'DECLINED' && 'Your last independent review was not approved. You can purchase another review at any time.'}
+                  {independentReview.status === 'NOT_PURCHASED' && `Purchase an independent review by a Health & Safety professional for £${independentReview.feeGbp} excl. VAT.`}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <StatusBadge status={independentReview.status === 'APPROVED' ? 'approved' : independentReview.status === 'PURCHASED' ? 'pending' : independentReview.status === 'DECLINED' ? 'attention' : 'neutral'}>
+                  {independentReview.status === 'APPROVED' ? 'Independently Verified' : independentReview.status === 'PURCHASED' ? 'Awaiting review' : independentReview.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
+                </StatusBadge>
+                {(independentReview.status === 'NOT_PURCHASED' || independentReview.status === 'DECLINED') && (
+                  <Link href="/retailer/independent-review"><Button>Purchase review</Button></Link>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
         <Card>
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
             <div><h2 className="font-heading text-xl font-bold text-foundation-navy">Company profile</h2><p className="mt-1 text-sm text-concrete-grey">Keep the details used for matching and commercial correspondence current.</p></div>

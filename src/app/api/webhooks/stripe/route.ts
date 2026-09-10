@@ -9,6 +9,7 @@ import { finalizeUnlockWithPayment } from '@/server/domain/unlockService';
 import { finalizeContactRelease } from '@/server/domain/contactReleaseService';
 import { finalizeSponsoredPlacementWithPayment } from '@/server/domain/sponsoredPlacementService';
 import { finalizeMembershipTierWithPayment } from '@/server/domain/membershipService';
+import { finalizeIndependentReviewWithPayment } from '@/server/domain/independentReviewService';
 import { reversePaymentEntitlements } from '@/server/payments/paymentReversalService';
 
 async function getReceiptUrl(stripe: Stripe, session: Stripe.Checkout.Session): Promise<string | null> {
@@ -114,6 +115,7 @@ export async function POST(request: Request) {
         if (payment.type === 'CLIENT_RELEASE' && payment.quoteId) await finalizeContactRelease(payment.userId, payment.quoteId, payment.id);
         if (payment.type === 'SPONSORED_PLACEMENT') await finalizeSponsoredPlacementWithPayment(payment.userId, payment.id);
         if (payment.type === 'MEMBERSHIP_TIER' && payment.tierId) await finalizeMembershipTierWithPayment(payment.userId, payment.tierId, payment.id);
+        if (payment.type === 'INDEPENDENT_REVIEW') await finalizeIndependentReviewWithPayment(payment.userId, payment.id);
       }
       const paymentAuditAction = confirmed ? 'PAYMENT_CONFIRMED' : 'PAYMENT_FAILED';
       const existingPaymentAudit = await prisma.auditLog.findFirst({
@@ -130,7 +132,7 @@ export async function POST(request: Request) {
         });
       }
 
-      if (payment) {
+      if (payment && payment.type !== 'INDEPENDENT_REVIEW') {
         const reference = payment.quote?.reference ?? payment.unlock?.tender.reference ?? paymentId;
         const accountPath = payment.type === 'CLIENT_RELEASE' ? '/client/billing' : '/retailer/billing';
         const template = confirmed

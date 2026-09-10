@@ -233,8 +233,38 @@ export function supportRequestNotificationTemplate(input: { type: string; submit
   };
 }
 
-export function accountCreatedByAdminTemplate(input: { role: 'USER' | 'USER'; contactName: string; companyName?: string; resetLink: string; expiresIn: string }): EmailTemplate {
+/** Deliberately excludes the AI report body and evidence — those are reviewed only inside the authenticated Super User screen. */
+export function providerVerificationReviewRequiredTemplate(input: { confidencePercent: number; reviewPath: string }): EmailTemplate {
   return {
+    subject: 'Provider verification needs human review',
+    html: layout({
+      eyebrow: 'Provider verification',
+      title: 'A Provider verification request needs review',
+      intro: 'An automated document assessment could not confirm this account for verification without a human reviewer.',
+      body: detailRows([
+        ['AI confidence score', `${input.confidencePercent}%`],
+        ['Next step', 'Open the account review screen to see the assessment report and uploaded evidence, then approve or decline.'],
+      ]),
+      action: { label: 'Review verification request', href: appUrl(input.reviewPath) },
+    }),
+  };
+}
+
+/** Deliberately excludes payment amounts and account identifiers beyond what the Provider already knows. */
+export function independentReviewPurchasedTemplate(_input: Record<string, never>): EmailTemplate {
+  return {
+    subject: 'Independent H&S review purchased',
+    html: layout({
+      eyebrow: 'Independent review',
+      title: 'Your independent review has been purchased',
+      intro: 'Thank you for purchasing an independent review of your business by a Health & Safety professional.',
+      body: '<p style="font-size:14px;line-height:1.6">A Health &amp; Safety professional will contact you directly about the next steps. No further action is required from you at this time.</p>',
+      action: { label: 'View your profile', href: appUrl('/retailer/profile') },
+    }),
+  };
+}
+
+export function accountCreatedByAdminTemplate(input: { role: 'USER' | 'USER'; contactName: string; companyName?: string; resetLink: string; expiresIn: string }): EmailTemplate {  return {
     subject: 'Your Trade Tender account is ready',
     html: layout({
       eyebrow: 'Account created',

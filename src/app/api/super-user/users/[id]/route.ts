@@ -7,6 +7,7 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { createPasswordResetToken, PASSWORD_RESET_EXPIRY_LABEL } from '@/server/auth/passwordReset';
 import { appUrl, passwordResetTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
+import { markUploadedDocumentsVerified } from '@/server/domain/verificationDocumentService';
 
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -150,6 +151,61 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       metadata: { email: user.email, previous: profile.launchCreditsLeft, next: launchCreditsLeft },
     });
     return NextResponse.json({ status: 'launch-credits-updated', launchCreditsLeft });
+  }
+
+  if (action === 'approve-verification' || action === 'reject-verification') {
+    if (user.role !== 'USER') {
+      return NextResponse.json({ error: 'Verification only applies to Provider accounts' }, { status: 400 });
+    }
+    const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { id: true, categories: true, verificationStatus: true } });
+    if (!profile) {
+      return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
+    }
+    if (profile.verificationStatus !== 'PENDING') {
+      return NextResponse.json({ error: 'Only a pending verification request can be decided' }, { status: 409 });
+    }
+    const nextStatus = action === 'approve-verification' ? 'VERIFIED' : 'REJECTED';
+    const note = typeof body?.note === 'string' ? body.note.slice(0, 500) : null;
+    await prisma.retailerProfile.update({
+      where: { userId: user.id },
+      data: { verificationStatus: nextStatus, verificationDecidedAt: new Date(), verificationNote: note },
+    });
+    await markUploadedDocumentsVerified(profile.id, profile.categories, action === 'approve-verification');
+    await recordAuditEvent({
+      actorId: admin.id,
+      action: action === 'approve-verification' ? 'PROVIDER_VERIFICATION_APPROVED' : 'PROVIDER_VERIFICATION_REJECTED',
+      targetType: 'User',
+      targetId: user.id,
+      metadata: { email: user.email, note: note ?? undefined },
+    });
+    return NextResponse.json({ status: 'verification-decided', verificationStatus: nextStatus });
+  }
+
+  if (action === 'approve-independent-review' || action === 'decline-independent-review') {
+    if (user.role !== 'USER') {
+      return NextResponse.json({ error: 'Independent review only applies to Provider accounts' }, { status: 400 });
+    }
+    const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { id: true, independentReviewStatus: true } });
+    if (!profile) {
+      return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
+    }
+    if (profile.independentReviewStatus !== 'PURCHASED') {
+      return NextResponse.json({ error: 'Only a purchased independent review can be decided' }, { status: 409 });
+    }
+    const nextStatus = action === 'approve-independent-review' ? 'APPROVED' : 'DECLINED';
+    const note = typeof body?.note === 'string' ? body.note.slice(0, 500) : null;
+    await prisma.retailerProfile.update({
+      where: { userId: user.id },
+      data: { independentReviewStatus: nextStatus, independentReviewDecidedAt: new Date(), independentReviewNote: note },
+    });
+    await recordAuditEvent({
+      actorId: admin.id,
+      action: action === 'approve-independent-review' ? 'INDEPENDENT_REVIEW_APPROVED' : 'INDEPENDENT_REVIEW_DECLINED',
+      targetType: 'User',
+      targetId: user.id,
+      metadata: { email: user.email, note: note ?? undefined },
+    });
+    return NextResponse.json({ status: 'independent-review-decided', independentReviewStatus: nextStatus });
   }
 
   return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });

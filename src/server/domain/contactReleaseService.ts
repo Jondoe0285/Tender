@@ -3,19 +3,27 @@ import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { createPayment } from '@/server/payments/paymentService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
-import { ForbiddenError } from '@/server/auth/session';
+import { ForbiddenError, ValidationError } from '@/server/auth/session';
 import { getClientReleaseFeeGbp } from '@/server/domain/platformSettings';
 import { contactReleaseTemplate, quoteAcceptedTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { getPurchasedRetentionDeadline } from '@/server/domain/retentionService';
 import { consumePaymentWaiver } from '@/server/domain/paymentWaiverService';
+import { syncVerificationExpiry } from '@/server/domain/verificationDocumentService';
 
 type AcceptOutcome = { status: 'PAYMENT_REQUIRED' | 'RELEASED_WITH_CREDIT'; paymentId: string; checkoutUrl: string | null; devMode: boolean; feeGbp: number; vatGbp: number; totalAmountGbp: number; creditsLeft?: number };
 
 /** Accepting a quote enters a pending release-fee state — no contact data is exposed yet (SEC-035). */
-export async function acceptQuote(clientId: string, quoteId: string, mobileReturnUrl?: string): Promise<AcceptOutcome> {
+export async function acceptQuote(clientId: string, quoteId: string, mobileReturnUrl?: string, declarationAccepted = false): Promise<AcceptOutcome> {
   const quote = await prisma.quote.findUnique({ where: { id: quoteId }, include: { tender: true, retailer: { select: { email: true } }, releasePayment: true } });
   if (!quote || quote.tender.clientId !== clientId) throw new ForbiddenError('Quote not found for this Client');
+  if (quote.status === 'SUBMITTED') {
+    await syncVerificationExpiry(quote.retailerId);
+    const retailerProfile = await prisma.retailerProfile.findUnique({ where: { userId: quote.retailerId }, select: { verificationStatus: true, independentReviewStatus: true } });
+    if ((retailerProfile?.verificationStatus === 'VERIFIED' || retailerProfile?.independentReviewStatus === 'APPROVED') && !declarationAccepted) {
+      throw new ValidationError('You must accept the verification declaration before accepting a quote from a verified Provider');
+    }
+  }
   if (quote.status === 'ACCEPTED' && quote.releasePayment) {
     return {
       status: 'PAYMENT_REQUIRED',
@@ -42,6 +50,15 @@ export async function acceptQuote(clientId: string, quoteId: string, mobileRetur
       targetId: quoteId,
       metadata: { tenderId: quote.tenderId },
     });
+    if (declarationAccepted) {
+      await recordAuditEvent({
+        actorId: clientId,
+        action: 'VERIFICATION_DECLARATION_ACCEPTED',
+        targetType: 'Quote',
+        targetId: quoteId,
+        metadata: { tenderId: quote.tenderId, retailerId: quote.retailerId },
+      });
+    }
   }
 
   const releaseFeeGbp = await getClientReleaseFeeGbp(quote.priceGbp);
