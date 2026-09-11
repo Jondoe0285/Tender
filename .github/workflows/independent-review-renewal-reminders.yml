@@ -1,0 +1,49 @@
+name: Independent review renewal reminders
+
+on:
+  schedule:
+    - cron: '23 8 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: independent-review-renewal-reminders
+  cancel-in-progress: false
+
+jobs:
+  send-renewal-reminders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Send renewal reminders
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+        run: |
+          set -euo pipefail
+          for required in DATABASE_URL RESEND_API_KEY EMAIL_FROM NEXTAUTH_URL; do
+            if [ -z "${!required}" ]; then
+              echo "::error::${required} is not configured in the production GitHub Actions environment."
+              exit 1
+            fi
+          done
+          npx tsx scripts/send-independent-review-renewal-reminders.ts

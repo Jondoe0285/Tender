@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input, Label } from '@/components/ui/Field';
@@ -13,6 +13,21 @@ export function MfaSettings() {
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetch('/api/auth/mfa')
+      .then((response) => response.ok ? response.json() : null)
+      .then((data: { enabled?: boolean } | null) => {
+        if (!cancelled) setEnabled(Boolean(data?.enabled));
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   async function request(action: 'begin' | 'verify' | 'disable') {
     setLoading(true);

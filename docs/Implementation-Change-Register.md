@@ -28,6 +28,33 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-11 - Full-Quote Contact Release Fee Basis
+
+- Changed: accepted quote release pricing is explicitly based on the full submitted quote value for the Provider quote being accepted. Contractors cannot select only part of a quote to reduce the release fee.
+- Changed: narrowed payment fee overrides so they apply only to independent-review payments, preventing any future accidental override of `CLIENT_RELEASE` fees away from the full quote value.
+- Changed: quote comparison and Contractor tender copy now state `Accept full quote` and `Full submitted quote value`, and clarify that the release fee is not based on selected quote lines.
+- Affects: contact-release/payment pricing guard, Contractor quote comparison copy, and focused full-quote release tests. No schema, migration, or external service change.
+- Environment: no operator action required.
+- Validation: focused full-quote release tests and `npm run type-check -- --pretty false` pass locally.
+
+### 2026-09-11 - MFA Activation Repair
+
+- Changed: starting MFA enrollment no longer increments `sessionVersion`, so the current authenticated session remains valid long enough for the Super User to enter the authenticator code and complete activation. Session invalidation still occurs when MFA is successfully enabled or disabled.
+- Changed: the Security page MFA settings now load the current MFA enabled state from `/api/auth/mfa` before presenting setup/disable controls, so an already enabled account is not shown the setup flow again.
+- Affects: MFA API route, MFA settings UI, and focused MFA tests.
+- Environment: no migration, secret, or external service change. `NEXTAUTH_SECRET` must remain configured because it encrypts MFA secrets.
+- Validation: focused MFA tests and `npm run type-check -- --pretty false` pass locally.
+
+### 2026-09-11 - Independent Verification Renewal Reminder Emails
+
+- Changed: added an automatic renewal reminder workflow for independent verification. When the Owner renewal model is active, approved Providers are scanned once they reach the 11-month renewal window, which is one month before the 12-month expiry.
+- Changed: reminders are sent to the primary contact for the operating company where available, falling back to the Provider account email if no operating-company primary contact is found. The email includes the expiry date, renewal fee, and a `Renew now` link to `/retailer/independent-review?renewal=1`.
+- Changed: reminder sends and failures are recorded in audit logs, and successful sends are deduplicated by profile and expiry date so the company is not repeatedly emailed for the same renewal window.
+- Changed: added `npm run independent-review:renewal-reminders` and the scheduled production workflow `independent-review-renewal-reminders.yml`, which fails closed unless `DATABASE_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `NEXTAUTH_URL` are configured in the production GitHub Actions environment.
+- Affects: independent review service, email templates, reminder script, GitHub workflow validation, package scripts, operational docs, and focused renewal reminder tests.
+- Environment: configure the production GitHub Actions environment secrets named above before relying on the scheduled workflow. No new database migration is required.
+- Validation: focused renewal reminder tests, `npm run type-check -- --pretty false`, and `npm run health:validate-workflows` pass locally.
+
 ### 2026-09-11 - Independent Verification Tier Guide
 
 - Changed: added a shared Bronze/Silver/Gold independent verification tier guide. Bronze represents reviewed evidence of legal requirements such as permits, insurances, and competent advice. Silver includes Bronze plus sufficient evidence of industry-specific employee and managerial training. Gold includes Bronze and Silver plus either a comprehensive management system or validated SSIP membership.

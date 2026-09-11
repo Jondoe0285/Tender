@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
     if (parsed.data.action === 'begin') {
       const enrollment = buildMfaEnrollment(user.email);
-      await prisma.user.update({ where: { id: user.id }, data: { mfaEnabled: false, mfaSecretEncrypted: encryptMfaSecret(enrollment.secret), mfaRecoveryCodesHash: null, mfaVerifiedAt: null, sessionVersion: { increment: 1 } } });
+      await prisma.user.update({ where: { id: user.id }, data: { mfaEnabled: false, mfaSecretEncrypted: encryptMfaSecret(enrollment.secret), mfaRecoveryCodesHash: null, mfaVerifiedAt: null } });
       await recordAuditEvent({ actorId: user.id, action: 'MFA_ENROLLMENT_STARTED', targetType: 'User', targetId: user.id });
       return NextResponse.json({ uri: enrollment.uri, secret: enrollment.secret, qrCodeDataUrl: await QRCode.toDataURL(enrollment.uri) });
     }

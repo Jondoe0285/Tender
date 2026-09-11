@@ -345,7 +345,7 @@ function QuoteBreakdown({ quote }: { quote: ActiveQuote }) {
           </li>
         ))}
       </ul>
-      <p className="mt-2 border-t border-slate-200 pt-2 text-sm font-semibold text-foundation-navy">Total: £{quote.priceGbp} excl. VAT</p>
+      <p className="mt-2 border-t border-slate-200 pt-2 text-sm font-semibold text-foundation-navy">Full submitted quote value: £{quote.priceGbp} excl. VAT</p>
     </div>
   );
 }
@@ -415,7 +415,7 @@ function DecisionActions({
     const requiresDeclaration = quote.providerVerificationStatus === 'VERIFIED' || quote.independentlyVerified;
     return (
       <>
-        <Button onClick={() => requiresDeclaration ? setShowDeclaration(true) : onAccept(quote.id)} loading={busy}>Accept quote · £{quote.releaseFeeGbp} excl. VAT release fee</Button>
+        <Button onClick={() => requiresDeclaration ? setShowDeclaration(true) : onAccept(quote.id)} loading={busy}>Accept full quote · £{quote.releaseFeeGbp} excl. VAT release fee</Button>
         {showDeclaration && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-foundation-navy/50 p-4">
             <Card className="max-w-lg">

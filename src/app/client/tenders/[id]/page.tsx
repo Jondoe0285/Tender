@@ -391,8 +391,8 @@ export default function ClientTenderDetailPage() {
         ) : (
           <>
             <p className="mb-4 text-sm text-concrete-grey">
-              Compare the commercial details first. Accepting a quote starts the contact-release payment shown against
-              that quote; contact details remain hidden until payment is confirmed.
+              Compare the commercial details first. Accepting a quote releases contact details for that Provider quote only;
+              the release fee is based on the full submitted quote value, not selected quote lines.
             </p>
             <QuoteComparison
               quotes={quotes}

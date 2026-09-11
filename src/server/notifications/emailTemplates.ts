@@ -94,6 +94,19 @@ export function quoteReminderTemplate(input: { quoteReference: string; tenderRef
   };
 }
 
+export function independentReviewRenewalReminderTemplate(input: { companyName: string; expiryDate: Date; renewalFeeGbp: number; renewalPath: string }): EmailTemplate {
+  return {
+    subject: 'Independent verification renewal due soon',
+    html: layout({
+      eyebrow: 'Independent verification renewal',
+      title: 'Your independent verification is due to expire',
+      intro: `${input.companyName}'s independent verification is due to expire on ${input.expiryDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`,
+      body: detailRows([['Company', input.companyName], ['Expiry date', input.expiryDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })], ['Renewal fee', `£${input.renewalFeeGbp} excl. VAT`], ['Action required', 'Renew before expiry to use the lower renewal price and avoid a gap in independent verification status.']]),
+      action: { label: 'Renew now', href: appUrl(input.renewalPath) },
+    }),
+  };
+}
+
 export function paymentConfirmationTemplate(input: { paymentType: string; amountGbp: number; vatGbp: number; totalAmountGbp: number; reference: string; accountPath: string }): EmailTemplate {
   return {
     subject: `Payment confirmed: ${input.reference}`,

@@ -147,7 +147,7 @@ for (const [file, content] of contents) {
 
 // One authoritative scheduled audit only.
 const scheduled = [...contents.entries()].filter(([, content]) => /^\s*schedule:/m.test(content)).map(([file]) => file);
-const auditSchedules = scheduled.filter((file) => !['quote-retention.yml', 'pricing-estimate-refresh.yml'].includes(file));
+const auditSchedules = scheduled.filter((file) => !['quote-retention.yml', 'pricing-estimate-refresh.yml', 'independent-review-renewal-reminders.yml'].includes(file));
 check(auditSchedules.length <= 1, `More than one scheduled audit workflow is enabled: ${auditSchedules.join(', ')}. Exactly one authoritative audit schedule is permitted.`);
 
 if (problems.length > 0) {

@@ -51,7 +51,7 @@ export async function createPayment(params: {
     if (!tier?.active) throw new Error('Membership tier is not available');
     netFeeGbp = tier.monthlyPriceGbp;
   } else {
-    netFeeGbp = params.feeOverrideGbp !== undefined
+    netFeeGbp = params.type === 'INDEPENDENT_REVIEW' && params.feeOverrideGbp !== undefined
       ? params.feeOverrideGbp
       : params.type === 'CLIENT_RELEASE' && params.quotePriceGbp !== undefined
       ? await getClientReleaseFeeGbp(params.quotePriceGbp)
