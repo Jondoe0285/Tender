@@ -36,6 +36,7 @@ function formatFileSize(sizeBytes: number) {
 
 export default function ProviderVerificationPage() {
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>('UNVERIFIED');
+  const [isSoleTrader, setIsSoleTrader] = useState(false);
   const [applicableTypes, setApplicableTypes] = useState<VerificationDocumentType[]>([]);
   const [requiredTypes, setRequiredTypes] = useState<VerificationDocumentType[]>([]);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
@@ -57,6 +58,7 @@ export default function ProviderVerificationPage() {
     if (profileResponse.ok) {
       const profile = await profileResponse.json();
       setVerificationStatus(profile.verificationStatus);
+      setIsSoleTrader(Boolean(profile.isSoleTrader));
     }
     if (documentsResponse.ok) {
       const data = await documentsResponse.json();
@@ -148,7 +150,7 @@ export default function ProviderVerificationPage() {
   const validUploadedTypes = new Set(documents.filter((doc) => !doc.expiryDate || new Date(doc.expiryDate).getTime() > now).map((doc) => doc.documentType));
   const requiredUploaded = requiredTypes.filter((type) => validUploadedTypes.has(type));
   const canSubmit = requiredTypes.length > 0 && requiredUploaded.length === requiredTypes.length;
-  const canEdit = REOPEN_STATUSES.includes(verificationStatus);
+  const canEdit = !isSoleTrader && REOPEN_STATUSES.includes(verificationStatus);
   const minExpiryDate = new Date(now + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   if (loading) return <AppShell role="retailer" title="Become Verified"><p className="text-sm text-concrete-grey">Loading...</p></AppShell>;
@@ -166,15 +168,19 @@ export default function ProviderVerificationPage() {
             <div>
               <h2 className="font-heading text-xl font-bold text-foundation-navy">Verification documents</h2>
               <p className="mt-1 max-w-xl text-sm text-concrete-grey">
-                Upload each document below with its expiry date. Every upload is submitted separately, so you can complete this checklist at your own pace.
-                {requiredTypes.length > 0 && ` Required documents uploaded: ${requiredUploaded.length} of ${requiredTypes.length}.`}
+                {isSoleTrader
+                  ? 'Your profile is marked as a sole trader, so AI verification is not available. Your quotes will show a Sole Trader status for Contractor due diligence.'
+                  : 'Upload each document below with its expiry date. Every upload is submitted separately, so you can complete this checklist at your own pace.'}
+                {!isSoleTrader && requiredTypes.length > 0 && ` Required documents uploaded: ${requiredUploaded.length} of ${requiredTypes.length}.`}
               </p>
             </div>
-            <StatusBadge status={verificationStatus === 'VERIFIED' ? 'approved' : verificationStatus === 'PENDING' ? 'pending' : verificationStatus === 'REJECTED' || verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
-              {verificationStatus === 'VERIFIED' ? 'Verified by Ai' : verificationStatus === 'PENDING' ? 'Pending review' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : 'Unverified'}
+            <StatusBadge status={isSoleTrader ? 'neutral' : verificationStatus === 'VERIFIED' ? 'approved' : verificationStatus === 'PENDING' ? 'pending' : verificationStatus === 'REJECTED' || verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
+              {isSoleTrader ? 'Sole Trader' : verificationStatus === 'VERIFIED' ? 'Verified by Ai' : verificationStatus === 'PENDING' ? 'Pending review' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : 'Unverified'}
             </StatusBadge>
           </div>
         </Card>
+
+        {isSoleTrader && <Card className="border-l-4 border-safety-amber bg-amber-50/40"><p className="text-sm font-semibold text-foundation-navy">Sole trader status</p><p className="mt-2 text-sm text-concrete-grey">Sole traders cannot be AI verified by Trade Tender because the automated legal-entity evidence route is not suitable. Contractors will see a Sole Trader flag on your quotes and should complete their own identity, insurance, competence, and commercial checks.</p></Card>}
 
         <Card className="border-l-4 border-safety-amber bg-amber-50/40">
           <p className="text-sm font-semibold text-foundation-navy">Compliance score disclaimer</p>
@@ -255,6 +261,7 @@ export default function ProviderVerificationPage() {
             <p className="text-sm text-concrete-grey">
               {verificationStatus === 'VERIFIED' && 'This account is verified. No further action is required.'}
               {verificationStatus === 'PENDING' && 'Your request is under review. You can still upload or replace documents while it is pending.'}
+              {isSoleTrader && 'AI verification is not available for sole trader profiles. Your quotes will show a Sole Trader status.'}
               {canEdit && !canSubmit && 'Upload every required document above, with a future expiry date, then submit your request for review.'}
               {canEdit && canSubmit && 'All required documents are uploaded. Submit your request for review.'}
             </p>

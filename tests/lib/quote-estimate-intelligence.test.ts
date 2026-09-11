@@ -91,6 +91,6 @@ describe('quote estimate intelligence', () => {
     const catalogue = buildPricingCatalogue();
 
     assert.ok(catalogue.some((row) => row.key === 'Materials > Bricks > Facing bricks'));
-    assert.ok(catalogue.some((row) => row.key === 'Professional Services > Safety, Compliance & Consultancy'));
+    assert.ok(catalogue.some((row) => row.key === 'Professional Services > Health, Safety & CDM Consultancy'));
   });
 });

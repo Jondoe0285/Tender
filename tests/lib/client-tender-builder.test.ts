@@ -14,7 +14,7 @@ test('Contractor tender builder sequences selected service package requirements'
   assert.ok(source.indexOf('id="closing-date"') < source.indexOf('{step === 2 && ('));
   assert.ok(source.includes("{step === 2 && ("));
   assert.ok(source.includes('activePackageIndex'));
-  assert.ok(source.includes('Complete this service package before moving to the next selected service.'));
+  assert.ok(source.includes('Complete {currentPackageLabel()} of {form.items.length + 1}.'));
   assert.ok(source.includes('Add another item'));
   assert.ok(source.includes("Package 1: {form.item || form.subcategory || 'Untitled package'}"));
   assert.ok(source.includes('const isActive = index === activePackageIndex - 1;'));
@@ -26,7 +26,18 @@ test('Contractor tender builder sequences selected service package requirements'
   assert.ok(source.includes('days'));
   assert.ok(source.includes('weeks'));
   assert.ok(source.includes('not applicable'));
-  assert.ok(source.includes('PROFESSIONAL_SERVICE_TYPES'));
+  assert.ok(source.includes('Professional discipline'));
+  assert.ok(source.includes('Professional service needed'));
+  assert.ok(source.includes("form.item === 'Other'"));
+  assert.ok(source.includes('Size, scope or output quantity'));
+  assert.ok(source.includes('Permitted working hours'));
+  assert.ok(source.includes('Access restrictions'));
+  assert.ok(source.includes('Site constraints'));
+  assert.ok(source.includes('Works, outputs or deliverables'));
+  assert.ok(source.includes('SERVICE_MINIMUM_REQUIREMENTS'));
+  assert.ok(source.includes('PLANT_HIRE_SUPPORT_OPTIONS'));
+  assert.ok(source.includes('cannot continue yet'));
+  assert.ok(source.includes('If more than one service was selected, Continue opens the next package before the Additional Requirements step.'));
   assert.ok(source.includes('Lift plan required'));
   assert.ok(source.includes('id="quantity-value"'));
   assert.ok(source.includes('id="primary-item-description"'));

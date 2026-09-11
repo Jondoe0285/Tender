@@ -178,8 +178,8 @@ test('accepts Contractor and Professional Services tender provisions', () => {
   const professionalService = createTenderSchema.safeParse({
     ...VALID_TENDER,
     category: 'Professional Services',
-    subcategory: 'Surveying, Design & Engineering',
-    item: 'Surveying, architecture, engineering, project management and technical design',
+    subcategory: 'Health, Safety & CDM Consultancy',
+    item: 'Retained health and safety consultancy',
   });
 
   assert.equal(contractorService.success, true);

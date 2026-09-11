@@ -13,6 +13,7 @@ const updateProfileSchema = z.object({
   companyName: z.string().min(1, 'Company name is required').max(200),
   companyNumber: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
+  isSoleTrader: z.boolean().optional(),
   standardQuoteValidityDays: z.coerce.number().int().positive().max(365).optional(),
   coverageScope: z.enum(['COUNTY', 'REGION', 'UK']),
   counties: z.string(), // comma-separated
@@ -56,6 +57,8 @@ export async function PUT(req: NextRequest) {
         companyName: parsed.companyName,
         companyNumber: parsed.companyNumber || null,
         address: parsed.address || null,
+        isSoleTrader: parsed.isSoleTrader ?? profile.isSoleTrader,
+        ...(parsed.isSoleTrader ? { verificationStatus: 'UNVERIFIED' as const, verificationDecidedAt: new Date(), verificationNote: 'Sole trader declaration: AI verification is not available for this profile.' } : {}),
         standardQuoteValidityDays: parsed.standardQuoteValidityDays ?? profile.standardQuoteValidityDays,
         coverageScope: parsed.coverageScope,
         counties: parsed.counties,

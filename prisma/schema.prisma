@@ -434,6 +434,7 @@ model RetailerProfile {
   companyName       String
   companyNumber     String?
   address           String?
+  isSoleTrader      Boolean               @default(false)
   coverageScope     RetailerCoverageScope @default(COUNTY)
   counties          String                @default("") // comma-separated UK county names, used when coverageScope = COUNTY
   regions           String                @default("") // comma-separated UK region names, used when coverageScope = REGION

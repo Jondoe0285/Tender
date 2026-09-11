@@ -20,6 +20,10 @@ export async function POST(request: Request) {
     const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id } });
     if (!profile) return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
 
+    if (profile.isSoleTrader) {
+      return NextResponse.json({ error: 'Sole trader profiles cannot be AI verified. Your quotes will show a Sole Trader status instead.' }, { status: 403 });
+    }
+
     if (!isVerificationEligible(profile.categories)) {
       return NextResponse.json({ error: 'Verification is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers' }, { status: 403 });
     }

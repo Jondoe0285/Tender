@@ -1,0 +1,1 @@
+ALTER TABLE "RetailerProfile" ADD COLUMN "isSoleTrader" BOOLEAN NOT NULL DEFAULT false;

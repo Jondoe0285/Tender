@@ -110,6 +110,10 @@ const policies = [
         content: 'Providers submit evidence, which is checked against the declared category and service scope. Validation may include document checks, policy compliance checks, and service-eligibility review. Trade Tender may reject, request more information, or suspend a profile where evidence is incomplete, inconsistent, or materially misleading.',
       },
       {
+        heading: 'Sole trader status',
+        content: 'A Provider may declare that they operate as a sole trader in their profile. Sole trader profiles are not eligible for Trade Tender AI verification because the automated legal-entity evidence route is not suitable for that status. Quotes from sole traders display a Sole Trader flag with explanatory text so Contractors can complete appropriate identity, insurance, competence, and commercial due diligence before appointment.',
+      },
+      {
         heading: 'User due diligence',
         content: 'Contractors and other clients must complete their own checks before committing to a provider or acting on any recommendation derived from a verification status. Verification status may be considered to inform decision-making, but it is not a substitute for formal credit, insurance, competence, or contract review.',
       },

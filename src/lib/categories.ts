@@ -63,8 +63,14 @@ export const SERVICE_CATALOG = {
     'Labour & Workforce Supply': ['General labour, skilled trades, plant operators, supervisors and site management'],
   },
   'Professional Services': {
-    'Surveying, Design & Engineering': ['Surveying, architecture, engineering, project management and technical design'],
-    'Safety, Compliance & Consultancy': ['Health and safety, CDM, Principal Designer, quality, environmental, fire, occupational health, training and management-system consultancy'],
+    'Health, Safety & CDM Consultancy': ['Construction phase health and safety plan', 'RAMS review or preparation', 'Site safety inspection', 'Accident or incident investigation', 'CDM Principal Designer support', 'CDM Principal Contractor support', 'Retained health and safety consultancy', 'Health and safety policy and management system', 'Toolbox talks and workforce training', 'Permit to work system review', 'Temporary works procedure review', 'Other'],
+    'Fire Safety Consultancy': ['Fire risk assessment', 'Fire strategy review', 'Fire door inspection', 'Fire stopping inspection', 'Emergency plan review', 'Compartmentation survey', 'Construction fire safety plan', 'Fire evacuation strategy', 'External wall/fire safety review', 'Other'],
+    'Surveying & Building Consultancy': ['Measured building survey', 'Condition survey', 'Dilapidation survey', 'Party wall surveyor services', 'Building survey', 'Defect inspection', 'Clerk of works inspection', 'Snagging inspection', 'Schedule of condition', 'Other'],
+    'Design & Engineering Consultancy': ['Structural engineering design', 'Civil engineering design', 'Temporary works design', 'Drainage design', 'Mechanical design', 'Electrical design', 'Architectural design support', 'Technical design review', 'Principal Designer design risk review', 'Buildability review', 'Other'],
+    'Quantity Surveying & Cost Consultancy': ['Bill of quantities preparation', 'Cost plan or estimate review', 'Tender document preparation', 'Valuation support', 'Final account support', 'Procurement advice', 'Change control assessment', 'Payment application review', 'Other'],
+    'Project Management & Programme Support': ['Project management support', 'Programme planning', 'Contract administration', 'Client representative services', 'Pre-construction coordination', 'Site meeting attendance', 'Risk register facilitation', 'Progress reporting', 'Other'],
+    'Environmental & Specialist Consultancy': ['Asbestos survey coordination', 'Ecology survey', 'Noise or dust assessment', 'Waste management plan', 'Sustainability or BREEAM support', 'Occupational health support', 'Contaminated land assessment', 'Environmental management plan', 'Other'],
+    'Legal, Contract & Claims Support': ['Contract review support', 'Claims preparation support', 'Delay analysis support', 'Adjudication support', 'Expert witness support', 'Insurance claim technical support', 'Other'],
   },
 } as const;
 

@@ -177,9 +177,10 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
     : new Set<string>();
   const verificationProfiles = await prisma.retailerProfile.findMany({
     where: { userId: { in: quotes.map((quote) => quote.retailerId) } },
-    select: { id: true, userId: true, verificationStatus: true, independentReviewStatus: true, independentReviewTier: true },
+    select: { id: true, userId: true, isSoleTrader: true, verificationStatus: true, independentReviewStatus: true, independentReviewTier: true },
   });
   const verificationByRetailerId = new Map(verificationProfiles.map((profile) => [profile.userId, profile.verificationStatus] as const));
+  const soleTraderByRetailerId = new Map(verificationProfiles.map((profile) => [profile.userId, profile.isSoleTrader] as const));
   const independentTierByRetailerId = new Map(verificationProfiles.filter((profile) => profile.independentReviewStatus === 'APPROVED').map((profile) => [profile.userId, profile.independentReviewTier] as const));
   const verifiedDocumentsByRetailerId = new Map(await Promise.all(
     verificationProfiles
@@ -201,6 +202,7 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
         expired: true,
         expiryMessage: QUOTE_EXPIRED_MESSAGE,
         sponsoredPlacementActive: sponsoredRetailerIds.has(retailerId),
+        providerIsSoleTrader: soleTraderByRetailerId.get(retailerId) ?? false,
         providerVerificationStatus: verificationByRetailerId.get(retailerId) ?? 'UNVERIFIED',
         verifiedDocumentLabels: verifiedDocumentsByRetailerId.get(retailerId) ?? [],
         independentlyVerified: independentTierByRetailerId.has(retailerId),
@@ -213,6 +215,7 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
       expiresAt: getQuoteExpiresAt(quote.submittedAt, quote.validityDays),
       expired: false,
       sponsoredPlacementActive: sponsoredRetailerIds.has(retailerId),
+      providerIsSoleTrader: soleTraderByRetailerId.get(retailerId) ?? false,
       releaseFeeGbp: await getClientReleaseFeeGbp(quote.priceGbp),
       providerVerificationStatus: verificationByRetailerId.get(retailerId) ?? 'UNVERIFIED',
       verifiedDocumentLabels: verifiedDocumentsByRetailerId.get(retailerId) ?? [],

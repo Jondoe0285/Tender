@@ -34,6 +34,7 @@ type QuoteCommon = {
   submittedAt: string;
   expiresAt: string;
   sponsoredPlacementActive?: boolean;
+  providerIsSoleTrader: boolean;
   providerVerificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
   verifiedDocumentLabels: string[];
   independentlyVerified: boolean;

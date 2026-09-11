@@ -28,6 +28,27 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-11 - Sole Trader Verification Status
+
+- Changed: Provider profiles now include an `isSoleTrader` declaration. When enabled, the profile is not eligible for AI verification and any existing AI verification status is reset to unverified with an explanatory note.
+- Changed: sole trader profiles are blocked server-side from submitting AI verification requests, and the Become Verified page explains why AI verification is unavailable.
+- Changed: Contractor quote comparison now shows a `Sole Trader` status flag with hover text explaining that the Provider declared sole-trader status and that Contractors should complete their own identity, insurance, competence, and commercial checks.
+- Changed: public verification policy text now documents sole trader status and the due-diligence implications.
+- Affects: `RetailerProfile` schema/migration `20260911170000_add_sole_trader_profile_flag`, Provider profile API/UI, Provider verification API/UI, Client quote comparison, quote service data selection, verification policy, and focused verification/quote tests.
+- Environment: apply migration `20260911170000_add_sole_trader_profile_flag` through the approved staging and production release process. No secrets or external integrations changed.
+- Validation: focused verification/quote tests and `npm run type-check -- --pretty false` pass locally. Full suite/build validation remains required before release.
+
+### 2026-09-11 - Professional Services Tender Form Refinement
+
+- Changed: expanded the Professional Services catalogue into stronger consultant/service provisions covering Health, Safety & CDM Consultancy, Fire Safety Consultancy, Surveying & Building Consultancy, Design & Engineering Consultancy, Quantity Surveying & Cost Consultancy, Project Management & Programme Support, and Environmental & Specialist Consultancy.
+- Changed: removed the duplicate Professional Services prompt in the tender package form. The user now selects the professional discipline and the specific service needed from the catalogue; only selecting `Other` opens a mandatory further-details field.
+- Changed: fixed the Professional Services validation path so it validates the visible service-period controls instead of hidden quantity/unit fields, preventing the form from getting stuck.
+- Changed: strengthened Contractor Services, Professional Services, and Plant Hire packages with quote-critical fields for size/scope/output quantity, permitted working hours, access restrictions, site constraints, works/outputs/deliverables, minimum requirements, and expanded plant hire support options including fuel, delivery/collection, lifting accessories, operator competence, certificates, out-of-hours delivery, permits, traffic management, and insurance evidence.
+- Changed: when Continue is blocked, the tender builder now sets an explicit page-level error telling the user to fix the highlighted package details, while each missing service field shows its own specific error message.
+- Affects: service catalogue, tender builder UI/validation, pricing catalogue keys derived from service provisions, and focused tender/pricing tests.
+- Environment: no migration or external configuration change.
+- Validation: focused tender builder, tender schema, pricing catalogue tests, and `npm run type-check -- --pretty false` pass locally.
+
 ### 2026-09-11 - Product-Category Pricing Intelligence And Master Fee Reduction
 
 - Changed: moved detailed pricing intelligence out of the main Super User dashboard and into a dedicated `/super-user/pricing-intelligence` page. The dashboard now shows only an overall accuracy summary chart and a link to the detailed page.
