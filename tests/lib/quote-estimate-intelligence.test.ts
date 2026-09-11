@@ -4,12 +4,16 @@ import {
   applyEstimateOffset,
   applyMasterEstimateReduction,
   buildEstimateBaselineKey,
+  buildPricingCatalogue,
   calculateAutomaticOffsetPercent,
   calculateEstimateVariancePercent,
+  convertQuantityToStandardUnit,
   estimateTenderQuoteValue,
   effectiveBaselineOffsetPercent,
   getUtcWeekStart,
   selectBottomThirdPriceScale,
+  standardUnitForPurchase,
+  unitPriceFromQuoteLine,
 } from '@/server/domain/quoteEstimateService';
 import { calculateTenderUnlockDynamicFeeGbp } from '@/server/domain/platformSettings';
 
@@ -67,5 +71,26 @@ describe('quote estimate intelligence', () => {
 
   it('calculates automatic offset from reviewed live-data baseline movement', () => {
     assert.equal(calculateAutomaticOffsetPercent(1000, 925), -7.5);
+  });
+
+  it('defines standard estimate units for potential purchases', () => {
+    assert.deepEqual(standardUnitForPurchase('Materials', 'Bricks', 'Facing bricks'), { standardUnit: 'units', standardUnitSize: 1000 });
+    assert.deepEqual(standardUnitForPurchase('Plant Hire', 'Excavators', 'Mini excavators approx. 1.5-3 tonnes'), { standardUnit: 'week', standardUnitSize: 1 });
+  });
+
+  it('converts quote quantities into the standard estimate unit', () => {
+    assert.equal(convertQuantityToStandardUnit('4,000 units', 'units', 1000), 4);
+    assert.equal(convertQuantityToStandardUnit('10 days', 'week', 1), 2);
+  });
+
+  it('calculates live quotation price per standard estimate unit', () => {
+    assert.equal(unitPriceFromQuoteLine(2400, '4,000 units', 'units', 1000), 600);
+  });
+
+  it('lists potential purchases from the platform catalogue before live data exists', () => {
+    const catalogue = buildPricingCatalogue();
+
+    assert.ok(catalogue.some((row) => row.key === 'Materials > Bricks > Facing bricks'));
+    assert.ok(catalogue.some((row) => row.key === 'Professional Services > Safety, Compliance & Consultancy'));
   });
 });

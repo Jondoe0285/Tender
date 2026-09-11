@@ -292,7 +292,10 @@ model QuoteEstimateBaseline {
   service            String
   category           String
   item               String?
+  standardUnit       String   @default("unit")
+  standardUnitSize   Float    @default(1)
   baselineGbp        Float
+  observedUnitPriceGbp Float?
   automaticOffsetPercent Float @default(0)
   manualOffsetPercent Float?
   offsetMode         String   @default("AUTOMATIC")

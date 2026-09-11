@@ -152,8 +152,10 @@ export function calculateTenderUnlockDynamicFeeGbp(estimatedTenderValueGbp: numb
 }
 
 export async function getTenderUnlockFeeGbp(tenderId: string): Promise<number> {
+  const fixedUnlockFeeGbp = await getPaymentFeeGbp('RETAILER_UNLOCK');
+  if (fixedUnlockFeeGbp <= 0) return 0;
   const mode = await getPlatformSetting('RETAILER_UNLOCK_FEE_MODE');
-  if (mode !== 'PERCENTAGE') return getPaymentFeeGbp('RETAILER_UNLOCK');
+  if (mode !== 'PERCENTAGE') return fixedUnlockFeeGbp;
 
   const tender = await prisma.tender.findUniqueOrThrow({
     where: { id: tenderId },

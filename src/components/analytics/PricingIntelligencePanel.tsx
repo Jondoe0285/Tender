@@ -38,7 +38,7 @@ export function PricingIntelligencePanel({ rows: initialRows, masterReductionPer
     const payload = mode === 'AUTOMATIC'
       ? { mode }
       : { mode, manualOffsetPercent: Number(drafts[row.id]) };
-    const response = await fetch(`/api/super-user/pricing-intelligence/${row.id}`, {
+    const response = await fetch(`/api/super-user/pricing-intelligence/${encodeURIComponent(row.id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -60,7 +60,7 @@ export function PricingIntelligencePanel({ rows: initialRows, masterReductionPer
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-steel-blue">Pricing intelligence</p>
           <h1 className="font-heading text-3xl font-bold text-foundation-navy">Product-category estimate accuracy</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-concrete-grey">Baseline estimates refresh weekly from live quotation data already available in the platform. Automatic item offsets are recalculated from quote-line history, while Owners can apply a manual offset where erroneous or unusual results need correction.</p>
+          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-concrete-grey">Every potential purchase is listed with a standard estimate unit. Weekly refresh converts live quote-line history into the same unit, reports whether real-world pricing is materially higher or lower, and suggests the offset needed to align the estimate.</p>
         </div>
         <StatusBadge status={Math.abs(averageVariancePercent) <= 10 ? 'approved' : 'pending'}>{Math.abs(averageVariancePercent) <= 10 ? 'Accurate' : 'Review offsets'}</StatusBadge>
       </div>
@@ -104,11 +104,13 @@ export function PricingIntelligencePanel({ rows: initialRows, masterReductionPer
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-concrete-grey">
               <tr>
-                <th className="pb-3">Product category</th>
-                <th className="pb-3">Baseline</th>
+                <th className="pb-3">Potential purchase</th>
+                <th className="pb-3">Set unit</th>
+                <th className="pb-3">Estimated price</th>
+                <th className="pb-3">Live quotation price</th>
+                <th className="pb-3">Variance</th>
                 <th className="pb-3">Automatic offset</th>
                 <th className="pb-3">Effective estimate</th>
-                <th className="pb-3">Accuracy</th>
                 <th className="pb-3">Override</th>
               </tr>
             </thead>
@@ -116,10 +118,12 @@ export function PricingIntelligencePanel({ rows: initialRows, masterReductionPer
               {rows.map((row) => (
                 <tr key={row.id}>
                   <td className="py-4 pr-4"><p className="font-semibold text-foundation-navy">{row.service} / {row.category}</p><p className="text-xs text-concrete-grey">{row.item ?? 'Category baseline'} · {row.sampleSize} live sample{row.sampleSize === 1 ? '' : 's'}</p></td>
+                  <td className="py-4 pr-4 text-concrete-grey">{row.standardUnitSize === 1 ? row.standardUnit : `${row.standardUnitSize} ${row.standardUnit}`}</td>
                   <td className="py-4 pr-4 text-concrete-grey">{money.format(row.baselineGbp)}</td>
+                  <td className="py-4 pr-4 text-concrete-grey">{row.observedUnitPriceGbp === null ? 'No live data' : money.format(row.observedUnitPriceGbp)}</td>
+                  <td className="py-4 pr-4"><StatusBadge status={row.sampleSize === 0 ? 'neutral' : Math.abs(row.variancePercent) <= 10 ? 'approved' : 'pending'}>{row.sampleSize === 0 ? 'Awaiting data' : `${row.variancePercent > 0 ? '+' : ''}${row.variancePercent.toFixed(2)}% ${row.variancePercent > 0 ? 'higher' : row.variancePercent < 0 ? 'lower' : 'aligned'}`}</StatusBadge></td>
                   <td className="py-4 pr-4 text-concrete-grey">{row.automaticOffsetPercent.toFixed(2)}%</td>
                   <td className="py-4 pr-4 text-concrete-grey">{money.format(row.adjustedEstimateGbp)}</td>
-                  <td className="py-4 pr-4"><StatusBadge status={Math.abs(row.variancePercent) <= 10 ? 'approved' : 'pending'}>{`${row.variancePercent > 0 ? '+' : ''}${row.variancePercent.toFixed(2)}%`}</StatusBadge></td>
                   <td className="py-4 pr-4">
                     {isOwner ? <div className="flex min-w-72 flex-wrap items-end gap-2"><div><Label htmlFor={`offset-${row.id}`}>Offset (%)</Label><Input id={`offset-${row.id}`} type="number" min="-100" max="100" step="0.01" value={drafts[row.id] ?? ''} onChange={(event) => setDrafts((current) => ({ ...current, [row.id]: event.target.value }))} /></div><Button size="md" onClick={() => saveOffset(row, 'MANUAL')} loading={savingId === row.id}>Save</Button><Button size="md" variant="secondary" onClick={() => saveOffset(row, 'AUTOMATIC')} loading={savingId === row.id}>Auto</Button></div> : <span className="text-sm text-concrete-grey">{row.offsetMode === 'MANUAL' ? 'Manual override' : 'Automatic'}</span>}
                   </td>

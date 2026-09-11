@@ -1,4 +1,5 @@
 import { prisma } from '@/server/data/prisma';
+import { SERVICE_CATALOG } from '@/lib/categories';
 
 export type TenderEstimateInput = {
   category?: string | null;
@@ -16,7 +17,10 @@ export type QuoteEstimateBaseline = {
   service: string;
   category: string;
   item: string | null;
+  standardUnit: string;
+  standardUnitSize: number;
   baselineGbp: number;
+  observedUnitPriceGbp: number | null;
   automaticOffsetPercent: number;
   manualOffsetPercent: number | null;
   offsetMode: string;
@@ -38,6 +42,16 @@ export const DEFAULT_QUOTE_ESTIMATE_BASELINES: Record<string, number> = {
   'Mechanical & Electrical': 1600,
 };
 
+type PricingCatalogueRow = {
+  key: string;
+  service: string;
+  category: string;
+  item: string | null;
+  standardUnit: string;
+  standardUnitSize: number;
+  estimatedUnitPriceGbp: number;
+};
+
 export function roundCurrency(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -48,6 +62,89 @@ export function parseEstimateQuantity(quantity?: string | null): number {
   if (!match) return 1;
   const parsed = Number(match[0]);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+export function parseQuantityForUnit(quantity?: string | null): { value: number; unit: string } | null {
+  if (!quantity) return null;
+  const match = quantity.trim().match(/(\d[\d,]*(?:\.\d+)?)/);
+  if (!match) return null;
+  const value = Number(match[1].replace(/,/g, ''));
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const unitText = quantity.toLowerCase().replace(match[1], '').trim();
+  return { value, unit: normaliseUnit(unitText) };
+}
+
+export function normaliseUnit(unit: string): string {
+  const value = unit.toLowerCase().trim();
+  if (value.includes('tonne') || value === 't') return 'tonne';
+  if (value.includes('m³') || value.includes('m3') || value.includes('cubic')) return 'm3';
+  if (value.includes('pallet')) return 'pallet';
+  if (value.includes('bag')) return 'bag';
+  if (value.includes('skip')) return 'skip';
+  if (value.includes('week')) return 'week';
+  if (value.includes('month')) return 'month';
+  if (value.includes('day')) return 'day';
+  if (value.includes('hour')) return 'hour';
+  return 'unit';
+}
+
+export function convertQuantityToStandardUnit(quantity: string | null | undefined, standardUnit: string, standardUnitSize: number): number | null {
+  const parsed = parseQuantityForUnit(quantity);
+  if (!parsed) return null;
+  const target = normaliseUnit(standardUnit);
+  const source = parsed.unit;
+  let converted = parsed.value;
+  if (source === 'day' && target === 'week') converted = parsed.value / 5;
+  else if (source === 'week' && target === 'day') converted = parsed.value * 5;
+  else if (source === 'month' && target === 'week') converted = parsed.value * 4.33;
+  else if (source === 'week' && target === 'month') converted = parsed.value / 4.33;
+  else if (source !== target && !(source === 'unit' && target === 'unit')) return null;
+  const divisor = standardUnitSize > 0 ? standardUnitSize : 1;
+  return converted / divisor;
+}
+
+export function unitPriceFromQuoteLine(priceGbp: number | null | undefined, quantity: string | null | undefined, standardUnit: string, standardUnitSize: number): number | null {
+  if (!priceGbp || priceGbp <= 0) return null;
+  const standardQuantity = convertQuantityToStandardUnit(quantity, standardUnit, standardUnitSize);
+  if (!standardQuantity || standardQuantity <= 0) return null;
+  return roundCurrency(priceGbp / standardQuantity);
+}
+
+export function standardUnitForPurchase(service: string, category: string, item: string | null): { standardUnit: string; standardUnitSize: number } {
+  const text = `${service} ${category} ${item ?? ''}`.toLowerCase();
+  if (text.includes('brick')) return { standardUnit: 'units', standardUnitSize: 1000 };
+  if (text.includes('block')) return { standardUnit: 'units', standardUnitSize: 100 };
+  if (text.includes('concrete') || text.includes('screed')) return { standardUnit: 'm3', standardUnitSize: 1 };
+  if (text.includes('aggregate') || text.includes('sand') || text.includes('stone') || text.includes('spoil')) return { standardUnit: 'tonne', standardUnitSize: 1 };
+  if (text.includes('timber') || text.includes('sheet') || text.includes('insulation') || text.includes('plasterboard')) return { standardUnit: 'units', standardUnitSize: 1 };
+  if (service === 'Waste') return { standardUnit: 'skip', standardUnitSize: 1 };
+  if (service === 'Plant Hire') return { standardUnit: 'week', standardUnitSize: 1 };
+  if (service === 'Contractor Services' || service === 'Professional Services') return { standardUnit: 'week', standardUnitSize: 1 };
+  return { standardUnit: 'unit', standardUnitSize: 1 };
+}
+
+export function estimatedUnitPriceForPurchase(service: string, category: string, item: string | null): number {
+  const base = DEFAULT_QUOTE_ESTIMATE_BASELINES[service] ?? DEFAULT_QUOTE_ESTIMATE_BASELINES.General;
+  const text = `${category} ${item ?? ''}`.toLowerCase();
+  const multiplier = text.includes('brick') ? 0.85
+    : text.includes('block') ? 0.55
+      : text.includes('concrete') ? 0.16
+        : text.includes('aggregate') || text.includes('sand') || text.includes('stone') ? 0.08
+          : text.includes('crane') || text.includes('lifting') ? 1.6
+            : text.includes('excavator') || text.includes('dumper') || text.includes('telehandler') ? 0.7
+              : 1;
+  return roundCurrency(Math.max(25, base * multiplier));
+}
+
+export function buildPricingCatalogue(): PricingCatalogueRow[] {
+  return Object.entries(SERVICE_CATALOG).flatMap(([service, categories]) => Object.entries(categories).flatMap(([category, items]) => {
+    const itemRows = (items as readonly string[]).map((item) => {
+      const unit = standardUnitForPurchase(service, category, item);
+      return { key: buildEstimateBaselineKey(service, category, item), service, category, item, ...unit, estimatedUnitPriceGbp: estimatedUnitPriceForPurchase(service, category, item) };
+    });
+    const unit = standardUnitForPurchase(service, category, null);
+    return [{ key: buildEstimateBaselineKey(service, category), service, category, item: null, ...unit, estimatedUnitPriceGbp: estimatedUnitPriceForPurchase(service, category, null) }, ...itemRows];
+  }));
 }
 
 export function selectBottomThirdPriceScale(pricesGbp: number[]): number | null {
@@ -132,71 +229,118 @@ export async function getReviewedQuoteEstimateBaselines(): Promise<Record<string
 
 export async function getPricingIntelligenceByCategory() {
   const rows = await prisma.quoteEstimateBaseline.findMany({ orderBy: [{ service: 'asc' }, { category: 'asc' }, { item: 'asc' }] });
-  return rows.map((row) => {
+  const persisted = new Map(rows.map((row) => [row.key, row]));
+  const merged = buildPricingCatalogue().map((catalogueRow) => persisted.get(catalogueRow.key) ?? {
+    id: catalogueRow.key,
+    key: catalogueRow.key,
+    service: catalogueRow.service,
+    category: catalogueRow.category,
+    item: catalogueRow.item,
+    standardUnit: catalogueRow.standardUnit,
+    standardUnitSize: catalogueRow.standardUnitSize,
+    baselineGbp: catalogueRow.estimatedUnitPriceGbp,
+    observedUnitPriceGbp: null,
+    automaticOffsetPercent: 0,
+    manualOffsetPercent: null,
+    offsetMode: 'AUTOMATIC',
+    sampleSize: 0,
+    reviewedAt: new Date(0),
+    effectiveWeekStart: new Date(0),
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  });
+  return merged.map((row) => {
     const offsetPercent = effectiveBaselineOffsetPercent(row);
     const adjustedEstimateGbp = adjustedBaselineGbp(row.baselineGbp, offsetPercent);
-    const actualBaselineGbp = adjustedBaselineGbp(row.baselineGbp, row.automaticOffsetPercent);
+    const observedUnitPriceGbp = row.observedUnitPriceGbp ?? null;
     return {
       id: row.id,
       key: row.key,
       service: row.service,
       category: row.category,
       item: row.item,
+      standardUnit: row.standardUnit,
+      standardUnitSize: row.standardUnitSize,
       baselineGbp: row.baselineGbp,
+      observedUnitPriceGbp,
       adjustedEstimateGbp,
-      actualBaselineGbp,
+      actualBaselineGbp: observedUnitPriceGbp,
       automaticOffsetPercent: row.automaticOffsetPercent,
       manualOffsetPercent: row.manualOffsetPercent,
       effectiveOffsetPercent: offsetPercent,
       offsetMode: row.offsetMode,
       sampleSize: row.sampleSize,
       reviewedAt: row.reviewedAt,
-      variancePercent: calculateEstimateVariancePercent(adjustedEstimateGbp, actualBaselineGbp),
+      variancePercent: observedUnitPriceGbp ? calculateEstimateVariancePercent(row.baselineGbp, observedUnitPriceGbp) : 0,
     };
   });
 }
 
 export async function setPricingIntelligenceManualOffset(id: string, offsetPercent: number | null) {
-  return prisma.quoteEstimateBaseline.update({
-    where: { id },
-    data: offsetPercent === null
-      ? { offsetMode: 'AUTOMATIC', manualOffsetPercent: null }
-      : { offsetMode: 'MANUAL', manualOffsetPercent: offsetPercent },
+  const data = offsetPercent === null
+    ? { offsetMode: 'AUTOMATIC', manualOffsetPercent: null }
+    : { offsetMode: 'MANUAL', manualOffsetPercent: offsetPercent };
+  const existing = await prisma.quoteEstimateBaseline.findFirst({ where: { OR: [{ id }, { key: id }] } });
+  if (existing) return prisma.quoteEstimateBaseline.update({ where: { id: existing.id }, data });
+
+  const catalogueRow = buildPricingCatalogue().find((row) => row.key === id);
+  if (!catalogueRow) throw new Error('Pricing catalogue row not found');
+  return prisma.quoteEstimateBaseline.create({
+    data: {
+      key: catalogueRow.key,
+      service: catalogueRow.service,
+      category: catalogueRow.category,
+      item: catalogueRow.item,
+      standardUnit: catalogueRow.standardUnit,
+      standardUnitSize: catalogueRow.standardUnitSize,
+      baselineGbp: catalogueRow.estimatedUnitPriceGbp,
+      sampleSize: 0,
+      reviewedAt: new Date(),
+      effectiveWeekStart: getUtcWeekStart(),
+      ...data,
+    },
   });
 }
 
 export async function refreshQuoteEstimateBaselines(reviewedAt = new Date()): Promise<QuoteEstimateBaseline[]> {
-  const [quotes, quoteLines] = await Promise.all([
-    prisma.quote.findMany({
-      where: { priceGbp: { gt: 0 } },
-      select: { priceGbp: true, tender: { select: { category: true } } },
-    }),
+  const [quoteLines] = await Promise.all([
     prisma.quoteLine.findMany({
       where: { priceGbp: { not: null } },
-      select: { priceGbp: true, tenderItem: { select: { category: true, subcategory: true, item: true } } },
+      select: { priceGbp: true, tenderItem: { select: { category: true, subcategory: true, item: true, quantity: true } } },
     }),
   ]);
-  const pricesByCategory = new Map<string, { service: string; category: string; item: string | null; prices: number[] }>();
-  const addObservation = (service: string | null | undefined, category: string | null | undefined, item: string | null | undefined, priceGbp: number | null | undefined) => {
-    const serviceKey = service?.trim();
-    const categoryKey = category?.trim() || serviceKey;
-    if (!serviceKey || !categoryKey || !priceGbp || priceGbp <= 0) return;
-    const key = buildEstimateBaselineKey(serviceKey, categoryKey, item);
-    const current = pricesByCategory.get(key) ?? { service: serviceKey, category: categoryKey, item: item?.trim() || null, prices: [] };
-    pricesByCategory.set(key, { ...current, prices: [...current.prices, priceGbp] });
-  };
-
-  quotes.forEach((quote) => addObservation(quote.tender.category, quote.tender.category, null, quote.priceGbp));
-  quoteLines.forEach((line) => addObservation(line.tenderItem.category, line.tenderItem.subcategory, line.tenderItem.item, line.priceGbp));
+  const catalogue = buildPricingCatalogue();
+  const catalogueByKey = new Map(catalogue.map((row) => [row.key, row]));
+  const pricesByKey = new Map<string, number[]>();
+  quoteLines.forEach((line) => {
+    const key = buildEstimateBaselineKey(line.tenderItem.category, line.tenderItem.subcategory, line.tenderItem.item);
+    const catalogueRow = catalogueByKey.get(key) ?? catalogueByKey.get(buildEstimateBaselineKey(line.tenderItem.category, line.tenderItem.subcategory));
+    if (!catalogueRow) return;
+    const unitPrice = unitPriceFromQuoteLine(line.priceGbp, line.tenderItem.quantity, catalogueRow.standardUnit, catalogueRow.standardUnitSize);
+    if (!unitPrice) return;
+    pricesByKey.set(catalogueRow.key, [...(pricesByKey.get(catalogueRow.key) ?? []), unitPrice]);
+  });
 
   const effectiveWeekStart = getUtcWeekStart(reviewedAt);
   const existingRows = await prisma.quoteEstimateBaseline.findMany({ select: { key: true, baselineGbp: true, offsetMode: true } });
   const existingByKey = new Map(existingRows.map((row) => [row.key, row]));
-  const updates = [...pricesByCategory.entries()].flatMap(([key, observation]) => {
-    const observedBaselineGbp = selectBottomThirdPriceScale(observation.prices);
-    if (observedBaselineGbp === null) return [];
-    const previousBaselineGbp = existingByKey.get(key)?.baselineGbp ?? DEFAULT_QUOTE_ESTIMATE_BASELINES[observation.service] ?? observedBaselineGbp;
-    return [{ key, service: observation.service, category: observation.category, item: observation.item, baselineGbp: observedBaselineGbp, automaticOffsetPercent: calculateAutomaticOffsetPercent(previousBaselineGbp, observedBaselineGbp), sampleSize: observation.prices.length, reviewedAt, effectiveWeekStart }];
+  const updates = catalogue.map((catalogueRow) => {
+    const prices = pricesByKey.get(catalogueRow.key) ?? [];
+    const observedUnitPriceGbp = selectBottomThirdPriceScale(prices);
+    return {
+      key: catalogueRow.key,
+      service: catalogueRow.service,
+      category: catalogueRow.category,
+      item: catalogueRow.item,
+      standardUnit: catalogueRow.standardUnit,
+      standardUnitSize: catalogueRow.standardUnitSize,
+      baselineGbp: existingByKey.get(catalogueRow.key)?.baselineGbp ?? catalogueRow.estimatedUnitPriceGbp,
+      observedUnitPriceGbp,
+      automaticOffsetPercent: observedUnitPriceGbp === null ? 0 : calculateAutomaticOffsetPercent(catalogueRow.estimatedUnitPriceGbp, observedUnitPriceGbp),
+      sampleSize: prices.length,
+      reviewedAt,
+      effectiveWeekStart,
+    };
   });
 
   return Promise.all(updates.map((baseline) => prisma.quoteEstimateBaseline.upsert({

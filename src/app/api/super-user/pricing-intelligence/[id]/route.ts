@@ -34,7 +34,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
     const effectiveOffsetPercent = effectiveBaselineOffsetPercent(row);
     const adjustedEstimateGbp = adjustedBaselineGbp(row.baselineGbp, effectiveOffsetPercent);
-    const actualBaselineGbp = adjustedBaselineGbp(row.baselineGbp, row.automaticOffsetPercent);
+    const actualBaselineGbp = row.observedUnitPriceGbp;
 
     return NextResponse.json({
       row: {
@@ -43,7 +43,10 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
         service: row.service,
         category: row.category,
         item: row.item,
+        standardUnit: row.standardUnit,
+        standardUnitSize: row.standardUnitSize,
         baselineGbp: row.baselineGbp,
+        observedUnitPriceGbp: row.observedUnitPriceGbp,
         adjustedEstimateGbp,
         actualBaselineGbp,
         automaticOffsetPercent: row.automaticOffsetPercent,
@@ -52,7 +55,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
         offsetMode: row.offsetMode,
         sampleSize: row.sampleSize,
         reviewedAt: row.reviewedAt,
-        variancePercent: calculateEstimateVariancePercent(adjustedEstimateGbp, actualBaselineGbp),
+        variancePercent: actualBaselineGbp ? calculateEstimateVariancePercent(row.baselineGbp, actualBaselineGbp) : 0,
       },
     });
   } catch (error) {

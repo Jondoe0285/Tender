@@ -23,6 +23,9 @@ test('pricing intelligence has a dedicated product-category page with offset con
   const navigation = readFileSync(navigationPath, 'utf8');
 
   assert.match(panel, /Product-category estimate accuracy/);
+  assert.match(panel, /Every potential purchase is listed with a standard estimate unit/);
+  assert.match(panel, /Live quotation price/);
+  assert.match(panel, /Estimated price/);
   assert.match(panel, /Rows are grouped by service, product category, and item rather than by tender/);
   assert.match(panel, /Manual offset/);
   assert.match(panel, /Automatic offset/);
