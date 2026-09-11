@@ -22,9 +22,12 @@ test('Contractor tender builder sequences selected service package requirements'
   assert.ok(source.includes('Edit details'));
   assert.ok(source.includes('Remove contact details'));
   assert.ok(source.includes('getServiceSenseCheck'));
-  assert.ok(source.includes('Groundworks'));
+  assert.ok(source.includes('Contractor services should include a scope'));
   assert.ok(source.includes('days'));
   assert.ok(source.includes('weeks'));
+  assert.ok(source.includes('not applicable'));
+  assert.ok(source.includes('PROFESSIONAL_SERVICE_TYPES'));
+  assert.ok(source.includes('Lift plan required'));
   assert.ok(source.includes('id="quantity-value"'));
   assert.ok(source.includes('id="primary-item-description"'));
   assert.ok(source.includes("update('primaryItemDescription', event.target.value)"));

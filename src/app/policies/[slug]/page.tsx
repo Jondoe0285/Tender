@@ -210,7 +210,7 @@ const policies = [
       },
       {
         heading: 'Approved trigger conditions',
-        content: 'A contact release may occur only after the relevant payment or waiver condition is verified and the associated quote or tender workflow is in the authorized state. The platform enforces this server-side and prevents browser-controlled release attempts.',
+        content: 'A contact release may occur only after the relevant payment or waiver condition is verified and the associated quote or tender workflow is in the authorized state. Where the Owner activates direct contact requests, a Contractor Services or Professional Services Provider may pay the approved direct-contact fee to share only their own Provider contact details with the purchasing Client. This does not release the Client contact details to the Provider. The platform enforces every release server-side and prevents browser-controlled release attempts.',
       },
       {
         heading: 'Audit and revocation',

@@ -29,7 +29,7 @@ export function createTenderSchemaForCatalog(catalog: CategoryCatalog = CATEGORI
     subcategory: z.string().trim().min(1),
     item: z.string().trim().min(1).optional(),
     quantity: z.string().trim().min(1).max(120),
-    description: z.string().trim().max(4000),
+    description: z.string().trim().min(20).max(4000),
   });
   const hasValidSubcategory = (service: string, category: string, item?: string) => {
     const serviceName = Object.keys(catalog).find((value) => value.toLowerCase() === service.toLowerCase());
@@ -48,12 +48,12 @@ export function createTenderSchemaForCatalog(catalog: CategoryCatalog = CATEGORI
     item: z.string().trim().min(1).optional(),
     location: z.string().trim().min(2).max(120),
     quantity: z.string().trim().min(1).max(120),
-    itemDescription: z.string().trim().max(4000).optional().default(''),
+    itemDescription: z.string().trim().min(20).max(4000),
     urgency: z.enum(URGENCY_OPTIONS),
     closingDate: z.coerce.date(),
     supplyDate: z.coerce.date().optional(),
     requirements: z.array(z.enum(REQUIREMENT_OPTIONS)).optional().default([]),
-    description: z.string().trim().max(4000),
+    description: z.string().trim().min(20).max(4000),
     items: z.array(tenderItemSchema).max(50).optional(),
     attachments: z.array(tenderAttachmentSchema).max(10).optional().default([]),
   })

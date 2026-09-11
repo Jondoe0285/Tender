@@ -37,6 +37,8 @@ type TenderFull = Omit<TenderSummary, 'items'> & {
   items: { id: string; category: string; subcategory: string; item: string | null; quantity: string; description: string }[];
 };
 
+type DirectContactStatus = { active: boolean; available: boolean; feeGbp: number; released: boolean; paymentId: string | null; checkoutUrl: string | null; paymentStatus: string | null };
+
 export default function RetailerTenderDetailPage() {
   const params = useParams<{ id: string }>();
   const [tender, setTender] = useState<TenderSummary | TenderFull | null>(null);
@@ -52,9 +54,11 @@ export default function RetailerTenderDetailPage() {
   const [unavailableItemIds, setUnavailableItemIds] = useState<string[]>([]);
   const [charges, setCharges] = useState<{ id: string; description: string; priceGbp: string }[]>([]);
   const [standardQuoteValidityDays, setStandardQuoteValidityDays] = useState(30);
+  const [directContactStatus, setDirectContactStatus] = useState<DirectContactStatus | null>(null);
+  const [directContactPaymentId, setDirectContactPaymentId] = useState<string | null>(null);
 
   async function load() {
-    const [response, profileResponse] = await Promise.all([fetch(`/api/tenders/${params.id}`), fetch('/api/retailer/profile')]);
+    const [response, profileResponse, directContactResponse] = await Promise.all([fetch(`/api/tenders/${params.id}`), fetch('/api/retailer/profile'), fetch(`/api/tenders/${params.id}/direct-contact`)]);
     if (!response.ok) {
       setMessage('Unable to load this tender.');
       return;
@@ -69,6 +73,11 @@ export default function RetailerTenderDetailPage() {
     setLinePrices({});
     setUnavailableItemIds([]);
     setCharges([]);
+    if (directContactResponse.ok) {
+      const status = await directContactResponse.json() as DirectContactStatus;
+      setDirectContactStatus(status);
+      setDirectContactPaymentId(status.paymentStatus === 'PENDING' ? status.paymentId : null);
+    }
   }
 
   useEffect(() => {
@@ -111,6 +120,41 @@ export default function RetailerTenderDetailPage() {
       return;
     }
     setInterestRegistered(true);
+  }
+
+  async function handleDirectContactRequest() {
+    setUnlocking(true);
+    setMessage(null);
+    const response = await fetch(`/api/tenders/${params.id}/direct-contact`, { method: 'POST' });
+    const data = await response.json().catch(() => null) as { paymentId?: string; checkoutUrl?: string; error?: string } | null;
+    setUnlocking(false);
+    if (!response.ok) {
+      setMessage(data?.error ?? 'Unable to start direct contact request.');
+      return;
+    }
+    if (data?.checkoutUrl) {
+      window.location.href = data.checkoutUrl;
+      return;
+    }
+    if (data?.paymentId) {
+      setDirectContactPaymentId(data.paymentId);
+      setMessage('Payment required. This environment has no Stripe keys configured — use the dev payment simulation below.');
+    }
+    await load();
+  }
+
+  async function handleSimulateDirectContactPayment() {
+    if (!directContactPaymentId) return;
+    setSimulating(true);
+    setMessage(null);
+    const response = await fetch('/api/dev/confirm-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentId: directContactPaymentId }) });
+    setSimulating(false);
+    if (!response.ok) {
+      setMessage('Dev payment simulation failed.');
+      return;
+    }
+    setDirectContactPaymentId(null);
+    await load();
   }
 
   async function handleSimulatePayment() {
@@ -255,6 +299,19 @@ export default function RetailerTenderDetailPage() {
                 <Button onClick={handleUnlock} loading={unlocking} size="lg">
                   {`Unlock full details — £${tender.unlockFeeGbp ?? 0} excl. VAT`}
                 </Button>
+              )}
+              {directContactStatus?.active && directContactStatus.available && (
+                <div className="mt-5 rounded-md border border-steel-blue/20 bg-steel-blue/5 p-4">
+                  <p className="text-sm font-semibold text-foundation-navy">Direct contact request</p>
+                  <p className="mt-1 text-sm text-concrete-grey">Pay the approved fee to share your Provider contact details with the purchasing Client for this Contractor or Professional Services tender. This does not release the Client&apos;s contact details to you.</p>
+                  {directContactStatus.released ? (
+                    <p className="mt-3 text-sm font-semibold text-approved">Your contact details have been shared with the Client.</p>
+                  ) : directContactPaymentId ? (
+                    <Button className="mt-3" onClick={handleSimulateDirectContactPayment} loading={simulating}>Pay direct contact fee (dev)</Button>
+                  ) : (
+                    <Button className="mt-3" variant="secondary" onClick={handleDirectContactRequest} loading={unlocking}>Share contact details · £{directContactStatus.feeGbp} excl. VAT</Button>
+                  )}
+                </div>
               )}
             </Card>
           )}

@@ -4,6 +4,7 @@ export type TenderEstimateInput = {
   category?: string | null;
   items?: Array<{
     category?: string | null;
+    subcategory?: string | null;
     item?: string | null;
     description?: string | null;
     quantity?: string | null;
@@ -11,8 +12,14 @@ export type TenderEstimateInput = {
 };
 
 export type QuoteEstimateBaseline = {
+  key: string;
+  service: string;
   category: string;
+  item: string | null;
   baselineGbp: number;
+  automaticOffsetPercent: number;
+  manualOffsetPercent: number | null;
+  offsetMode: string;
   sampleSize: number;
   reviewedAt: Date;
 };
@@ -56,6 +63,28 @@ export function getUtcWeekStart(date = new Date()): Date {
   return weekStart;
 }
 
+export function buildEstimateBaselineKey(service?: string | null, category?: string | null, item?: string | null): string {
+  return [service, category, item].map((value) => value?.trim()).filter(Boolean).join(' > ');
+}
+
+export function effectiveBaselineOffsetPercent(baseline: Pick<QuoteEstimateBaseline, 'automaticOffsetPercent' | 'manualOffsetPercent' | 'offsetMode'>): number {
+  return baseline.offsetMode === 'MANUAL' && baseline.manualOffsetPercent !== null ? baseline.manualOffsetPercent : baseline.automaticOffsetPercent;
+}
+
+export function adjustedBaselineGbp(baselineGbp: number, offsetPercent: number): number {
+  return roundCurrency(baselineGbp * (1 + offsetPercent / 100));
+}
+
+export function calculateAutomaticOffsetPercent(previousBaselineGbp: number, observedBaselineGbp: number): number {
+  if (!previousBaselineGbp || previousBaselineGbp <= 0) return 0;
+  return Number((((observedBaselineGbp - previousBaselineGbp) / previousBaselineGbp) * 100).toFixed(2));
+}
+
+export function applyMasterEstimateReduction(estimateGbp: number, reductionPercent: number): number {
+  const reduction = Math.min(Math.max(Number.isFinite(reductionPercent) ? reductionPercent : 0, 0), 100);
+  return roundCurrency(estimateGbp * (1 - reduction / 100));
+}
+
 export function estimateTenderQuoteValue(
   input: TenderEstimateInput,
   baselines: Record<string, number> = DEFAULT_QUOTE_ESTIMATE_BASELINES,
@@ -70,7 +99,11 @@ export function estimateTenderQuoteValue(
 
   const itemEstimates = items.map((item) => {
     const itemCategory = (item.category ?? categoryKey).trim();
-    const itemBaseline = baselines[itemCategory]
+    const itemKey = buildEstimateBaselineKey(itemCategory, item.subcategory, item.item);
+    const itemCategoryKey = buildEstimateBaselineKey(itemCategory, item.subcategory);
+    const itemBaseline = baselines[itemKey]
+      ?? baselines[itemCategoryKey]
+      ?? baselines[itemCategory]
       ?? Object.entries(baselines).find(([key]) => itemCategory.toLowerCase().includes(key.toLowerCase()))?.[1]
       ?? fallback;
 
@@ -88,8 +121,48 @@ export function estimateTenderQuoteValue(
 }
 
 export async function getReviewedQuoteEstimateBaselines(): Promise<Record<string, number>> {
-  const rows = await prisma.quoteEstimateBaseline.findMany({ select: { category: true, baselineGbp: true } });
-  return { ...DEFAULT_QUOTE_ESTIMATE_BASELINES, ...Object.fromEntries(rows.map((row) => [row.category, row.baselineGbp])) };
+  const rows = await prisma.quoteEstimateBaseline.findMany({ select: { key: true, service: true, category: true, baselineGbp: true, automaticOffsetPercent: true, manualOffsetPercent: true, offsetMode: true } });
+  const reviewed = Object.fromEntries(rows.flatMap((row) => {
+    const offsetPercent = effectiveBaselineOffsetPercent(row);
+    const value = adjustedBaselineGbp(row.baselineGbp, offsetPercent);
+    return [[row.key, value], [buildEstimateBaselineKey(row.service, row.category), value], [row.service, value]];
+  }));
+  return { ...DEFAULT_QUOTE_ESTIMATE_BASELINES, ...reviewed };
+}
+
+export async function getPricingIntelligenceByCategory() {
+  const rows = await prisma.quoteEstimateBaseline.findMany({ orderBy: [{ service: 'asc' }, { category: 'asc' }, { item: 'asc' }] });
+  return rows.map((row) => {
+    const offsetPercent = effectiveBaselineOffsetPercent(row);
+    const adjustedEstimateGbp = adjustedBaselineGbp(row.baselineGbp, offsetPercent);
+    const actualBaselineGbp = adjustedBaselineGbp(row.baselineGbp, row.automaticOffsetPercent);
+    return {
+      id: row.id,
+      key: row.key,
+      service: row.service,
+      category: row.category,
+      item: row.item,
+      baselineGbp: row.baselineGbp,
+      adjustedEstimateGbp,
+      actualBaselineGbp,
+      automaticOffsetPercent: row.automaticOffsetPercent,
+      manualOffsetPercent: row.manualOffsetPercent,
+      effectiveOffsetPercent: offsetPercent,
+      offsetMode: row.offsetMode,
+      sampleSize: row.sampleSize,
+      reviewedAt: row.reviewedAt,
+      variancePercent: calculateEstimateVariancePercent(adjustedEstimateGbp, actualBaselineGbp),
+    };
+  });
+}
+
+export async function setPricingIntelligenceManualOffset(id: string, offsetPercent: number | null) {
+  return prisma.quoteEstimateBaseline.update({
+    where: { id },
+    data: offsetPercent === null
+      ? { offsetMode: 'AUTOMATIC', manualOffsetPercent: null }
+      : { offsetMode: 'MANUAL', manualOffsetPercent: offsetPercent },
+  });
 }
 
 export async function refreshQuoteEstimateBaselines(reviewedAt = new Date()): Promise<QuoteEstimateBaseline[]> {
@@ -100,28 +173,35 @@ export async function refreshQuoteEstimateBaselines(reviewedAt = new Date()): Pr
     }),
     prisma.quoteLine.findMany({
       where: { priceGbp: { not: null } },
-      select: { priceGbp: true, tenderItem: { select: { category: true } } },
+      select: { priceGbp: true, tenderItem: { select: { category: true, subcategory: true, item: true } } },
     }),
   ]);
-  const pricesByCategory = new Map<string, number[]>();
-  const addObservation = (category: string | null | undefined, priceGbp: number | null | undefined) => {
-    const key = category?.trim();
-    if (!key || !priceGbp || priceGbp <= 0) return;
-    pricesByCategory.set(key, [...(pricesByCategory.get(key) ?? []), priceGbp]);
+  const pricesByCategory = new Map<string, { service: string; category: string; item: string | null; prices: number[] }>();
+  const addObservation = (service: string | null | undefined, category: string | null | undefined, item: string | null | undefined, priceGbp: number | null | undefined) => {
+    const serviceKey = service?.trim();
+    const categoryKey = category?.trim() || serviceKey;
+    if (!serviceKey || !categoryKey || !priceGbp || priceGbp <= 0) return;
+    const key = buildEstimateBaselineKey(serviceKey, categoryKey, item);
+    const current = pricesByCategory.get(key) ?? { service: serviceKey, category: categoryKey, item: item?.trim() || null, prices: [] };
+    pricesByCategory.set(key, { ...current, prices: [...current.prices, priceGbp] });
   };
 
-  quotes.forEach((quote) => addObservation(quote.tender.category, quote.priceGbp));
-  quoteLines.forEach((line) => addObservation(line.tenderItem.category, line.priceGbp));
+  quotes.forEach((quote) => addObservation(quote.tender.category, quote.tender.category, null, quote.priceGbp));
+  quoteLines.forEach((line) => addObservation(line.tenderItem.category, line.tenderItem.subcategory, line.tenderItem.item, line.priceGbp));
 
   const effectiveWeekStart = getUtcWeekStart(reviewedAt);
-  const updates = [...pricesByCategory.entries()].flatMap(([category, prices]) => {
-    const baselineGbp = selectBottomThirdPriceScale(prices);
-    return baselineGbp === null ? [] : [{ category, baselineGbp, sampleSize: prices.length, reviewedAt, effectiveWeekStart }];
+  const existingRows = await prisma.quoteEstimateBaseline.findMany({ select: { key: true, baselineGbp: true, offsetMode: true } });
+  const existingByKey = new Map(existingRows.map((row) => [row.key, row]));
+  const updates = [...pricesByCategory.entries()].flatMap(([key, observation]) => {
+    const observedBaselineGbp = selectBottomThirdPriceScale(observation.prices);
+    if (observedBaselineGbp === null) return [];
+    const previousBaselineGbp = existingByKey.get(key)?.baselineGbp ?? DEFAULT_QUOTE_ESTIMATE_BASELINES[observation.service] ?? observedBaselineGbp;
+    return [{ key, service: observation.service, category: observation.category, item: observation.item, baselineGbp: observedBaselineGbp, automaticOffsetPercent: calculateAutomaticOffsetPercent(previousBaselineGbp, observedBaselineGbp), sampleSize: observation.prices.length, reviewedAt, effectiveWeekStart }];
   });
 
   return Promise.all(updates.map((baseline) => prisma.quoteEstimateBaseline.upsert({
-    where: { category: baseline.category },
-    update: baseline,
+    where: { key: baseline.key },
+    update: { ...baseline, offsetMode: existingByKey.get(baseline.key)?.offsetMode === 'MANUAL' ? 'MANUAL' : 'AUTOMATIC' },
     create: baseline,
   })));
 }

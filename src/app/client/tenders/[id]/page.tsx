@@ -55,6 +55,7 @@ type Quote = QuoteCommon & ({
 });
 
 type Contact = { contactName: string; contactPhone: string | null; email: string };
+type DirectContact = { id: string; releasedAt: string | null; contact: Contact & { companyName: string; categories: string } };
 
 export default function ClientTenderDetailPage() {
   const params = useParams<{ id: string }>();
@@ -64,6 +65,7 @@ export default function ClientTenderDetailPage() {
   const [pendingPayment, setPendingPayment] = useState<{ quoteId: string; paymentId: string; checkoutUrl: string | null } | null>(null);
   const [contacts, setContacts] = useState<Record<string, Contact>>({});
   const [professionalInterests, setProfessionalInterests] = useState<Array<{ id: string; contact: Contact }>>([]);
+  const [directContacts, setDirectContacts] = useState<DirectContact[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -82,9 +84,14 @@ export default function ClientTenderDetailPage() {
       setLoadError(data?.error ?? 'Unable to load this tender.');
     }
     const interestResponse = await fetch(`/api/tenders/${params.id}/professional-interest`);
+    const directContactResponse = await fetch(`/api/tenders/${params.id}/direct-contact`);
     if (interestResponse.ok) {
       const interestData = await interestResponse.json() as { interests?: Array<{ id: string; contact: Contact }> };
       setProfessionalInterests(interestData.interests ?? []);
+    }
+    if (directContactResponse.ok) {
+      const directContactData = await directContactResponse.json() as { contacts?: DirectContact[] };
+      setDirectContacts(directContactData.contacts ?? []);
     }
     if (quotesResponse.ok) {
       const nextQuotes: Quote[] = (await quotesResponse.json()).quotes;
@@ -339,6 +346,23 @@ export default function ClientTenderDetailPage() {
                   <p className="font-semibold text-foundation-navy">{interest.contact.contactName}</p>
                   <p>{interest.contact.email}</p>
                   {interest.contact.contactPhone && <p>{interest.contact.contactPhone}</p>}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+        {directContacts.length > 0 && (
+          <Card className="mt-5">
+            <h3 className="font-heading text-lg font-bold text-foundation-navy">Direct contact requests</h3>
+            <p className="mt-1 text-sm text-concrete-grey">These Providers paid the approved direct-contact fee to share their own details for this Contractor or Professional Services tender. Your contact details remain private unless released through an approved workflow.</p>
+            <ul className="mt-3 flex flex-col gap-3">
+              {directContacts.map((request) => (
+                <li key={request.id} className="border-l-4 border-steel-blue/40 pl-4 text-sm text-concrete-grey">
+                  <p className="font-semibold text-foundation-navy">{request.contact.companyName}</p>
+                  <p>{request.contact.contactName}</p>
+                  <p>{request.contact.email}</p>
+                  {request.contact.contactPhone && <p>{request.contact.contactPhone}</p>}
+                  <p className="mt-1 text-xs">{request.contact.categories}</p>
                 </li>
               ))}
             </ul>

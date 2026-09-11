@@ -3,7 +3,7 @@ import { prisma } from '@/server/data/prisma';
 import { CLIENT_RELEASE_FEE_GBP, RETAILER_UNLOCK_FEE_GBP } from '@/lib/categories';
 import { SERVICE_NAMES } from '@/lib/categories';
 import { VERIFICATION_DOCUMENT_TYPES, type VerificationDocumentType } from '@/lib/verification-documents';
-import { applyEstimateOffset, estimateTenderQuoteValue, getReviewedQuoteEstimateBaselines } from '@/server/domain/quoteEstimateService';
+import { applyMasterEstimateReduction, estimateTenderQuoteValue, getReviewedQuoteEstimateBaselines } from '@/server/domain/quoteEstimateService';
 
 const defaultSettings: Record<string, string> = {
   RETAILER_UNLOCK_FEE_GBP: String(RETAILER_UNLOCK_FEE_GBP),
@@ -17,6 +17,7 @@ const defaultSettings: Record<string, string> = {
   CLIENT_RELEASE_PERCENTAGE_HIGH: '0.5',
   CLIENT_RELEASE_PERCENTAGE_TOP: '0.25',
   QUOTE_ESTIMATE_OFFSET_PERCENTAGE: '0',
+  QUOTE_ESTIMATE_MASTER_REDUCTION_PERCENTAGE: '0',
   VAT_PERCENTAGE: '20',
   SPONSORED_PLACEMENT_ACTIVE: 'false',
   SPONSORED_PLACEMENT_FEE_GBP: '25',
@@ -25,6 +26,8 @@ const defaultSettings: Record<string, string> = {
   ADSPACE_ACTIVE: 'false',
   INDEPENDENT_REVIEW_ACTIVE: 'false',
   INDEPENDENT_REVIEW_FEE_GBP: '150',
+  DIRECT_CONTACT_ACTIVE: 'false',
+  DIRECT_CONTACT_FEE_GBP: '25',
   HUMAN_REVIEW_ACTIVE: 'true',
   VERIFICATION_DOCUMENT_REQUIREMENTS: '{}',
   RETAILER_ANALYTICS_SECTION_TRENDS: 'true',
@@ -70,7 +73,9 @@ export async function getPaymentFeeGbp(type: PaymentType): Promise<number> {
       ? 'SPONSORED_PLACEMENT_FEE_GBP'
       : type === 'INDEPENDENT_REVIEW'
         ? 'INDEPENDENT_REVIEW_FEE_GBP'
-        : 'CLIENT_RELEASE_FEE_GBP';
+        : type === 'DIRECT_CONTACT'
+          ? 'DIRECT_CONTACT_FEE_GBP'
+          : 'CLIENT_RELEASE_FEE_GBP';
   const value = Number(await getPlatformSetting(key));
   return Number.isInteger(value) && value >= 0 ? value : Number(defaultSettings[key]);
 }
@@ -91,6 +96,13 @@ export async function getQuoteEstimateOffsetPercentage(): Promise<number> {
   return Number.isFinite(percentage) && percentage >= -100 && percentage <= 100
     ? percentage
     : Number(defaultSettings.QUOTE_ESTIMATE_OFFSET_PERCENTAGE);
+}
+
+export async function getQuoteEstimateMasterReductionPercentage(): Promise<number> {
+  const percentage = Number(await getPlatformSetting('QUOTE_ESTIMATE_MASTER_REDUCTION_PERCENTAGE'));
+  return Number.isFinite(percentage) && percentage >= 0 && percentage <= 100
+    ? percentage
+    : Number(defaultSettings.QUOTE_ESTIMATE_MASTER_REDUCTION_PERCENTAGE);
 }
 
 export async function getVatPercentage(): Promise<number> {
@@ -147,18 +159,20 @@ export async function getTenderUnlockFeeGbp(tenderId: string): Promise<number> {
     where: { id: tenderId },
     select: {
       category: true,
-      items: { select: { category: true, item: true, description: true, quantity: true } },
-      packages: { select: { category: true, item: true, description: true, quantity: true } },
+      items: { select: { category: true, subcategory: true, item: true, description: true, quantity: true } },
+      packages: { select: { category: true, subcategory: true, item: true, description: true, quantity: true } },
     },
   });
-  const offsetPercentage = await getQuoteEstimateOffsetPercentage();
-  const baselines = await getReviewedQuoteEstimateBaselines();
-  const estimatedValueGbp = applyEstimateOffset(
+  const [masterReductionPercentage, baselines] = await Promise.all([
+    getQuoteEstimateMasterReductionPercentage(),
+    getReviewedQuoteEstimateBaselines(),
+  ]);
+  const estimatedValueGbp = applyMasterEstimateReduction(
     estimateTenderQuoteValue({
       category: tender.category,
       items: tender.items.length > 0 ? tender.items : tender.packages,
     }, baselines),
-    offsetPercentage,
+    masterReductionPercentage,
   );
   const { lowPercentage, highPercentage, topPercentage } = await getPercentageBandSettings('RETAILER_UNLOCK');
   return calculateTenderUnlockDynamicFeeGbp(estimatedValueGbp, lowPercentage, highPercentage, topPercentage);
@@ -170,6 +184,10 @@ export async function isAdspaceActive(): Promise<boolean> {
 
 export async function isIndependentReviewActive(): Promise<boolean> {
   return await getPlatformSetting('INDEPENDENT_REVIEW_ACTIVE') === 'true';
+}
+
+export async function isDirectContactActive(): Promise<boolean> {
+  return await getPlatformSetting('DIRECT_CONTACT_ACTIVE') === 'true';
 }
 
 /** Owner-controlled: when disabled, a verification request that would need a human decision is declined automatically instead of queuing for review. */
@@ -224,6 +242,7 @@ export async function getAdminSettings(includeSupportRecipient = false) {
       clientReleasePercentageHigh: Number(settings.find((setting) => setting.key === 'CLIENT_RELEASE_PERCENTAGE_HIGH')?.value ?? defaultSettings.CLIENT_RELEASE_PERCENTAGE_HIGH),
       clientReleasePercentageTop: Number(settings.find((setting) => setting.key === 'CLIENT_RELEASE_PERCENTAGE_TOP')?.value ?? defaultSettings.CLIENT_RELEASE_PERCENTAGE_TOP),
       quoteEstimateOffsetPercentage: Number(settings.find((setting) => setting.key === 'QUOTE_ESTIMATE_OFFSET_PERCENTAGE')?.value ?? defaultSettings.QUOTE_ESTIMATE_OFFSET_PERCENTAGE),
+      quoteEstimateMasterReductionPercentage: Number(settings.find((setting) => setting.key === 'QUOTE_ESTIMATE_MASTER_REDUCTION_PERCENTAGE')?.value ?? defaultSettings.QUOTE_ESTIMATE_MASTER_REDUCTION_PERCENTAGE),
       vatPercentage: Number(settings.find((setting) => setting.key === 'VAT_PERCENTAGE')?.value ?? defaultSettings.VAT_PERCENTAGE),
       sponsoredPlacementActive: (settings.find((setting) => setting.key === 'SPONSORED_PLACEMENT_ACTIVE')?.value ?? defaultSettings.SPONSORED_PLACEMENT_ACTIVE) === 'true',
       sponsoredPlacementFeeGbp: Number(settings.find((setting) => setting.key === 'SPONSORED_PLACEMENT_FEE_GBP')?.value ?? defaultSettings.SPONSORED_PLACEMENT_FEE_GBP),
@@ -232,6 +251,8 @@ export async function getAdminSettings(includeSupportRecipient = false) {
       adspaceActive: (settings.find((setting) => setting.key === 'ADSPACE_ACTIVE')?.value ?? defaultSettings.ADSPACE_ACTIVE) === 'true',
       independentReviewActive: (settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_ACTIVE')?.value ?? defaultSettings.INDEPENDENT_REVIEW_ACTIVE) === 'true',
       independentReviewFeeGbp: Number(settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_FEE_GBP')?.value ?? defaultSettings.INDEPENDENT_REVIEW_FEE_GBP),
+      directContactActive: (settings.find((setting) => setting.key === 'DIRECT_CONTACT_ACTIVE')?.value ?? defaultSettings.DIRECT_CONTACT_ACTIVE) === 'true',
+      directContactFeeGbp: Number(settings.find((setting) => setting.key === 'DIRECT_CONTACT_FEE_GBP')?.value ?? defaultSettings.DIRECT_CONTACT_FEE_GBP),
       humanReviewActive: (settings.find((setting) => setting.key === 'HUMAN_REVIEW_ACTIVE')?.value ?? defaultSettings.HUMAN_REVIEW_ACTIVE) === 'true',
       verificationDocumentRequirements: Object.entries(verificationDocumentRequirements),
     },

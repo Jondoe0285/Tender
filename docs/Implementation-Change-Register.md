@@ -28,6 +28,25 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-11 - Product-Category Pricing Intelligence And Master Fee Reduction
+
+- Changed: moved detailed pricing intelligence out of the main Super User dashboard and into a dedicated `/super-user/pricing-intelligence` page. The dashboard now shows only an overall accuracy summary chart and a link to the detailed page.
+- Changed: pricing intelligence is now linked to product/service categories and items, not individual tenders. Baseline rows use service/category/item keys such as `Materials > Bricks > Facing bricks` and show live sample counts, baseline value, automatic offset, manual override, effective estimate, and variance.
+- Changed: weekly live-data refresh now recalculates automatic item offsets from available quote and quote-line data. Owner manual overrides remain available for erroneous or unusual results and can be returned to automatic mode.
+- Changed: added an Owner-controlled master estimate reduction percentage. This reduction applies after item-level offsets and only to the dynamic tender release fee basis; for example, a 5% master reduction means a £100,000 estimate is charged as a £95,000 fee basis.
+- Affects: `QuoteEstimateBaseline` schema/migration `20260911150000_item_pricing_offsets`, quote-estimate service, dynamic tender unlock fee calculation, Super User dashboard, new Pricing Intelligence page/API, Owner settings, navigation, pricing refresh script behavior, and focused pricing tests.
+- Environment: apply migration `20260911150000_item_pricing_offsets` through the approved staging and production release process before running the weekly pricing refresh in deployed environments. No secrets or external integrations changed.
+- Validation: focused pricing intelligence tests, `npx prisma generate`, and `npm run type-check -- --pretty false` pass locally. Full suite/build validation remains required before release.
+
+### 2026-09-11 - Refined Service Tender Forms And Paid Direct Contact Requests
+
+- Changed: tender creation now requires detailed project/package specifications and supports more purpose-specific package capture, including not-applicable units, service provision duration, Contractor Services minimum requirements such as CSCS/SSIP/RAMS/insurance, Professional Services service types with mandatory details when "Other" is selected, and Plant Hire driver/operator and lift-plan requirements.
+- Changed: added owner-controlled direct contact requests for Contractor Services and Professional Services tenders. When active, a Provider can pay the configured direct-contact fee to share their own contact details with the purchasing Client before the standard quote route; the Client's contact details remain protected unless released by another approved workflow.
+- Changed: added `DIRECT_CONTACT` payments, `DirectContactRequest` records, payment webhook/dev finalisation, Provider request UI, Client released-contact UI, and the Owner settings toggle/fee.
+- Affects: tender schema and builder UI, service requirement catalogue, Prisma schema/migration `20260911140000_add_direct_contact_requests`, direct-contact API/domain service, payment service/webhook/dev confirmation, Owner settings, Client tender detail, Provider tender detail, and contact-release policy text.
+- Environment: apply the migration through the approved staging and production release process. No secrets or external integrations changed, but production Stripe webhook validation must include the new `DIRECT_CONTACT` payment finaliser after deployment.
+- Validation: focused tender builder/schema and direct-contact tests plus `npm run type-check -- --pretty false` pass locally. Full suite and production build remain to be rerun before release.
+
 ### 2026-09-11 - Affiliated Partner Terminology
 
 - Changed: replaced current user-facing "partner advertising" wording with "affiliated partners" / "affiliated partner information" across the footer, public partner policy, Owner settings copy, active product requirements, and brand rules.

@@ -1,8 +1,8 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/server/data/prisma';
 import { analyticsFilterSchema } from '@/lib/schemas/analytics';
-import { applyEstimateOffset, calculateEstimateVariancePercent, estimateTenderQuoteValue, getReviewedQuoteEstimateBaselines, type TenderEstimateInput } from '@/server/domain/quoteEstimateService';
-import { getQuoteEstimateOffsetPercentage } from '@/server/domain/platformSettings';
+import { estimateTenderQuoteValue, getPricingIntelligenceByCategory, getReviewedQuoteEstimateBaselines } from '@/server/domain/quoteEstimateService';
+import { getQuoteEstimateMasterReductionPercentage } from '@/server/domain/platformSettings';
 
 export type AnalyticsFilters = {
   from?: Date;
@@ -26,7 +26,7 @@ type AnalyticsTender = {
   location: string;
   createdAt: Date;
   client: { id: string; contactName: string; email: string };
-  items: { category: string | null; item: string | null; description: string | null; quantity: string | null }[];
+  items: { category: string | null; subcategory: string | null; item: string | null; description: string | null; quantity: string | null }[];
   _count: { matches: number; unlocks: number; quotes: number };
   quotes: { status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED'; priceGbp: number }[];
 };
@@ -151,9 +151,10 @@ async function getVerificationBreakdown(quotes: { status: 'SUBMITTED' | 'ACCEPTE
 
 export async function getAnalytics(filters: AnalyticsFilters = {}) {
   const tenderWhere = buildAnalyticsTenderWhere(filters);
-  const [quoteEstimateOffsetPercent, estimateBaselines] = await Promise.all([
-    getQuoteEstimateOffsetPercentage(),
+  const [masterReductionPercent, estimateBaselines, pricingRows] = await Promise.all([
+    getQuoteEstimateMasterReductionPercentage(),
     getReviewedQuoteEstimateBaselines(),
+    getPricingIntelligenceByCategory(),
   ]);
   const tenders = (await prisma.tender.findMany({
     where: tenderWhere,
@@ -161,7 +162,7 @@ export async function getAnalytics(filters: AnalyticsFilters = {}) {
     include: {
       _count: { select: { matches: true, unlocks: true, quotes: true } },
       client: { select: { id: true, contactName: true, email: true } },
-      items: { select: { category: true, item: true, description: true, quantity: true } },
+      items: { select: { category: true, subcategory: true, item: true, description: true, quantity: true } },
       quotes: { select: { status: true, priceGbp: true } },
     },
   })) as AnalyticsTender[];
@@ -217,32 +218,15 @@ export async function getAnalytics(filters: AnalyticsFilters = {}) {
   const revenue = payments.reduce((sum, payment) => sum + payment.amountGbp, 0);
   const vatCollectedGbp = vatPayments.reduce((sum, payment) => sum + payment.vatGbp, 0);
   const verificationBreakdown = await getVerificationBreakdown(quotes);
-  const pricingIntelligence = tenders.map((tender) => {
-    const estimateInput: TenderEstimateInput = {
-      category: tender.category,
-      items: tender.items,
-    };
-    const estimateGbp = applyEstimateOffset(estimateTenderQuoteValue(estimateInput, estimateBaselines), quoteEstimateOffsetPercent);
-    const actualQuotedGbp = tender.quotes.length
-      ? tender.quotes.reduce((sum, quote) => sum + quote.priceGbp, 0) / tender.quotes.length
-      : 0;
-    const variancePercent = calculateEstimateVariancePercent(estimateGbp, actualQuotedGbp);
-
-    return {
-      id: tender.id,
-      reference: tender.reference,
-      category: tender.category,
-      location: tender.location,
-      createdAt: tender.createdAt,
-      estimatedValueGbp: estimateGbp,
-      actualQuotedValueGbp: Number(actualQuotedGbp.toFixed(2)),
-      variancePercent,
-      varianceGbp: Number((actualQuotedGbp - estimateGbp).toFixed(2)),
-    };
-  });
-  const averageVariancePercent = pricingIntelligence.length
-    ? pricingIntelligence.reduce((sum, item) => sum + item.variancePercent, 0) / pricingIntelligence.length
+  const averageVariancePercent = pricingRows.length
+    ? pricingRows.reduce((sum, item) => sum + item.variancePercent, 0) / pricingRows.length
     : 0;
+  const accuracyBands = [
+    { label: 'Within 5%', count: pricingRows.filter((item) => Math.abs(item.variancePercent) <= 5).length },
+    { label: 'Within 10%', count: pricingRows.filter((item) => Math.abs(item.variancePercent) > 5 && Math.abs(item.variancePercent) <= 10).length },
+    { label: 'Within 20%', count: pricingRows.filter((item) => Math.abs(item.variancePercent) > 10 && Math.abs(item.variancePercent) <= 20).length },
+    { label: 'Over 20%', count: pricingRows.filter((item) => Math.abs(item.variancePercent) > 20).length },
+  ];
 
   const tenderDetails = tenders.map((tender) => ({
     id: tender.id,
@@ -254,7 +238,7 @@ export async function getAnalytics(filters: AnalyticsFilters = {}) {
     quotes: tender._count.quotes,
     acceptedQuotes: tender.quotes.filter((quote) => quote.status === 'ACCEPTED').length,
     quotedValue: tender.quotes.reduce((sum, quote) => sum + quote.priceGbp, 0),
-    estimatedValueGbp: applyEstimateOffset(estimateTenderQuoteValue({ category: tender.category, items: tender.items }, estimateBaselines), quoteEstimateOffsetPercent),
+    estimatedValueGbp: estimateTenderQuoteValue({ category: tender.category, items: tender.items }, estimateBaselines),
   }));
 
   return {
@@ -280,9 +264,11 @@ export async function getAnalytics(filters: AnalyticsFilters = {}) {
     verificationBreakdown,
     tenderDetails,
     pricingIntelligence: {
-      offsetPercent: quoteEstimateOffsetPercent,
+      masterReductionPercent,
       averageVariancePercent: Number(averageVariancePercent.toFixed(2)),
-      tenders: pricingIntelligence,
+      itemCount: pricingRows.length,
+      sampleSize: pricingRows.reduce((sum, item) => sum + item.sampleSize, 0),
+      accuracyBands,
     },
   };
 }

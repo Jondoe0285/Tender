@@ -10,6 +10,7 @@ import { finalizeContactRelease } from '@/server/domain/contactReleaseService';
 import { finalizeSponsoredPlacementWithPayment } from '@/server/domain/sponsoredPlacementService';
 import { finalizeMembershipTierWithPayment } from '@/server/domain/membershipService';
 import { finalizeIndependentReviewWithPayment } from '@/server/domain/independentReviewService';
+import { finalizeDirectContactWithPayment } from '@/server/domain/directContactService';
 import { reversePaymentEntitlements } from '@/server/payments/paymentReversalService';
 
 async function getReceiptUrl(stripe: Stripe, session: Stripe.Checkout.Session): Promise<string | null> {
@@ -138,6 +139,7 @@ export async function POST(request: Request) {
         if (payment.type === 'SPONSORED_PLACEMENT') await finalizeSponsoredPlacementWithPayment(payment.userId, payment.id);
         if (payment.type === 'MEMBERSHIP_TIER' && payment.tierId) await finalizeMembershipTierWithPayment(payment.userId, payment.tierId, payment.id);
         if (payment.type === 'INDEPENDENT_REVIEW') await finalizeIndependentReviewWithPayment(payment.userId, payment.id);
+        if (payment.type === 'DIRECT_CONTACT') await finalizeDirectContactWithPayment(payment.userId, payment.id);
       }
       if (!existingPaymentAudit) {
         await recordAuditEvent({
@@ -153,8 +155,8 @@ export async function POST(request: Request) {
         const reference = payment.quote?.reference ?? payment.unlock?.tender.reference ?? paymentId;
         const accountPath = payment.type === 'CLIENT_RELEASE' ? '/client/billing' : '/retailer/billing';
         const template = confirmed
-          ? paymentConfirmationTemplate({ paymentType: payment.type === 'RETAILER_UNLOCK' ? 'Retailer tender unlock fee' : payment.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : payment.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : 'Client Accepted Quote Release Fee', amountGbp: payment.amountGbp, vatGbp: payment.vatGbp, totalAmountGbp: payment.totalAmountGbp, reference, accountPath })
-          : failedPaymentTemplate({ paymentType: payment.type === 'RETAILER_UNLOCK' ? 'Retailer tender unlock fee' : payment.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : payment.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : 'Client Accepted Quote Release Fee', amountGbp: payment.amountGbp, vatGbp: payment.vatGbp, totalAmountGbp: payment.totalAmountGbp, reference, retryPath: accountPath });
+          ? paymentConfirmationTemplate({ paymentType: payment.type === 'RETAILER_UNLOCK' ? 'Retailer tender unlock fee' : payment.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : payment.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : payment.type === 'DIRECT_CONTACT' ? 'Direct contact request fee' : 'Client Accepted Quote Release Fee', amountGbp: payment.amountGbp, vatGbp: payment.vatGbp, totalAmountGbp: payment.totalAmountGbp, reference, accountPath })
+          : failedPaymentTemplate({ paymentType: payment.type === 'RETAILER_UNLOCK' ? 'Retailer tender unlock fee' : payment.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : payment.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : payment.type === 'DIRECT_CONTACT' ? 'Direct contact request fee' : 'Client Accepted Quote Release Fee', amountGbp: payment.amountGbp, vatGbp: payment.vatGbp, totalAmountGbp: payment.totalAmountGbp, reference, retryPath: accountPath });
         await sendTransactionalEmail(payment.user.email, template).catch(() => undefined);
       }
     }

@@ -44,6 +44,7 @@ enum PaymentType {
   SPONSORED_PLACEMENT
   MEMBERSHIP_TIER
   INDEPENDENT_REVIEW
+  DIRECT_CONTACT
 }
 
 enum PaymentStatus {
@@ -163,6 +164,7 @@ model User {
   retailerMessages TenderMessage[] @relation("TenderMessageRetailer")
   clientMessages TenderMessage[] @relation("TenderMessageClient")
   professionalInterests ProfessionalInterest[]
+  directContactRequests DirectContactRequest[] @relation("DirectContactRequester")
   moderationEvents  ModerationEvent[] @relation("ModerationActor")
   reviewedModerationEvents ModerationEvent[] @relation("ModerationReviewer")
   legalHoldsCreated LegalHold[] @relation("LegalHoldCreatedBy")
@@ -286,14 +288,21 @@ model PlatformSetting {
 
 model QuoteEstimateBaseline {
   id                 String   @id @default(cuid())
-  category           String   @unique
+  key                String   @unique
+  service            String
+  category           String
+  item               String?
   baselineGbp        Float
+  automaticOffsetPercent Float @default(0)
+  manualOffsetPercent Float?
+  offsetMode         String   @default("AUTOMATIC")
   sampleSize         Int
   reviewedAt         DateTime
   effectiveWeekStart DateTime
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
+  @@index([service, category])
   @@index([effectiveWeekStart])
   @@index([reviewedAt])
 }
@@ -521,6 +530,7 @@ model Tender {
   attachments   TenderAttachment[]
   messages      TenderMessage[]
   professionalInterests ProfessionalInterest[]
+  directContactRequests DirectContactRequest[]
   legalHolds    LegalHold[] @relation("LegalHoldTender")
   warnings      TenderWarning[]
 }
@@ -746,6 +756,7 @@ model Payment {
   releases              ContactRelease[]
   sponsoredPlacement    RetailerSponsoredPlacement?
   retailerMembership    RetailerMembership?
+  directContactRequest  DirectContactRequest?
   reversals             PaymentReversal[]
 
   @@index([paymentWaiverId])
@@ -804,6 +815,22 @@ model ProfessionalInterest {
 
   @@unique([tenderId, retailerId])
   @@index([tenderId, releasedAt])
+}
+
+model DirectContactRequest {
+  id          String   @id @default(cuid())
+  tenderId    String
+  tender      Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  requesterId String
+  requester   User     @relation("DirectContactRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  paymentId   String?  @unique
+  payment     Payment? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  releasedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([tenderId, requesterId])
+  @@index([tenderId, releasedAt])
+  @@index([requesterId, createdAt])
 }
 
 model AuditLog {

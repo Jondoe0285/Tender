@@ -2,8 +2,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   applyEstimateOffset,
+  applyMasterEstimateReduction,
+  buildEstimateBaselineKey,
+  calculateAutomaticOffsetPercent,
   calculateEstimateVariancePercent,
   estimateTenderQuoteValue,
+  effectiveBaselineOffsetPercent,
   getUtcWeekStart,
   selectBottomThirdPriceScale,
 } from '@/server/domain/quoteEstimateService';
@@ -46,5 +50,22 @@ describe('quote estimate intelligence', () => {
 
   it('uses the same staged progression for dynamic tender unlock pricing', () => {
     assert.equal(calculateTenderUnlockDynamicFeeGbp(150000, 1, 0.5, 0.25), 675);
+  });
+
+  it('builds product-category baseline keys from service, category, and item', () => {
+    assert.equal(buildEstimateBaselineKey('Materials', 'Bricks', 'Facing bricks'), 'Materials > Bricks > Facing bricks');
+  });
+
+  it('applies a master reduction after item estimates for the fee basis', () => {
+    assert.equal(applyMasterEstimateReduction(100000, 5), 95000);
+  });
+
+  it('uses manual item offset when the owner overrides automatic pricing intelligence', () => {
+    assert.equal(effectiveBaselineOffsetPercent({ automaticOffsetPercent: -7.5, manualOffsetPercent: 2.25, offsetMode: 'MANUAL' }), 2.25);
+    assert.equal(effectiveBaselineOffsetPercent({ automaticOffsetPercent: -7.5, manualOffsetPercent: 2.25, offsetMode: 'AUTOMATIC' }), -7.5);
+  });
+
+  it('calculates automatic offset from reviewed live-data baseline movement', () => {
+    assert.equal(calculateAutomaticOffsetPercent(1000, 925), -7.5);
   });
 });

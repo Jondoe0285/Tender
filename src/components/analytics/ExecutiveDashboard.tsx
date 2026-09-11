@@ -119,33 +119,32 @@ export function ExecutiveDashboard({ data }: Props) {
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-heading text-lg font-bold text-foundation-navy">Pricing intelligence</h2>
-            <p className="mt-1 text-sm text-concrete-grey">Internal estimate offset: {data.pricingIntelligence.offsetPercent.toFixed(2)}%. Baselines refresh from live platform quotation data. Average variance against actual quoted values: {data.pricingIntelligence.averageVariancePercent.toFixed(2)}%.</p>
+            <p className="mt-1 text-sm text-concrete-grey">Overall estimate accuracy by product category. Master fee-basis reduction: {data.pricingIntelligence.masterReductionPercent.toFixed(2)}%.</p>
           </div>
           <StatusBadge status={Math.abs(data.pricingIntelligence.averageVariancePercent) <= 15 ? 'approved' : 'pending'}>
             {String(Math.abs(data.pricingIntelligence.averageVariancePercent) <= 15 ? 'Market aligned' : 'Review variance')}
           </StatusBadge>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-concrete-grey">
-              <tr>
-                <th className="pb-3">Tender</th>
-                <th className="pb-3">Estimated</th>
-                <th className="pb-3">Actual quoted</th>
-                <th className="pb-3">Variance</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {data.pricingIntelligence.tenders.slice(0, 10).map((item) => (
-                <tr key={item.id}>
-                  <td className="py-3"><Link href={`/super-user/tenders/${item.id}`} className="font-semibold text-steel-blue hover:text-foundation-navy hover:underline">{item.reference}</Link><p className="text-xs text-concrete-grey">{item.category}</p></td>
-                  <td className="py-3 text-concrete-grey">{money.format(item.estimatedValueGbp)}</td>
-                  <td className="py-3 text-concrete-grey">{money.format(item.actualQuotedValueGbp)}</td>
-                  <td className="py-3"><StatusBadge status={item.variancePercent <= 15 && item.variancePercent >= -15 ? 'approved' : 'pending'}>{`${item.variancePercent > 0 ? '+' : ''}${item.variancePercent}%`}</StatusBadge></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="grid gap-5 lg:grid-cols-[1fr_260px] lg:items-center">
+          <div className="h-56">
+            {data.pricingIntelligence.itemCount === 0 ? <EmptyChart /> : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.pricingIntelligence.accuracyBands}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis dataKey="label" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#1D3D5C" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-concrete-grey">
+            <p><span className="font-semibold text-foundation-navy">Average variance:</span> {data.pricingIntelligence.averageVariancePercent.toFixed(2)}%</p>
+            <p className="mt-2"><span className="font-semibold text-foundation-navy">Tracked categories:</span> {data.pricingIntelligence.itemCount}</p>
+            <p className="mt-2"><span className="font-semibold text-foundation-navy">Live samples:</span> {data.pricingIntelligence.sampleSize}</p>
+            <Link href="/super-user/pricing-intelligence" className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-foundation-navy px-4 text-sm font-semibold text-white hover:bg-steel-blue">Open pricing intelligence</Link>
+          </div>
         </div>
       </Card>
 

@@ -47,6 +47,7 @@ export const SUPER_USER_NAV: NavGroup[] = [
       { label: 'Tender Monitoring', href: '/super-user/compliance' },
       { label: 'Activity Log', href: '/super-user/activity-log' },
       { label: 'Analytics', href: '/super-user/analytics' },
+      { label: 'Pricing Intelligence', href: '/super-user/pricing-intelligence' },
       { label: 'Support requests', href: '/super-user/support' },
     ],
   },
