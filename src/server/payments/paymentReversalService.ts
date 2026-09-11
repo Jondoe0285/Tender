@@ -24,19 +24,27 @@ export async function reversePaymentEntitlements(input: ReversalInput): Promise<
   if (!payment) return null;
 
   try {
-    await prisma.$transaction([
-      prisma.paymentReversal.create({
+    await prisma.$transaction(async (transaction) => {
+      await transaction.paymentReversal.create({
         data: {
           paymentId: payment.id,
           type: input.type,
           stripeEventId: input.stripeEventId,
           providerObjectId: input.providerObjectId,
         },
-      }),
-      prisma.payment.update({ where: { id: payment.id }, data: { status: 'REVERSED' } }),
-      prisma.unlock.deleteMany({ where: { paymentId: payment.id, method: 'PAID' } }),
-      prisma.contactRelease.deleteMany({ where: { authorizingPaymentId: payment.id } }),
-    ]);
+      });
+      await transaction.payment.update({ where: { id: payment.id }, data: { status: 'REVERSED' } });
+      await transaction.unlock.deleteMany({ where: { paymentId: payment.id, method: 'PAID' } });
+      await transaction.contactRelease.deleteMany({ where: { authorizingPaymentId: payment.id } });
+      await transaction.directContactRequest.updateMany({ where: { paymentId: payment.id, releasedAt: { not: null } }, data: { releasedAt: null } });
+      await recordAuditEvent({
+        actorId: null,
+        action: 'PAYMENT_REVERSED',
+        targetType: 'Payment',
+        targetId: payment.id,
+        metadata: { stripeEventId: input.stripeEventId, type: input.type, providerObjectId: input.providerObjectId },
+      }, transaction);
+    });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return null;
     throw error;
@@ -47,13 +55,5 @@ export async function reversePaymentEntitlements(input: ReversalInput): Promise<
     affectedUserIds.add(release.clientId);
     affectedUserIds.add(release.retailerId);
   }
-  await recordAuditEvent({
-    actorId: null,
-    action: 'PAYMENT_REVERSED',
-    targetType: 'Payment',
-    targetId: payment.id,
-    metadata: { stripeEventId: input.stripeEventId, type: input.type, providerObjectId: input.providerObjectId },
-  });
-
   return { paymentId: payment.id, paymentType: payment.type, affectedUserIds: [...affectedUserIds] };
 }

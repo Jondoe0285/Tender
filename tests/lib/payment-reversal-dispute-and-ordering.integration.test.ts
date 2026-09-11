@@ -128,7 +128,7 @@ test('a reversal delivered before the completion event blocks the later out-of-o
     id: `evt_complete_${suffix}`,
     object: 'event',
     type: 'checkout.session.completed',
-    data: { object: { object: 'checkout.session', metadata: { paymentId }, amount_total: 1200, payment_intent: null } },
+    data: { object: { object: 'checkout.session', metadata: { paymentId }, payment_status: 'paid', amount_total: 1200, payment_intent: null } },
   });
   const completionSignature = Stripe.webhooks.generateTestHeaderString({ payload: completionPayload, secret: webhookSecret });
   const completionResponse = await POST(new Request('http://localhost/api/webhooks/stripe', { method: 'POST', headers: { 'stripe-signature': completionSignature }, body: completionPayload }));
@@ -216,7 +216,7 @@ test('a retry after a partial failure resumes entitlement finalisation instead o
     id: eventId,
     object: 'event',
     type: 'checkout.session.completed',
-    data: { object: { object: 'checkout.session', metadata: { paymentId }, amount_total: 1200, payment_intent: null } },
+    data: { object: { object: 'checkout.session', metadata: { paymentId }, payment_status: 'paid', amount_total: 1200, payment_intent: null } },
   });
   const signature = Stripe.webhooks.generateTestHeaderString({ payload, secret: webhookSecret });
   const request = () => new Request('http://localhost/api/webhooks/stripe', { method: 'POST', headers: { 'stripe-signature': signature }, body: payload });

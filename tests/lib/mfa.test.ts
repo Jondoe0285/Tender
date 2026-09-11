@@ -20,6 +20,8 @@ test('MFA enrollment keeps the current session valid until the code is verified'
   const beginBlock = route.slice(route.indexOf("parsed.data.action === 'begin'"), route.indexOf('const account = await prisma.user.findUnique'));
 
   assert.doesNotMatch(beginBlock, /sessionVersion/);
+  assert.match(route, /if \(account\?\.mfaEnabled\) return NextResponse\.json\(\{ error: 'Disable MFA before starting a new enrollment' \}/);
+  assert.match(readFileSync('src/server/auth/auth.ts', 'utf8'), /updateMany\(\{ where: \{ id: user\.id, mfaRecoveryCodesHash: user\.mfaRecoveryCodesHash \}/);
   assert.match(route, /MFA_ENABLED/);
   assert.match(route, /MFA_DISABLED/);
 });
@@ -29,4 +31,10 @@ test('MFA settings load current enabled state before showing setup controls', ()
 
   assert.match(source, /fetch\('\/api\/auth\/mfa'\)/);
   assert.match(source, /setEnabled\(Boolean\(data\?\.enabled\)\)/);
+});
+
+test('login forwards the authenticator code to the credentials provider', () => {
+  const source = readFileSync('src/components/auth/LoginForm.tsx', 'utf8');
+
+  assert.match(source, /mfaCode: form\.get\('mfaCode'\)/);
 });

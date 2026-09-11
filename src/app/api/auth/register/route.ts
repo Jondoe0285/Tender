@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   });
   if (existing) {
     if (existing.role === 'SUPER_USER') {
-      return NextResponse.json({ error: 'This email is already assigned to a Super User account' }, { status: 409 });
+      return NextResponse.json({ status: 'verification_pending' }, { status: 202 });
     }
     const validPassword = await verifyPassword(input.password, existing.passwordHash);
     const hasRole = existing.roleMemberships.some((membership) => membership.role === input.role) || existing.role === input.role;

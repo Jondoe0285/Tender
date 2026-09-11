@@ -233,14 +233,63 @@ test('a signed completion event grants one unlock and replays without duplicate 
     id: `evt_${suffix}`,
     object: 'event',
     type: 'checkout.session.completed',
-    data: { object: { object: 'checkout.session', metadata: { paymentId }, amount_total: 1200, payment_intent: null } },
+    data: { object: { object: 'checkout.session', metadata: { paymentId }, payment_status: 'paid', amount_total: 1200, payment_intent: null } },
   });
   const signature = Stripe.webhooks.generateTestHeaderString({ payload, secret: webhookSecret });
   const request = () => new Request('http://localhost/api/webhooks/stripe', { method: 'POST', headers: { 'stripe-signature': signature }, body: payload });
+
+  const unpaidPayload = JSON.stringify({
+    id: `evt_unpaid_${suffix}`,
+    object: 'event',
+    type: 'checkout.session.completed',
+    data: { object: { object: 'checkout.session', metadata: { paymentId }, payment_status: 'unpaid', amount_total: 1200, payment_intent: null } },
+  });
+  const unpaidSignature = Stripe.webhooks.generateTestHeaderString({ payload: unpaidPayload, secret: webhookSecret });
+  const unpaidResponse = await POST(new Request('http://localhost/api/webhooks/stripe', { method: 'POST', headers: { 'stripe-signature': unpaidSignature }, body: unpaidPayload }));
+  assert.equal(unpaidResponse.status, 200);
+  assert.equal((await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } })).status, 'PENDING');
+  assert.equal(await prisma.unlock.count({ where: { tenderId, retailerId, paymentId } }), 0);
 
   assert.equal((await POST(request())).status, 200);
   assert.equal((await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } })).status, 'CONFIRMED');
   assert.equal(await prisma.unlock.count({ where: { tenderId, retailerId, paymentId } }), 1);
   assert.equal((await POST(request())).status, 200);
   assert.equal(await prisma.unlock.count({ where: { tenderId, retailerId, paymentId } }), 1);
+});
+
+test('a reversed direct-contact payment clears the released contact state', async (context) => {
+  const suffix = randomUUID();
+  let clientId: string | undefined;
+  let retailerId: string | undefined;
+  let tenderId: string | undefined;
+  let paymentId: string | undefined;
+
+  context.after(async () => {
+    if (paymentId) await prisma.paymentReversal.deleteMany({ where: { paymentId } });
+    if (paymentId) await prisma.directContactRequest.deleteMany({ where: { paymentId } });
+    if (paymentId) await prisma.payment.deleteMany({ where: { id: paymentId } });
+    if (tenderId) await prisma.tender.deleteMany({ where: { id: tenderId } });
+    const userIds = [clientId, retailerId].filter((id): id is string => Boolean(id));
+    if (userIds.length > 0) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+  });
+
+  const [client, retailer] = await Promise.all([
+    prisma.user.create({ data: { email: `direct-reversal-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Direct Reversal Client' } }),
+    prisma.user.create({ data: { email: `direct-reversal-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Direct Reversal Retailer' } }),
+  ]);
+  clientId = client.id;
+  retailerId = retailer.id;
+  const tender = await prisma.tender.create({
+    data: { reference: `DIRECT-REV-${suffix}`, clientId, category: 'Contractor Services', subcategory: 'Groundworks', location: 'Leeds', quantity: 'Project', urgency: 'Standard', closingDate: new Date(Date.now() + 86_400_000), requirements: 'Delivery', description: 'Fictional direct-contact reversal test tender' },
+  });
+  tenderId = tender.id;
+  const payment = await prisma.payment.create({
+    data: { type: 'DIRECT_CONTACT', amountGbp: 25, vatPercentage: 20, vatGbp: 5, totalAmountGbp: 30, status: 'CONFIRMED', userId: retailerId, tenderId, stripePaymentIntentId: `pi_${suffix}`, confirmedAt: new Date() },
+  });
+  paymentId = payment.id;
+  await prisma.directContactRequest.create({ data: { tenderId, requesterId: retailerId, paymentId, releasedAt: new Date() } });
+
+  await reversePaymentEntitlements({ stripePaymentIntentId: payment.stripePaymentIntentId!, stripeEventId: `evt_${suffix}`, providerObjectId: `ch_${suffix}`, type: 'REFUND' });
+
+  assert.equal((await prisma.directContactRequest.findUniqueOrThrow({ where: { paymentId } })).releasedAt, null);
 });

@@ -27,8 +27,10 @@ export async function authenticateCredentials(credentials: Record<string, unknow
     if (mfaCode && user.mfaSecretEncrypted) verified = await verifyMfaCode(decryptMfaSecret(user.mfaSecretEncrypted), mfaCode).catch(() => false);
     if (!verified && mfaCode) {
       const recovery = consumeRecoveryCode(user.mfaRecoveryCodesHash, mfaCode);
-      verified = recovery.valid;
-      if (recovery.valid) await prisma.user.update({ where: { id: user.id }, data: { mfaRecoveryCodesHash: JSON.stringify(recovery.remaining) } });
+      if (recovery.valid) {
+        const consumed = await prisma.user.updateMany({ where: { id: user.id, mfaRecoveryCodesHash: user.mfaRecoveryCodesHash }, data: { mfaRecoveryCodesHash: JSON.stringify(recovery.remaining) } });
+        verified = consumed.count === 1;
+      }
     }
     if (!verified) throw new Error(mfaCode ? 'MFA_INVALID' : 'MFA_REQUIRED');
   }

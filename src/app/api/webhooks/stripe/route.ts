@@ -100,9 +100,18 @@ export async function POST(request: Request) {
     const paymentId = session.metadata?.paymentId;
     if (paymentId) {
       const confirmed = event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded';
+      if (event.type === 'checkout.session.completed' && session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
+        return NextResponse.json({ received: true });
+      }
       const paymentBeforeUpdate = await prisma.payment.findUnique({ where: { id: paymentId } });
       if (!paymentBeforeUpdate) {
         return NextResponse.json({ received: true });
+      }
+      if (confirmed && session.currency && session.currency !== 'gbp') {
+        return NextResponse.json({ error: 'Payment currency mismatch' }, { status: 400 });
+      }
+      if (confirmed && paymentBeforeUpdate.stripePaymentIntentId && typeof session.payment_intent === 'string' && paymentBeforeUpdate.stripePaymentIntentId !== session.payment_intent) {
+        return NextResponse.json({ error: 'Payment intent mismatch' }, { status: 400 });
       }
       if (confirmed && session.amount_total !== null && session.amount_total !== Math.round(paymentBeforeUpdate.totalAmountGbp * 100)) {
         return NextResponse.json({ error: 'Payment amount mismatch' }, { status: 400 });
@@ -111,7 +120,7 @@ export async function POST(request: Request) {
       const updated = await prisma.payment.updateMany({
         where: { id: paymentId, status: confirmed ? { in: ['PENDING', 'FAILED'] } : 'PENDING' },
         data: confirmed
-          ? { status: 'CONFIRMED', confirmedAt: new Date(), stripeEventId: event.id, stripeReceiptUrl: receiptUrl, accountingRecordPath: `accounting/stripe/${new Date().getUTCFullYear()}/${paymentId}.json` }
+          ? { status: 'CONFIRMED', confirmedAt: new Date(), stripeEventId: event.id, stripePaymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : paymentBeforeUpdate.stripePaymentIntentId, stripeReceiptUrl: receiptUrl, accountingRecordPath: `accounting/stripe/${new Date().getUTCFullYear()}/${paymentId}.json` }
           : { status: 'FAILED', stripeEventId: event.id },
       });
       const payment = await prisma.payment.findUnique({

@@ -27,6 +27,7 @@ export function LoginForm() {
     const result = await signIn('credentials', {
       email: form.get('email'),
       password: form.get('password'),
+      mfaCode: form.get('mfaCode'),
       redirect: false,
     });
 

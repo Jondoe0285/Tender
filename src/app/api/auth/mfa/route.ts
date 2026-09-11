@@ -26,6 +26,8 @@ export async function POST(request: Request) {
     if (!parsed.success) return NextResponse.json({ error: 'Invalid MFA request' }, { status: 400 });
 
     if (parsed.data.action === 'begin') {
+      const account = await prisma.user.findUnique({ where: { id: user.id }, select: { mfaEnabled: true } });
+      if (account?.mfaEnabled) return NextResponse.json({ error: 'Disable MFA before starting a new enrollment' }, { status: 409 });
       const enrollment = buildMfaEnrollment(user.email);
       await prisma.user.update({ where: { id: user.id }, data: { mfaEnabled: false, mfaSecretEncrypted: encryptMfaSecret(enrollment.secret), mfaRecoveryCodesHash: null, mfaVerifiedAt: null } });
       await recordAuditEvent({ actorId: user.id, action: 'MFA_ENROLLMENT_STARTED', targetType: 'User', targetId: user.id });
@@ -48,7 +50,10 @@ export async function POST(request: Request) {
       const validTotp = await verifyMfaCode(secret, parsed.data.code);
       const recovery = validTotp ? { valid: true, remaining: account.mfaRecoveryCodesHash ? JSON.parse(account.mfaRecoveryCodesHash) : null } : consumeRecoveryCode(account.mfaRecoveryCodesHash, parsed.data.code);
       if (!recovery.valid) return NextResponse.json({ error: 'Invalid MFA code' }, { status: 400 });
-      await prisma.user.update({ where: { id: user.id }, data: { mfaEnabled: false, mfaSecretEncrypted: null, mfaRecoveryCodesHash: null, mfaVerifiedAt: null, sessionVersion: { increment: 1 } } });
+      const disabled = validTotp
+        ? await prisma.user.updateMany({ where: { id: user.id, mfaEnabled: true }, data: { mfaEnabled: false, mfaSecretEncrypted: null, mfaRecoveryCodesHash: null, mfaVerifiedAt: null, sessionVersion: { increment: 1 } } })
+        : await prisma.user.updateMany({ where: { id: user.id, mfaEnabled: true, mfaRecoveryCodesHash: account.mfaRecoveryCodesHash }, data: { mfaEnabled: false, mfaSecretEncrypted: null, mfaRecoveryCodesHash: null, mfaVerifiedAt: null, sessionVersion: { increment: 1 } } });
+      if (disabled.count !== 1) return NextResponse.json({ error: 'Invalid MFA code' }, { status: 400 });
       await recordAuditEvent({ actorId: user.id, action: 'MFA_DISABLED', targetType: 'User', targetId: user.id });
       return NextResponse.json({ enabled: false });
     }

@@ -1165,3 +1165,10 @@ Update it in the same change set as every applicable implementation. Do not reco
 - Affects: retailer opportunity/dashboard/detail views and tender summary API.
 - Environment: no migration; existing tender locations are formatted dynamically.
 - Validation: run geography and retailer opportunity tests under Node 20.
+
+### 2026-09-11 - Production Review Payment And MFA Hardening
+
+- Changed: rejected unpaid Stripe Checkout completion events before payment confirmation or entitlement finalisation; completed sessions are checked for GBP currency and any previously stored PaymentIntent; payment reversal state, entitlement removal, and the reversal audit event are committed transactionally; reversed direct-contact payments now clear the released contact state; active MFA cannot be replaced without first disabling it; MFA recovery-code use is atomic against concurrent reuse; and existing Super User registration attempts now return the same generic pending response as other existing accounts.
+- Affects: Stripe webhook payment confirmation, direct-contact access, Super User MFA enrollment/login/disable flows, registration privacy, and related regression tests.
+- Environment: no new migration or external resource change. Stripe event fixtures and deployed webhook verification must still be exercised in staging with provider-side evidence.
+- Validation: focused MFA tests (4 passing), payment reversal/dispute tests (7 passing), type-check, lint, and full test suite remain required before commit; browser MFA and real Stripe staging tests remain outstanding.
