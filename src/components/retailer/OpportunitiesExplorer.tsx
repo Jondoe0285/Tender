@@ -106,6 +106,8 @@ export function OpportunitiesExplorer({ opportunities }: { opportunities: Opport
               key={category}
               type="button"
               onClick={() => toggle(categories, setCategories, category)}
+              aria-pressed={categories.includes(category)}
+              aria-label={`${categories.includes(category) ? 'Remove' : 'Add'} ${category} filter`}
               className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                 categories.includes(category)
                   ? 'border-safety-amber bg-safety-amber/10 text-foundation-navy'
@@ -120,6 +122,8 @@ export function OpportunitiesExplorer({ opportunities }: { opportunities: Opport
               key={urgency}
               type="button"
               onClick={() => toggle(urgencies, setUrgencies, urgency)}
+              aria-pressed={urgencies.includes(urgency)}
+              aria-label={`${urgencies.includes(urgency) ? 'Remove' : 'Add'} ${urgency} urgency filter`}
               className={`rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
                 urgencies.includes(urgency)
                   ? 'border-steel-blue bg-steel-blue/10 text-foundation-navy'

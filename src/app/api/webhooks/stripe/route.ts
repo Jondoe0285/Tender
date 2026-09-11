@@ -53,7 +53,7 @@ export async function POST(request: Request) {
         const users = await prisma.user.findMany({ where: { id: { in: reversal.affectedUserIds } }, select: { email: true } });
         await Promise.allSettled(users.map((user) => sendTransactionalEmail(
           user.email,
-          paymentReversedTemplate({ paymentType: reversal.paymentType, reference: reversal.paymentId, reversalType: 'REFUND', accountPath: '/policies#payments' })
+          paymentReversedTemplate({ paymentType: reversal.paymentType, reference: reversal.paymentId, reversalType: 'REFUND', accountPath: '/policies/payments' })
         )));
       }
     }
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
         const users = await prisma.user.findMany({ where: { id: { in: reversal.affectedUserIds } }, select: { email: true } });
         await Promise.allSettled(users.map((user) => sendTransactionalEmail(
           user.email,
-          paymentReversedTemplate({ paymentType: reversal.paymentType, reference: reversal.paymentId, reversalType: 'DISPUTE', accountPath: '/policies#payments' })
+          paymentReversedTemplate({ paymentType: reversal.paymentType, reference: reversal.paymentId, reversalType: 'DISPUTE', accountPath: '/policies/payments' })
         )));
       }
     }

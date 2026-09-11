@@ -6,25 +6,37 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 
-type Quote = {
+type QuoteCommon = {
   id: string;
   reference: string;
-  priceGbp: number;
-  leadTimeDays: number;
-  deliveryDateConfirmed: boolean;
-  deliveryInfo: string;
   validityDays: number;
-  lines: { tenderItemId: string; priceGbp: number | null; available: boolean; tenderItem: { category: string; subcategory: string; item: string | null; quantity: string } }[];
-  charges: { id: string; description: string; priceGbp: number }[];
   status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
   submittedAt: string;
+  expiresAt: string;
   sponsoredPlacementActive?: boolean;
-  releaseFeeGbp: number;
   providerVerificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
   verifiedDocumentLabels: string[];
   independentlyVerified: boolean;
   independentReviewTier: 'BRONZE' | 'SILVER' | 'GOLD' | null;
 };
+
+type ActiveQuote = QuoteCommon & {
+  expired: false;
+  priceGbp: number;
+  leadTimeDays: number;
+  deliveryDateConfirmed: boolean;
+  deliveryInfo: string;
+  lines: { tenderItemId: string; priceGbp: number | null; available: boolean; tenderItem: { category: string; subcategory: string; item: string | null; quantity: string } }[];
+  charges: { id: string; description: string; priceGbp: number }[];
+  releaseFeeGbp: number;
+};
+
+type ExpiredQuote = QuoteCommon & {
+  expired: true;
+  expiryMessage: string;
+};
+
+type Quote = ActiveQuote | ExpiredQuote;
 
 function ProviderVerificationBadge({ status, verifiedDocumentLabels, independentlyVerified, independentReviewTier }: { status: Quote['providerVerificationStatus']; verifiedDocumentLabels: string[]; independentlyVerified: boolean; independentReviewTier: Quote['independentReviewTier'] }) {
   if (independentlyVerified) {
@@ -67,13 +79,16 @@ export function QuoteComparison({
   const [sortKey, setSortKey] = useState<SortKey>('priceGbp');
   const [sortAscending, setSortAscending] = useState(true);
 
-  const submittedQuotes = quotes.filter((quote) => quote.status === 'SUBMITTED');
+  const activeQuotes = quotes.filter((quote): quote is ActiveQuote => !quote.expired);
+  const submittedQuotes = activeQuotes.filter((quote) => quote.status === 'SUBMITTED');
   const fullySuppliedQuotes = submittedQuotes.filter((quote) => quote.lines.length > 0 && quote.lines.every((quoteLine) => quoteLine.available));
   const bestPrice = fullySuppliedQuotes.length ? Math.min(...fullySuppliedQuotes.map((quote) => quote.priceGbp)) : null;
   const bestLeadTime = submittedQuotes.length ? Math.min(...submittedQuotes.map((quote) => quote.leadTimeDays)) : null;
 
   const sortedQuotes = useMemo(() => {
     return [...quotes].sort((first, second) => {
+      if (first.expired !== second.expired) return first.expired ? 1 : -1;
+      if (first.expired || second.expired) return new Date(second.submittedAt).getTime() - new Date(first.submittedAt).getTime();
       const firstValue = first[sortKey];
       const secondValue = second[sortKey];
       const comparison = firstValue < secondValue ? -1 : firstValue > secondValue ? 1 : 0;
@@ -104,7 +119,7 @@ export function QuoteComparison({
           <div><StatusBadge status="approved">Independently Verified</StatusBadge><p className="mt-2 text-concrete-grey">A Health &amp; Safety professional reviewed the legal-compliance evidence.</p></div>
         </div>
         <p className="mt-3 text-xs text-concrete-grey">These statuses do not replace your own suitable due diligence before entering a formal agreement.</p>
-        <Link href="/policies#verification-policy" className="mt-2 inline-block text-xs font-semibold text-steel-blue hover:text-foundation-navy">Read the detailed verification policy</Link>
+        <Link href="/policies/verification-policy" className="mt-2 inline-block text-xs font-semibold text-steel-blue hover:text-foundation-navy">Read the detailed verification policy</Link>
       </div>
 
       <div className="hidden overflow-x-auto rounded-card border border-slate-200 bg-white shadow-soft lg:block">
@@ -176,8 +191,13 @@ function SortableHeader({
 }) {
   const active = activeKey === sortKey;
   return (
-    <th className="px-5 py-4 font-semibold">
-      <button type="button" onClick={() => onSort(sortKey)} className="rounded px-1 py-1 text-left hover:text-foundation-navy">
+    <th className="px-5 py-4 font-semibold" aria-sort={active ? (ascending ? 'ascending' : 'descending') : 'none'}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        aria-label={`Sort by ${label}`}
+        className="rounded px-1 py-1 text-left hover:text-foundation-navy"
+      >
         {label} {active ? (ascending ? '↑' : '↓') : '↕'}
       </button>
     </th>
@@ -196,6 +216,8 @@ function QuoteRow({
   onLoadContact,
   pendingCheckoutUrl,
 }: QuoteRowProps) {
+  if (quote.expired) return <ExpiredQuoteRow quote={quote} />;
+
   return (
     <tr className={`align-top ${quote.independentlyVerified ? 'bg-approved/5' : ''}`}>
       <td className="px-5 py-5">
@@ -244,6 +266,8 @@ function QuoteCard({
   onLoadContact,
   pendingCheckoutUrl,
 }: QuoteRowProps) {
+  if (quote.expired) return <ExpiredQuoteCard quote={quote} />;
+
   return (
     <Card interactive className={quote.independentlyVerified ? 'border-approved/40 bg-approved/5' : ''}>
       <div className="flex items-start justify-between gap-3">
@@ -293,7 +317,7 @@ type QuoteRowProps = {
 
 type Contact = { contactName: string; contactPhone: string | null; email: string };
 
-function QuoteBreakdown({ quote }: { quote: Quote }) {
+function QuoteBreakdown({ quote }: { quote: ActiveQuote }) {
   if (quote.lines.length === 0 && quote.charges.length === 0) return <p className="text-sm text-concrete-grey">Not itemized</p>;
 
   return (
@@ -329,6 +353,36 @@ function Detail({ label, value, highlight = false }: { label: string; value: str
   );
 }
 
+function ExpiredQuoteRow({ quote }: { quote: ExpiredQuote }) {
+  return (
+    <tr className="align-top bg-slate-50">
+      <td className="px-5 py-5">
+        <p className="font-semibold text-foundation-navy">{quote.reference}</p>
+        <StatusBadge status="attention">Expired</StatusBadge>
+      </td>
+      <td colSpan={6} className="px-5 py-5 text-sm text-concrete-grey">
+        <p className="font-semibold text-foundation-navy">{quote.expiryMessage}</p>
+        <p className="mt-1">Provider validity period: {quote.validityDays} days. Expired on {new Date(quote.expiresAt).toLocaleDateString('en-GB')}.</p>
+      </td>
+    </tr>
+  );
+}
+
+function ExpiredQuoteCard({ quote }: { quote: ExpiredQuote }) {
+  return (
+    <Card className="border-attention/30 bg-slate-50">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">{quote.reference}</p>
+          <p className="mt-2 text-sm font-semibold text-foundation-navy">{quote.expiryMessage}</p>
+          <p className="mt-1 text-sm text-concrete-grey">Provider validity period: {quote.validityDays} days. Expired on {new Date(quote.expiresAt).toLocaleDateString('en-GB')}.</p>
+        </div>
+        <StatusBadge status="attention">Expired</StatusBadge>
+      </div>
+    </Card>
+  );
+}
+
 function DecisionActions({
   quote,
   contact,
@@ -339,7 +393,7 @@ function DecisionActions({
   onLoadContact,
   pendingCheckoutUrl,
 }: {
-  quote: Quote;
+  quote: ActiveQuote;
   contact?: Contact;
   isPendingPayment: boolean;
   busy: boolean;

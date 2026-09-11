@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { TradeTenderLogo } from '@/components/layout/TradeTenderLogo';
 import { supportEmail } from '@/lib/contact';
@@ -30,24 +31,24 @@ export function SiteFooter() {
         <div className="border-l-0 border-site-white/15 lg:border-l lg:pl-8">
           <p className="text-xs font-semibold uppercase tracking-widest text-safety-amber">Policies</p>
           <div className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 text-xs font-semibold">
-            <a href="/policies#platform-terms" className="hover:text-sky-blue">Platform terms</a>
-            <a href="/policies#client-terms" className="hover:text-sky-blue">Contractor terms</a>
-            <a href="/policies#retailer-terms" className="hover:text-sky-blue">Provider terms</a>
-            <a href="/policies#marketplace-disclaimer" className="hover:text-sky-blue">Marketplace disclaimer</a>
-            <a href="/policies#privacy" className="hover:text-sky-blue">Privacy</a>
-            <a href="/policies#cookies" className="hover:text-sky-blue">Cookies</a>
-            <a href="/policies#quote-retention" className="hover:text-sky-blue">Quote retention</a>
-            <a href="/policies#payments" className="hover:text-sky-blue">Payments and refunds</a>
-            <a href="/policies#contact-release" className="hover:text-sky-blue">Contact release</a>
-            <a href="/policies#acceptable-use" className="hover:text-sky-blue">Acceptable use</a>
-            <a href="/policies#partners" className="hover:text-sky-blue">Partner links</a>
-            <a href="/policies#accessibility" className="hover:text-sky-blue">Accessibility</a>
+            <Link href="/policies/platform-terms" className="hover:text-sky-blue">Platform terms</Link>
+            <Link href="/policies/contractor-terms" className="hover:text-sky-blue">Contractor terms</Link>
+            <Link href="/policies/provider-terms" className="hover:text-sky-blue">Provider terms</Link>
+            <Link href="/policies/marketplace-disclaimer" className="hover:text-sky-blue">Marketplace disclaimer</Link>
+            <Link href="/policies/privacy" className="hover:text-sky-blue">Privacy</Link>
+            <Link href="/policies/cookies" className="hover:text-sky-blue">Cookies</Link>
+            <Link href="/policies/quote-retention" className="hover:text-sky-blue">Quote retention</Link>
+            <Link href="/policies/payments" className="hover:text-sky-blue">Payments and refunds</Link>
+            <Link href="/policies/contact-release" className="hover:text-sky-blue">Contact release</Link>
+            <Link href="/policies/acceptable-use" className="hover:text-sky-blue">Acceptable use</Link>
+            <Link href="/policies/partners" className="hover:text-sky-blue">Partner links</Link>
+            <Link href="/policies/accessibility" className="hover:text-sky-blue">Accessibility</Link>
           </div>
         </div>
         <div className="border-l-0 border-site-white/15 md:border-l md:pl-8">
           {partners.length > 0 && (
             <>
-              <p className="text-xs font-semibold uppercase tracking-widest text-safety-amber">Partner advertising</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-safety-amber">Affiliated partners</p>
               <div className="mt-4 grid max-w-md grid-cols-2 gap-3">
                 {partners.map((partner) => (
                   partner.destinationUrl ? (
@@ -62,7 +63,7 @@ export function SiteFooter() {
                 ))}
               </div>
               <p className="mt-4 max-w-md text-xs leading-relaxed text-site-white/60">
-                Partner advertising is separate from tender matching, quote ranking, supplier selection, and Contractor decisions.
+                Affiliated partner information is separate from tender matching, quote ranking, supplier selection, and Contractor decisions.
               </p>
             </>
           )}
@@ -70,7 +71,7 @@ export function SiteFooter() {
             <p className="text-xs font-semibold uppercase tracking-widest text-safety-amber">Contact us</p>
             <p className="mt-2 text-xs leading-relaxed text-site-white/70">Support for account access, platform use, payments, and technical issues.</p>
             {support && <a href={`mailto:${support}`} className="mt-2 inline-block text-xs font-semibold text-site-white underline underline-offset-4 hover:text-sky-blue">Email support</a>}
-            <a href="/policies#support" className="ml-4 text-xs font-semibold text-site-white underline underline-offset-4 hover:text-sky-blue">Support policy</a>
+            <Link href="/policies/support" className="ml-4 text-xs font-semibold text-site-white underline underline-offset-4 hover:text-sky-blue">Support policy</Link>
           </div>
         </div>
       </div>

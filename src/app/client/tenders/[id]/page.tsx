@@ -26,25 +26,33 @@ type Tender = {
   attachments: { id: string; fileName: string; mimeType: string; sizeBytes: number }[];
 };
 
-type Quote = {
+type QuoteCommon = {
   id: string;
   reference: string;
-  priceGbp: number;
-  leadTimeDays: number;
-  deliveryDateConfirmed: boolean;
-  deliveryInfo: string;
   validityDays: number;
-  lines: { tenderItemId: string; priceGbp: number | null; available: boolean; tenderItem: { category: string; subcategory: string; item: string | null; quantity: string } }[];
-  charges: { id: string; description: string; priceGbp: number }[];
   status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
   submittedAt: string;
+  expiresAt: string;
   sponsoredPlacementActive?: boolean;
-  releaseFeeGbp: number;
   providerVerificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
   verifiedDocumentLabels: string[];
   independentlyVerified: boolean;
   independentReviewTier: 'BRONZE' | 'SILVER' | 'GOLD' | null;
 };
+
+type Quote = QuoteCommon & ({
+  expired: false;
+  priceGbp: number;
+  leadTimeDays: number;
+  deliveryDateConfirmed: boolean;
+  deliveryInfo: string;
+  lines: { tenderItemId: string; priceGbp: number | null; available: boolean; tenderItem: { category: string; subcategory: string; item: string | null; quantity: string } }[];
+  charges: { id: string; description: string; priceGbp: number }[];
+  releaseFeeGbp: number;
+} | {
+  expired: true;
+  expiryMessage: string;
+});
 
 type Contact = { contactName: string; contactPhone: string | null; email: string };
 
@@ -373,7 +381,7 @@ export default function ClientTenderDetailPage() {
             />
           </>
         )}
-        {quotes.map((quote) => (
+        {quotes.filter((quote) => !quote.expired).map((quote) => (
           <div key={quote.id} className="mt-6">
             <TenderMessages tenderId={params.id} quoteId={quote.id} role="client" />
           </div>

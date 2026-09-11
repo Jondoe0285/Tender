@@ -180,6 +180,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
             onClick={() => setMobileOpen(false)}
           />
           <aside
+            id="mobile-navigation-drawer"
             ref={drawerRef}
             role="dialog"
             aria-modal="true"
@@ -211,6 +212,8 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
             <button
               type="button"
               aria-label="Open navigation"
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-navigation-drawer"
               ref={menuButtonRef}
               onClick={() => setMobileOpen(true)}
               className="rounded-md p-2 text-foundation-navy hover:bg-foundation-navy/5 md:hidden"

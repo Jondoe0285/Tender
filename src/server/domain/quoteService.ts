@@ -17,6 +17,16 @@ export function isQuoteRetentionLocked(retentionLockedUntil: Date | null | undef
   return retentionLockedUntil !== null && retentionLockedUntil !== undefined && retentionLockedUntil > now;
 }
 
+export function getQuoteExpiresAt(submittedAt: Date, validityDays: number): Date {
+  return new Date(submittedAt.getTime() + validityDays * 24 * 60 * 60 * 1000);
+}
+
+export function isQuoteExpired(submittedAt: Date, validityDays: number, now = new Date()): boolean {
+  return getQuoteExpiresAt(submittedAt, validityDays) <= now;
+}
+
+export const QUOTE_EXPIRED_MESSAGE = "This quote has exceeded the Provider's validity period and is no longer valid.";
+
 /** Deletes only quotes outside the mandatory retention window. Callers must authorize the actor. */
 export async function deleteQuote(quoteId: string) {
   const quote = await prisma.quote.findUnique({
@@ -55,6 +65,8 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
     where: { id: tenderId },
     include: { client: { select: { email: true } }, items: { where: { category: { in: serviceCategories } }, select: { id: true } } },
   });
+  const providerProfile = await prisma.retailerProfile.findUnique({ where: { userId: retailerId }, select: { standardQuoteValidityDays: true } });
+  const validityDays = providerProfile?.standardQuoteValidityDays ?? 30;
   if (tender.supplyDate && !input.deliveryDateConfirmed) {
     throw new ValidationError('Confirm you can deliver on the requested supply date');
   }
@@ -77,7 +89,7 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
       leadTimeDays: input.leadTimeDays,
       deliveryDateConfirmed: input.deliveryDateConfirmed,
       deliveryInfo: input.deliveryInfo,
-      validityDays: input.validityDays,
+      validityDays,
       status: 'SUBMITTED' as const,
       lines: { create: input.lineItems },
       charges: { create: input.charges },
@@ -177,13 +189,35 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
         return [profile.userId, verifiedDocuments.map((document) => VERIFICATION_DOCUMENT_TYPES.find((doc) => doc.type === document.documentType)?.label ?? document.documentType)] as const;
       })
   ));
-  return Promise.all(quotes.map(async ({ retailerId, ...quote }) => ({
-    ...quote,
-    sponsoredPlacementActive: sponsoredRetailerIds.has(retailerId),
-    releaseFeeGbp: await getClientReleaseFeeGbp(quote.priceGbp),
-    providerVerificationStatus: verificationByRetailerId.get(retailerId) ?? 'UNVERIFIED',
-    verifiedDocumentLabels: verifiedDocumentsByRetailerId.get(retailerId) ?? [],
-    independentlyVerified: independentTierByRetailerId.has(retailerId),
-    independentReviewTier: independentTierByRetailerId.get(retailerId) ?? null,
-  })));
+  return Promise.all(quotes.map(async ({ retailerId, ...quote }) => {
+    if (quote.status === 'SUBMITTED' && isQuoteExpired(quote.submittedAt, quote.validityDays)) {
+      return {
+        id: quote.id,
+        reference: quote.reference,
+        validityDays: quote.validityDays,
+        submittedAt: quote.submittedAt,
+        expiresAt: getQuoteExpiresAt(quote.submittedAt, quote.validityDays),
+        status: quote.status,
+        expired: true,
+        expiryMessage: QUOTE_EXPIRED_MESSAGE,
+        sponsoredPlacementActive: sponsoredRetailerIds.has(retailerId),
+        providerVerificationStatus: verificationByRetailerId.get(retailerId) ?? 'UNVERIFIED',
+        verifiedDocumentLabels: verifiedDocumentsByRetailerId.get(retailerId) ?? [],
+        independentlyVerified: independentTierByRetailerId.has(retailerId),
+        independentReviewTier: independentTierByRetailerId.get(retailerId) ?? null,
+      };
+    }
+
+    return {
+      ...quote,
+      expiresAt: getQuoteExpiresAt(quote.submittedAt, quote.validityDays),
+      expired: false,
+      sponsoredPlacementActive: sponsoredRetailerIds.has(retailerId),
+      releaseFeeGbp: await getClientReleaseFeeGbp(quote.priceGbp),
+      providerVerificationStatus: verificationByRetailerId.get(retailerId) ?? 'UNVERIFIED',
+      verifiedDocumentLabels: verifiedDocumentsByRetailerId.get(retailerId) ?? [],
+      independentlyVerified: independentTierByRetailerId.has(retailerId),
+      independentReviewTier: independentTierByRetailerId.get(retailerId) ?? null,
+    };
+  }));
 }

@@ -76,6 +76,8 @@ test('accepts staging deployment approval for the current staging commit', () =>
     headSha(),
     '--staging-ref',
     'HEAD',
+    '--high-risk-attestation',
+    'HIGH RISK STAGING CONTROLS VERIFIED',
   ]);
   rmSync('docs/health-check/deployment-approval.json', { force: true });
   assert.equal(result.code, 0);

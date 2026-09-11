@@ -53,7 +53,8 @@ jobs:
             --target staging \
             --sha "${{ github.event.inputs.commit_sha }}" \
             --staging-ref origin/staging \
-            --statement "${{ github.event.inputs.staging_approval_statement }}"
+            --statement "${{ github.event.inputs.staging_approval_statement }}" \
+            --high-risk-attestation "${{ github.event.inputs.high_risk_attestation }}"
 
   deploy:
     name: Deploy to staging slot

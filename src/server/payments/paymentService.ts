@@ -1,7 +1,7 @@
 import { prisma } from '@/server/data/prisma';
 import { getStripeClient, isStripeConfigured } from '@/server/payments/stripeClient';
 import type { PaymentType } from '@prisma/client';
-import { buildPaymentAmounts, getClientReleaseFeeGbp, getPaymentFeeGbp, getVatPercentage } from '@/server/domain/platformSettings';
+import { buildPaymentAmounts, getClientReleaseFeeGbp, getPaymentFeeGbp, getTenderUnlockFeeGbp, getVatPercentage } from '@/server/domain/platformSettings';
 import { appUrl } from '@/server/config/appUrl';
 
 type CreatePaymentResult = {
@@ -52,7 +52,9 @@ export async function createPayment(params: {
   } else {
     netFeeGbp = params.type === 'CLIENT_RELEASE' && params.quotePriceGbp !== undefined
       ? await getClientReleaseFeeGbp(params.quotePriceGbp)
-      : await getPaymentFeeGbp(params.type);
+      : params.type === 'RETAILER_UNLOCK' && params.tenderId
+        ? await getTenderUnlockFeeGbp(params.tenderId)
+        : await getPaymentFeeGbp(params.type);
     if (params.type === 'RETAILER_UNLOCK' && params.discountPercentage !== undefined) {
       netFeeGbp = applyPaymentDiscount(netFeeGbp, params.discountPercentage);
     }

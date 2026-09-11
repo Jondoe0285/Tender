@@ -5,6 +5,7 @@ import { createPayment } from '@/server/payments/paymentService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { ForbiddenError, ValidationError } from '@/server/auth/session';
 import { getClientReleaseFeeGbp } from '@/server/domain/platformSettings';
+import { isQuoteExpired } from '@/server/domain/quoteService';
 import { contactReleaseTemplate, quoteAcceptedTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { getPurchasedRetentionDeadline } from '@/server/domain/retentionService';
@@ -41,6 +42,9 @@ export async function acceptQuote(clientId: string, quoteId: string, mobileRetur
     };
   }
   if (quote.status !== 'SUBMITTED' && quote.status !== 'ACCEPTED') throw new ForbiddenError('Quote is not in a state that can be accepted');
+  if (quote.status === 'SUBMITTED' && isQuoteExpired(quote.submittedAt, quote.validityDays)) {
+    throw new ValidationError("This quote has exceeded the Provider's validity period and is no longer valid.");
+  }
 
   if (quote.status === 'SUBMITTED') {
     const retentionLockedUntil = getPurchasedRetentionDeadline();

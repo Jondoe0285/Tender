@@ -284,6 +284,20 @@ model PlatformSetting {
   updatedAt DateTime @updatedAt
 }
 
+model QuoteEstimateBaseline {
+  id                 String   @id @default(cuid())
+  category           String   @unique
+  baselineGbp        Float
+  sampleSize         Int
+  reviewedAt         DateTime
+  effectiveWeekStart DateTime
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([effectiveWeekStart])
+  @@index([reviewedAt])
+}
+
 model Partner {
   id              String   @id @default(cuid())
   name            String   @unique
@@ -414,6 +428,7 @@ model RetailerProfile {
   categories        String                // comma-separated category names
   coverageAreas     String                // comma-separated postcode areas / towns, used for distance estimates only
   accreditations    String?
+  standardQuoteValidityDays Int           @default(30)
   launchCreditsLeft Int                   @default(3)
   verificationStatus     ProviderVerificationStatus @default(UNVERIFIED)
   verificationRequestedAt DateTime?

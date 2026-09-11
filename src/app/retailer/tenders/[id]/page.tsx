@@ -51,12 +51,17 @@ export default function RetailerTenderDetailPage() {
   const [linePrices, setLinePrices] = useState<Record<string, string>>({});
   const [unavailableItemIds, setUnavailableItemIds] = useState<string[]>([]);
   const [charges, setCharges] = useState<{ id: string; description: string; priceGbp: string }[]>([]);
+  const [standardQuoteValidityDays, setStandardQuoteValidityDays] = useState(30);
 
   async function load() {
-    const response = await fetch(`/api/tenders/${params.id}`);
+    const [response, profileResponse] = await Promise.all([fetch(`/api/tenders/${params.id}`), fetch('/api/retailer/profile')]);
     if (!response.ok) {
       setMessage('Unable to load this tender.');
       return;
+    }
+    if (profileResponse.ok) {
+      const profile = await profileResponse.json() as { standardQuoteValidityDays?: number };
+      setStandardQuoteValidityDays(profile.standardQuoteValidityDays ?? 30);
     }
     const data = await response.json();
     setTender(data.tender);
@@ -159,7 +164,6 @@ export default function RetailerTenderDetailPage() {
         leadTimeDays: form.get('leadTimeDays'),
         deliveryDateConfirmed: form.get('deliveryDateConfirmed') === 'on',
         deliveryInfo: form.get('deliveryInfo'),
-        validityDays: form.get('validityDays'),
       }),
     });
     setSubmittingQuote(false);
@@ -416,10 +420,10 @@ export default function RetailerTenderDetailPage() {
                       <Label htmlFor="deliveryInfo">Delivery information</Label>
                       <Textarea id="deliveryInfo" name="deliveryInfo" rows={3} placeholder="Delivery window, charges, and access requirements" required />
                     </FieldGroup>
-                    <FieldGroup>
-                      <Label htmlFor="validityDays">Quote valid for (days)</Label>
-                      <Input id="validityDays" name="validityDays" type="number" min="1" required defaultValue={30} />
-                    </FieldGroup>
+                    <div className="rounded-md bg-slate-50 px-4 py-3 text-sm text-concrete-grey">
+                      <p className="font-semibold text-foundation-navy">Quote validity: {standardQuoteValidityDays} days</p>
+                      <p className="mt-1">This is applied from your Provider profile to every quote you submit.</p>
+                    </div>
                     {message && <p className="text-sm font-semibold text-attention">{message}</p>}
                     <Button type="submit" loading={submittingQuote} className="self-start">
                       Submit quote

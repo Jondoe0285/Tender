@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/server/auth/session';
 import { listMatchedSummariesForRetailer } from '@/server/domain/tenderService';
 import { prisma } from '@/server/data/prisma';
 import { estimateDistanceMiles } from '@/lib/geography';
-import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
+import { getTenderUnlockFeeGbp } from '@/server/domain/platformSettings';
 import { OpportunitiesExplorer } from '@/components/retailer/OpportunitiesExplorer';
 import type { OpportunityCardData } from '@/components/retailer/TenderOpportunityCard';
 
@@ -14,7 +14,7 @@ export default async function NewOpportunitiesPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== 'USER') redirect('/login');
 
-  const [matches, unlocks, profile, unlockFeeGbp] = await Promise.all([
+  const [matches, unlocks, profile] = await Promise.all([
     listMatchedSummariesForRetailer(user.id),
     prisma.unlock.findMany({ where: { retailerId: user.id }, select: { tenderId: true } }),
     prisma.retailerProfile.findUnique({
@@ -28,18 +28,18 @@ export default async function NewOpportunitiesPage() {
         launchCreditsLeft: true,
       },
     }),
-    getPaymentFeeGbp('RETAILER_UNLOCK'),
   ]);
   const unlockedIds = new Set(unlocks.map((u) => u.tenderId));
   const hasCredits = (profile?.launchCreditsLeft ?? 0) > 0;
   const coverageAreas = profile?.coverageAreas ?? '';
 
-  const opportunities: OpportunityCardData[] = matches
+  const opportunities: OpportunityCardData[] = (await Promise.all(matches
     .filter(({ tender }) => !unlockedIds.has(tender.id))
-    .map(({ tender, viewedAt }) => {
+    .map(async ({ tender, viewedAt }) => {
       const categoryMatch = tender.categoryMatch;
       const locationMatch = tender.locationMatch;
       const strongMatch = categoryMatch && locationMatch;
+      const unlockFeeGbp = hasCredits ? 0 : await getTenderUnlockFeeGbp(tender.id);
 
       return {
         tenderId: tender.id,
@@ -57,7 +57,7 @@ export default async function NewOpportunitiesPage() {
         categoryMatch,
         locationMatch,
       };
-    })
+    })))
     .sort((a, b) => {
       if (a.strongMatch !== b.strongMatch) return Number(b.strongMatch) - Number(a.strongMatch);
       if ((a.categoryMatch ?? false) !== (b.categoryMatch ?? false)) return Number(b.categoryMatch) - Number(a.categoryMatch);

@@ -134,7 +134,7 @@ The Super User can, subject to authorization and audit logging:
 - Set fees, launch credits, promotional waivers, fee disablement, and future feature activation.
 - Review tenders, quotes, payments, contact-release events, and audit records.
 - Review analytics and export approved reports.
-- Manage partner branding and clearly labelled advertising links.
+- Manage affiliated partner branding and clearly labelled partner links.
 - Manage email templates and platform settings.
 - Investigate unusual activity and support operational compliance.
 
@@ -232,10 +232,10 @@ The Super User can, subject to authorization and audit logging:
 
 ### 5.10 Partners and Public Policies
 
-- **FR-090:** The platform shall support clearly labelled partner or advertising links for Sinclair Safety Solutions Ltd, Smart Works Civils Ltd, and HSQE Consult Hub (displayed without a link until it has a website).
+- **FR-090:** The platform shall support clearly labelled affiliated partner links for Sinclair Safety Solutions Ltd, Smart Works Civils Ltd, and HSQE Consult Hub (displayed without a link until it has a website).
 - **FR-091:** Partner visibility shall remain separate from matching, quote ranking, supplier selection, and Contractor decisions.
 - **FR-092:** The Super User shall manage partner names, display positions, destination links, active state, and labels.
-- **FR-093:** Public links shall be available to relevant users for platform, Contractor, Provider, privacy, cookie, quote retention, payment/refund, contact-release, acceptable-use, advertising, complaints, and accessibility policies.
+- **FR-093:** Public links shall be available to relevant users for platform, Contractor, Provider, privacy, cookie, quote retention, payment/refund, contact-release, acceptable-use, affiliated-partner, complaints, and accessibility policies.
 
 ### 5.11 Data Retention
 

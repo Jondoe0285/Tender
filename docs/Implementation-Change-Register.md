@@ -1,3 +1,11 @@
+### 2026-09-11 - Fail-Closed Deployment Gate For Required Staging Evidence
+
+- Changed: hardened the staged deployment gate so the repository verification fails closed when required evidence is missing or remains `UNVERIFIED`, rather than recording a success and continuing. The staging approval script now requires the exact `HIGH RISK STAGING CONTROLS VERIFIED` attestation, and the post-deploy verification script exits non-zero whenever any check is `FAIL` or `UNVERIFIED`, preventing a release from being treated as healthy without explicit evidence.
+- Changed: `deploy-staging.yml` passes the `high_risk_attestation` workflow input into `verify-deployment-approval.mjs` before any deployment step runs, ensuring the high-risk evidence is checked before the staging job proceeds.
+- Affects: `.github/workflows/deploy-staging.yml`, `scripts/health-check/verify-deployment-approval.mjs`, `scripts/health-check/verify-deployment.mjs`, and the focused regression test `tests/lib/deployment-high-risk-attestation.test.ts`.
+- Environment: no production or staging environment resource change; this is a repository gate fix only. Production deployment still requires the protected Render environment and approved deployment evidence from the external hosting setup.
+- Validation: `npm test -- --test-name-pattern "deployment-high-risk-attestation|deployment|verify-deployment"` passes with the fail-closed gate regression covered.
+
 ### 2026-09-06 - GDPR Privacy-By-Design Hardening
 
 - Changed: registration now requires and records versioned Terms of Use and Privacy Policy acknowledgement, with a timestamp and append-only `LEGAL_DOCUMENTS_ACCEPTED` audit event. The authenticated support workflow now captures a structured data-subject right (access/export, rectification, erasure, restriction, or objection), assigns a 30-day due date, limits final resolution to the Owner with recorded resolution evidence, and audits lifecycle actions. The server rejects support submissions containing obvious passwords, payment-card numbers, email addresses, or UK phone numbers without persisting the content. The authorised retention job removes expired email-verification/password-reset tokens after 30 days and page-view telemetry after 90 days; legal holds remain applicable to their existing Tender, Quote, and TenderAttachment scope only. Public policy copy now accurately states the essential-only cookie position and that optional trackers and consent controls are not live.
@@ -19,6 +27,41 @@ Update it in the same change set as every applicable implementation. Do not reco
 - Validation completed and validation still outstanding
 
 ## Current Changes
+
+### 2026-09-11 - Affiliated Partner Terminology
+
+- Changed: replaced current user-facing "partner advertising" wording with "affiliated partners" / "affiliated partner information" across the footer, public partner policy, Owner settings copy, active product requirements, and brand rules.
+- Changed: retained internal `ADSPACE_ACTIVE` setting names and historical change-register entries because they are implementation history or compatibility identifiers, not current public wording.
+- Affects: public footer, policy index/detail text, Owner settings labels, footer partner terminology test, action tracker wording, product requirements, and brand rules.
+- Environment: no migration, secret, production resource, cookie, tracking, tender matching, quote ranking, supplier-selection, payment, or partner-record change.
+- Validation: focused footer/policy tests and `npm run type-check -- --pretty false` pass locally.
+
+### 2026-09-11 - Provider Standard Quote Validity And Expired Quote Masking
+
+- Changed: Provider profiles now store `standardQuoteValidityDays` with a default of 30 days. The Provider profile screen lets the User set the standard validity period, and quote submission applies the stored profile value server-side instead of relying on a per-quote form value.
+- Changed: purchasing Clients can no longer access commercial details for unaccepted quotes after the Provider validity period expires. The quote comparison view and quote-comparison PDF show the message "This quote has exceeded the Provider's validity period and is no longer valid." instead of quote price, line, charge, delivery, or acceptance controls.
+- Changed: server-side quote acceptance rejects expired unaccepted quotes, preserving the payment/contact-release controls even if a stale UI tries to accept one.
+- Affects: `RetailerProfile` schema/migration `20260911130000_add_standard_quote_validity`, Provider profile API/UI, Provider quote submission UI, quote submission service, Client quote comparison, quote PDF export, and contact-release quote acceptance.
+- Environment: apply the migration through the approved staging and production release process before enabling this behavior in deployed environments. No secrets or external integrations changed.
+- Validation: `npx prisma generate`, focused quote-schema and quote-validity tests, and `npm run type-check -- --pretty false` pass locally.
+
+### 2026-09-11 - Conservative Weekly Quote Estimate Baselines
+
+- Changed: internal quote-estimate pricing now uses a bottom-third pricing scale when observed quote or quote-line prices from live quotation data already available in the Trade Tender platform conflict, rather than a straight average. This deliberately keeps estimates conservative before the Owner's offset is applied.
+- Changed: added `QuoteEstimateBaseline` and migration `20260911120000_add_quote_estimate_baselines` so reviewed category baselines can be stored and reused by dynamic tender-unlock pricing and Super User pricing intelligence.
+- Changed: added `npm run pricing:refresh-estimates` and the weekly `pricing-estimate-refresh.yml` workflow. The workflow runs Mondays at 03:11 UTC and updates the baseline table from live platform quotation data, using the production GitHub Actions `DATABASE_URL` secret to read current quote and quote-line records.
+- Changed: updated the workflow validator to recognise `pricing-estimate-refresh.yml` as an explicitly allowed operational schedule, matching the existing retention-job exception while preserving the single authoritative repository audit schedule rule.
+- Affects: quote-estimate service, dynamic Provider tender-unlock pricing, Super User analytics estimate values, Prisma schema/migration, package scripts, workflow validation, and the new weekly workflow.
+- Environment: apply the migration through the approved staging/production release process before enabling the weekly workflow. Configure only the production GitHub Actions environment secret name `DATABASE_URL`; do not commit secret values.
+- Validation: `npx prisma generate`, focused quote-estimate tests, and `npm run type-check -- --pretty false` pass locally. Production workflow execution remains outstanding until environment secrets and migration deployment are approved.
+
+### 2026-09-11 - WCAG Status Badge Accessibility Fix
+
+- Changed: darkened the platform status-symbol colours used by the status badge component so the Pending, Approved, and Neutral variants meet AA normal-text contrast against their light tinted backgrounds without changing the broader brand palette or the red attention treatment. The adjusted values are Pending `#8A4B00`, Approved `#1F5F2A`, and Neutral `#4B5563`.
+- Changed: kept the fix isolated to the status token values used by `StatusBadge` in `src/components/ui/StatusBadge.tsx`, while leaving the rest of the brand palette and the attention badge untouched.
+- Affects: `tailwind.config.ts`, `src/components/ui/StatusBadge.tsx`, and `tests/lib/wcag-contrast.test.ts`.
+- Environment: no operator action required; this is a UI token change only.
+- Validation: `npx tsx --test tests/lib/wcag-contrast.test.ts` passes with the updated AA contrast assertions.
 
 ### 2026-09-10 - Pre-Release Email Template Privacy Coverage
 

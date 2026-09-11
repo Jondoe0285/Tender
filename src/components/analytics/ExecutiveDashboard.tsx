@@ -115,6 +115,40 @@ export function ExecutiveDashboard({ data }: Props) {
         <Metric label="VAT collected" value={money.format(data.financialQuarter.vatCollectedGbp)} hint={data.financialQuarter.label} />
       </div>
 
+      <Card className="mb-8">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-lg font-bold text-foundation-navy">Pricing intelligence</h2>
+            <p className="mt-1 text-sm text-concrete-grey">Internal estimate offset: {data.pricingIntelligence.offsetPercent.toFixed(2)}%. Baselines refresh from live platform quotation data. Average variance against actual quoted values: {data.pricingIntelligence.averageVariancePercent.toFixed(2)}%.</p>
+          </div>
+          <StatusBadge status={Math.abs(data.pricingIntelligence.averageVariancePercent) <= 15 ? 'approved' : 'pending'}>
+            {String(Math.abs(data.pricingIntelligence.averageVariancePercent) <= 15 ? 'Market aligned' : 'Review variance')}
+          </StatusBadge>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-concrete-grey">
+              <tr>
+                <th className="pb-3">Tender</th>
+                <th className="pb-3">Estimated</th>
+                <th className="pb-3">Actual quoted</th>
+                <th className="pb-3">Variance</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {data.pricingIntelligence.tenders.slice(0, 10).map((item) => (
+                <tr key={item.id}>
+                  <td className="py-3"><Link href={`/super-user/tenders/${item.id}`} className="font-semibold text-steel-blue hover:text-foundation-navy hover:underline">{item.reference}</Link><p className="text-xs text-concrete-grey">{item.category}</p></td>
+                  <td className="py-3 text-concrete-grey">{money.format(item.estimatedValueGbp)}</td>
+                  <td className="py-3 text-concrete-grey">{money.format(item.actualQuotedValueGbp)}</td>
+                  <td className="py-3"><StatusBadge status={item.variancePercent <= 15 && item.variancePercent >= -15 ? 'approved' : 'pending'}>{`${item.variancePercent > 0 ? '+' : ''}${item.variancePercent}%`}</StatusBadge></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
       <Card className="mb-8 border-l-4 border-l-safety-amber bg-amber-50/40">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

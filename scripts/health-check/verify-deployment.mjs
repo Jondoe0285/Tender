@@ -158,7 +158,7 @@ record('Error rates', 'UNVERIFIED', 'requires an observability platform; none is
 
 const failed = results.filter((entry) => entry.status === 'FAIL');
 const unverified = results.filter((entry) => entry.status === 'UNVERIFIED');
-const outcome = failed.length === 0 ? 'SUCCESSFUL' : 'FAILED';
+const outcome = failed.length === 0 && unverified.length === 0 ? 'SUCCESSFUL' : 'FAILED';
 
 const record_ = {
   target,
@@ -193,6 +193,7 @@ if (process.env.GITHUB_STEP_SUMMARY) {
     '',
     `- Commit: \`${commitSha}\``,
     `- Actor: @${record_.actor}`,
+    `- Unverified checks: ${unverified.length}`,
     '',
     '| Check | Status | Detail |',
     '| --- | --- | --- |',
@@ -202,4 +203,4 @@ if (process.env.GITHUB_STEP_SUMMARY) {
   writeFileSync(process.env.GITHUB_STEP_SUMMARY, summary, { flag: 'a' });
 }
 
-if (failed.length > 0) process.exit(1);
+if (failed.length > 0 || unverified.length > 0) process.exit(1);

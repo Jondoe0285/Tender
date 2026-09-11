@@ -5,7 +5,7 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { ForbiddenError } from '@/server/auth/session';
 import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getUserTenderServiceCategories } from '@/server/domain/tenderService';
 import { membershipTiersEnabled } from '@/server/domain/membershipService';
-import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
+import { getTenderUnlockFeeGbp } from '@/server/domain/platformSettings';
 import { consumePaymentWaiver } from '@/server/domain/paymentWaiverService';
 
 type UnlockOutcome =
@@ -24,7 +24,7 @@ export async function requestUnlock(retailerId: string, tenderId: string, mobile
   });
   if (existing) return { status: 'ALREADY_UNLOCKED' };
 
-  const unlockFeeGbp = await getPaymentFeeGbp('RETAILER_UNLOCK');
+  const unlockFeeGbp = await getTenderUnlockFeeGbp(tenderId);
   if (unlockFeeGbp <= 0) {
     await prisma.unlock.create({ data: { tenderId, retailerId, method: 'WAIVED' } });
     await recordAuditEvent({

@@ -7,7 +7,7 @@ const footerPath = path.join(process.cwd(), 'src/components/layout/SiteFooter.ts
 const footerApiPath = path.join(process.cwd(), 'src/app/api/partners/footer/route.ts');
 const landingPartnersPath = path.join(process.cwd(), 'src/components/layout/LandingPartners.tsx');
 
-test('footer fetches active, ordered partner advertising from a server-only display endpoint', () => {
+test('footer fetches active, ordered affiliated partners from a server-only display endpoint', () => {
   const source = readFileSync(footerPath, 'utf8');
   const apiSource = readFileSync(footerApiPath, 'utf8');
 
@@ -18,7 +18,7 @@ test('footer fetches active, ordered partner advertising from a server-only disp
   assert.match(apiSource, /expiresAt: \{ gt: new Date\(\) \}/);
   assert.match(apiSource, /orderBy: \[\{ sortOrder: 'asc' \}, \{ name: 'asc' \}\]/);
   assert.match(apiSource, /select: \{ id: true, name: true, logoPath: true, destinationUrl: true \}/);
-  assert.match(source, /Partner advertising is separate from tender matching, quote ranking, supplier selection, and Contractor decisions/);
+  assert.match(source, /Affiliated partner information is separate from tender matching, quote ranking, supplier selection, and Contractor decisions/);
   assert.match(source, /partner\.destinationUrl \?/);
   assert.doesNotMatch(source, /sinclairsafetysolutions\.co\.uk|smartworkscivils\.com/);
 });

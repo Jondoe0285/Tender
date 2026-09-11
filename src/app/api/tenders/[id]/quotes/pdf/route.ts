@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { getCurrentUser } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
+import { getQuoteExpiresAt, isQuoteExpired, QUOTE_EXPIRED_MESSAGE } from '@/server/domain/quoteService';
 
 export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -66,6 +67,11 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
     y -= 28;
     addText(quote.reference, 40, 11, true);
     y -= 18;
+    if (quote.status === 'SUBMITTED' && isQuoteExpired(quote.submittedAt, quote.validityDays)) {
+      addWrapped(`${QUOTE_EXPIRED_MESSAGE} Provider validity period: ${quote.validityDays} days. Expired on ${getQuoteExpiresAt(quote.submittedAt, quote.validityDays).toLocaleDateString('en-GB')}.`, 40);
+      y -= 8;
+      continue;
+    }
     addText(`Price: £${quote.priceGbp} excl. VAT · Lead time: ${quote.leadTimeDays} days · Valid: ${quote.validityDays} days`, 40, 10);
     y -= 16;
     if (tender.supplyDate) addWrapped(`Requested supply date: ${tender.supplyDate.toLocaleDateString('en-GB')} · Confirmed: ${quote.deliveryDateConfirmed ? 'Yes' : 'No'}`, 40);

@@ -3,14 +3,20 @@ import { prisma } from '@/server/data/prisma';
 import { CLIENT_RELEASE_FEE_GBP, RETAILER_UNLOCK_FEE_GBP } from '@/lib/categories';
 import { SERVICE_NAMES } from '@/lib/categories';
 import { VERIFICATION_DOCUMENT_TYPES, type VerificationDocumentType } from '@/lib/verification-documents';
+import { applyEstimateOffset, estimateTenderQuoteValue, getReviewedQuoteEstimateBaselines } from '@/server/domain/quoteEstimateService';
 
 const defaultSettings: Record<string, string> = {
   RETAILER_UNLOCK_FEE_GBP: String(RETAILER_UNLOCK_FEE_GBP),
+  RETAILER_UNLOCK_FEE_MODE: 'FIXED',
+  RETAILER_UNLOCK_PERCENTAGE_LOW: '1',
+  RETAILER_UNLOCK_PERCENTAGE_HIGH: '0.5',
+  RETAILER_UNLOCK_PERCENTAGE_TOP: '0.25',
   CLIENT_RELEASE_FEE_GBP: String(CLIENT_RELEASE_FEE_GBP),
   CLIENT_RELEASE_FEE_MODE: 'FIXED',
   CLIENT_RELEASE_PERCENTAGE_LOW: '1',
   CLIENT_RELEASE_PERCENTAGE_HIGH: '0.5',
   CLIENT_RELEASE_PERCENTAGE_TOP: '0.25',
+  QUOTE_ESTIMATE_OFFSET_PERCENTAGE: '0',
   VAT_PERCENTAGE: '20',
   SPONSORED_PLACEMENT_ACTIVE: 'false',
   SPONSORED_PLACEMENT_FEE_GBP: '25',
@@ -69,6 +75,24 @@ export async function getPaymentFeeGbp(type: PaymentType): Promise<number> {
   return Number.isInteger(value) && value >= 0 ? value : Number(defaultSettings[key]);
 }
 
+async function getPercentageBandSettings(prefix: 'CLIENT_RELEASE' | 'RETAILER_UNLOCK') {
+  const lowPercentage = Number(await getPlatformSetting(`${prefix}_PERCENTAGE_LOW`));
+  const highPercentage = Number(await getPlatformSetting(`${prefix}_PERCENTAGE_HIGH`));
+  const topPercentage = Number(await getPlatformSetting(`${prefix}_PERCENTAGE_TOP`));
+  return {
+    lowPercentage: Number.isFinite(lowPercentage) ? lowPercentage : Number(defaultSettings[`${prefix}_PERCENTAGE_LOW`]),
+    highPercentage: Number.isFinite(highPercentage) ? highPercentage : Number(defaultSettings[`${prefix}_PERCENTAGE_HIGH`]),
+    topPercentage: Number.isFinite(topPercentage) ? topPercentage : Number(defaultSettings[`${prefix}_PERCENTAGE_TOP`]),
+  };
+}
+
+export async function getQuoteEstimateOffsetPercentage(): Promise<number> {
+  const percentage = Number(await getPlatformSetting('QUOTE_ESTIMATE_OFFSET_PERCENTAGE'));
+  return Number.isFinite(percentage) && percentage >= -100 && percentage <= 100
+    ? percentage
+    : Number(defaultSettings.QUOTE_ESTIMATE_OFFSET_PERCENTAGE);
+}
+
 export async function getVatPercentage(): Promise<number> {
   const percentage = Number(await getPlatformSetting('VAT_PERCENTAGE'));
   return Number.isFinite(percentage) && percentage >= 0 && percentage <= 100 ? percentage : Number(defaultSettings.VAT_PERCENTAGE);
@@ -107,10 +131,37 @@ export function calculatePercentageFee(quotePriceGbp: number, lowPercentage: num
 export async function getClientReleaseFeeGbp(quotePriceGbp: number): Promise<number> {
   const mode = await getPlatformSetting('CLIENT_RELEASE_FEE_MODE');
   if (mode !== 'PERCENTAGE') return getPaymentFeeGbp('CLIENT_RELEASE');
-  const lowPercentage = Number(await getPlatformSetting('CLIENT_RELEASE_PERCENTAGE_LOW'));
-  const highPercentage = Number(await getPlatformSetting('CLIENT_RELEASE_PERCENTAGE_HIGH'));
-  const topPercentage = Number(await getPlatformSetting('CLIENT_RELEASE_PERCENTAGE_TOP'));
+  const { lowPercentage, highPercentage, topPercentage } = await getPercentageBandSettings('CLIENT_RELEASE');
   return calculatePercentageFee(quotePriceGbp, lowPercentage, highPercentage, topPercentage);
+}
+
+export function calculateTenderUnlockDynamicFeeGbp(estimatedTenderValueGbp: number, lowPercentage: number, highPercentage: number, topPercentage: number): number {
+  return calculatePercentageFee(estimatedTenderValueGbp, lowPercentage, highPercentage, topPercentage);
+}
+
+export async function getTenderUnlockFeeGbp(tenderId: string): Promise<number> {
+  const mode = await getPlatformSetting('RETAILER_UNLOCK_FEE_MODE');
+  if (mode !== 'PERCENTAGE') return getPaymentFeeGbp('RETAILER_UNLOCK');
+
+  const tender = await prisma.tender.findUniqueOrThrow({
+    where: { id: tenderId },
+    select: {
+      category: true,
+      items: { select: { category: true, item: true, description: true, quantity: true } },
+      packages: { select: { category: true, item: true, description: true, quantity: true } },
+    },
+  });
+  const offsetPercentage = await getQuoteEstimateOffsetPercentage();
+  const baselines = await getReviewedQuoteEstimateBaselines();
+  const estimatedValueGbp = applyEstimateOffset(
+    estimateTenderQuoteValue({
+      category: tender.category,
+      items: tender.items.length > 0 ? tender.items : tender.packages,
+    }, baselines),
+    offsetPercentage,
+  );
+  const { lowPercentage, highPercentage, topPercentage } = await getPercentageBandSettings('RETAILER_UNLOCK');
+  return calculateTenderUnlockDynamicFeeGbp(estimatedValueGbp, lowPercentage, highPercentage, topPercentage);
 }
 
 export async function isAdspaceActive(): Promise<boolean> {
@@ -163,11 +214,16 @@ export async function getAdminSettings(includeSupportRecipient = false) {
   return {
     fees: {
       retailerUnlockGbp: Number(settings.find((setting) => setting.key === 'RETAILER_UNLOCK_FEE_GBP')?.value ?? defaultSettings.RETAILER_UNLOCK_FEE_GBP),
+      retailerUnlockMode: settings.find((setting) => setting.key === 'RETAILER_UNLOCK_FEE_MODE')?.value ?? defaultSettings.RETAILER_UNLOCK_FEE_MODE,
+      retailerUnlockPercentageLow: Number(settings.find((setting) => setting.key === 'RETAILER_UNLOCK_PERCENTAGE_LOW')?.value ?? defaultSettings.RETAILER_UNLOCK_PERCENTAGE_LOW),
+      retailerUnlockPercentageHigh: Number(settings.find((setting) => setting.key === 'RETAILER_UNLOCK_PERCENTAGE_HIGH')?.value ?? defaultSettings.RETAILER_UNLOCK_PERCENTAGE_HIGH),
+      retailerUnlockPercentageTop: Number(settings.find((setting) => setting.key === 'RETAILER_UNLOCK_PERCENTAGE_TOP')?.value ?? defaultSettings.RETAILER_UNLOCK_PERCENTAGE_TOP),
       clientReleaseGbp: Number(settings.find((setting) => setting.key === 'CLIENT_RELEASE_FEE_GBP')?.value ?? defaultSettings.CLIENT_RELEASE_FEE_GBP),
       clientReleaseMode: settings.find((setting) => setting.key === 'CLIENT_RELEASE_FEE_MODE')?.value ?? defaultSettings.CLIENT_RELEASE_FEE_MODE,
       clientReleasePercentageLow: Number(settings.find((setting) => setting.key === 'CLIENT_RELEASE_PERCENTAGE_LOW')?.value ?? defaultSettings.CLIENT_RELEASE_PERCENTAGE_LOW),
       clientReleasePercentageHigh: Number(settings.find((setting) => setting.key === 'CLIENT_RELEASE_PERCENTAGE_HIGH')?.value ?? defaultSettings.CLIENT_RELEASE_PERCENTAGE_HIGH),
       clientReleasePercentageTop: Number(settings.find((setting) => setting.key === 'CLIENT_RELEASE_PERCENTAGE_TOP')?.value ?? defaultSettings.CLIENT_RELEASE_PERCENTAGE_TOP),
+      quoteEstimateOffsetPercentage: Number(settings.find((setting) => setting.key === 'QUOTE_ESTIMATE_OFFSET_PERCENTAGE')?.value ?? defaultSettings.QUOTE_ESTIMATE_OFFSET_PERCENTAGE),
       vatPercentage: Number(settings.find((setting) => setting.key === 'VAT_PERCENTAGE')?.value ?? defaultSettings.VAT_PERCENTAGE),
       sponsoredPlacementActive: (settings.find((setting) => setting.key === 'SPONSORED_PLACEMENT_ACTIVE')?.value ?? defaultSettings.SPONSORED_PLACEMENT_ACTIVE) === 'true',
       sponsoredPlacementFeeGbp: Number(settings.find((setting) => setting.key === 'SPONSORED_PLACEMENT_FEE_GBP')?.value ?? defaultSettings.SPONSORED_PLACEMENT_FEE_GBP),

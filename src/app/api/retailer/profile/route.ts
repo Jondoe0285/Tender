@@ -13,6 +13,7 @@ const updateProfileSchema = z.object({
   companyName: z.string().min(1, 'Company name is required').max(200),
   companyNumber: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
+  standardQuoteValidityDays: z.coerce.number().int().positive().max(365).optional(),
   coverageScope: z.enum(['COUNTY', 'REGION', 'UK']),
   counties: z.string(), // comma-separated
   regions: z.string(), // comma-separated
@@ -55,6 +56,7 @@ export async function PUT(req: NextRequest) {
         companyName: parsed.companyName,
         companyNumber: parsed.companyNumber || null,
         address: parsed.address || null,
+        standardQuoteValidityDays: parsed.standardQuoteValidityDays ?? profile.standardQuoteValidityDays,
         coverageScope: parsed.coverageScope,
         counties: parsed.counties,
         regions: parsed.regions,

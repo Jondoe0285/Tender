@@ -16,3 +16,11 @@ test('User navigation displays an unread tender opportunity count from a protect
   assert.ok(endpoint.includes('listMatchedSummariesForRetailer(user.id)'));
   assert.ok(endpoint.includes('match.viewedAt === null'));
 });
+
+test('Mobile navigation exposes the expanded state to assistive technology', () => {
+  const shell = readFileSync(path.join(root, 'src/components/layout/AppShell.tsx'), 'utf8');
+
+  assert.ok(shell.includes('aria-expanded={mobileOpen}'));
+  assert.ok(shell.includes('aria-controls="mobile-navigation-drawer"'));
+  assert.ok(shell.includes('id="mobile-navigation-drawer"'));
+});

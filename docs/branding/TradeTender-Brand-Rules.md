@@ -197,9 +197,9 @@ Use wording that is clear, direct, helpful, practical, and free of unnecessary j
 
 Explain fees, visibility, responsibilities, and next actions near the relevant workflow step. Do not describe Trade Tender as the supplier, contractor, broker, guarantor, or responsible party for the final Contractor-Provider transaction.
 
-## 9. Partner Branding and Advertising
+## 9. Affiliated Partner Branding
 
-Partner branding and advertising links for Sinclair Safety Solutions Ltd, Smart Works Civils Ltd, and HSQE Consult Hub must be clearly labelled as advertising, sponsorship, or partner information. HSQE Consult Hub has no website yet, so its logo is shown without a link until one is provided.
+Affiliated partner branding and links for Sinclair Safety Solutions Ltd, Smart Works Civils Ltd, and HSQE Consult Hub must be clearly labelled as affiliated partner information. HSQE Consult Hub has no website yet, so its logo is shown without a link until one is provided.
 
 Partner visibility must remain separate from:
 

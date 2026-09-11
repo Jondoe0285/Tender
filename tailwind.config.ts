@@ -18,10 +18,11 @@ const config: Config = {
         'sky-blue': '#6EB1E4',
         'hi-viz-tint': '#6EB1E4',
         'concrete-grey': '#6B7280',
+        neutral: '#4B5563',
         ink: '#0D1B2A',
-        approved: '#2E7D32',
+        approved: '#1F5F2A',
         attention: '#B23B3B',
-        pending: '#C77D11',
+        pending: '#8A4B00',
       },
       fontFamily: {
         heading: ['var(--font-montserrat)', 'Arial', 'sans-serif'],

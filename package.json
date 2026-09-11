@@ -22,6 +22,7 @@
     "db:seed-demo-scenarios": "tsx --env-file=.env scripts/seed-demo-scenarios.ts",
     "db:verify-owner-password": "tsx --env-file=.env scripts/verify-owner-password.ts",
     "retention:purge": "tsx --env-file=.env scripts/purge-retention.ts",
+    "pricing:refresh-estimates": "tsx --env-file=.env scripts/refresh-quote-estimate-baselines.ts",
     "health:audit": "node scripts/health-check/run-audit.mjs",
     "health:validate-workflows": "node scripts/health-check/validate-workflows.mjs",
     "health:verify-approval": "node scripts/health-check/verify-approval.mjs",

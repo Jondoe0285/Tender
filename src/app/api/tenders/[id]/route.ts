@@ -6,7 +6,7 @@ import { getUserTenderServiceCategories, markMatchViewed, userOwnsTender } from 
 import { ForbiddenError, UnauthorizedError } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
 import { formatRetailerSummaryLocation } from '@/server/domain/tenderService';
-import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
+import { getTenderUnlockFeeGbp } from '@/server/domain/platformSettings';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { updateTenderSchema } from '@/lib/schemas/tender';
 import { updateTender } from '@/server/domain/tenderService';
@@ -56,7 +56,7 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
           packages: { where: { category: { in: serviceCategories } }, orderBy: { createdAt: 'asc' }, select: { id: true, reference: true, category: true, subcategory: true, item: true, quantity: true } },
         },
       }),
-        getPaymentFeeGbp('RETAILER_UNLOCK'),
+        getTenderUnlockFeeGbp(params.id),
     ]);
     const packageCategories = [...new Set((tender.packages ?? []).map((pkg) => pkg.category))];
     return NextResponse.json({ tender: { ...tender, category: packageCategories[0] ?? tender.category, packageCategories, packageCount: packageCategories.length, location: formatRetailerSummaryLocation(tender.location), unlockFeeGbp }, unlocked: false });

@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { Button } from '@/components/ui/Button';
@@ -171,11 +172,11 @@ export default function RegisterPage() {
                   )}
               <label className="flex items-start gap-3 text-sm text-concrete-grey">
                 <input type="checkbox" name="termsAccepted" required className="mt-1 h-4 w-4 accent-safety-amber" />
-                I accept the <a href="/policies#platform-terms" className="font-semibold text-steel-blue underline underline-offset-4">Trade Tender Terms of Use</a>.
+                I accept the <Link href="/policies/platform-terms" className="font-semibold text-steel-blue underline underline-offset-4">Trade Tender Terms of Use</Link>.
               </label>
               <label className="flex items-start gap-3 text-sm text-concrete-grey">
                 <input type="checkbox" name="privacyAccepted" required className="mt-1 h-4 w-4 accent-safety-amber" />
-                I acknowledge the <a href="/policies#privacy" className="font-semibold text-steel-blue underline underline-offset-4">Privacy Policy</a>.
+                I acknowledge the <Link href="/policies/privacy" className="font-semibold text-steel-blue underline underline-offset-4">Privacy Policy</Link>.
               </label>
 
               {error && (
