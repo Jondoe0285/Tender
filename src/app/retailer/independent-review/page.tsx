@@ -6,15 +6,22 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { INDEPENDENT_REVIEW_TIER_DESCRIPTIONS, INDEPENDENT_REVIEW_TIER_LABELS, type IndependentReviewTier } from '@/lib/independentReviewTiers';
 
 type Status = 'NOT_PURCHASED' | 'PURCHASED' | 'APPROVED' | 'DECLINED';
 
 type ReviewState = {
   active: boolean;
   feeGbp: number;
+  renewalActive: boolean;
+  renewalFeeGbp: number;
+  renewalAvailable: boolean;
+  renewalOpenAt: string | null;
+  expiresAt: string | null;
+  expired: boolean;
   eligible: boolean;
   status: Status;
-  tier: 'BRONZE' | 'SILVER' | 'GOLD' | null;
+  tier: IndependentReviewTier | null;
   purchasedAt: string | null;
   decidedAt: string | null;
   note: string | null;
@@ -37,10 +44,10 @@ export default function IndependentReviewPage() {
 
   useEffect(() => { void load(); }, []);
 
-  async function handlePurchase() {
+  async function handlePurchase(mode: 'NEW' | 'RENEWAL' = 'NEW') {
     setPurchasing(true);
     setMessage(null);
-    const response = await fetch('/api/retailer/independent-review', { method: 'POST' });
+    const response = await fetch('/api/retailer/independent-review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
     const data = await response.json().catch(() => null);
     setPurchasing(false);
     if (!response.ok) {
@@ -95,6 +102,13 @@ export default function IndependentReviewPage() {
             Independently Verified and every quote you submit shows a green independently-verified indicator.
           </p>
 
+          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-foundation-navy">Independent verification tiers</p>
+            <dl className="mt-3 grid gap-3 text-sm text-concrete-grey">
+              {(Object.keys(INDEPENDENT_REVIEW_TIER_DESCRIPTIONS) as IndependentReviewTier[]).map((tier) => <div key={tier}><dt className="font-semibold text-foundation-navy">{INDEPENDENT_REVIEW_TIER_LABELS[tier]}</dt><dd>{INDEPENDENT_REVIEW_TIER_DESCRIPTIONS[tier]}</dd></div>)}
+            </dl>
+          </div>
+
           {!state?.active && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Independent review purchases are not currently available.</p>}
 
           {state?.active && !state.eligible && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Independent review is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers.</p>}
@@ -106,9 +120,19 @@ export default function IndependentReviewPage() {
                 <StatusBadge status={state.status === 'APPROVED' ? 'approved' : state.status === 'PURCHASED' ? 'pending' : state.status === 'DECLINED' ? 'attention' : 'neutral'}>
                     {state.status === 'APPROVED' ? `Independently Verified${state.tier ? ` · ${state.tier[0] + state.tier.slice(1).toLowerCase()}` : ''}` : state.status === 'PURCHASED' ? 'Awaiting review' : state.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
                 </StatusBadge>
+                {state.expiresAt && <p className="mt-2 text-sm text-concrete-grey">Independent verification expires on {new Date(state.expiresAt).toLocaleDateString('en-GB')}.</p>}
+                {state.renewalActive && state.renewalOpenAt && !state.renewalAvailable && state.status === 'APPROVED' && !state.expired && <p className="mt-2 text-sm text-concrete-grey">Renewal opens on {new Date(state.renewalOpenAt).toLocaleDateString('en-GB')}.</p>}
+                {state.renewalAvailable && <p className="mt-2 text-sm font-semibold text-steel-blue">Renew now for £{state.renewalFeeGbp} excl. VAT before your current verification expires.</p>}
+                {state.expired && <p className="mt-2 text-sm font-semibold text-attention">Your independent verification has expired. Purchase a new review to regain independent verification.</p>}
               </div>
               {(state.status === 'NOT_PURCHASED' || state.status === 'DECLINED') && !pendingPayment && (
-                <Button onClick={handlePurchase} loading={purchasing}>Pay now</Button>
+                <Button onClick={() => handlePurchase()} loading={purchasing}>Pay now</Button>
+              )}
+              {state.renewalAvailable && !pendingPayment && (
+                <Button onClick={() => handlePurchase('RENEWAL')} loading={purchasing}>Renew now</Button>
+              )}
+              {state.expired && !pendingPayment && (
+                <Button onClick={() => handlePurchase()} loading={purchasing}>Purchase new review</Button>
               )}
             </div>
           )}

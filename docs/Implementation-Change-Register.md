@@ -28,6 +28,41 @@ Update it in the same change set as every applicable implementation. Do not reco
 
 ## Current Changes
 
+### 2026-09-11 - Independent Verification Tier Guide
+
+- Changed: added a shared Bronze/Silver/Gold independent verification tier guide. Bronze represents reviewed evidence of legal requirements such as permits, insurances, and competent advice. Silver includes Bronze plus sufficient evidence of industry-specific employee and managerial training. Gold includes Bronze and Silver plus either a comprehensive management system or validated SSIP membership.
+- Changed: surfaced the tier guide in the Provider independent review page, Provider profile independent-review messaging, Contractor quote badge hover text, the quote comparison verification key, and the public verification policy.
+- Affects: independent verification copy, quote comparison badge descriptions, public verification policy, and focused quote/policy tests. No schema, payment, or environment change.
+- Environment: no operator action required.
+- Validation: focused quote/policy tests and `npm run type-check -- --pretty false` pass locally.
+
+### 2026-09-11 - Independent Review Renewal Workflow
+
+- Changed: independent verification now has a 12-month validity model with renewal opening 11 months after approval. The Provider renewal option appears before expiry when the Owner has activated renewals.
+- Changed: added Owner-controlled settings for `INDEPENDENT_REVIEW_RENEWAL_ACTIVE` and `INDEPENDENT_REVIEW_RENEWAL_FEE_GBP`, allowing the renewal price to be lower than the standard independent review purchase price.
+- Changed: renewal purchases use the lower configured renewal fee when requested during the renewal window. Confirmed renewal payments move the profile back to purchased/awaiting review so the Super User can approve or decline the renewed review through the existing decision workflow.
+- Changed: expired independent reviews no longer show as independently verified in Contractor quote comparison badges.
+- Affects: independent review API/UI, independent review service, payment creation fee override support, Owner settings UI/API, quote badge eligibility, and focused renewal/quote tests.
+- Environment: no migration, secret, or external service change. Production Stripe webhook validation should include an independent-review renewal purchase once the model is activated.
+- Validation: focused renewal/quote tests and `npm run type-check -- --pretty false` pass locally. Full suite/build validation remains required before release.
+
+### 2026-09-11 - Fixed Contractor And Professional Service Release Fees
+
+- Changed: Contractor Services and Professional Services tender releases now use independent fixed Owner-controlled fees rather than the internal estimate/dynamic staged pricing path.
+- Changed: added separate Owner settings for `CONTRACTOR_SERVICE_UNLOCK_FEE_GBP` and `PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP`. These fees apply whenever a tender contains the relevant service category, regardless of estimated tender value, item-level pricing intelligence, or master estimate reduction.
+- Changed: dynamic estimate-based tender release pricing remains available for other service categories, with the global zero-cost Provider unlock fee still acting as a hard payment waiver.
+- Affects: platform fee settings, Owner settings UI/API, Provider tender unlock fee calculation, and focused pricing tests.
+- Environment: no migration, secret, or external service change.
+- Validation: focused pricing tests and `npm run type-check -- --pretty false` pass locally.
+
+### 2026-09-11 - Initial Category Pricing Estimates
+
+- Changed: added an explicit initial unit-price estimate table for every service/category type in the platform catalogue. These internal starting estimates are based on publicly available UK construction-market pricing patterns and provide a cautious first baseline until Trade Tender has enough live quotation history for each category.
+- Changed: pricing intelligence now uses the explicit category estimate first, then applies item-level adjustments for clearly higher-risk or lower-cost variants such as reclaimed/special items, hazardous/asbestos work, operator/contract-lift/temporary-works requirements, or simpler low-risk items.
+- Affects: quote-estimate service, Pricing Intelligence catalogue rows, dynamic tender unlock estimates, and focused pricing tests. No customer-facing estimate disclosure was added.
+- Environment: no migration, secret, or external service change.
+- Validation: focused pricing intelligence tests and `npm run type-check -- --pretty false` pass locally.
+
 ### 2026-09-11 - Sole Trader Verification Status
 
 - Changed: Provider profiles now include an `isSoleTrader` declaration. When enabled, the profile is not eligible for AI verification and any existing AI verification status is reset to unverified with an explanatory note.

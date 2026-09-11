@@ -106,6 +106,10 @@ const policies = [
         content: 'Verification reviews submitted evidence for service eligibility, legal entity information, document completeness, and service-specific requirements. Bronze, Silver, and Gold review outcomes describe the evidence reviewed and the review status; they are not guarantees of workmanship, legal compliance, insurance coverage, or final transaction outcomes.',
       },
       {
+        heading: 'Independent verification tiers',
+        content: 'Bronze means legal requirements such as permits, insurances, and competent advice have been reviewed as evidenced. Silver means the Provider has met the Bronze criteria and provided sufficient evidence of industry-specific employee and managerial training. Gold means the Provider has met the Bronze and Silver criteria and has evidenced either a comprehensive management system or validated SSIP membership.',
+      },
+      {
         heading: 'Evidence and review process',
         content: 'Providers submit evidence, which is checked against the declared category and service scope. Validation may include document checks, policy compliance checks, and service-eligibility review. Trade Tender may reject, request more information, or suspend a profile where evidence is incomplete, inconsistent, or materially misleading.',
       },

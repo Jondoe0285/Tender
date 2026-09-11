@@ -9,6 +9,7 @@ import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
 import { sponsoredPlacementEnabled } from '@/server/domain/sponsoredPlacementService';
 import { getClientReleaseFeeGbp } from '@/server/domain/platformSettings';
+import { independentReviewExpired } from '@/server/domain/independentReviewService';
 import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getTenderReviewSnapshot, getUserTenderServiceCategories, userOwnsTender } from '@/server/domain/tenderService';
 import { syncVerificationExpiryForUserIds } from '@/server/domain/verificationDocumentService';
 import { VERIFICATION_DOCUMENT_TYPES } from '@/lib/verification-documents';
@@ -177,11 +178,11 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
     : new Set<string>();
   const verificationProfiles = await prisma.retailerProfile.findMany({
     where: { userId: { in: quotes.map((quote) => quote.retailerId) } },
-    select: { id: true, userId: true, isSoleTrader: true, verificationStatus: true, independentReviewStatus: true, independentReviewTier: true },
+    select: { id: true, userId: true, isSoleTrader: true, verificationStatus: true, independentReviewStatus: true, independentReviewTier: true, independentReviewDecidedAt: true },
   });
   const verificationByRetailerId = new Map(verificationProfiles.map((profile) => [profile.userId, profile.verificationStatus] as const));
   const soleTraderByRetailerId = new Map(verificationProfiles.map((profile) => [profile.userId, profile.isSoleTrader] as const));
-  const independentTierByRetailerId = new Map(verificationProfiles.filter((profile) => profile.independentReviewStatus === 'APPROVED').map((profile) => [profile.userId, profile.independentReviewTier] as const));
+  const independentTierByRetailerId = new Map(verificationProfiles.filter((profile) => profile.independentReviewStatus === 'APPROVED' && !independentReviewExpired(profile.independentReviewStatus, profile.independentReviewDecidedAt)).map((profile) => [profile.userId, profile.independentReviewTier] as const));
   const verifiedDocumentsByRetailerId = new Map(await Promise.all(
     verificationProfiles
       .filter((profile) => profile.verificationStatus === 'VERIFIED')

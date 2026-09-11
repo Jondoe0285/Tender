@@ -10,6 +10,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Input, Label, Textarea, FieldGroup } from '@/components/ui/Field';
 import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
 import { CATEGORIES } from '@/lib/categories';
+import { independentReviewTierDescription } from '@/lib/independentReviewTiers';
 import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 
 type TeamMember = {
@@ -176,7 +177,7 @@ export default function RetailerProfilePage() {
               <div>
                 <p className="font-heading text-lg font-bold text-foundation-navy">Independent H&amp;S review</p>
                 <p className="mt-1 max-w-xl text-sm text-concrete-grey">
-                  {independentReview.status === 'APPROVED' && `Your business is Independently Verified${independentReview.tier ? ` at ${independentReview.tier[0] + independentReview.tier.slice(1).toLowerCase()} level` : ''} by a Health & Safety professional.`}
+                  {independentReview.status === 'APPROVED' && `Your business is Independently Verified${independentReview.tier ? ` at ${independentReview.tier[0] + independentReview.tier.slice(1).toLowerCase()} level` : ''}. ${independentReviewTierDescription(independentReview.tier)}`}
                   {independentReview.status === 'PURCHASED' && 'Your independent review has been purchased. A Health & Safety professional will contact you about the next steps.'}
                   {independentReview.status === 'DECLINED' && 'Your last independent review was not approved. You can purchase another review at any time.'}
                   {independentReview.status === 'NOT_PURCHASED' && `Purchase an independent review by a Health & Safety professional for £${independentReview.feeGbp} excl. VAT.`}

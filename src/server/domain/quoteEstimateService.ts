@@ -42,6 +42,72 @@ export const DEFAULT_QUOTE_ESTIMATE_BASELINES: Record<string, number> = {
   'Mechanical & Electrical': 1600,
 };
 
+export const INITIAL_CATEGORY_UNIT_ESTIMATES_GBP: Record<string, number> = {
+  'Materials > Bricks': 520,
+  'Materials > Blocks': 165,
+  'Materials > Timber and Sheet Materials': 38,
+  'Materials > Aggregates, Sand and Stone': 42,
+  'Materials > Cement, Concrete and Mortar': 135,
+  'Materials > Insulation': 32,
+  'Materials > Roofing Materials': 4.5,
+  'Materials > Plastering and Drylining': 15,
+  'Materials > Drainage, Civils and Groundworks': 32,
+  'Waste > Inert waste': 240,
+  'Waste > Excavation waste': 325,
+  'Waste > Aggregates for recycling': 210,
+  'Waste > Timber waste': 285,
+  'Waste > Plasterboard and gypsum waste': 360,
+  'Waste > Metals': 190,
+  'Waste > Plastics': 310,
+  'Waste > Glass': 260,
+  'Waste > Packaging waste': 235,
+  'Waste > Insulation waste': 340,
+  'Waste > Flooring waste': 290,
+  'Waste > Roofing waste': 320,
+  'Waste > Mixed construction and demolition waste': 300,
+  'Waste > Welfare and site waste': 220,
+  'Waste > Hazardous waste': 650,
+  'Waste > Electrical and mechanical waste': 280,
+  'Plant Hire > Excavators': 625,
+  'Plant Hire > Dumpers': 350,
+  'Plant Hire > Cranes and lifting plant': 1850,
+  'Plant Hire > Telehandlers and forklifts': 575,
+  'Plant Hire > Access equipment': 295,
+  'Plant Hire > Rollers and compaction equipment': 310,
+  'Plant Hire > Earthmoving and site preparation plant': 875,
+  'Plant Hire > Concrete plant and equipment': 240,
+  'Plant Hire > Piling and drilling equipment': 1450,
+  'Plant Hire > Attachments and hydraulic tools': 225,
+  'Plant Hire > Generators, lighting and power': 210,
+  'Plant Hire > Pumps and water management': 180,
+  'Plant Hire > Heating, drying and ventilation': 165,
+  'Plant Hire > Traffic management and site safety': 95,
+  'Plant Hire > Welfare and temporary accommodation': 260,
+  'Plant Hire > Transport, haulage and logistics': 700,
+  'Contractor Services > Groundworks & Civil Engineering': 1950,
+  'Contractor Services > Demolition & Enabling Works': 2250,
+  'Contractor Services > General Building & Construction': 2100,
+  'Contractor Services > Roofing & Cladding': 1850,
+  'Contractor Services > Carpentry, Joinery & Fit-Out': 1750,
+  'Contractor Services > Mechanical, Plumbing & HVAC': 1900,
+  'Contractor Services > Electrical, Data & Renewables': 1850,
+  'Contractor Services > Fire, Security & Life Safety': 1700,
+  'Contractor Services > Finishing Trades': 1450,
+  'Contractor Services > External Works & Landscaping': 1500,
+  'Contractor Services > Facilities, Maintenance & Cleaning': 950,
+  'Contractor Services > Transport, Haulage & Logistics': 1200,
+  'Contractor Services > Specialist Construction Services': 2350,
+  'Contractor Services > Labour & Workforce Supply': 850,
+  'Professional Services > Health, Safety & CDM Consultancy': 950,
+  'Professional Services > Fire Safety Consultancy': 1100,
+  'Professional Services > Surveying & Building Consultancy': 1000,
+  'Professional Services > Design & Engineering Consultancy': 1450,
+  'Professional Services > Quantity Surveying & Cost Consultancy': 1200,
+  'Professional Services > Project Management & Programme Support': 1300,
+  'Professional Services > Environmental & Specialist Consultancy': 1250,
+  'Professional Services > Legal, Contract & Claims Support': 1600,
+};
+
 type PricingCatalogueRow = {
   key: string;
   service: string;
@@ -124,16 +190,15 @@ export function standardUnitForPurchase(service: string, category: string, item:
 }
 
 export function estimatedUnitPriceForPurchase(service: string, category: string, item: string | null): number {
-  const base = DEFAULT_QUOTE_ESTIMATE_BASELINES[service] ?? DEFAULT_QUOTE_ESTIMATE_BASELINES.General;
+  const categoryEstimate = INITIAL_CATEGORY_UNIT_ESTIMATES_GBP[buildEstimateBaselineKey(service, category)];
+  const base = categoryEstimate ?? DEFAULT_QUOTE_ESTIMATE_BASELINES[service] ?? DEFAULT_QUOTE_ESTIMATE_BASELINES.General;
   const text = `${category} ${item ?? ''}`.toLowerCase();
-  const multiplier = text.includes('brick') ? 0.85
-    : text.includes('block') ? 0.55
-      : text.includes('concrete') ? 0.16
-        : text.includes('aggregate') || text.includes('sand') || text.includes('stone') ? 0.08
-          : text.includes('crane') || text.includes('lifting') ? 1.6
-            : text.includes('excavator') || text.includes('dumper') || text.includes('telehandler') ? 0.7
-              : 1;
-  return roundCurrency(Math.max(25, base * multiplier));
+  const itemMultiplier = item === null ? 1
+    : text.includes('reclaimed') || text.includes('special') || text.includes('hazardous') || text.includes('asbestos') || text.includes('expert witness') ? 1.25
+      : text.includes('lightweight') || text.includes('clean soil') || text.includes('welfare') || text.includes('pedestrian') ? 0.85
+        : text.includes('operator') || text.includes('contract lift') || text.includes('temporary works') || text.includes('claims') ? 1.15
+          : 1;
+  return roundCurrency(Math.max(25, base * itemMultiplier));
 }
 
 export function buildPricingCatalogue(): PricingCatalogueRow[] {

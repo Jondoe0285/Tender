@@ -36,6 +36,7 @@ export async function createPayment(params: {
   contractMonths?: 6 | 12;
   quoteId?: string;
   quotePriceGbp?: number;
+  feeOverrideGbp?: number;
   discountPercentage?: number;
   mobileReturnUrl?: string;
 }): Promise<CreatePaymentResult> {
@@ -50,7 +51,9 @@ export async function createPayment(params: {
     if (!tier?.active) throw new Error('Membership tier is not available');
     netFeeGbp = tier.monthlyPriceGbp;
   } else {
-    netFeeGbp = params.type === 'CLIENT_RELEASE' && params.quotePriceGbp !== undefined
+    netFeeGbp = params.feeOverrideGbp !== undefined
+      ? params.feeOverrideGbp
+      : params.type === 'CLIENT_RELEASE' && params.quotePriceGbp !== undefined
       ? await getClientReleaseFeeGbp(params.quotePriceGbp)
       : params.type === 'RETAILER_UNLOCK' && params.tenderId
         ? await getTenderUnlockFeeGbp(params.tenderId)

@@ -27,3 +27,20 @@ test('quote comparison documents sole trader status separately from AI verificat
   assert.match(quoteComparison, /not AI verified/i);
   assert.match(quoteComparison, /providerIsSoleTrader/);
 });
+
+test('quote service ignores expired independent verification when building quote badges', () => {
+  const quoteService = readFileSync('src/server/domain/quoteService.ts', 'utf8');
+
+  assert.match(quoteService, /independentReviewExpired/);
+  assert.match(quoteService, /independentReviewDecidedAt/);
+});
+
+test('quote comparison explains independent verification tiers', () => {
+  const quoteComparison = readFileSync('src/components/quotes/QuoteComparison.tsx', 'utf8');
+  const tierGuide = readFileSync('src/lib/independentReviewTiers.ts', 'utf8');
+
+  assert.match(quoteComparison, /independentReviewTierDescription/);
+  assert.match(tierGuide, /Bronze means legal requirements/);
+  assert.match(tierGuide, /industry-specific employee and managerial training/);
+  assert.match(tierGuide, /validated SSIP membership/);
+});

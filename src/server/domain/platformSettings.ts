@@ -11,6 +11,8 @@ const defaultSettings: Record<string, string> = {
   RETAILER_UNLOCK_PERCENTAGE_LOW: '1',
   RETAILER_UNLOCK_PERCENTAGE_HIGH: '0.5',
   RETAILER_UNLOCK_PERCENTAGE_TOP: '0.25',
+  CONTRACTOR_SERVICE_UNLOCK_FEE_GBP: String(RETAILER_UNLOCK_FEE_GBP),
+  PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP: String(RETAILER_UNLOCK_FEE_GBP),
   CLIENT_RELEASE_FEE_GBP: String(CLIENT_RELEASE_FEE_GBP),
   CLIENT_RELEASE_FEE_MODE: 'FIXED',
   CLIENT_RELEASE_PERCENTAGE_LOW: '1',
@@ -26,6 +28,8 @@ const defaultSettings: Record<string, string> = {
   ADSPACE_ACTIVE: 'false',
   INDEPENDENT_REVIEW_ACTIVE: 'false',
   INDEPENDENT_REVIEW_FEE_GBP: '150',
+  INDEPENDENT_REVIEW_RENEWAL_ACTIVE: 'false',
+  INDEPENDENT_REVIEW_RENEWAL_FEE_GBP: '100',
   DIRECT_CONTACT_ACTIVE: 'false',
   DIRECT_CONTACT_FEE_GBP: '25',
   HUMAN_REVIEW_ACTIVE: 'true',
@@ -151,11 +155,20 @@ export function calculateTenderUnlockDynamicFeeGbp(estimatedTenderValueGbp: numb
   return calculatePercentageFee(estimatedTenderValueGbp, lowPercentage, highPercentage, topPercentage);
 }
 
+export function tenderUsesFixedServiceRelease(categories: readonly string[]): 'CONTRACTOR_SERVICE_UNLOCK_FEE_GBP' | 'PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP' | null {
+  if (categories.includes('Professional Services')) return 'PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP';
+  if (categories.includes('Contractor Services')) return 'CONTRACTOR_SERVICE_UNLOCK_FEE_GBP';
+  return null;
+}
+
+async function getConfiguredFeeGbp(key: keyof typeof defaultSettings): Promise<number> {
+  const value = Number(await getPlatformSetting(key));
+  return Number.isFinite(value) && value >= 0 ? value : Number(defaultSettings[key]);
+}
+
 export async function getTenderUnlockFeeGbp(tenderId: string): Promise<number> {
   const fixedUnlockFeeGbp = await getPaymentFeeGbp('RETAILER_UNLOCK');
   if (fixedUnlockFeeGbp <= 0) return 0;
-  const mode = await getPlatformSetting('RETAILER_UNLOCK_FEE_MODE');
-  if (mode !== 'PERCENTAGE') return fixedUnlockFeeGbp;
 
   const tender = await prisma.tender.findUniqueOrThrow({
     where: { id: tenderId },
@@ -165,6 +178,15 @@ export async function getTenderUnlockFeeGbp(tenderId: string): Promise<number> {
       packages: { select: { category: true, subcategory: true, item: true, description: true, quantity: true } },
     },
   });
+  const serviceFeeKey = tenderUsesFixedServiceRelease([
+    tender.category,
+    ...tender.items.map((item) => item.category),
+    ...tender.packages.map((pkg) => pkg.category),
+  ]);
+  if (serviceFeeKey) return getConfiguredFeeGbp(serviceFeeKey);
+
+  const mode = await getPlatformSetting('RETAILER_UNLOCK_FEE_MODE');
+  if (mode !== 'PERCENTAGE') return fixedUnlockFeeGbp;
   const [masterReductionPercentage, baselines] = await Promise.all([
     getQuoteEstimateMasterReductionPercentage(),
     getReviewedQuoteEstimateBaselines(),
@@ -186,6 +208,14 @@ export async function isAdspaceActive(): Promise<boolean> {
 
 export async function isIndependentReviewActive(): Promise<boolean> {
   return await getPlatformSetting('INDEPENDENT_REVIEW_ACTIVE') === 'true';
+}
+
+export async function isIndependentReviewRenewalActive(): Promise<boolean> {
+  return await getPlatformSetting('INDEPENDENT_REVIEW_RENEWAL_ACTIVE') === 'true';
+}
+
+export async function getIndependentReviewRenewalFeeGbp(): Promise<number> {
+  return getConfiguredFeeGbp('INDEPENDENT_REVIEW_RENEWAL_FEE_GBP');
 }
 
 export async function isDirectContactActive(): Promise<boolean> {
@@ -238,6 +268,8 @@ export async function getAdminSettings(includeSupportRecipient = false) {
       retailerUnlockPercentageLow: Number(settings.find((setting) => setting.key === 'RETAILER_UNLOCK_PERCENTAGE_LOW')?.value ?? defaultSettings.RETAILER_UNLOCK_PERCENTAGE_LOW),
       retailerUnlockPercentageHigh: Number(settings.find((setting) => setting.key === 'RETAILER_UNLOCK_PERCENTAGE_HIGH')?.value ?? defaultSettings.RETAILER_UNLOCK_PERCENTAGE_HIGH),
       retailerUnlockPercentageTop: Number(settings.find((setting) => setting.key === 'RETAILER_UNLOCK_PERCENTAGE_TOP')?.value ?? defaultSettings.RETAILER_UNLOCK_PERCENTAGE_TOP),
+      contractorServiceUnlockGbp: Number(settings.find((setting) => setting.key === 'CONTRACTOR_SERVICE_UNLOCK_FEE_GBP')?.value ?? defaultSettings.CONTRACTOR_SERVICE_UNLOCK_FEE_GBP),
+      professionalServiceUnlockGbp: Number(settings.find((setting) => setting.key === 'PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP')?.value ?? defaultSettings.PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP),
       clientReleaseGbp: Number(settings.find((setting) => setting.key === 'CLIENT_RELEASE_FEE_GBP')?.value ?? defaultSettings.CLIENT_RELEASE_FEE_GBP),
       clientReleaseMode: settings.find((setting) => setting.key === 'CLIENT_RELEASE_FEE_MODE')?.value ?? defaultSettings.CLIENT_RELEASE_FEE_MODE,
       clientReleasePercentageLow: Number(settings.find((setting) => setting.key === 'CLIENT_RELEASE_PERCENTAGE_LOW')?.value ?? defaultSettings.CLIENT_RELEASE_PERCENTAGE_LOW),
@@ -253,6 +285,8 @@ export async function getAdminSettings(includeSupportRecipient = false) {
       adspaceActive: (settings.find((setting) => setting.key === 'ADSPACE_ACTIVE')?.value ?? defaultSettings.ADSPACE_ACTIVE) === 'true',
       independentReviewActive: (settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_ACTIVE')?.value ?? defaultSettings.INDEPENDENT_REVIEW_ACTIVE) === 'true',
       independentReviewFeeGbp: Number(settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_FEE_GBP')?.value ?? defaultSettings.INDEPENDENT_REVIEW_FEE_GBP),
+      independentReviewRenewalActive: (settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_RENEWAL_ACTIVE')?.value ?? defaultSettings.INDEPENDENT_REVIEW_RENEWAL_ACTIVE) === 'true',
+      independentReviewRenewalFeeGbp: Number(settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_RENEWAL_FEE_GBP')?.value ?? defaultSettings.INDEPENDENT_REVIEW_RENEWAL_FEE_GBP),
       directContactActive: (settings.find((setting) => setting.key === 'DIRECT_CONTACT_ACTIVE')?.value ?? defaultSettings.DIRECT_CONTACT_ACTIVE) === 'true',
       directContactFeeGbp: Number(settings.find((setting) => setting.key === 'DIRECT_CONTACT_FEE_GBP')?.value ?? defaultSettings.DIRECT_CONTACT_FEE_GBP),
       humanReviewActive: (settings.find((setting) => setting.key === 'HUMAN_REVIEW_ACTIVE')?.value ?? defaultSettings.HUMAN_REVIEW_ACTIVE) === 'true',

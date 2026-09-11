@@ -8,14 +8,17 @@ import {
   calculateAutomaticOffsetPercent,
   calculateEstimateVariancePercent,
   convertQuantityToStandardUnit,
+  estimatedUnitPriceForPurchase,
   estimateTenderQuoteValue,
   effectiveBaselineOffsetPercent,
   getUtcWeekStart,
+  INITIAL_CATEGORY_UNIT_ESTIMATES_GBP,
   selectBottomThirdPriceScale,
   standardUnitForPurchase,
   unitPriceFromQuoteLine,
 } from '@/server/domain/quoteEstimateService';
-import { calculateTenderUnlockDynamicFeeGbp } from '@/server/domain/platformSettings';
+import { SERVICE_CATALOG } from '@/lib/categories';
+import { calculateTenderUnlockDynamicFeeGbp, tenderUsesFixedServiceRelease } from '@/server/domain/platformSettings';
 
 describe('quote estimate intelligence', () => {
   it('applies the owner offset as a percentage of the estimate', () => {
@@ -92,5 +95,23 @@ describe('quote estimate intelligence', () => {
 
     assert.ok(catalogue.some((row) => row.key === 'Materials > Bricks > Facing bricks'));
     assert.ok(catalogue.some((row) => row.key === 'Professional Services > Health, Safety & CDM Consultancy'));
+  });
+
+  it('defines an initial public-market estimate for every platform category type', () => {
+    const missing = Object.entries(SERVICE_CATALOG).flatMap(([service, categories]) => Object.keys(categories).filter((category) => INITIAL_CATEGORY_UNIT_ESTIMATES_GBP[buildEstimateBaselineKey(service, category)] === undefined));
+
+    assert.deepEqual(missing, []);
+  });
+
+  it('uses explicit category estimates before applying item-level adjustments', () => {
+    assert.equal(estimatedUnitPriceForPurchase('Materials', 'Bricks', null), 520);
+    assert.equal(estimatedUnitPriceForPurchase('Materials', 'Bricks', 'Reclaimed bricks'), 650);
+    assert.equal(estimatedUnitPriceForPurchase('Professional Services', 'Legal, Contract & Claims Support', null), 1600);
+  });
+
+  it('keeps Contractor and Professional Services tender release pricing fixed outside estimates', () => {
+    assert.equal(tenderUsesFixedServiceRelease(['Contractor Services']), 'CONTRACTOR_SERVICE_UNLOCK_FEE_GBP');
+    assert.equal(tenderUsesFixedServiceRelease(['Professional Services']), 'PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP');
+    assert.equal(tenderUsesFixedServiceRelease(['Materials']), null);
   });
 });

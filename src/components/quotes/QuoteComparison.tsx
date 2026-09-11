@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { independentReviewTierDescription } from '@/lib/independentReviewTiers';
 
 type QuoteCommon = {
   id: string;
@@ -46,7 +47,7 @@ function ProviderVerificationBadge({ status, verifiedDocumentLabels, independent
   if (independentlyVerified) {
     const tier = independentReviewTier;
     const label = `Independently Verified${tier ? ` · ${tier[0] + tier.slice(1).toLowerCase()}` : ''}`;
-    return <span title={`Sinclair Safety Solutions Ltd completed the independent review through the HSQE Consult Hub platform, assessing legal-compliance evidence and safety competency${tier ? ` at ${tier[0] + tier.slice(1).toLowerCase()} level` : ''}. This does not replace your own due diligence before any formal agreement.`}><StatusBadge status="approved">{label}</StatusBadge></span>;
+    return <span title={`${independentReviewTierDescription(tier)} Sinclair Safety Solutions Ltd completed the independent review through the HSQE Consult Hub platform. This does not replace your own due diligence before any formal agreement.`}><StatusBadge status="approved">{label}</StatusBadge></span>;
   }
   if (status === 'VERIFIED') {
     const title = verifiedDocumentLabels.length > 0 ? `Automated legal-compliance evidence reviewed: ${verifiedDocumentLabels.join(', ')}. AI may make mistakes; complete your own due diligence.` : 'Automated legal-compliance assessment only. AI may make mistakes; complete your own due diligence.';
@@ -120,7 +121,7 @@ export function QuoteComparison({
         <div className="mt-3 grid gap-3 text-sm md:grid-cols-4">
           <div><StatusBadge status="neutral">Sole Trader</StatusBadge><p className="mt-2 text-concrete-grey">The Provider declared sole-trader status and is not AI verified.</p></div>
           <div><StatusBadge status="approved">Verified by Ai</StatusBadge><p className="mt-2 text-concrete-grey">Automated legal-compliance evidence assessment passed; AI can make mistakes.</p></div>
-          <div><StatusBadge status="approved">Independently Verified</StatusBadge><p className="mt-2 text-concrete-grey">A Health &amp; Safety professional reviewed the legal-compliance evidence.</p></div>
+          <div><StatusBadge status="approved">Independently Verified</StatusBadge><p className="mt-2 text-concrete-grey">Bronze, Silver, and Gold describe the evidence reviewed by a Health &amp; Safety professional.</p></div>
           <div><StatusBadge status="neutral">Unverified Provider</StatusBadge><p className="mt-2 text-concrete-grey">No approved verification evidence is recorded.</p></div>
         </div>
         <p className="mt-3 text-xs text-concrete-grey">These statuses do not replace your own suitable due diligence before entering a formal agreement.</p>
