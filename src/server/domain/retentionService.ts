@@ -81,12 +81,13 @@ export async function purgeExpiredUnpurchasedQuotes(now = new Date()): Promise<{
         },
       });
     }
-    const [emailVerificationTokens, passwordResetTokens, pageViews] = await Promise.all([
+    const [emailVerificationTokens, passwordResetTokens, enhancedVerificationInvitations, pageViews] = await Promise.all([
       transaction.emailVerificationToken.deleteMany({ where: { expiresAt: { lt: tokenCutoff } } }),
       transaction.passwordResetToken.deleteMany({ where: { expiresAt: { lt: tokenCutoff } } }),
+      transaction.enhancedVerificationInvitation.deleteMany({ where: { expiresAt: { lt: tokenCutoff } } }),
       transaction.pageView.deleteMany({ where: { createdAt: { lt: pageViewCutoff } } }),
     ]);
-    return { emailVerificationTokensDeleted: emailVerificationTokens.count, passwordResetTokensDeleted: passwordResetTokens.count, pageViewsDeleted: pageViews.count };
+    return { emailVerificationTokensDeleted: emailVerificationTokens.count, passwordResetTokensDeleted: passwordResetTokens.count, enhancedVerificationInvitationsDeleted: enhancedVerificationInvitations.count, pageViewsDeleted: pageViews.count };
   });
 
   return { quotesDeleted: quotes.length, documentsDeleted: attachments.length, ...operationalData };

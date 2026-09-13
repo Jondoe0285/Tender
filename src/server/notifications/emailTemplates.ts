@@ -277,6 +277,36 @@ export function independentReviewPurchasedTemplate(_input: Record<string, never>
   };
 }
 
+export function enhancedVerificationInvitationTemplate(input: {
+  recipientName?: string | null;
+  inviteLink: string;
+  expiresAt: Date;
+}): EmailTemplate {
+  const recipientName = input.recipientName?.trim() || 'Valued Partner';
+  const expiryFormatted = input.expiresAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
+  return {
+    subject: 'Enhanced Verification Registration Invitation',
+    html: layout({
+      eyebrow: 'Enhanced Verification',
+      title: 'Enhanced Verification Registration Invitation',
+      intro: `Dear ${escapeHtml(recipientName)},`,
+      body: '<p style="font-size:14px;line-height:1.6">You have been nominated to complete Enhanced Verification.</p>' +
+            '<p style="font-size:14px;line-height:1.6">A secure invitation has been generated on your behalf.</p>' +
+            '<div style="margin:20px 0;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #F5A524">' +
+            '<p style="margin:0 0 8px;font-weight:700;font-size:13px;color:#0E1C2E">Important:</p>' +
+            '<ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.6;color:#1D3D5C">' +
+            '<li>This link is unique</li>' +
+            '<li>It can only be used once</li>' +
+            `<li>It expires on ${escapeHtml(expiryFormatted)}</li>` +
+            '<li>It must not be shared</li>' +
+            '</ul></div>' +
+            '<p style="font-size:12px;line-height:1.5;color:#8A94A0">If you were not expecting this invitation, please ignore this email.</p>' +
+            '<p style="font-size:14px;line-height:1.6;margin-top:20px">Kind Regards,<br><strong>Verification Team</strong></p>',
+      action: { label: 'Begin Enhanced Verification', href: input.inviteLink },
+    }),
+  };
+}
+
 export function accountCreatedByAdminTemplate(input: { role: 'USER'; contactName: string; companyName?: string; resetLink: string; expiresIn: string }): EmailTemplate {  return {
     subject: 'Your Trade Tender account is ready',
     html: layout({

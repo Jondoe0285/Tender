@@ -1,3 +1,12 @@
+### 2026-09-13 - Enhanced Verification Invitation Agent & Secure Link Dispatch
+
+- Changed: added an Enhanced Verification invitation workflow (`src/server/domain/enhancedVerificationInvitationService.ts`) enforcing business rules that require a verified, non-refunded, non-disputed `INDEPENDENT_REVIEW` purchase (`CONFIRMED` status) and active user account.
+- Changed: generates cryptographically signed invitation tokens (HMAC-SHA256) containing structured payloads (`InvitationId`, `TenantId`, `Email`, `Module`, `Product`, `IssuedAt`, `ExpiresAt`, `Nonce`, `Version`), stores token hashes in `EnhancedVerificationInvitation` table (migration `20260913030000_add_enhanced_verification_invitation`), dispatches branded invitation emails (`Enhanced Verification Registration Invitation`), and logs immutable audit events.
+- Changed: added invitation endpoint `/api/retailer/independent-review/invite` and verification/consumption endpoint `/api/auth/verify-invitation`. Integrated token purging into retention service.
+- Affects: `prisma/schema.prisma`, migration `20260913030000_add_enhanced_verification_invitation`, `src/server/domain/enhancedVerificationInvitationService.ts`, `src/server/notifications/emailTemplates.ts`, `src/app/api/retailer/independent-review/invite/route.ts`, `src/app/api/auth/verify-invitation/route.ts`, `src/server/domain/retentionService.ts`, and `tests/lib/enhanced-verification-invitation.test.ts`.
+- Environment: additive database migration (`EnhancedVerificationInvitation` table and `EnhancedVerificationInvitationStatus` enum); no destructive change.
+- Validation: `npx prisma generate`, `npx prisma migrate deploy`, `npm run type-check`, and full `npm test` pass.
+
 ### 2026-09-13 - Verification Reset On Service Scope Change & Enhanced Review Updated Assessment Fee
 
 - Changed: modifying a company profile's services/categories or company type now automatically resets both AI verification (`verificationStatus` -> `UNVERIFIED`) and Enhanced Verification (`independentReviewStatus` -> `NOT_PURCHASED`), with clear notes explaining that changing the service scope introduces new legal and compliance requirements.

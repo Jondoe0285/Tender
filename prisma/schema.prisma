@@ -158,6 +158,7 @@ model User {
   roleMemberships   UserRole[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens PasswordResetToken[]
+  enhancedVerificationInvitations EnhancedVerificationInvitation[] @relation("UserEnhancedVerificationInvitations")
   masterOfRetailers RetailerProfile[] @relation("MasterUser")
   teamMember        RetailerTeamMember?
   tenders           Tender[]        @relation("ClientTenders")
@@ -256,6 +257,34 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@index([userId, expiresAt])
+}
+
+enum EnhancedVerificationInvitationStatus {
+  PENDING
+  USED
+  EXPIRED
+  REVOKED
+}
+
+model EnhancedVerificationInvitation {
+  id                    String                              @id @default(cuid())
+  userId                String
+  user                  User                                @relation("UserEnhancedVerificationInvitations", fields: [userId], references: [id], onDelete: Cascade)
+  paymentId             String
+  payment               Payment                             @relation("PaymentEnhancedVerificationInvitations", fields: [paymentId], references: [id], onDelete: Cascade)
+  recipientEmail        String
+  recipientName         String?
+  moduleCode            String                              @default("VERIFICATION")
+  productCode           String                              @default("ENHANCED_VERIFICATION")
+  tokenHash             String                              @unique
+  status                EnhancedVerificationInvitationStatus @default(PENDING)
+  expiresAt             DateTime
+  usedAt                DateTime?
+  createdAt             DateTime                            @default(now())
+
+  @@index([userId, expiresAt])
+  @@index([paymentId])
+  @@index([recipientEmail])
 }
 
 model ClientCompany {
@@ -782,6 +811,7 @@ model Payment {
   retailerMembership    RetailerMembership?
   directContactRequest  DirectContactRequest?
   reversals             PaymentReversal[]
+  enhancedVerificationInvitations EnhancedVerificationInvitation[] @relation("PaymentEnhancedVerificationInvitations")
 
   @@index([paymentWaiverId])
 }
