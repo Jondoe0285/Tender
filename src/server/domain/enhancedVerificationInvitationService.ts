@@ -3,6 +3,7 @@ import { prisma } from '@/server/data/prisma';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { appUrl, enhancedVerificationInvitationTemplate } from '@/server/notifications/emailTemplates';
+import { getIndependentReviewPartnerUrl } from '@/server/domain/platformSettings';
 
 const INVITATION_EXPIRY_DAYS = 30;
 
@@ -50,6 +51,7 @@ export type CreateInvitationInput = {
   paymentId: string;
   recipientEmail: string;
   recipientName?: string | null;
+  registrationUrl?: string | null;
   ipAddress?: string | null;
 };
 
@@ -139,8 +141,16 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
     },
   });
 
-  // 5. Construct Registration Link
-  const registrationLink = appUrl(`/register?verificationToken=${encodeURIComponent(signedToken)}`);
+  // 5. Construct Registration Link (defined URL incorporating secret token)
+  const targetUrl = (input.registrationUrl?.trim() || await getIndependentReviewPartnerUrl()).trim();
+  let registrationLink: string;
+
+  if (targetUrl) {
+    const separator = targetUrl.includes('?') ? '&' : '?';
+    registrationLink = `${targetUrl}${separator}token=${encodeURIComponent(signedToken)}&verificationToken=${encodeURIComponent(signedToken)}`;
+  } else {
+    registrationLink = appUrl(`/register?token=${encodeURIComponent(signedToken)}&verificationToken=${encodeURIComponent(signedToken)}`);
+  }
 
   // 6. Send Email
   const template = enhancedVerificationInvitationTemplate({

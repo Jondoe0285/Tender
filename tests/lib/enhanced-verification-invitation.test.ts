@@ -156,7 +156,7 @@ test('successful invitation creation: validates purchase, generates token, store
   assert.equal(result.Status, 'SUCCESS');
   assert.ok(result.invitationId);
   assert.ok(result.expiryUtc);
-  assert.ok(result.registrationLink.includes('/register?verificationToken='));
+  assert.ok(result.registrationLink.includes('token='));
 
   // Verify DB record
   const dbRecord = await prisma.enhancedVerificationInvitation.findUnique({
@@ -187,6 +187,54 @@ test('successful invitation creation: validates purchase, generates token, store
   // Double consumption fails
   const reConsumed = await verifyAndConsumeInvitationToken(result.signedToken);
   assert.equal(reConsumed, null);
+});
+
+test('custom defined registration URL incorporates secret token in query parameters', async (context) => {
+  const suffix = randomUUID();
+  let userId: string | undefined;
+  let paymentId: string | undefined;
+  let invitationId: string | undefined;
+
+  context.after(async () => {
+    if (invitationId) await prisma.enhancedVerificationInvitation.deleteMany({ where: { id: invitationId } });
+    if (paymentId) await prisma.payment.deleteMany({ where: { id: paymentId } });
+    if (userId) await prisma.user.deleteMany({ where: { id: userId } });
+  });
+
+  const user = await prisma.user.create({
+    data: {
+      email: `custom-url-${suffix}@example.test`,
+      passwordHash: 'hash',
+      role: 'USER',
+      contactName: 'Custom URL Purchaser',
+    },
+  });
+  userId = user.id;
+
+  const payment = await prisma.payment.create({
+    data: {
+      type: 'INDEPENDENT_REVIEW',
+      amountGbp: 150,
+      totalAmountGbp: 180,
+      vatGbp: 30,
+      status: 'CONFIRMED',
+      userId,
+    },
+  });
+  paymentId = payment.id;
+
+  const customPartnerUrl = 'https://hsqeconsulthub.co.uk/register';
+  const result = await createEnhancedVerificationInvitation({
+    userId,
+    paymentId: payment.id,
+    recipientEmail: `custom-partner-${suffix}@example.test`,
+    registrationUrl: customPartnerUrl,
+  });
+
+  invitationId = result.invitationId;
+
+  assert.ok(result.registrationLink.startsWith('https://hsqeconsulthub.co.uk/register?token='));
+  assert.ok(result.registrationLink.includes('&verificationToken='));
 });
 
 test('email template includes required prompt elements', () => {

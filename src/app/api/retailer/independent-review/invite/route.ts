@@ -10,6 +10,7 @@ const inviteSchema = z.object({
   paymentId: z.string().min(1, 'Payment transaction ID is required'),
   recipientEmail: z.string().trim().toLowerCase().email('A valid recipient email address is required'),
   recipientName: z.string().trim().max(120).optional().nullable(),
+  registrationUrl: z.string().trim().url().optional().nullable(),
 });
 
 export async function POST(request: Request) {
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
       paymentId: parsed.data.paymentId,
       recipientEmail: parsed.data.recipientEmail,
       recipientName: parsed.data.recipientName,
+      registrationUrl: parsed.data.registrationUrl,
       ipAddress: clientIp,
     });
 

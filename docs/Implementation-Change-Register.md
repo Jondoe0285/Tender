@@ -1,3 +1,11 @@
+### 2026-09-13 - Direct Registration Link & Secret Token Integration For Third-Party Applications
+
+- Changed: enhanced `createEnhancedVerificationInvitation` so invitation emails automatically send nominated users directly to a defined registration URL (`INDEPENDENT_REVIEW_PARTNER_URL` platform setting, `ENHANCED_VERIFICATION_PARTNER_URL` environment variable, or optional custom `registrationUrl` request parameter), with the signed secret token incorporated in query parameters (`?token={SignedInvitationToken}&verificationToken={SignedInvitationToken}`). If no third-party URL is configured, it falls back to the platform's standard registration route.
+- Changed: added `INDEPENDENT_REVIEW_PARTNER_URL` configuration to Owner platform settings (`src/server/domain/platformSettings.ts`), Super User settings API (`/api/super-user/settings`), and the Super User settings panel (`SuperUserSettingsPanel.tsx`).
+- Affects: `src/server/domain/enhancedVerificationInvitationService.ts`, `src/app/api/retailer/independent-review/invite/route.ts`, `src/server/domain/platformSettings.ts`, `src/app/api/super-user/settings/route.ts`, `src/components/admin/SuperUserSettingsPanel.tsx`, and `tests/lib/enhanced-verification-invitation.test.ts`.
+- Environment: no schema or migration change.
+- Validation: `npm run type-check` and full `npm test` pass.
+
 ### 2026-09-13 - Enhanced Verification Invitation Agent & Secure Link Dispatch
 
 - Changed: added an Enhanced Verification invitation workflow (`src/server/domain/enhancedVerificationInvitationService.ts`) enforcing business rules that require a verified, non-refunded, non-disputed `INDEPENDENT_REVIEW` purchase (`CONFIRMED` status) and active user account.
