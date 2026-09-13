@@ -67,9 +67,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized: Invalid or missing shared secret' }, { status: 401 });
     }
 
-    const body = rawBodyText ? JSON.parse(rawBodyText) : null;
-    const parsed = statusUpdateSchema.safeParse(body);
+    let body: unknown = null;
+    try {
+      body = rawBodyText ? JSON.parse(rawBodyText) : null;
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
 
+    const parsed = statusUpdateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid status payload', issues: parsed.error.flatten() }, { status: 400 });
     }
@@ -82,7 +87,6 @@ export async function POST(request: Request) {
     const paymentId = input.paymentId;
     const rawStatus = input.status;
     const nextStatus = (rawStatus === 'APPROVED' || rawStatus === 'PASSED') ? 'APPROVED' : 'DECLINED';
-    const tier = nextStatus === 'APPROVED' ? (input.tier ?? 'BRONZE') : null;
     const note = input.note || input.comments || null;
 
     let targetUserId: string | null = null;
@@ -138,14 +142,30 @@ export async function POST(request: Request) {
     // 3. Find retailer profile
     const profile = await prisma.retailerProfile.findUnique({
       where: { userId: targetUserId },
-      select: { id: true, userId: true, user: { select: { email: true } } },
+      select: { id: true, userId: true, independentReviewTier: true, user: { select: { email: true } } },
     });
 
     if (!profile) {
       return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
     }
 
-    // 4. Update retailer profile verification status
+    // 4. Require confirmed payment record before granting verification
+    const confirmedPayment = await prisma.payment.findFirst({
+      where: {
+        userId: profile.userId,
+        type: 'INDEPENDENT_REVIEW',
+        status: 'CONFIRMED',
+        reversals: { none: {} },
+      },
+    });
+
+    if (!confirmedPayment) {
+      return NextResponse.json({ error: 'Enhanced Verification has not been purchased or payment is incomplete for this provider' }, { status: 400 });
+    }
+
+    const tier = nextStatus === 'APPROVED' ? (input.tier ?? profile.independentReviewTier ?? 'BRONZE') : null;
+
+    // 5. Update retailer profile verification status
     await prisma.retailerProfile.update({
       where: { id: profile.id },
       data: {

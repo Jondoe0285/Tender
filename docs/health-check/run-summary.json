@@ -1,18 +1,24 @@
 {
-  "status": "PASS WITH WARNINGS",
-  "release": "ELIGIBLE FOR FIX REVIEW",
+  "status": "FAIL",
+  "release": "RELEASE BLOCKED",
   "counts": {
     "CRITICAL": 0,
-    "HIGH": 4,
-    "MEDIUM": 2,
+    "HIGH": 5,
+    "MEDIUM": 3,
     "LOW": 9,
     "INFORMATIONAL": 0
   },
-  "archiveMarkdown": "docs/health-check/archive/health-check-2026-08-31-0602-UTC.md",
-  "archiveJson": "docs/health-check/archive/health-check-2026-08-31-0602-UTC.json",
-  "reportBranch": "health-report/2026-08-31-0602",
-  "title": "[Health Check] 2026-08-31 - PASS WITH WARNINGS",
+  "archiveMarkdown": "docs\\health-check\\archive\\health-check-2026-09-13-0903-UTC.md",
+  "archiveJson": "docs\\health-check\\archive\\health-check-2026-09-13-0903-UTC.json",
+  "reportBranch": "health-report/2026-09-13-0903",
+  "title": "[Health Check] 2026-09-13 - FAIL",
   "failedChecks": [
-    "Dependency vulnerability scan"
+    "Production build",
+    "Type checking",
+    "Linting",
+    "Unit tests",
+    "Dependency vulnerability scan",
+    "Database schema validation",
+    "Migration validation"
   ]
 }

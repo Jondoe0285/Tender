@@ -44,7 +44,16 @@ export function verifyInvitationToken(signedToken: string, secret?: string | nul
 
     const jsonStr = Buffer.from(payloadBase64, 'base64url').toString('utf8');
     const parsed = JSON.parse(jsonStr);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    if (parsed.ExpiresAt && typeof parsed.ExpiresAt === 'string') {
+      const expiresAtDate = new Date(parsed.ExpiresAt);
+      if (!isNaN(expiresAtDate.getTime()) && expiresAtDate <= new Date()) {
+        return null;
+      }
+    }
+
+    return parsed as Record<string, unknown>;
   } catch {
     return null;
   }
@@ -151,7 +160,39 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
   });
 
   // 5. Construct Registration Link (defined URL incorporating secret token)
-  const targetUrl = (input.registrationUrl?.trim() || await getIndependentReviewPartnerUrl()).trim();
+  const configuredPartnerUrl = (await getIndependentReviewPartnerUrl()).trim();
+  let targetUrl = configuredPartnerUrl;
+
+  if (input.registrationUrl?.trim()) {
+    const candidateUrl = input.registrationUrl.trim();
+    try {
+      const candidateOrigin = new URL(candidateUrl).origin;
+      let allowedAppOrigin: string | null = null;
+      if (process.env.NEXTAUTH_URL) {
+        try {
+          allowedAppOrigin = new URL(process.env.NEXTAUTH_URL).origin;
+        } catch {
+          allowedAppOrigin = null;
+        }
+      }
+      const allowedPartnerOrigin = configuredPartnerUrl ? new URL(configuredPartnerUrl).origin : null;
+      const allowlistEnv = process.env.VERIFICATION_RETURN_URL_ALLOWLIST_TRADE_TENDER_VERIFICATION ?? process.env.ADDITIONAL_ALLOWED_ORIGINS ?? '';
+      const allowedOrigins = allowlistEnv.split(',').map((item) => item.trim()).filter(Boolean);
+      const hasConfiguredAllowlist = Boolean(configuredPartnerUrl || allowedOrigins.length > 0);
+      const isAllowed = (allowedAppOrigin !== null && candidateOrigin === allowedAppOrigin) ||
+        (allowedPartnerOrigin !== null && candidateOrigin === allowedPartnerOrigin) ||
+        allowedOrigins.some((allowed) => {
+          try { return new URL(allowed).origin === candidateOrigin; } catch { return false; }
+        });
+
+      if (isAllowed || !hasConfiguredAllowlist) {
+        targetUrl = candidateUrl;
+      }
+    } catch {
+      targetUrl = configuredPartnerUrl;
+    }
+  }
+
   let registrationLink: string;
 
   if (targetUrl) {
@@ -218,12 +259,22 @@ export async function verifyAndConsumeInvitationToken(signedToken: string, consu
   }
 
   const now = new Date();
-  const updated = await prisma.enhancedVerificationInvitation.update({
-    where: { id: record.id },
+  const updatedCount = await prisma.enhancedVerificationInvitation.updateMany({
+    where: {
+      id: record.id,
+      status: 'PENDING',
+      expiresAt: { gt: now },
+    },
     data: {
       status: 'USED',
       usedAt: now,
     },
+  });
+
+  if (updatedCount.count === 0) return null;
+
+  const updated = await prisma.enhancedVerificationInvitation.findUnique({
+    where: { id: record.id },
   });
 
   await recordAuditEvent({

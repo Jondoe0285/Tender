@@ -43,7 +43,16 @@ export async function POST(request: Request) {
       ipAddress: clientIp,
     });
 
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json({
+      status: result.status,
+      Status: result.Status,
+      invitationId: result.invitationId,
+      InvitationId: result.InvitationId,
+      expiryUtc: result.expiryUtc,
+      ExpiryUtc: result.ExpiryUtc,
+      emailSent: result.emailSent,
+      EmailSent: result.EmailSent,
+    }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message.includes('Enhanced Verification has not been purchased')) {
       return NextResponse.json({ error: error.message }, { status: 400 });
