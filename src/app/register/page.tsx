@@ -8,6 +8,7 @@ import { SiteFooter } from '@/components/layout/SiteFooter';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { SERVICE_CATALOG, SERVICE_NAMES } from '@/lib/categories';
+import { COMPANY_TYPE_LABELS, COMPANY_TYPES } from '@/lib/companyTypes';
 import { FieldGroup, Input, Label, PasswordInput } from '@/components/ui/Field';
 import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
 import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
@@ -42,6 +43,7 @@ export default function RegisterPage() {
         termsAccepted: form.get('termsAccepted') === 'on',
         privacyAccepted: form.get('privacyAccepted') === 'on',
         companyName: form.get('companyName') || undefined,
+        companyType: form.get('companyType') || undefined,
         branchIdentifier: form.get('branchIdentifier') || undefined,
         categories: services,
         serviceProvisions,
@@ -99,6 +101,14 @@ export default function RegisterPage() {
               <FieldGroup>
                 <Label htmlFor="companyName">Company name</Label>
                 <Input id="companyName" name="companyName" required autoComplete="organization" />
+              </FieldGroup>
+              <FieldGroup>
+                <Label htmlFor="companyType">Company type</Label>
+                <select id="companyType" name="companyType" required defaultValue="LIMITED_COMPANY" className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm">
+                  {COMPANY_TYPES.map((type) => (
+                    <option key={type} value={type}>{COMPANY_TYPE_LABELS[type]}</option>
+                  ))}
+                </select>
               </FieldGroup>
               <FieldGroup>
                 <Label htmlFor="branchIdentifier">Branch or location</Label>

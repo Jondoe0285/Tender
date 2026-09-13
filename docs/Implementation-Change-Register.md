@@ -1,3 +1,11 @@
+### 2026-09-13 - Universal Company Type Field Across Contractor Profiles & Registration
+
+- Changed: added `companyType` to `ClientCompany` model and migration `20260913020000_add_client_company_type`. Contractor company profile (`/client/profile`), Provider company profile (`/retailer/profile`), and account registration (`/register`) now all present a mandatory Company Type dropdown (`Sole trader`, `Limited company`, `Partnership`, `LLP`, `PLC`, `Other`).
+- Changed: ensured Provider profile fallback formatting for `companyType` so `COMPANY_TYPE_LABELS[companyType]` safely defaults to `Limited company` if unset, preventing blank values.
+- Affects: `prisma/schema.prisma`, migration `20260913020000_add_client_company_type`, `src/lib/schemas/register.ts`, `src/app/api/auth/register/route.ts`, `src/app/register/page.tsx`, `src/app/api/client/profile/route.ts`, `src/app/client/profile/page.tsx`, `src/app/retailer/profile/page.tsx`, and `tests/lib/client-company.test.ts`.
+- Environment: additive database migration (`companyType` column on `ClientCompany` with default `LIMITED_COMPANY`); no breaking or destructive change.
+- Validation: `npx prisma generate`, `npx prisma migrate deploy`, `npm run type-check`, and `npm test` pass.
+
 ### 2026-09-13 - Mandatory Certificate Of Incorporation For Incorporated Companies & Verification Levels
 
 - Changed: Certificate of Incorporation is now a mandatory document during verification whenever a Provider's company type requires incorporation (Limited Company, LLP, PLC). For unincorporated company types (Sole Trader, Partnership, Other), Certificate of Incorporation remains optional.

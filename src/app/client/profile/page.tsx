@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { FieldGroup, Input, Label, PasswordInput } from '@/components/ui/Field';
 import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
 import { SERVICE_CATALOG, SERVICE_NAMES, isVerificationEligible } from '@/lib/categories';
+import { COMPANY_TYPE_LABELS, COMPANY_TYPES, type CompanyType } from '@/lib/companyTypes';
 import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 
 const PROFILE_SERVICE_LABELS: Record<string, string> = {
@@ -22,6 +23,7 @@ type Profile = {
   email: string;
   phoneNumber: string;
   companyName: string | null;
+  companyType: CompanyType;
   branchIdentifier: string | null;
   services: string[];
   serviceProvisions: string[];
@@ -34,7 +36,7 @@ type Profile = {
 };
 
 const emptyProfile: Profile = {
-  firstName: '', lastName: '', email: '', phoneNumber: '', companyName: null, branchIdentifier: null, services: [], serviceProvisions: [], operatingLocations: [], tradeTenderId: null, isPrimaryUser: false, additionalUsers: [], warnings: [], verificationStatus: null,
+  firstName: '', lastName: '', email: '', phoneNumber: '', companyName: null, companyType: 'LIMITED_COMPANY', branchIdentifier: null, services: [], serviceProvisions: [], operatingLocations: [], tradeTenderId: null, isPrimaryUser: false, additionalUsers: [], warnings: [], verificationStatus: null,
 };
 
 export default function ClientProfilePage() {
@@ -66,7 +68,7 @@ export default function ClientProfilePage() {
       body: JSON.stringify({
         firstName: profile.firstName, lastName: profile.lastName, email: profile.email,
         phoneNumber: profile.phoneNumber || undefined,
-        ...(profile.isPrimaryUser ? { companyName: profile.companyName, branchIdentifier: profile.branchIdentifier, services: profile.services, serviceProvisions: profile.serviceProvisions, operatingLocations: profile.operatingLocations } : {}),
+        ...(profile.isPrimaryUser ? { companyName: profile.companyName, companyType: profile.companyType, branchIdentifier: profile.branchIdentifier, services: profile.services, serviceProvisions: profile.serviceProvisions, operatingLocations: profile.operatingLocations } : {}),
       }),
     });
     setSaving(false);
@@ -162,6 +164,7 @@ export default function ClientProfilePage() {
               <FieldGroup><Label htmlFor="email">Email address</Label><Input id="email" type="email" value={profile.email} onChange={(event) => setProfile({ ...profile, email: event.target.value })} autoComplete="email" /></FieldGroup>
               <FieldGroup><Label htmlFor="phone">Phone number</Label><Input id="phone" type="tel" value={profile.phoneNumber} onChange={(event) => setProfile({ ...profile, phoneNumber: event.target.value })} autoComplete="tel" /></FieldGroup>
               {profile.isPrimaryUser && <FieldGroup wide><Label htmlFor="companyName">Company name</Label><Input id="companyName" value={profile.companyName ?? ''} onChange={(event) => setProfile({ ...profile, companyName: event.target.value })} autoComplete="organization" />{fieldErrors.companyName && <p className="text-sm text-attention">{fieldErrors.companyName}</p>}</FieldGroup>}
+              {profile.isPrimaryUser && <FieldGroup wide><Label htmlFor="companyType">Company type</Label><select id="companyType" value={profile.companyType} onChange={(event) => setProfile({ ...profile, companyType: event.target.value as CompanyType })} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm">{COMPANY_TYPES.map((type) => <option key={type} value={type}>{COMPANY_TYPE_LABELS[type]}</option>)}</select>{fieldErrors.companyType && <p className="text-sm text-attention">{fieldErrors.companyType}</p>}</FieldGroup>}
               {profile.isPrimaryUser && <FieldGroup wide><Label htmlFor="branchIdentifier">Branch or location</Label><Input id="branchIdentifier" value={profile.branchIdentifier ?? ''} onChange={(event) => setProfile({ ...profile, branchIdentifier: event.target.value })} />{fieldErrors.branchIdentifier && <p className="text-sm text-attention">{fieldErrors.branchIdentifier}</p>}</FieldGroup>}
               {profile.isPrimaryUser && <FieldGroup wide><Label>Services</Label><MultiSelectDropdown options={SERVICE_NAMES.map((service) => ({ label: PROFILE_SERVICE_LABELS[service] ?? service, value: service }))} selected={profile.services} onChange={(services) => setProfile({ ...profile, services, serviceProvisions: profile.serviceProvisions.filter((entry) => services.includes(entry.split('::')[0] ?? '')) })} placeholder="Select services offered" />{fieldErrors.services && <p className="text-sm text-attention">{fieldErrors.services}</p>}</FieldGroup>}
               {profile.isPrimaryUser && profile.services.map((service) => (

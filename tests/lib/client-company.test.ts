@@ -73,3 +73,14 @@ test('company profile updates refresh active tender opportunity matching', () =>
   assert.ok(profileRoute.includes('if (companyProfileChanged) await matchRetailerToOpenTenders(user.id)'));
   assert.ok(profileRoute.includes("coverageScope: parsed.data.operatingLocations.includes('United Kingdom') ? 'UK'"));
 });
+
+test('client company profiles and registration include company type options', () => {
+  const schema = readFileSync(path.join(process.cwd(), 'prisma/schema.prisma'), 'utf8');
+  const clientProfilePage = readFileSync(path.join(process.cwd(), 'src/app/client/profile/page.tsx'), 'utf8');
+  const registerPage = readFileSync(path.join(process.cwd(), 'src/app/register/page.tsx'), 'utf8');
+
+  assert.match(schema, /model ClientCompany\s*\{[\s\S]*companyType\s+CompanyType/);
+  assert.match(clientProfilePage, /companyType/);
+  assert.match(clientProfilePage, /COMPANY_TYPES\.map/);
+  assert.match(registerPage, /name="companyType"/);
+});

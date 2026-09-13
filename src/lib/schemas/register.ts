@@ -14,6 +14,7 @@ export const registerSchema = z.object({
   privacyAccepted: z.literal(true, { message: 'You must acknowledge the privacy policy to register' }),
   companyName: z.string().trim().min(2).max(160).optional(),
   branchIdentifier: z.string().trim().min(2).max(120).optional(),
+  companyType: z.enum(['SOLE_TRADER', 'LIMITED_COMPANY', 'PARTNERSHIP', 'LIMITED_LIABILITY_PARTNERSHIP', 'PUBLIC_LIMITED_COMPANY', 'OTHER']).optional(),
   categories: z.array(z.enum(SERVICE_NAMES)).max(SERVICE_NAMES.length).optional(),
   serviceProvisions: z.array(z.string().trim().min(1).max(160)).max(100).optional(),
   coverageScope: z.enum(['COUNTY', 'REGION', 'UK']).optional(),

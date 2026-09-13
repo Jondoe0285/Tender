@@ -263,6 +263,7 @@ model ClientCompany {
   tradeTenderId String?  @unique
   companyName   String
   branchIdentifier String @default("Head Office")
+  companyType   CompanyType @default(LIMITED_COMPANY)
   services      String   @default("")
   serviceProvisions String @default("")
   operatingLocations String @default("")

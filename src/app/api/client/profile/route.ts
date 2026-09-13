@@ -26,6 +26,7 @@ const personalProfileSchema = z.object({
 const profileUpdateSchema = personalProfileSchema.extend({
   companyName: z.string().trim().min(2).max(160).optional(),
   branchIdentifier: z.string().trim().min(2).max(120).optional(),
+  companyType: z.enum(['SOLE_TRADER', 'LIMITED_COMPANY', 'PARTNERSHIP', 'LIMITED_LIABILITY_PARTNERSHIP', 'PUBLIC_LIMITED_COMPANY', 'OTHER']).optional(),
   services: z.array(z.enum(SERVICE_NAMES)).max(SERVICE_NAMES.length).optional(),
   serviceProvisions: z.array(z.string().trim().min(1).max(160)).max(100).optional(),
   operatingLocations: z.array(z.enum(COMPANY_OPERATING_LOCATIONS)).max(COMPANY_OPERATING_LOCATIONS.length).optional(),
@@ -80,6 +81,7 @@ export async function GET() {
       email: account.email,
       phoneNumber: account.contactPhone ?? '',
       companyName: membership?.company.companyName ?? null,
+      companyType: membership?.company.companyType ?? 'LIMITED_COMPANY',
       branchIdentifier: membership?.company.branchIdentifier ?? null,
       services: membership?.company.services ? membership.company.services.split(',').filter(Boolean) : [],
       serviceProvisions: parseServiceProvisions(membership?.company.serviceProvisions, membership?.company.services.split(',').filter(Boolean) ?? []),
@@ -115,7 +117,7 @@ export async function PUT(request: Request) {
     if (!membership) return NextResponse.json({ error: 'Client company membership is required' }, { status: 409 });
     const isPrimaryUser = isPrimaryClientUser(membership.company.primaryUserId, user.id);
     const companyProfileChanged = parsed.data.services !== undefined || parsed.data.operatingLocations !== undefined;
-    if ((parsed.data.companyName !== undefined || parsed.data.branchIdentifier !== undefined || parsed.data.services !== undefined || parsed.data.serviceProvisions !== undefined || parsed.data.operatingLocations !== undefined) && !isPrimaryUser) {
+    if ((parsed.data.companyName !== undefined || parsed.data.branchIdentifier !== undefined || parsed.data.companyType !== undefined || parsed.data.services !== undefined || parsed.data.serviceProvisions !== undefined || parsed.data.operatingLocations !== undefined) && !isPrimaryUser) {
       return NextResponse.json({ error: 'Only the primary user can update company details' }, { status: 403 });
     }
 
@@ -131,8 +133,8 @@ export async function PUT(request: Request) {
           contactPhone: parsed.data.phoneNumber || null,
         },
       }),
-      ...(parsed.data.companyName !== undefined || parsed.data.branchIdentifier !== undefined || parsed.data.services !== undefined || parsed.data.serviceProvisions !== undefined || parsed.data.operatingLocations !== undefined
-        ? [prisma.clientCompany.update({ where: { id: membership.companyId }, data: { ...(parsed.data.companyName !== undefined ? { companyName: parsed.data.companyName } : {}), ...(parsed.data.branchIdentifier !== undefined ? { branchIdentifier: parsed.data.branchIdentifier } : {}), ...(parsed.data.services !== undefined ? { services: parsed.data.services.join(',') } : {}), ...(parsed.data.serviceProvisions !== undefined ? { serviceProvisions: serialiseServiceProvisions(parsed.data.serviceProvisions) } : {}), ...(parsed.data.operatingLocations !== undefined ? { operatingLocations: parsed.data.operatingLocations.join(',') } : {}) } })]
+      ...(parsed.data.companyName !== undefined || parsed.data.branchIdentifier !== undefined || parsed.data.companyType !== undefined || parsed.data.services !== undefined || parsed.data.serviceProvisions !== undefined || parsed.data.operatingLocations !== undefined
+        ? [prisma.clientCompany.update({ where: { id: membership.companyId }, data: { ...(parsed.data.companyName !== undefined ? { companyName: parsed.data.companyName } : {}), ...(parsed.data.branchIdentifier !== undefined ? { branchIdentifier: parsed.data.branchIdentifier } : {}), ...(parsed.data.companyType !== undefined ? { companyType: parsed.data.companyType } : {}), ...(parsed.data.services !== undefined ? { services: parsed.data.services.join(',') } : {}), ...(parsed.data.serviceProvisions !== undefined ? { serviceProvisions: serialiseServiceProvisions(parsed.data.serviceProvisions) } : {}), ...(parsed.data.operatingLocations !== undefined ? { operatingLocations: parsed.data.operatingLocations.join(',') } : {}) } })]
         : []),
       ...(parsed.data.services !== undefined
         ? [prisma.retailerProfile.updateMany({ where: { userId: user.id }, data: { categories: parsed.data.services.join(',') } })]

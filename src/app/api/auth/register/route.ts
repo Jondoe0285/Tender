@@ -69,6 +69,8 @@ export async function POST(request: Request) {
               data: {
                 userId: existing.id,
                 companyName: input.companyName ?? '',
+                companyType: input.companyType ?? 'LIMITED_COMPANY',
+                isSoleTrader: input.companyType === 'SOLE_TRADER',
                 categories: (input.categories ?? []).join(','),
                 coverageAreas: '',
                 coverageScope: input.coverageScope ?? 'COUNTY',
@@ -78,7 +80,7 @@ export async function POST(request: Request) {
             });
       }
       if (input.role === 'USER') {
-        const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', services: (input.categories ?? []).join(','), serviceProvisions: serialiseServiceProvisions(input.serviceProvisions ?? []), primaryUserId: existing.id } });
+        const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', companyType: input.companyType ?? 'LIMITED_COMPANY', services: (input.categories ?? []).join(','), serviceProvisions: serialiseServiceProvisions(input.serviceProvisions ?? []), primaryUserId: existing.id } });
         await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: existing.id } });
       }
     });
@@ -117,6 +119,8 @@ export async function POST(request: Request) {
             retailerProfile: {
               create: {
                 companyName: input.companyName ?? '',
+                companyType: input.companyType ?? 'LIMITED_COMPANY',
+                isSoleTrader: input.companyType === 'SOLE_TRADER',
                 categories: (input.categories ?? []).join(','),
                 coverageAreas: '',
                 coverageScope: input.coverageScope ?? 'COUNTY',
@@ -137,7 +141,7 @@ export async function POST(request: Request) {
       metadata: { termsVersion: CURRENT_TERMS_VERSION, privacyVersion: CURRENT_PRIVACY_VERSION, acceptedAt: acceptedAt.toISOString() },
     }, transaction);
     if (input.role === 'USER') {
-      const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', services: (input.categories ?? []).join(','), serviceProvisions: serialiseServiceProvisions(input.serviceProvisions ?? []), primaryUserId: createdUser.id } });
+      const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', companyType: input.companyType ?? 'LIMITED_COMPANY', services: (input.categories ?? []).join(','), serviceProvisions: serialiseServiceProvisions(input.serviceProvisions ?? []), primaryUserId: createdUser.id } });
       await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: createdUser.id } });
     }
     return createdUser;

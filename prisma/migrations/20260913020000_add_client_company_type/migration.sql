@@ -1,0 +1,1 @@
+ALTER TABLE "ClientCompany" ADD COLUMN "companyType" "CompanyType" NOT NULL DEFAULT 'LIMITED_COMPANY';
