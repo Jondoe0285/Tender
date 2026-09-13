@@ -232,7 +232,7 @@ export default function ProviderVerificationPage() {
                 Professional H&amp;S Review &middot; £{enhancedReview?.reassessmentAvailable ? enhancedReview.reassessmentFeeGbp : (enhancedReview?.feeGbp ?? 150)} excl. VAT
               </p>
               <p className="mt-2 text-xs leading-relaxed text-concrete-grey">
-                In-depth review by a Health &amp; Safety professional awarding Bronze, Silver, or Gold safety competency tiers.
+                In-depth review by a Health &amp; Safety professional. The auditor awards a Bronze, Silver, or Gold safety competency tier based on the evidence submitted (individual tiers cannot be purchased separately).
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
@@ -262,7 +262,10 @@ export default function ProviderVerificationPage() {
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-sm font-semibold text-foundation-navy">Safety Competency Tiers</p>
+              <p className="text-sm font-semibold text-foundation-navy">Safety Competency Tiers (Assessed Outcomes)</p>
+              <p className="mt-1 text-xs text-concrete-grey">
+                Individual tiers are awarded by the Health &amp; Safety auditor based on evidence quality and cannot be purchased separately.
+              </p>
               <dl className="mt-3 grid gap-3 text-sm text-concrete-grey sm:grid-cols-3">
                 {(Object.keys(INDEPENDENT_REVIEW_TIER_DESCRIPTIONS) as IndependentReviewTier[]).map((tier) => (
                   <div key={tier} className="rounded-md border border-slate-100 bg-slate-50 p-3">

@@ -107,7 +107,10 @@ export default function IndependentReviewPage() {
           </p>
 
           <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-foundation-navy">Enhanced verification tiers</p>
+            <p className="text-sm font-semibold text-foundation-navy">Enhanced verification outcome tiers</p>
+            <p className="mt-1 text-xs text-concrete-grey">
+              You purchase a single Enhanced Verification assessment. Individual tiers cannot be purchased separately; the Health &amp; Safety auditor awards Bronze, Silver, or Gold based on the evidence reviewed.
+            </p>
             <dl className="mt-3 grid gap-3 text-sm text-concrete-grey">
               {(Object.keys(INDEPENDENT_REVIEW_TIER_DESCRIPTIONS) as IndependentReviewTier[]).map((tier) => <div key={tier}><dt className="font-semibold text-foundation-navy">{INDEPENDENT_REVIEW_TIER_LABELS[tier]}</dt><dd>{INDEPENDENT_REVIEW_TIER_DESCRIPTIONS[tier]}</dd></div>)}
             </dl>
