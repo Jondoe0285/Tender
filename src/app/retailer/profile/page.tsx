@@ -63,7 +63,7 @@ export default function RetailerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [independentReview, setIndependentReview] = useState<{ active: boolean; feeGbp: number; eligible: boolean; status: 'NOT_PURCHASED' | 'PURCHASED' | 'APPROVED' | 'DECLINED'; tier: 'BRONZE' | 'SILVER' | 'GOLD' | null } | null>(null);
+  const [independentReview, setIndependentReview] = useState<{ active: boolean; feeGbp: number; eligible: boolean; status: 'NOT_PURCHASED' | 'PURCHASED' | 'APPROVED' | 'DECLINED'; tier: 'BRONZE' | 'SILVER' | 'GOLD' | null; note: string | null; renewalActive: boolean; renewalFeeGbp: number; renewalAvailable: boolean; reassessmentActive: boolean; reassessmentFeeGbp: number; reassessmentAvailable: boolean } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -183,14 +183,18 @@ export default function RetailerProfilePage() {
                   {independentReview.status === 'APPROVED' && `Your business has achieved Enhanced ${independentReview.tier ? independentReview.tier[0] + independentReview.tier.slice(1).toLowerCase() : ''} Verification level. ${independentReviewTierDescription(independentReview.tier)}`}
                   {independentReview.status === 'PURCHASED' && 'Your review has been purchased. A Health & Safety professional will contact you about the next steps.'}
                   {independentReview.status === 'DECLINED' && 'Your last review was not approved. You can purchase another review at any time.'}
-                  {independentReview.status === 'NOT_PURCHASED' && `Purchase a review by a Health & Safety professional for £${independentReview.feeGbp} excl. VAT.`}
+                  {independentReview.status === 'NOT_PURCHASED' && independentReview.note?.includes('Service scope changed') && 'Changing your service scope reset your enhanced verification due to the addition of new legal and compliance requirements. You can purchase an updated assessment below.'}
+                  {independentReview.status === 'NOT_PURCHASED' && !independentReview.note?.includes('Service scope changed') && `Purchase a review by a Health & Safety professional for £${independentReview.feeGbp} excl. VAT.`}
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <StatusBadge status={independentReview.status === 'APPROVED' ? 'approved' : independentReview.status === 'PURCHASED' ? 'pending' : independentReview.status === 'DECLINED' ? 'attention' : 'neutral'}>
-                  {independentReview.status === 'APPROVED' ? (independentReview.tier === 'SILVER' ? 'Silver' : independentReview.tier === 'GOLD' ? 'Gold' : 'Bronze') : independentReview.status === 'PURCHASED' ? 'Awaiting review' : independentReview.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
+                  {independentReview.status === 'APPROVED' ? (independentReview.tier === 'SILVER' ? 'Silver' : independentReview.tier === 'GOLD' ? 'Gold' : 'Bronze') : independentReview.status === 'PURCHASED' ? 'Awaiting review' : independentReview.status === 'DECLINED' ? 'Not approved' : (independentReview.reassessmentAvailable ? 'Re-assessment required' : 'Not purchased')}
                 </StatusBadge>
-                {(independentReview.status === 'NOT_PURCHASED' || independentReview.status === 'DECLINED') && (
+                {independentReview.reassessmentAvailable && (independentReview.status === 'NOT_PURCHASED' || independentReview.status === 'DECLINED') && (
+                  <Link href="/retailer/independent-review"><Button>Purchase updated assessment (£{independentReview.reassessmentFeeGbp} excl. VAT)</Button></Link>
+                )}
+                {!independentReview.reassessmentAvailable && (independentReview.status === 'NOT_PURCHASED' || independentReview.status === 'DECLINED') && (
                   <Link href="/retailer/independent-review"><Button>Purchase review</Button></Link>
                 )}
               </div>
@@ -227,7 +231,7 @@ export default function RetailerProfilePage() {
               {form.coverageScope === 'REGION' && (
                 <FieldGroup><Label htmlFor="regions">Operational regions</Label><MultiSelectDropdown options={UK_REGIONS.map((region) => ({ label: region, value: region }))} selected={form.regions} onChange={(regions) => setForm({ ...form, regions })} placeholder="Select one or more regions" /></FieldGroup>
               )}
-              <FieldGroup><Label htmlFor="categories">Services provided</Label><MultiSelectDropdown options={Object.keys(CATEGORIES).map((category) => ({ label: category, value: category }))} selected={form.categories} onChange={(categories) => setForm({ ...form, categories })} placeholder="Select service categories" /></FieldGroup>
+              <FieldGroup><Label htmlFor="categories">Services provided</Label><MultiSelectDropdown options={Object.keys(CATEGORIES).map((category) => ({ label: category, value: category }))} selected={form.categories} onChange={(categories) => setForm({ ...form, categories })} placeholder="Select service categories" /><p className="mt-1 text-xs font-semibold text-safety-amber">Note: Modifying your services or company type resets your AI verification and enhanced verification statuses due to new legal and compliance requirements for the updated service scope.</p></FieldGroup>
               <FieldGroup><Label htmlFor="masterUserId">Master user</Label><select id="masterUserId" value={form.masterUserId} onChange={(event) => setForm({ ...form, masterUserId: event.target.value })} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm"><option value="">Select a team member</option>{teamMembers.map((member) => <option key={member.userId} value={member.userId}>{member.user.contactName} ({member.user.email})</option>)}</select></FieldGroup>
               <div className="flex items-end gap-3 sm:col-span-2"><Button variant="secondary" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button><Button onClick={saveProfile} loading={saving}>Save profile</Button></div>
             </div>

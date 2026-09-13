@@ -28,6 +28,14 @@ export function independentReviewRenewalAvailable(status: string, decidedAt: Dat
   return Boolean(renewalOpenAt && expiresAt && renewalOpenAt <= now && now < expiresAt);
 }
 
+export function independentReviewReassessmentAvailable(status: string, decidedAt: Date | null | undefined, note: string | null | undefined, reassessmentActive: boolean): boolean {
+  if (!reassessmentActive) return false;
+  if (status === 'PURCHASED' || status === 'APPROVED') return false;
+  const isResetFromServiceChange = Boolean(note && note.includes('Service scope changed'));
+  const hasPriorDecision = decidedAt !== null && decidedAt !== undefined;
+  return isResetFromServiceChange || (hasPriorDecision && (status === 'NOT_PURCHASED' || status === 'DECLINED'));
+}
+
 export function independentReviewExpired(status: string, decidedAt: Date | null | undefined, now = new Date()): boolean {
   if (status !== 'APPROVED') return false;
   const expiresAt = getIndependentReviewExpiryDate(decidedAt);

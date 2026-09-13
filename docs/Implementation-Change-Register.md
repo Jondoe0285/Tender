@@ -1,3 +1,12 @@
+### 2026-09-13 - Verification Reset On Service Scope Change & Enhanced Review Updated Assessment Fee
+
+- Changed: modifying a company profile's services/categories or company type now automatically resets both AI verification (`verificationStatus` -> `UNVERIFIED`) and Enhanced Verification (`independentReviewStatus` -> `NOT_PURCHASED`), with clear notes explaining that changing the service scope introduces new legal and compliance requirements.
+- Changed: added Owner-controlled platform settings for `INDEPENDENT_REVIEW_REASSESSMENT_ACTIVE` and `INDEPENDENT_REVIEW_REASSESSMENT_FEE_GBP` (default £50 excl. VAT) in the Super User settings panel alongside other purchase options.
+- Changed: when a Provider's Enhanced Verification is reset due to a service scope change, the Provider profile and Enhanced H&S review pages display a clear message explaining the reset and offering a minor re-verification via an "updated assessment" purchase option at the Owner-configured fee.
+- Affects: `src/server/domain/platformSettings.ts`, `src/app/api/super-user/settings/route.ts`, `src/components/admin/SuperUserSettingsPanel.tsx`, `src/server/domain/independentReviewService.ts`, `src/app/api/retailer/independent-review/route.ts`, `src/app/api/retailer/profile/route.ts`, `src/app/api/client/profile/route.ts`, `src/app/retailer/profile/page.tsx`, `src/app/retailer/independent-review/page.tsx`, `src/app/client/profile/page.tsx`, and `tests/lib/independent-review-renewal.test.ts`.
+- Environment: no schema, migration, or environment resource change.
+- Validation: `npm run type-check` and full `npm test` pass.
+
 ### 2026-09-13 - Universal Company Type Field Across Contractor Profiles & Registration
 
 - Changed: added `companyType` to `ClientCompany` model and migration `20260913020000_add_client_company_type`. Contractor company profile (`/client/profile`), Provider company profile (`/retailer/profile`), and account registration (`/register`) now all present a mandatory Company Type dropdown (`Sole trader`, `Limited company`, `Partnership`, `LLP`, `PLC`, `Other`).

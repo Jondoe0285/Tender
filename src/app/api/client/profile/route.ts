@@ -12,6 +12,7 @@ import { SERVICE_CATALOG, SERVICE_NAMES } from '@/lib/categories';
 import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
 import { parseServiceProvisions, serialiseServiceProvisions } from '@/lib/service-provisions';
+import { markUploadedDocumentsVerified } from '@/server/domain/verificationDocumentService';
 import { Prisma } from '@prisma/client';
 
 const COMPANY_OPERATING_LOCATIONS = ['United Kingdom', ...UK_COUNTIES, ...UK_REGIONS] as const;
@@ -124,6 +125,36 @@ export async function PUT(request: Request) {
     }
 
     const contactName = `${parsed.data.firstName} ${parsed.data.lastName}`;
+    const retailerProfile = await prisma.retailerProfile.findUnique({ where: { userId: user.id } });
+    const newCategories = parsed.data.services !== undefined ? parsed.data.services.join(',') : retailerProfile?.categories;
+    const newCompanyType = parsed.data.companyType !== undefined ? parsed.data.companyType : retailerProfile?.companyType;
+    const servicesChanged = retailerProfile && (newCategories !== retailerProfile.categories || newCompanyType !== retailerProfile.companyType);
+
+    if (servicesChanged && retailerProfile) {
+      const resetVerification = retailerProfile.verificationStatus === 'VERIFIED' || retailerProfile.verificationStatus === 'PENDING';
+      const resetIndependent = retailerProfile.independentReviewStatus === 'APPROVED' || retailerProfile.independentReviewStatus === 'PURCHASED';
+
+      if (resetVerification || resetIndependent) {
+        await prisma.retailerProfile.update({
+          where: { id: retailerProfile.id },
+          data: {
+            ...(resetVerification ? {
+              verificationStatus: 'UNVERIFIED',
+              verificationDecidedAt: new Date(),
+              verificationNote: 'Service scope changed: verification reset due to modified service requirements.',
+            } : {}),
+            ...(resetIndependent ? {
+              independentReviewStatus: 'NOT_PURCHASED',
+              independentReviewNote: 'Service scope changed: enhanced verification reset due to the addition of new legal and compliance requirements.',
+            } : {}),
+          },
+        });
+        if (resetVerification && newCategories) {
+          await markUploadedDocumentsVerified(retailerProfile.id, newCategories, false, retailerProfile.isSoleTrader);
+        }
+      }
+    }
+
     await prisma.$transaction([
       prisma.user.update({
         where: { id: user.id },

@@ -17,6 +17,9 @@ type ReviewState = {
   renewalFeeGbp: number;
   renewalAvailable: boolean;
   renewalOpenAt: string | null;
+  reassessmentActive: boolean;
+  reassessmentFeeGbp: number;
+  reassessmentAvailable: boolean;
   expiresAt: string | null;
   expired: boolean;
   eligible: boolean;
@@ -44,7 +47,7 @@ export default function IndependentReviewPage() {
 
   useEffect(() => { void load(); }, []);
 
-  async function handlePurchase(mode: 'NEW' | 'RENEWAL' = 'NEW') {
+  async function handlePurchase(mode: 'NEW' | 'RENEWAL' | 'REASSESSMENT' = 'NEW') {
     setPurchasing(true);
     setMessage(null);
     const response = await fetch('/api/retailer/independent-review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
@@ -113,20 +116,35 @@ export default function IndependentReviewPage() {
 
           {state?.active && !state.eligible && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Enhanced review is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers.</p>}
 
+          {state?.reassessmentAvailable && (
+            <div className="mt-4 rounded-lg border-l-4 border-safety-amber bg-amber-50/40 p-4">
+              <p className="text-sm font-semibold text-foundation-navy">Service scope updated</p>
+              <p className="mt-2 text-sm text-concrete-grey">
+                Changing your service scope reset your enhanced verification due to the addition of new legal and compliance requirements for your updated services. A minor re-verification is required to assess your new service scope.
+              </p>
+            </div>
+          )}
+
           {state?.active && state.eligible && (
             <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-2xl font-heading font-bold text-foundation-navy">£{state.feeGbp} excl. VAT</p>
+                <p className="text-2xl font-heading font-bold text-foundation-navy">
+                  £{state.reassessmentAvailable ? state.reassessmentFeeGbp : state.renewalAvailable ? state.renewalFeeGbp : state.feeGbp} excl. VAT
+                </p>
                 <StatusBadge status={state.status === 'APPROVED' ? 'approved' : state.status === 'PURCHASED' ? 'pending' : state.status === 'DECLINED' ? 'attention' : 'neutral'}>
-                    {state.status === 'APPROVED' ? `Enhanced Verified${state.tier ? ` · ${state.tier[0] + state.tier.slice(1).toLowerCase()}` : ''}` : state.status === 'PURCHASED' ? 'Awaiting review' : state.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
+                    {state.status === 'APPROVED' ? `Enhanced Verified${state.tier ? ` · ${state.tier[0] + state.tier.slice(1).toLowerCase()}` : ''}` : state.status === 'PURCHASED' ? 'Awaiting review' : state.status === 'DECLINED' ? 'Not approved' : (state.reassessmentAvailable ? 'Re-assessment required' : 'Not purchased')}
                 </StatusBadge>
                 {state.expiresAt && <p className="mt-2 text-sm text-concrete-grey">Enhanced verification expires on {new Date(state.expiresAt).toLocaleDateString('en-GB')}.</p>}
                 {state.renewalActive && state.renewalOpenAt && !state.renewalAvailable && state.status === 'APPROVED' && !state.expired && <p className="mt-2 text-sm text-concrete-grey">Renewal opens on {new Date(state.renewalOpenAt).toLocaleDateString('en-GB')}.</p>}
                 {state.renewalAvailable && <p className="mt-2 text-sm font-semibold text-steel-blue">Renew now for £{state.renewalFeeGbp} excl. VAT before your current verification expires.</p>}
+                {state.reassessmentAvailable && <p className="mt-2 text-sm font-semibold text-steel-blue">Purchase an updated assessment for £{state.reassessmentFeeGbp} excl. VAT to re-verify your updated service scope.</p>}
                 {state.expired && <p className="mt-2 text-sm font-semibold text-attention">Your enhanced verification has expired. Purchase a new review to regain enhanced verification.</p>}
               </div>
-              {(state.status === 'NOT_PURCHASED' || state.status === 'DECLINED') && !pendingPayment && (
+              {(state.status === 'NOT_PURCHASED' || state.status === 'DECLINED') && !state.reassessmentAvailable && !pendingPayment && (
                 <Button onClick={() => handlePurchase()} loading={purchasing}>Pay now</Button>
+              )}
+              {state.reassessmentAvailable && !pendingPayment && (
+                <Button onClick={() => handlePurchase('REASSESSMENT')} loading={purchasing}>Purchase updated assessment</Button>
               )}
               {state.renewalAvailable && !pendingPayment && (
                 <Button onClick={() => handlePurchase('RENEWAL')} loading={purchasing}>Renew now</Button>

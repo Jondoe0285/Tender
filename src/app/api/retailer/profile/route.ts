@@ -5,7 +5,7 @@ import { prisma } from '@/server/data/prisma';
 import { z } from 'zod';
 import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
 import { isVerificationEligible } from '@/lib/categories';
-import { syncVerificationExpiry } from '@/server/domain/verificationDocumentService';
+import { markUploadedDocumentsVerified, syncVerificationExpiry } from '@/server/domain/verificationDocumentService';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,8 +51,14 @@ export async function PUT(req: NextRequest) {
     }
 
     // Update profile
+    const categoriesChanged = parsed.categories !== profile.categories;
     const companyTypeChanged = parsed.companyType !== profile.companyType;
+    const servicesChanged = categoriesChanged || companyTypeChanged;
     const isSoleTrader = parsed.companyType === 'SOLE_TRADER';
+
+    const resetVerification = servicesChanged && (profile.verificationStatus === 'VERIFIED' || profile.verificationStatus === 'PENDING');
+    const resetIndependent = servicesChanged && (profile.independentReviewStatus === 'APPROVED' || profile.independentReviewStatus === 'PURCHASED');
+
     const updated = await prisma.retailerProfile.update({
       where: { userId: user.id },
       data: {
@@ -61,8 +67,15 @@ export async function PUT(req: NextRequest) {
         address: parsed.address || null,
         companyType: parsed.companyType,
         isSoleTrader,
-        // Evidence requirements differ by company type, so a change requires re-verification under the new type.
-        ...(companyTypeChanged ? { verificationStatus: 'UNVERIFIED' as const, verificationDecidedAt: new Date(), verificationNote: 'Company type changed: verification must be completed again for the new company type.' } : {}),
+        ...(resetVerification ? {
+          verificationStatus: 'UNVERIFIED' as const,
+          verificationDecidedAt: new Date(),
+          verificationNote: companyTypeChanged ? 'Company type changed: verification must be completed again for the new company type.' : 'Service scope changed: verification reset due to modified service requirements.',
+        } : {}),
+        ...(resetIndependent ? {
+          independentReviewStatus: 'NOT_PURCHASED' as const,
+          independentReviewNote: 'Service scope changed: enhanced verification reset due to the addition of new legal and compliance requirements.',
+        } : {}),
         standardQuoteValidityDays: parsed.standardQuoteValidityDays ?? profile.standardQuoteValidityDays,
         coverageScope: parsed.coverageScope,
         counties: parsed.counties,
@@ -71,6 +84,10 @@ export async function PUT(req: NextRequest) {
         masterUserId: parsed.masterUserId || null,
       },
     });
+
+    if (resetVerification) {
+      await markUploadedDocumentsVerified(profile.id, parsed.categories, false, isSoleTrader);
+    }
 
     // Categories/coverage may now qualify this Retailer for tenders that were already open —
     // matching otherwise only runs once, at tender creation time.

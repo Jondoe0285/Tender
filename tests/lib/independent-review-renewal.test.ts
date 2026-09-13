@@ -5,6 +5,7 @@ import {
   getIndependentReviewExpiryDate,
   getIndependentReviewRenewalOpenDate,
   independentReviewExpired,
+  independentReviewReassessmentAvailable,
   independentReviewRenewalAvailable,
 } from '../../src/server/domain/independentReviewService';
 
@@ -37,4 +38,29 @@ test('independent review renewal is owner controlled and visible to eligible pro
   assert.match(ownerPanel, /Enhanced review renewal/);
   assert.match(providerPage, /Renew now/);
   assert.match(apiRoute, /mode.*RENEWAL/);
+});
+
+test('independent review reassessment is available when service scope changed after a prior decision', () => {
+  const decidedAt = new Date('2026-01-15T10:00:00.000Z');
+  const note = 'Service scope changed: enhanced verification reset due to the addition of new legal and compliance requirements.';
+
+  assert.equal(independentReviewReassessmentAvailable('NOT_PURCHASED', decidedAt, note, true), true);
+  assert.equal(independentReviewReassessmentAvailable('NOT_PURCHASED', decidedAt, note, false), false);
+  assert.equal(independentReviewReassessmentAvailable('APPROVED', decidedAt, note, true), false);
+  assert.equal(independentReviewReassessmentAvailable('NOT_PURCHASED', null, null, true), false);
+});
+
+test('enhanced review reassessment settings and UI are configured in Owner panel and profile routes', () => {
+  const settings = readFileSync('src/server/domain/platformSettings.ts', 'utf8');
+  const ownerPanel = readFileSync('src/components/admin/SuperUserSettingsPanel.tsx', 'utf8');
+  const providerPage = readFileSync('src/app/retailer/independent-review/page.tsx', 'utf8');
+  const profileRoute = readFileSync('src/app/api/retailer/profile/route.ts', 'utf8');
+  const apiRoute = readFileSync('src/app/api/retailer/independent-review/route.ts', 'utf8');
+
+  assert.match(settings, /INDEPENDENT_REVIEW_REASSESSMENT_ACTIVE: 'false'/);
+  assert.match(settings, /INDEPENDENT_REVIEW_REASSESSMENT_FEE_GBP: '50'/);
+  assert.match(ownerPanel, /Enhanced review updated assessment/);
+  assert.match(providerPage, /Purchase updated assessment/);
+  assert.match(profileRoute, /Service scope changed: enhanced verification reset/);
+  assert.match(apiRoute, /mode.*REASSESSMENT/);
 });
