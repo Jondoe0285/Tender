@@ -9,6 +9,9 @@ const INVITATION_EXPIRY_DAYS = 30;
 
 export function resolveSigningSecret(providedSecret?: string | null): string {
   const secret = providedSecret?.trim()
+    || process.env.VERIFICATION_REGISTRATION_TOKEN_SECRET
+    || process.env.VERIFICATION_INTEGRATION_SECRET_TRADE_TENDER_VERIFICATION
+    || process.env.VERIFICATION_OUTBOUND_SECRET_TRADE_TENDER_VERIFICATION
     || process.env.ENHANCED_VERIFICATION_SHARED_SECRET
     || process.env.INDEPENDENT_REVIEW_SHARED_SECRET
     || process.env.NEXTAUTH_SECRET

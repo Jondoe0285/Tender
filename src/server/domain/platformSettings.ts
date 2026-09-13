@@ -237,7 +237,13 @@ export async function getIndependentReviewPartnerUrl(): Promise<string> {
 
 export async function getIndependentReviewSharedSecret(): Promise<string> {
   const configured = await getPlatformSetting('INDEPENDENT_REVIEW_SHARED_SECRET');
-  return configured?.trim() || process.env.ENHANCED_VERIFICATION_SHARED_SECRET || process.env.INDEPENDENT_REVIEW_SHARED_SECRET || '';
+  return configured?.trim()
+    || process.env.VERIFICATION_OUTBOUND_SECRET_TRADE_TENDER_VERIFICATION
+    || process.env.VERIFICATION_INTEGRATION_SECRET_TRADE_TENDER_VERIFICATION
+    || process.env.VERIFICATION_REGISTRATION_TOKEN_SECRET
+    || process.env.ENHANCED_VERIFICATION_SHARED_SECRET
+    || process.env.INDEPENDENT_REVIEW_SHARED_SECRET
+    || '';
 }
 
 export async function isDirectContactActive(): Promise<boolean> {
