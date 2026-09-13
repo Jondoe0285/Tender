@@ -244,7 +244,7 @@ export default function ProviderVerificationPage() {
                 </Button>
                 <Link href="/retailer/independent-review">
                   <Button variant="secondary" size="md">
-                    {enhancedReview?.reassessmentAvailable ? 'Purchase Assessment' : 'Proceed to Enhanced Review &rarr;'}
+                    {enhancedReview?.reassessmentAvailable ? 'Purchase Assessment' : 'Proceed to Enhanced Review →'}
                   </Button>
                 </Link>
               </div>
