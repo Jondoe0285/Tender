@@ -42,7 +42,7 @@ export function SponsoredPlacementCard({ enabled, active, feeGbp }: SponsoredPla
         body: JSON.stringify({ paymentId: data.paymentId }),
       });
       const confirmData = await confirmResponse.json().catch(() => null);
-      setBusyCard(false);
+      setBusy(false);
       if (!confirmResponse.ok) {
         setMessage(confirmData?.error ?? 'Dev payment simulation failed.');
         return;
