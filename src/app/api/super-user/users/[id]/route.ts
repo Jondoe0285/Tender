@@ -157,7 +157,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     if (user.role !== 'USER') {
       return NextResponse.json({ error: 'Verification only applies to Provider accounts' }, { status: 400 });
     }
-    const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { id: true, categories: true, verificationStatus: true } });
+    const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { id: true, categories: true, verificationStatus: true, isSoleTrader: true } });
     if (!profile) {
       return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
     }
@@ -170,7 +170,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       where: { userId: user.id },
       data: { verificationStatus: nextStatus, verificationDecidedAt: new Date(), verificationNote: note },
     });
-    await markUploadedDocumentsVerified(profile.id, profile.categories, action === 'approve-verification');
+    await markUploadedDocumentsVerified(profile.id, profile.categories, action === 'approve-verification', profile.isSoleTrader);
     await recordAuditEvent({
       actorId: admin.id,
       action: action === 'approve-verification' ? 'PROVIDER_VERIFICATION_APPROVED' : 'PROVIDER_VERIFICATION_REJECTED',

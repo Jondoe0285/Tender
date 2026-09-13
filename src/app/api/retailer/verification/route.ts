@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     const evaluation = profile.isSoleTrader
       ? await evaluateSoleTraderVerification(profile.id)
-      : await evaluateProviderVerification(profile.id, profile.categories, profile.companyType);
+      : await evaluateProviderVerification(profile.id, profile.categories, profile.companyType, profile.isSoleTrader);
     if (!evaluation.canProceed) {
       return NextResponse.json({ error: profile.isSoleTrader ? evaluation.report : 'Upload every required document, with a future expiry date, before submitting for review' }, { status: 400 });
     }

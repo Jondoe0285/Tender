@@ -95,10 +95,52 @@ export function isDocumentApplicableForProfile(documentType: VerificationDocumen
   return isVerificationDocumentApplicable(documentType, categories);
 }
 
-export function getRequiredVerificationDocumentTypes(categories: string | string[] | null | undefined, companyType?: string | null | undefined): VerificationDocumentType[] {
-  const baseRequired = getApplicableVerificationDocuments(categories).filter((doc) => doc.required).map((doc) => doc.type);
-  if (isIncorporatedCompanyType(companyType) && !baseRequired.includes('CERTIFICATE_OF_INCORPORATION')) {
-    return ['CERTIFICATE_OF_INCORPORATION', ...baseRequired];
+export function getRequiredVerificationDocumentTypes(
+  categories: string | string[] | null | undefined,
+  companyType?: string | null | undefined,
+  requirementsOverrides?: Record<string, boolean> | null,
+  isSoleTrader?: boolean | null
+): VerificationDocumentType[] {
+  const services = normaliseCategories(categories);
+  const applicableDocs = getApplicableVerificationDocuments(categories);
+  const soleTrader = Boolean(isSoleTrader || companyType === 'SOLE_TRADER');
+  const incorporated = !soleTrader && isIncorporatedCompanyType(companyType);
+
+  const requiredSet = new Set<VerificationDocumentType>();
+
+  // Certificate of Incorporation is required only for incorporated company types (never for sole traders)
+  if (incorporated) {
+    requiredSet.add('CERTIFICATE_OF_INCORPORATION');
   }
-  return baseRequired;
+
+  // Evaluate requirements across all selected services. If a document is required by ANY selected service
+  // (either via requirementsOverrides or default doc.required), the required status takes precedence.
+  for (const doc of applicableDocs) {
+    if (doc.type === 'CERTIFICATE_OF_INCORPORATION') {
+      continue;
+    }
+
+    let isRequired = false;
+    for (const service of services) {
+      if (doc.appliesTo !== 'all' && !doc.appliesTo.includes(service as ServiceName)) {
+        continue;
+      }
+      const overrideKey = `${service}:${doc.type}`;
+      if (requirementsOverrides && typeof requirementsOverrides[overrideKey] === 'boolean') {
+        if (requirementsOverrides[overrideKey]) {
+          isRequired = true;
+          break;
+        }
+      } else if (doc.required) {
+        isRequired = true;
+        break;
+      }
+    }
+
+    if (isRequired) {
+      requiredSet.add(doc.type);
+    }
+  }
+
+  return Array.from(requiredSet);
 }
