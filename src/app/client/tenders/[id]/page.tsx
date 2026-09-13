@@ -164,9 +164,10 @@ export default function ClientTenderDetailPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paymentId: pendingPayment.paymentId }),
     });
+    const confirmData = await confirmResponse.json().catch(() => null);
     if (!confirmResponse.ok) {
       setBusyQuoteId(null);
-      setMessage('Dev payment simulation failed.');
+      setMessage(confirmData?.error ?? 'Dev payment simulation failed.');
       return;
     }
 

@@ -50,9 +50,10 @@ export function MembershipPackages({ enabled, tiers }: { enabled: boolean; tiers
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paymentId: data.paymentId }),
       });
+      const confirmData = await confirmResponse.json().catch(() => null);
       setBusyTierId(null);
       if (!confirmResponse.ok) {
-        setMessage('Dev payment simulation failed.');
+        setMessage(confirmData?.error ?? 'Dev payment simulation failed.');
         return;
       }
       setItems((current) => current.map((tier) => tier.id === tierId ? { ...tier, purchased: true } : tier));

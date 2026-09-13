@@ -148,9 +148,10 @@ export default function RetailerTenderDetailPage() {
     setSimulating(true);
     setMessage(null);
     const response = await fetch('/api/dev/confirm-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentId: directContactPaymentId }) });
+    const data = await response.json().catch(() => null);
     setSimulating(false);
     if (!response.ok) {
-      setMessage('Dev payment simulation failed.');
+      setMessage(data?.error ?? 'Dev payment simulation failed.');
       return;
     }
     setDirectContactPaymentId(null);
@@ -167,9 +168,10 @@ export default function RetailerTenderDetailPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paymentId: pendingPaymentId }),
     });
+    const confirmData = await confirmResponse.json().catch(() => null);
     if (!confirmResponse.ok) {
       setSimulating(false);
-      setMessage('Dev payment simulation failed.');
+      setMessage(confirmData?.error ?? 'Dev payment simulation failed.');
       return;
     }
 

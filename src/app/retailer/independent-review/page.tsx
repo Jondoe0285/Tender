@@ -76,9 +76,10 @@ export default function IndependentReviewPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paymentId: pendingPayment.paymentId }),
     });
+    const data = await response.json().catch(() => null);
     setSimulating(false);
     if (!response.ok) {
-      setMessage('Dev payment simulation failed.');
+      setMessage(data?.error ?? 'Dev payment simulation failed.');
       return;
     }
     setPendingPayment(null);
