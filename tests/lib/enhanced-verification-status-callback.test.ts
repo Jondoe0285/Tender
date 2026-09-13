@@ -79,6 +79,9 @@ test('partner status update via API updates RetailerProfile and consumes invitat
   });
   paymentId = payment.id;
 
+  const sharedSecret = 'test-secret-123456';
+  process.env.ENHANCED_VERIFICATION_SHARED_SECRET = sharedSecret;
+
   const invitation = await createEnhancedVerificationInvitation({
     userId,
     paymentId: payment.id,
@@ -89,13 +92,6 @@ test('partner status update via API updates RetailerProfile and consumes invitat
 
   // Import route handler dynamically to test status callback execution
   const { POST } = await import('../../src/app/api/partner/enhanced-verification/status/route');
-
-  const sharedSecret = 'test-secret-123456';
-  await prisma.platformSetting.upsert({
-    where: { key: 'INDEPENDENT_REVIEW_SHARED_SECRET' },
-    update: { value: sharedSecret },
-    create: { key: 'INDEPENDENT_REVIEW_SHARED_SECRET', value: sharedSecret },
-  });
 
   const payload = {
     token: invitation.signedToken,
@@ -133,6 +129,5 @@ test('partner status update via API updates RetailerProfile and consumes invitat
   assert.equal(profile?.independentReviewTier, 'GOLD');
   assert.equal(profile?.independentReviewNote, 'HSQE Consult Hub review completed successfully.');
 
-  // Clean up setting
-  await prisma.platformSetting.deleteMany({ where: { key: 'INDEPENDENT_REVIEW_SHARED_SECRET' } });
+  delete process.env.ENHANCED_VERIFICATION_SHARED_SECRET;
 });

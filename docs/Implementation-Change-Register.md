@@ -1,3 +1,10 @@
+### 2026-09-13 - Environmental Secret Resolution For Third-Party Verification URL & Signing Secrets
+
+- Changed: third-party partner portal URLs and verification secrets for Enhanced Verification are now resolved exclusively from environment variables (`VERIFICATION_REGISTRATION_TOKEN_SECRET`, `VERIFICATION_INTEGRATION_SECRET_TRADE_TENDER_VERIFICATION`, `VERIFICATION_OUTBOUND_SECRET_TRADE_TENDER_VERIFICATION`, `VERIFICATION_OUTBOUND_URL_TRADE_TENDER_VERIFICATION`, `ENHANCED_VERIFICATION_PARTNER_URL`, `ENHANCED_VERIFICATION_SHARED_SECRET`), removing third-party secret and URL inputs from the Owner space UI (`SuperUserSettingsPanel.tsx`) and database platform settings.
+- Affects: `src/server/domain/platformSettings.ts`, `src/app/api/super-user/settings/route.ts`, `src/components/admin/SuperUserSettingsPanel.tsx`, `src/server/domain/enhancedVerificationInvitationService.ts`, and `tests/lib/enhanced-verification-status-callback.test.ts`.
+- Environment: configure `VERIFICATION_REGISTRATION_TOKEN_SECRET` / `VERIFICATION_OUTBOUND_SECRET_TRADE_TENDER_VERIFICATION` and `VERIFICATION_OUTBOUND_URL_TRADE_TENDER_VERIFICATION` (or `ENHANCED_VERIFICATION_PARTNER_URL` / `ENHANCED_VERIFICATION_SHARED_SECRET`) in environment secrets.
+- Validation: `npm run type-check` and full `npm test` pass.
+
 ### 2026-09-13 - Verification Option Selection (AI Verification vs. Enhanced Verification)
 
 - Changed: updated the Provider "Become Verified" screen (`/retailer/verification`) to present a prominent choice card allowing users to select between AI Verification (included automated document evidence check) and Enhanced Verification (paid professional H&S review awarding Bronze, Silver, or Gold safety competency tiers).
