@@ -3,12 +3,17 @@ import { prisma } from '@/server/data/prisma';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { appUrl, enhancedVerificationInvitationTemplate } from '@/server/notifications/emailTemplates';
-import { getIndependentReviewPartnerUrl } from '@/server/domain/platformSettings';
+import { getIndependentReviewPartnerUrl, getIndependentReviewSharedSecret } from '@/server/domain/platformSettings';
 
 const INVITATION_EXPIRY_DAYS = 30;
 
-function signingSecret(): string {
-  const secret = process.env.NEXTAUTH_SECRET || process.env.SECRET_KEY || process.env.MOBILE_TOKEN_SECRET;
+export function resolveSigningSecret(providedSecret?: string | null): string {
+  const secret = providedSecret?.trim()
+    || process.env.ENHANCED_VERIFICATION_SHARED_SECRET
+    || process.env.INDEPENDENT_REVIEW_SHARED_SECRET
+    || process.env.NEXTAUTH_SECRET
+    || process.env.SECRET_KEY
+    || process.env.MOBILE_TOKEN_SECRET;
   if (!secret) {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('Server secret is required for signing invitation tokens');
@@ -18,20 +23,20 @@ function signingSecret(): string {
   return secret;
 }
 
-export function signInvitationPayload(payload: Record<string, unknown>): string {
+export function signInvitationPayload(payload: Record<string, unknown>, secret?: string | null): string {
   const jsonStr = JSON.stringify(payload);
   const payloadBase64 = Buffer.from(jsonStr).toString('base64url');
-  const signature = createHmac('sha256', signingSecret()).update(payloadBase64).digest('hex');
+  const signature = createHmac('sha256', resolveSigningSecret(secret)).update(payloadBase64).digest('hex');
   return `${payloadBase64}.${signature}`;
 }
 
-export function verifyInvitationToken(signedToken: string): Record<string, unknown> | null {
+export function verifyInvitationToken(signedToken: string, secret?: string | null): Record<string, unknown> | null {
   try {
     const parts = signedToken.split('.');
     if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
 
     const [payloadBase64, providedSignature] = parts;
-    const expectedSignature = createHmac('sha256', signingSecret()).update(payloadBase64).digest('hex');
+    const expectedSignature = createHmac('sha256', resolveSigningSecret(secret)).update(payloadBase64).digest('hex');
     if (providedSignature !== expectedSignature) return null;
 
     const jsonStr = Buffer.from(payloadBase64, 'base64url').toString('utf8');
@@ -122,7 +127,8 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
     Version: '1',
   };
 
-  const signedToken = signInvitationPayload(payload);
+  const sharedSecret = await getIndependentReviewSharedSecret();
+  const signedToken = signInvitationPayload(payload, sharedSecret);
   const tokenHash = hashInvitationToken(signedToken);
 
   // 4. Save Invitation Record in database (storing tokenHash only)
@@ -195,7 +201,8 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
 }
 
 export async function verifyAndConsumeInvitationToken(signedToken: string, consumerUserId?: string) {
-  const payload = verifyInvitationToken(signedToken);
+  const sharedSecret = await getIndependentReviewSharedSecret();
+  const payload = verifyInvitationToken(signedToken, sharedSecret);
   if (!payload) return null;
 
   const tokenHash = hashInvitationToken(signedToken);

@@ -1,3 +1,12 @@
+### 2026-09-13 - Shared Secret Management & Inbound Enhanced Verification Status Callback API
+
+- Changed: added Owner-managed platform setting `INDEPENDENT_REVIEW_SHARED_SECRET` in `platformSettings.ts`, `/api/super-user/settings`, and `SuperUserSettingsPanel.tsx` (falling back to environment variables `ENHANCED_VERIFICATION_SHARED_SECRET` / `INDEPENDENT_REVIEW_SHARED_SECRET` / `NEXTAUTH_SECRET`).
+- Changed: token signing and verification in `enhancedVerificationInvitationService.ts` now uses the configured shared secret.
+- Changed: created inbound partner status callback API endpoints `/api/partner/enhanced-verification/status` and `/api/webhooks/enhanced-verification`. Authenticates inbound requests from third-party verification providers using header shared secret (`X-Shared-Secret`, `Authorization: Bearer <secret>`) or HMAC-SHA256 signature (`X-Signature`, `X-Hub-Signature-256`). On callback, updates `RetailerProfile.independentReviewStatus` (`APPROVED`/`DECLINED`), assigns tier (`BRONZE`/`SILVER`/`GOLD`), updates notes, marks invitation status as `USED`, and records audit events.
+- Affects: `src/server/domain/platformSettings.ts`, `src/app/api/super-user/settings/route.ts`, `src/components/admin/SuperUserSettingsPanel.tsx`, `src/server/domain/enhancedVerificationInvitationService.ts`, `src/app/api/partner/enhanced-verification/status/route.ts`, `src/app/api/webhooks/enhanced-verification/route.ts`, and `tests/lib/enhanced-verification-status-callback.test.ts`.
+- Environment: no schema or migration change.
+- Validation: `npm run type-check` and full `npm test` pass.
+
 ### 2026-09-13 - Direct Registration Link & Secret Token Integration For Third-Party Applications
 
 - Changed: enhanced `createEnhancedVerificationInvitation` so invitation emails automatically send nominated users directly to a defined registration URL (`INDEPENDENT_REVIEW_PARTNER_URL` platform setting, `ENHANCED_VERIFICATION_PARTNER_URL` environment variable, or optional custom `registrationUrl` request parameter), with the signed secret token incorporated in query parameters (`?token={SignedInvitationToken}&verificationToken={SignedInvitationToken}`). If no third-party URL is configured, it falls back to the platform's standard registration route.

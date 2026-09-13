@@ -33,6 +33,7 @@ const defaultSettings: Record<string, string> = {
   INDEPENDENT_REVIEW_REASSESSMENT_ACTIVE: 'false',
   INDEPENDENT_REVIEW_REASSESSMENT_FEE_GBP: '50',
   INDEPENDENT_REVIEW_PARTNER_URL: '',
+  INDEPENDENT_REVIEW_SHARED_SECRET: '',
   DIRECT_CONTACT_ACTIVE: 'false',
   DIRECT_CONTACT_FEE_GBP: '25',
   HUMAN_REVIEW_ACTIVE: 'true',
@@ -234,6 +235,11 @@ export async function getIndependentReviewPartnerUrl(): Promise<string> {
   return configured?.trim() || process.env.ENHANCED_VERIFICATION_PARTNER_URL || process.env.INDEPENDENT_REVIEW_PARTNER_URL || '';
 }
 
+export async function getIndependentReviewSharedSecret(): Promise<string> {
+  const configured = await getPlatformSetting('INDEPENDENT_REVIEW_SHARED_SECRET');
+  return configured?.trim() || process.env.ENHANCED_VERIFICATION_SHARED_SECRET || process.env.INDEPENDENT_REVIEW_SHARED_SECRET || '';
+}
+
 export async function isDirectContactActive(): Promise<boolean> {
   return await getPlatformSetting('DIRECT_CONTACT_ACTIVE') === 'true';
 }
@@ -306,6 +312,7 @@ export async function getAdminSettings(includeSupportRecipient = false) {
       independentReviewReassessmentActive: (settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_REASSESSMENT_ACTIVE')?.value ?? defaultSettings.INDEPENDENT_REVIEW_REASSESSMENT_ACTIVE) === 'true',
       independentReviewReassessmentFeeGbp: Number(settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_REASSESSMENT_FEE_GBP')?.value ?? defaultSettings.INDEPENDENT_REVIEW_REASSESSMENT_FEE_GBP),
       independentReviewPartnerUrl: settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_PARTNER_URL')?.value ?? defaultSettings.INDEPENDENT_REVIEW_PARTNER_URL,
+      independentReviewSharedSecret: settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_SHARED_SECRET')?.value ?? defaultSettings.INDEPENDENT_REVIEW_SHARED_SECRET,
       directContactActive: (settings.find((setting) => setting.key === 'DIRECT_CONTACT_ACTIVE')?.value ?? defaultSettings.DIRECT_CONTACT_ACTIVE) === 'true',
       directContactFeeGbp: Number(settings.find((setting) => setting.key === 'DIRECT_CONTACT_FEE_GBP')?.value ?? defaultSettings.DIRECT_CONTACT_FEE_GBP),
       humanReviewActive: (settings.find((setting) => setting.key === 'HUMAN_REVIEW_ACTIVE')?.value ?? defaultSettings.HUMAN_REVIEW_ACTIVE) === 'true',
