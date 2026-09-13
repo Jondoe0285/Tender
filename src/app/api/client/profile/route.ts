@@ -32,11 +32,13 @@ const profileUpdateSchema = personalProfileSchema.extend({
   operatingLocations: z.array(z.enum(COMPANY_OPERATING_LOCATIONS)).max(COMPANY_OPERATING_LOCATIONS.length).optional(),
 }).superRefine((value, context) => {
   if (value.serviceProvisions === undefined) return;
-  const selectedServices = new Set(value.services ?? []);
+  const selectedServices = value.services !== undefined ? new Set(value.services) : null;
   value.serviceProvisions.forEach((entry, index) => {
-    const [service, provision] = entry.split('::');
+    const [service, ...provisionParts] = entry.split('::');
+    const provision = provisionParts.join('::');
     const categories = SERVICE_CATALOG[service as keyof typeof SERVICE_CATALOG];
-    if (!service || !provision || !selectedServices.has(service as typeof SERVICE_NAMES[number]) || !categories || !(provision in categories)) {
+    const invalidService = selectedServices !== null && !selectedServices.has(service as typeof SERVICE_NAMES[number]);
+    if (!service || !provision || invalidService || !categories || !(provision in categories)) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ['serviceProvisions', index], message: 'Select valid provisions for the services offered by your company' });
     }
   });

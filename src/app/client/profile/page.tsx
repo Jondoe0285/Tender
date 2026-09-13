@@ -15,6 +15,9 @@ import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 const PROFILE_SERVICE_LABELS: Record<string, string> = {
   Materials: 'Materials Supplier',
   Waste: 'Waste Disposal',
+  'Plant Hire': 'Plant Hire',
+  'Contractor Services': 'Contractor Services',
+  'Professional Services': 'Professional Services',
 };
 
 type Profile = {

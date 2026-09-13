@@ -24,7 +24,8 @@ export const registerSchema = z.object({
   if (!value.serviceProvisions) return;
   const services = new Set(value.categories ?? []);
   value.serviceProvisions.forEach((entry, index) => {
-    const [service, provision] = entry.split('::');
+    const [service, ...provisionParts] = entry.split('::');
+    const provision = provisionParts.join('::');
     const catalogue = SERVICE_CATALOG[service as keyof typeof SERVICE_CATALOG];
     if (!service || !provision || !services.has(service as typeof SERVICE_NAMES[number]) || !catalogue || !(provision in catalogue)) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ['serviceProvisions', index], message: 'Select valid provisions for the services offered by your company' });
