@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { VERIFICATION_DOCUMENT_TYPES, verificationDocumentExpires, type VerificationDocumentType } from '@/lib/verification-documents';
 import { buildSafeAttachmentName } from '@/lib/attachment-utils';
+import { INDEPENDENT_REVIEW_TIER_DESCRIPTIONS, INDEPENDENT_REVIEW_TIER_LABELS, type IndependentReviewTier } from '@/lib/independentReviewTiers';
 
 type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
 const REOPEN_STATUSES: VerificationStatus[] = ['UNVERIFIED', 'REJECTED', 'EXPIRED'];
@@ -35,12 +36,23 @@ function formatFileSize(sizeBytes: number) {
 }
 
 export default function ProviderVerificationPage() {
+  const [selectedOption, setSelectedOption] = useState<'ai' | 'enhanced'>('ai');
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>('UNVERIFIED');
   const [isSoleTrader, setIsSoleTrader] = useState(false);
   const [applicableTypes, setApplicableTypes] = useState<VerificationDocumentType[]>([]);
   const [requiredTypes, setRequiredTypes] = useState<VerificationDocumentType[]>([]);
   const [soleTraderEvidence, setSoleTraderEvidence] = useState<{ strongTypes: VerificationDocumentType[]; moderateTypes: VerificationDocumentType[]; eligible: boolean } | null>(null);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
+  const [enhancedReview, setEnhancedReview] = useState<{
+    active: boolean;
+    feeGbp: number;
+    status: string;
+    tier: IndependentReviewTier | null;
+    reassessmentAvailable: boolean;
+    reassessmentFeeGbp: number;
+    renewalAvailable: boolean;
+    renewalFeeGbp: number;
+  } | null>(null);
   const [pendingFiles, setPendingFiles] = useState<Record<string, File>>({});
   const [expiryDates, setExpiryDates] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -52,9 +64,10 @@ export default function ProviderVerificationPage() {
 
   async function load() {
     setLoading(true);
-    const [profileResponse, documentsResponse] = await Promise.all([
+    const [profileResponse, documentsResponse, reviewResponse] = await Promise.all([
       fetch('/api/retailer/profile'),
       fetch('/api/retailer/verification/documents'),
+      fetch('/api/retailer/independent-review'),
     ]);
     if (profileResponse.ok) {
       const profile = await profileResponse.json();
@@ -68,11 +81,19 @@ export default function ProviderVerificationPage() {
       setSoleTraderEvidence(data.soleTraderEvidence);
       setDocuments(data.documents);
     }
+    if (reviewResponse.ok) {
+      setEnhancedReview(await reviewResponse.json());
+    }
     setCurrentTime(Date.now());
     setLoading(false);
   }
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('option=enhanced')) {
+      setSelectedOption('enhanced');
+    }
+    void load();
+  }, []);
 
   async function handleUpload(documentType: VerificationDocumentType) {
     const file = pendingFiles[documentType];
@@ -168,24 +189,128 @@ export default function ProviderVerificationPage() {
         {message && <p role="status" className="rounded-lg border border-steel-blue/20 bg-steel-blue/5 px-4 py-3 text-sm text-steel-blue">{message}</p>}
         {error && <p role="alert" className="rounded-lg border border-attention/30 bg-attention/5 px-4 py-3 text-sm text-attention">{error}</p>}
 
-        <Card>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="font-heading text-xl font-bold text-foundation-navy">Verification documents</h2>
-              <p className="mt-1 max-w-xl text-sm text-concrete-grey">
-                {isSoleTrader
-                  ? 'Upload sole trader self-employment evidence below. Every upload is submitted separately, so you can complete this at your own pace.'
-                  : 'Upload each document below with its expiry date. Every upload is submitted separately, so you can complete this checklist at your own pace.'}
-                {!isSoleTrader && requiredTypes.length > 0 && ` Required documents uploaded: ${requiredUploaded.length} of ${requiredTypes.length}.`}
+        <Card className="border-l-4 border-steel-blue bg-steel-blue/5">
+          <h2 className="font-heading text-xl font-bold text-foundation-navy">Choose your verification option</h2>
+          <p className="mt-1 text-sm text-concrete-grey">
+            Trade Tender offers two verification options. Select whether you want automated AI Verification or professional Enhanced Verification.
+          </p>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div
+              className={`rounded-lg border p-4 transition-all ${selectedOption === 'ai' ? 'border-steel-blue bg-white shadow-sm ring-2 ring-steel-blue/20' : 'border-slate-200 bg-white'}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-heading text-base font-bold text-foundation-navy">AI Verification</p>
+                <StatusBadge status={verificationStatus === 'VERIFIED' ? 'approved' : verificationStatus === 'PENDING' ? 'pending' : 'neutral'}>
+                  {verificationStatus === 'VERIFIED' ? 'Verified' : 'AI Verified'}
+                </StatusBadge>
+              </div>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-steel-blue">Automated Evidence Check &middot; Included</p>
+              <p className="mt-2 text-xs leading-relaxed text-concrete-grey">
+                Upload your legal entity or self-employment evidence for automated AI verification assessment.
               </p>
+              <div className="mt-4">
+                <Button
+                  variant={selectedOption === 'ai' ? 'primary' : 'secondary'}
+                  size="md"
+                  onClick={() => setSelectedOption('ai')}
+                >
+                  {selectedOption === 'ai' ? 'Selected: Upload Evidence Below' : 'Select AI Verification'}
+                </Button>
+              </div>
             </div>
-            <StatusBadge status={verificationStatus === 'VERIFIED' ? 'approved' : verificationStatus === 'PENDING' ? 'pending' : verificationStatus === 'REJECTED' || verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
-              {verificationStatus === 'VERIFIED' ? 'Verified' : verificationStatus === 'PENDING' ? 'Pending review' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : (isSoleTrader ? 'Sole Trader' : 'Unverified')}
-            </StatusBadge>
+
+            <div
+              className={`rounded-lg border p-4 transition-all ${selectedOption === 'enhanced' ? 'border-steel-blue bg-white shadow-sm ring-2 ring-steel-blue/20' : 'border-slate-200 bg-white'}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-heading text-base font-bold text-foundation-navy">Enhanced Verification</p>
+                <StatusBadge status={enhancedReview?.status === 'APPROVED' ? 'approved' : enhancedReview?.status === 'PURCHASED' ? 'pending' : 'neutral'}>
+                  {enhancedReview?.status === 'APPROVED' ? (enhancedReview.tier ?? 'Bronze') : 'Enhanced'}
+                </StatusBadge>
+              </div>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-steel-blue">
+                Professional H&amp;S Review &middot; £{enhancedReview?.reassessmentAvailable ? enhancedReview.reassessmentFeeGbp : (enhancedReview?.feeGbp ?? 150)} excl. VAT
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-concrete-grey">
+                In-depth review by a Health &amp; Safety professional awarding Bronze, Silver, or Gold safety competency tiers.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  variant={selectedOption === 'enhanced' ? 'primary' : 'secondary'}
+                  size="md"
+                  onClick={() => setSelectedOption('enhanced')}
+                >
+                  {selectedOption === 'enhanced' ? 'Selected' : 'Select Enhanced Verification'}
+                </Button>
+                <Link href="/retailer/independent-review">
+                  <Button variant="secondary" size="md">
+                    {enhancedReview?.reassessmentAvailable ? 'Purchase Assessment' : 'Proceed to Enhanced Review &rarr;'}
+                  </Button>
+                </Link>
+              </div>
+            </div>
           </div>
         </Card>
 
-        {isSoleTrader && <Card className="border-l-4 border-safety-amber bg-amber-50/40"><p className="text-sm font-semibold text-foundation-navy">Sole trader evidence rule</p><p className="mt-2 text-sm text-concrete-grey">Upload one strong evidence document, or at least two moderate evidence documents, to become eligible for AI verification. Strong evidence: HMRC UTR confirmation, SA302 tax calculation, VAT registration certificate, proof of CIS registration, or public liability/professional indemnity insurance in the trading name. Moderate evidence: business bank statement, customer invoices, customer quotations or contracts, trade body membership, or trading activity evidence (business website, trading-domain email, or marketing materials).</p></Card>}
+        {selectedOption === 'enhanced' && (
+          <Card className="border-l-4 border-approved bg-approved/5 space-y-4">
+            <div>
+              <h2 className="font-heading text-xl font-bold text-foundation-navy">Enhanced Health &amp; Safety Review</h2>
+              <p className="mt-2 text-sm text-concrete-grey">
+                Enhanced Verification involves a professional assessment of your business by a qualified Health &amp; Safety professional. Once purchased, an auditor contacts you directly to review your safety management system, risk assessments, and training records.
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <p className="text-sm font-semibold text-foundation-navy">Safety Competency Tiers</p>
+              <dl className="mt-3 grid gap-3 text-sm text-concrete-grey sm:grid-cols-3">
+                {(Object.keys(INDEPENDENT_REVIEW_TIER_DESCRIPTIONS) as IndependentReviewTier[]).map((tier) => (
+                  <div key={tier} className="rounded-md border border-slate-100 bg-slate-50 p-3">
+                    <dt className="font-bold text-foundation-navy">{INDEPENDENT_REVIEW_TIER_LABELS[tier]}</dt>
+                    <dd className="mt-1 text-xs">{INDEPENDENT_REVIEW_TIER_DESCRIPTIONS[tier]}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+              <div>
+                <p className="text-2xl font-heading font-bold text-foundation-navy">
+                  £{enhancedReview?.reassessmentAvailable ? enhancedReview.reassessmentFeeGbp : (enhancedReview?.feeGbp ?? 150)} excl. VAT
+                </p>
+                <StatusBadge status={enhancedReview?.status === 'APPROVED' ? 'approved' : enhancedReview?.status === 'PURCHASED' ? 'pending' : enhancedReview?.status === 'DECLINED' ? 'attention' : 'neutral'}>
+                  {enhancedReview?.status === 'APPROVED' ? `Enhanced Verified · ${enhancedReview.tier ?? 'Bronze'}` : enhancedReview?.status === 'PURCHASED' ? 'Awaiting review' : enhancedReview?.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
+                </StatusBadge>
+              </div>
+              <Link href="/retailer/independent-review">
+                <Button>
+                  {enhancedReview?.reassessmentAvailable ? 'Purchase Updated Assessment' : enhancedReview?.renewalAvailable ? 'Renew Enhanced Verification' : 'Purchase Enhanced Review'}
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        )}
+
+        {selectedOption === 'ai' && (
+          <>
+            <Card>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="font-heading text-xl font-bold text-foundation-navy">Verification documents</h2>
+                  <p className="mt-1 max-w-xl text-sm text-concrete-grey">
+                    {isSoleTrader
+                      ? 'Upload sole trader self-employment evidence below. Every upload is submitted separately, so you can complete this at your own pace.'
+                      : 'Upload each document below with its expiry date. Every upload is submitted separately, so you can complete this checklist at your own pace.'}
+                    {!isSoleTrader && requiredTypes.length > 0 && ` Required documents uploaded: ${requiredUploaded.length} of ${requiredTypes.length}.`}
+                  </p>
+                </div>
+                <StatusBadge status={verificationStatus === 'VERIFIED' ? 'approved' : verificationStatus === 'PENDING' ? 'pending' : verificationStatus === 'REJECTED' || verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
+                  {verificationStatus === 'VERIFIED' ? 'Verified' : verificationStatus === 'PENDING' ? 'Pending review' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : (isSoleTrader ? 'Sole Trader' : 'Unverified')}
+                </StatusBadge>
+              </div>
+            </Card>
+
+            {isSoleTrader && <Card className="border-l-4 border-safety-amber bg-amber-50/40"><p className="text-sm font-semibold text-foundation-navy">Sole trader evidence rule</p><p className="mt-2 text-sm text-concrete-grey">Upload one strong evidence document, or at least two moderate evidence documents, to become eligible for AI verification. Strong evidence: HMRC UTR confirmation, SA302 tax calculation, VAT registration certificate, proof of CIS registration, or public liability/professional indemnity insurance in the trading name. Moderate evidence: business bank statement, customer invoices, customer quotations or contracts, trade body membership, or trading activity evidence (business website, trading-domain email, or marketing materials).</p></Card>}
 
         <Card className="border-l-4 border-safety-amber bg-amber-50/40">
           <p className="text-sm font-semibold text-foundation-navy">Compliance score disclaimer</p>
@@ -279,8 +404,10 @@ export default function ProviderVerificationPage() {
             )}
           </div>
         </Card>
-      </div>
-    </AppShell>
+      </>
+    )}
+  </div>
+</AppShell>
   );
 }
 

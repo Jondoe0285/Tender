@@ -1,3 +1,11 @@
+### 2026-09-13 - Verification Option Selection (AI Verification vs. Enhanced Verification)
+
+- Changed: updated the Provider "Become Verified" screen (`/retailer/verification`) to present a prominent choice card allowing users to select between AI Verification (included automated document evidence check) and Enhanced Verification (paid professional H&S review awarding Bronze, Silver, or Gold safety competency tiers).
+- Changed: selecting AI Verification displays the automated document checklist and upload tools below; selecting Enhanced Verification presents the H&S review summary, safety competency tiers guide, and pricing options with a direct action button proceeding to `/retailer/independent-review`. Supports pre-selection via `?option=enhanced` query parameter.
+- Affects: `src/app/retailer/verification/page.tsx` and `src/app/retailer/profile/page.tsx`.
+- Environment: no schema or migration change.
+- Validation: `npm run type-check` and full `npm test` pass.
+
 ### 2026-09-13 - Shared Secret Management & Inbound Enhanced Verification Status Callback API
 
 - Changed: added Owner-managed platform setting `INDEPENDENT_REVIEW_SHARED_SECRET` in `platformSettings.ts`, `/api/super-user/settings`, and `SuperUserSettingsPanel.tsx` (falling back to environment variables `VERIFICATION_REGISTRATION_TOKEN_SECRET`, `VERIFICATION_INTEGRATION_SECRET_TRADE_TENDER_VERIFICATION`, `VERIFICATION_OUTBOUND_SECRET_TRADE_TENDER_VERIFICATION`, `ENHANCED_VERIFICATION_SHARED_SECRET`, `INDEPENDENT_REVIEW_SHARED_SECRET`, and `NEXTAUTH_SECRET`).
