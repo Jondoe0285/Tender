@@ -49,15 +49,15 @@ export async function POST(request: Request) {
 
     const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { categories: true, independentReviewStatus: true, independentReviewDecidedAt: true } });
     if (!profile) return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
-    if (!await isIndependentReviewActive()) return NextResponse.json({ error: 'Independent review purchases are not currently available' }, { status: 403 });
-    if (!isVerificationEligible(profile.categories)) return NextResponse.json({ error: 'Independent review is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers' }, { status: 403 });
+    if (!await isIndependentReviewActive()) return NextResponse.json({ error: 'Enhanced review purchases are not currently available' }, { status: 403 });
+    if (!isVerificationEligible(profile.categories)) return NextResponse.json({ error: 'Enhanced review is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers' }, { status: 403 });
     const renewalRequested = body?.mode === 'RENEWAL';
     const renewalAvailable = await isIndependentReviewRenewalActive() && independentReviewRenewalAvailable(profile.independentReviewStatus, profile.independentReviewDecidedAt);
     const expired = independentReviewExpired(profile.independentReviewStatus, profile.independentReviewDecidedAt);
     if (profile.independentReviewStatus === 'PURCHASED' || (profile.independentReviewStatus === 'APPROVED' && !renewalAvailable && !expired)) {
-      return NextResponse.json({ error: 'An independent review has already been purchased or approved for this account' }, { status: 409 });
+      return NextResponse.json({ error: 'An enhanced review has already been purchased or approved for this account' }, { status: 409 });
     }
-    if (renewalRequested && !renewalAvailable) return NextResponse.json({ error: 'Renewal is only available from 11 months after approval until the independent verification expires' }, { status: 403 });
+    if (renewalRequested && !renewalAvailable) return NextResponse.json({ error: 'Renewal is only available from 11 months after approval until the enhanced verification expires' }, { status: 403 });
 
     const mobileReturnUrl = typeof body?.mobileReturnUrl === 'string' ? body.mobileReturnUrl : undefined;
     const feeOverrideGbp = renewalRequested ? await getIndependentReviewRenewalFeeGbp() : undefined;

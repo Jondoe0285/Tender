@@ -39,6 +39,7 @@ export default function ProviderVerificationPage() {
   const [isSoleTrader, setIsSoleTrader] = useState(false);
   const [applicableTypes, setApplicableTypes] = useState<VerificationDocumentType[]>([]);
   const [requiredTypes, setRequiredTypes] = useState<VerificationDocumentType[]>([]);
+  const [soleTraderEvidence, setSoleTraderEvidence] = useState<{ strongTypes: VerificationDocumentType[]; moderateTypes: VerificationDocumentType[]; eligible: boolean } | null>(null);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [pendingFiles, setPendingFiles] = useState<Record<string, File>>({});
   const [expiryDates, setExpiryDates] = useState<Record<string, string>>({});
@@ -64,6 +65,7 @@ export default function ProviderVerificationPage() {
       const data = await documentsResponse.json();
       setApplicableTypes(data.applicableDocumentTypes);
       setRequiredTypes(data.requiredDocumentTypes);
+      setSoleTraderEvidence(data.soleTraderEvidence);
       setDocuments(data.documents);
     }
     setCurrentTime(Date.now());
@@ -146,11 +148,14 @@ export default function ProviderVerificationPage() {
   }
 
   const applicableDocuments = VERIFICATION_DOCUMENT_TYPES.filter((doc) => applicableTypes.includes(doc.type));
+  const soleTraderDocuments = soleTraderEvidence
+    ? VERIFICATION_DOCUMENT_TYPES.filter((doc) => soleTraderEvidence.strongTypes.includes(doc.type) || soleTraderEvidence.moderateTypes.includes(doc.type))
+    : [];
   const now = currentTime;
   const validUploadedTypes = new Set(documents.filter((doc) => !doc.expiryDate || new Date(doc.expiryDate).getTime() > now).map((doc) => doc.documentType));
   const requiredUploaded = requiredTypes.filter((type) => validUploadedTypes.has(type));
-  const canSubmit = requiredTypes.length > 0 && requiredUploaded.length === requiredTypes.length;
-  const canEdit = !isSoleTrader && REOPEN_STATUSES.includes(verificationStatus);
+  const canSubmit = isSoleTrader ? Boolean(soleTraderEvidence?.eligible) : (requiredTypes.length > 0 && requiredUploaded.length === requiredTypes.length);
+  const canEdit = REOPEN_STATUSES.includes(verificationStatus);
   const minExpiryDate = new Date(now + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   if (loading) return <AppShell role="retailer" title="Become Verified"><p className="text-sm text-concrete-grey">Loading...</p></AppShell>;
@@ -169,18 +174,18 @@ export default function ProviderVerificationPage() {
               <h2 className="font-heading text-xl font-bold text-foundation-navy">Verification documents</h2>
               <p className="mt-1 max-w-xl text-sm text-concrete-grey">
                 {isSoleTrader
-                  ? 'Your profile is marked as a sole trader, so AI verification is not available. Your quotes will show a Sole Trader status for Contractor due diligence.'
+                  ? 'Upload sole trader self-employment evidence below. Every upload is submitted separately, so you can complete this at your own pace.'
                   : 'Upload each document below with its expiry date. Every upload is submitted separately, so you can complete this checklist at your own pace.'}
                 {!isSoleTrader && requiredTypes.length > 0 && ` Required documents uploaded: ${requiredUploaded.length} of ${requiredTypes.length}.`}
               </p>
             </div>
-            <StatusBadge status={isSoleTrader ? 'neutral' : verificationStatus === 'VERIFIED' ? 'approved' : verificationStatus === 'PENDING' ? 'pending' : verificationStatus === 'REJECTED' || verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
-              {isSoleTrader ? 'Sole Trader' : verificationStatus === 'VERIFIED' ? 'Verified by Ai' : verificationStatus === 'PENDING' ? 'Pending review' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : 'Unverified'}
+            <StatusBadge status={verificationStatus === 'VERIFIED' ? 'approved' : verificationStatus === 'PENDING' ? 'pending' : verificationStatus === 'REJECTED' || verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
+              {verificationStatus === 'VERIFIED' ? 'Verified' : verificationStatus === 'PENDING' ? 'Pending review' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : (isSoleTrader ? 'Sole Trader' : 'Unverified')}
             </StatusBadge>
           </div>
         </Card>
 
-        {isSoleTrader && <Card className="border-l-4 border-safety-amber bg-amber-50/40"><p className="text-sm font-semibold text-foundation-navy">Sole trader status</p><p className="mt-2 text-sm text-concrete-grey">Sole traders cannot be AI verified by Trade Tender because the automated legal-entity evidence route is not suitable. Contractors will see a Sole Trader flag on your quotes and should complete their own identity, insurance, competence, and commercial checks.</p></Card>}
+        {isSoleTrader && <Card className="border-l-4 border-safety-amber bg-amber-50/40"><p className="text-sm font-semibold text-foundation-navy">Sole trader evidence rule</p><p className="mt-2 text-sm text-concrete-grey">Upload one strong evidence document, or at least two moderate evidence documents, to become eligible for AI verification. Strong evidence: HMRC UTR confirmation, SA302 tax calculation, VAT registration certificate, proof of CIS registration, or public liability/professional indemnity insurance in the trading name. Moderate evidence: business bank statement, customer invoices, customer quotations or contracts, trade body membership, or trading activity evidence (business website, trading-domain email, or marketing materials).</p></Card>}
 
         <Card className="border-l-4 border-safety-amber bg-amber-50/40">
           <p className="text-sm font-semibold text-foundation-navy">Compliance score disclaimer</p>
@@ -192,18 +197,21 @@ export default function ProviderVerificationPage() {
           </p>
         </Card>
 
-        {applicableDocuments.map((doc) => {
+        {(isSoleTrader ? soleTraderDocuments : applicableDocuments).map((doc) => {
           const uploaded = documents.find((item) => item.documentType === doc.type);
           const expired = uploaded?.expiryDate ? new Date(uploaded.expiryDate).getTime() <= now : false;
           const busy = uploadingType === doc.type;
           const pendingFile = pendingFiles[doc.type];
+          const tierLabel = isSoleTrader
+            ? (soleTraderEvidence?.strongTypes.includes(doc.type) ? 'Strong evidence' : 'Moderate evidence')
+            : (requiredTypes.includes(doc.type) ? 'Required' : 'Optional');
           return (
             <Card key={doc.type}>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-heading text-base font-bold text-foundation-navy">{doc.label}</h3>
-                    <span className="text-xs font-semibold uppercase tracking-wide text-concrete-grey">{requiredTypes.includes(doc.type) ? 'Required' : 'Optional'}</span>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-concrete-grey">{tierLabel}</span>
                     {uploaded && !expired && <StatusBadge status="approved">Uploaded</StatusBadge>}
                     {uploaded && expired && <StatusBadge status="attention">Expired</StatusBadge>}
                   </div>
@@ -261,9 +269,10 @@ export default function ProviderVerificationPage() {
             <p className="text-sm text-concrete-grey">
               {verificationStatus === 'VERIFIED' && 'This account is verified. No further action is required.'}
               {verificationStatus === 'PENDING' && 'Your request is under review. You can still upload or replace documents while it is pending.'}
-              {isSoleTrader && 'AI verification is not available for sole trader profiles. Your quotes will show a Sole Trader status.'}
-              {canEdit && !canSubmit && 'Upload every required document above, with a future expiry date, then submit your request for review.'}
-              {canEdit && canSubmit && 'All required documents are uploaded. Submit your request for review.'}
+              {canEdit && isSoleTrader && !canSubmit && 'Upload one strong evidence document, or at least two moderate evidence documents, then submit your request for review.'}
+              {canEdit && isSoleTrader && canSubmit && 'Your sole trader evidence meets the verification rule. Submit your request for review.'}
+              {canEdit && !isSoleTrader && !canSubmit && 'Upload every required document above, with a future expiry date, then submit your request for review.'}
+              {canEdit && !isSoleTrader && canSubmit && 'All required documents are uploaded. Submit your request for review.'}
             </p>
             {canEdit && (
               <Button onClick={handleSubmitForReview} loading={submitting} disabled={!canSubmit}>Submit for review</Button>

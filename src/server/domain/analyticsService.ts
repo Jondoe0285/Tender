@@ -110,7 +110,7 @@ export function getFinancialQuarter(date = new Date()) {
 export type VerificationTierKey = 'INDEPENDENTLY_VERIFIED' | 'VERIFIED_BY_AI' | 'UNVERIFIED';
 
 const VERIFICATION_TIER_LABELS: Record<VerificationTierKey, string> = {
-  INDEPENDENTLY_VERIFIED: 'Independently Verified',
+  INDEPENDENTLY_VERIFIED: 'Enhanced Verified',
   VERIFIED_BY_AI: 'Verified by Ai',
   UNVERIFIED: 'Unverified',
 };

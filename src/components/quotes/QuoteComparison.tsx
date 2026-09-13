@@ -41,21 +41,24 @@ type ExpiredQuote = QuoteCommon & {
 type Quote = ActiveQuote | ExpiredQuote;
 
 function ProviderVerificationBadge({ status, verifiedDocumentLabels, independentlyVerified, independentReviewTier, soleTrader }: { status: Quote['providerVerificationStatus']; verifiedDocumentLabels: string[]; independentlyVerified: boolean; independentReviewTier: Quote['independentReviewTier']; soleTrader: boolean }) {
-  if (soleTrader) {
-    return <span title="This Provider has declared that they operate as a sole trader. Sole traders are not AI verified by Trade Tender; complete your own identity, insurance, competence, and commercial checks before appointing them."><StatusBadge status="neutral">Sole Trader</StatusBadge></span>;
-  }
   if (independentlyVerified) {
     const tier = independentReviewTier;
-    const label = `Independently Verified${tier ? ` · ${tier[0] + tier.slice(1).toLowerCase()}` : ''}`;
-    return <span title={`${independentReviewTierDescription(tier)} Sinclair Safety Solutions Ltd completed the independent review through the HSQE Consult Hub platform. This does not replace your own due diligence before any formal agreement.`}><StatusBadge status="approved">{label}</StatusBadge></span>;
+    const bannerLabel = tier === 'BRONZE' ? 'Bronze' : tier === 'SILVER' ? 'Silver' : tier === 'GOLD' ? 'Gold' : 'Bronze';
+    const docLabel = tier === 'BRONZE' ? 'Enhanced Bronze Verification' : tier === 'SILVER' ? 'Enhanced Silver Verification' : 'Enhanced Gold Verification';
+    return <span title={`${docLabel} — ${independentReviewTierDescription(tier)} Sinclair Safety Solutions Ltd completed this professional review through the HSQE Consult Hub platform. This does not replace your own due diligence before any formal agreement.`}><StatusBadge status="approved">{bannerLabel}</StatusBadge></span>;
   }
   if (status === 'VERIFIED') {
-    const title = verifiedDocumentLabels.length > 0 ? `Automated legal-compliance evidence reviewed: ${verifiedDocumentLabels.join(', ')}. AI may make mistakes; complete your own due diligence.` : 'Automated legal-compliance assessment only. AI may make mistakes; complete your own due diligence.';
-    return <span title={title}><StatusBadge status="approved">Verified by Ai</StatusBadge></span>;
+    const docLabel = soleTrader ? 'Sole trader AI Verified' : 'Incorporated AI Verified';
+    const evidenceLabel = soleTrader ? 'self-employment' : 'legal-compliance & incorporation';
+    const title = verifiedDocumentLabels.length > 0 ? `${docLabel} — Automated ${evidenceLabel} evidence reviewed: ${verifiedDocumentLabels.join(', ')}. AI may make mistakes; complete your own due diligence.` : `${docLabel} — Automated ${evidenceLabel} assessment passed. AI may make mistakes; complete your own due diligence.`;
+    return <span title={title}><StatusBadge status="approved">Verified</StatusBadge></span>;
+  }
+  if (soleTrader) {
+    return <span title="Sole Trader (Unverified) — This Provider declared sole-trader status and has not yet completed AI verification. Complete your own identity, insurance, competence, and commercial checks before appointing them."><StatusBadge status="neutral">Sole Trader</StatusBadge></span>;
   }
   if (status === 'PENDING') return <StatusBadge status="pending">Verification pending</StatusBadge>;
   if (status === 'EXPIRED') return <span title="This Provider's verification lapsed because a document expired."><StatusBadge status="attention">Verification expired</StatusBadge></span>;
-  return <StatusBadge status="neutral">Unverified Provider</StatusBadge>;
+  return <StatusBadge status="neutral">Unverified</StatusBadge>;
 }
 
 type SortKey = 'priceGbp' | 'leadTimeDays' | 'validityDays' | 'submittedAt';
@@ -118,11 +121,13 @@ export function QuoteComparison({
 
       <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Verification key</p>
-        <div className="mt-3 grid gap-3 text-sm md:grid-cols-4">
-          <div><StatusBadge status="neutral">Sole Trader</StatusBadge><p className="mt-2 text-concrete-grey">The Provider declared sole-trader status and is not AI verified.</p></div>
-          <div><StatusBadge status="approved">Verified by Ai</StatusBadge><p className="mt-2 text-concrete-grey">Automated legal-compliance evidence assessment passed; AI can make mistakes.</p></div>
-          <div><StatusBadge status="approved">Independently Verified</StatusBadge><p className="mt-2 text-concrete-grey">Bronze, Silver, and Gold describe the evidence reviewed by a Health &amp; Safety professional.</p></div>
-          <div><StatusBadge status="neutral">Unverified Provider</StatusBadge><p className="mt-2 text-concrete-grey">No approved verification evidence is recorded.</p></div>
+        <div className="mt-3 grid gap-3 text-sm md:grid-cols-3 lg:grid-cols-6">
+          <div><StatusBadge status="neutral">Unverified</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Unverified</p><p className="mt-1 text-xs text-concrete-grey">No approved verification evidence recorded on the platform.</p></div>
+          <div><StatusBadge status="neutral">Sole Trader</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Sole Trader (Unverified)</p><p className="mt-1 text-xs text-concrete-grey">Declared sole trader status; complete suitable due diligence before appointment.</p></div>
+          <div><StatusBadge status="approved">Verified</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Sole trader AI Verified / Incorporated AI Verified</p><p className="mt-1 text-xs text-concrete-grey">Passed automated self-employment or incorporation &amp; legal-compliance checks.</p></div>
+          <div><StatusBadge status="approved">Bronze</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Enhanced Bronze Verification</p><p className="mt-1 text-xs text-concrete-grey">Health &amp; Safety legal requirements, permits, insurances, and competent advice reviewed.</p></div>
+          <div><StatusBadge status="approved">Silver</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Enhanced Silver Verification</p><p className="mt-1 text-xs text-concrete-grey">Bronze criteria plus employee &amp; managerial safety training evidence reviewed.</p></div>
+          <div><StatusBadge status="approved">Gold</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Enhanced Gold Verification</p><p className="mt-1 text-xs text-concrete-grey">Bronze &amp; Silver criteria plus comprehensive management system or SSIP membership reviewed.</p></div>
         </div>
         <p className="mt-3 text-xs text-concrete-grey">These statuses do not replace your own suitable due diligence before entering a formal agreement.</p>
         <Link href="/policies/verification-policy" className="mt-2 inline-block text-xs font-semibold text-steel-blue hover:text-foundation-navy">Read the detailed verification policy</Link>

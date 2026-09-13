@@ -10,6 +10,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Input, Label, Textarea, FieldGroup } from '@/components/ui/Field';
 import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
 import { CATEGORIES } from '@/lib/categories';
+import { COMPANY_TYPE_LABELS, COMPANY_TYPES } from '@/lib/companyTypes';
 import { independentReviewTierDescription } from '@/lib/independentReviewTiers';
 import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 
@@ -27,6 +28,7 @@ type Profile = {
   companyName: string;
   companyNumber: string | null;
   address: string | null;
+  companyType: 'SOLE_TRADER' | 'LIMITED_COMPANY' | 'PARTNERSHIP' | 'LIMITED_LIABILITY_PARTNERSHIP' | 'PUBLIC_LIMITED_COMPANY' | 'OTHER';
   isSoleTrader: boolean;
   coverageScope: 'COUNTY' | 'REGION' | 'UK';
   counties: string;
@@ -53,7 +55,7 @@ export default function RetailerProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [form, setForm] = useState({ companyName: '', companyNumber: '', address: '', isSoleTrader: false, standardQuoteValidityDays: 30, coverageScope: 'COUNTY' as 'COUNTY' | 'REGION' | 'UK', counties: [] as string[], regions: [] as string[], categories: [] as string[], masterUserId: '' });
+  const [form, setForm] = useState({ companyName: '', companyNumber: '', address: '', companyType: 'LIMITED_COMPANY' as Profile['companyType'], standardQuoteValidityDays: 30, coverageScope: 'COUNTY' as 'COUNTY' | 'REGION' | 'UK', counties: [] as string[], regions: [] as string[], categories: [] as string[], masterUserId: '' });
   const [email, setEmail] = useState('');
   const [newPermissions, setNewPermissions] = useState<string[]>(['VIEW']);
   const [editing, setEditing] = useState(false);
@@ -69,7 +71,7 @@ export default function RetailerProfilePage() {
     if (profileResponse.ok) {
       const data: Profile = await profileResponse.json();
       setProfile(data);
-      setForm({ companyName: data.companyName, companyNumber: data.companyNumber ?? '', address: data.address ?? '', isSoleTrader: data.isSoleTrader, standardQuoteValidityDays: data.standardQuoteValidityDays, coverageScope: data.coverageScope, counties: splitValues(data.counties), regions: splitValues(data.regions), categories: splitValues(data.categories), masterUserId: data.masterUserId ?? '' });
+      setForm({ companyName: data.companyName, companyNumber: data.companyNumber ?? '', address: data.address ?? '', companyType: data.companyType, standardQuoteValidityDays: data.standardQuoteValidityDays, coverageScope: data.coverageScope, counties: splitValues(data.counties), regions: splitValues(data.regions), categories: splitValues(data.categories), masterUserId: data.masterUserId ?? '' });
     }
     if (teamResponse.ok) setTeamMembers(await teamResponse.json());
     if (independentReviewResponse.ok) setIndependentReview(await independentReviewResponse.json());
@@ -149,8 +151,9 @@ export default function RetailerProfilePage() {
               <div>
                 <p className="font-heading text-lg font-bold text-foundation-navy">Provider verification</p>
                 <p className="mt-1 max-w-xl text-sm text-concrete-grey">
-                  {profile.isSoleTrader && 'Your profile is marked as a sole trader. AI verification is not available; your quotes will show a Sole Trader status so Contractors can complete suitable checks.'}
-                  {!profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business is verified. This is shown to Contractors on every quote you submit.'}
+                  {profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business is Sole trader AI Verified based on your uploaded self-employment evidence. This is shown to Contractors on every quote you submit.'}
+                  {profile.isSoleTrader && profile.verificationStatus !== 'VERIFIED' && 'Your profile is marked as a sole trader. Upload self-employment evidence to become AI verified; until then your quotes show a Sole Trader status so Contractors can complete suitable checks.'}
+                  {!profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business is Incorporated AI Verified based on your Certificate of Incorporation and required service evidence. This is shown to Contractors on every quote you submit.'}
                   {profile.verificationStatus === 'PENDING' && 'Your verification request is under review. We will update your status once it has been checked.'}
                   {profile.verificationStatus === 'REJECTED' && 'Your last verification request was not approved. You can request verification again at any time.'}
                   {profile.verificationStatus === 'EXPIRED' && 'One or more of your verification documents have expired, so your verified status has been removed. Upload a replacement to restart the review.'}
@@ -158,10 +161,10 @@ export default function RetailerProfilePage() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <StatusBadge status={profile.isSoleTrader ? 'neutral' : profile.verificationStatus === 'VERIFIED' ? 'approved' : profile.verificationStatus === 'PENDING' ? 'pending' : profile.verificationStatus === 'REJECTED' || profile.verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
-                  {profile.isSoleTrader ? 'Sole Trader' : profile.verificationStatus === 'VERIFIED' ? 'Verified by Ai' : profile.verificationStatus === 'PENDING' ? 'Pending review' : profile.verificationStatus === 'REJECTED' ? 'Not approved' : profile.verificationStatus === 'EXPIRED' ? 'Expired' : 'Unverified'}
+                <StatusBadge status={profile.verificationStatus === 'VERIFIED' ? 'approved' : profile.verificationStatus === 'PENDING' ? 'pending' : profile.verificationStatus === 'REJECTED' || profile.verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
+                  {profile.verificationStatus === 'VERIFIED' ? 'Verified' : profile.verificationStatus === 'PENDING' ? 'Pending review' : profile.verificationStatus === 'REJECTED' ? 'Not approved' : profile.verificationStatus === 'EXPIRED' ? 'Expired' : (profile.isSoleTrader ? 'Sole Trader' : 'Unverified')}
                 </StatusBadge>
-                {!profile.isSoleTrader && (profile.verificationStatus === 'UNVERIFIED' || profile.verificationStatus === 'REJECTED' || profile.verificationStatus === 'EXPIRED') && (
+                {(profile.verificationStatus === 'UNVERIFIED' || profile.verificationStatus === 'REJECTED' || profile.verificationStatus === 'EXPIRED') && (
                   <Link href="/retailer/verification"><Button>Become Verified</Button></Link>
                 )}
                 {(profile.verificationStatus === 'PENDING' || profile.verificationStatus === 'VERIFIED') && (
@@ -175,17 +178,17 @@ export default function RetailerProfilePage() {
           <Card className="border-l-4 border-approved bg-approved/5">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="font-heading text-lg font-bold text-foundation-navy">Independent H&amp;S review</p>
+                <p className="font-heading text-lg font-bold text-foundation-navy">Enhanced H&amp;S review</p>
                 <p className="mt-1 max-w-xl text-sm text-concrete-grey">
-                  {independentReview.status === 'APPROVED' && `Your business is Independently Verified${independentReview.tier ? ` at ${independentReview.tier[0] + independentReview.tier.slice(1).toLowerCase()} level` : ''}. ${independentReviewTierDescription(independentReview.tier)}`}
-                  {independentReview.status === 'PURCHASED' && 'Your independent review has been purchased. A Health & Safety professional will contact you about the next steps.'}
-                  {independentReview.status === 'DECLINED' && 'Your last independent review was not approved. You can purchase another review at any time.'}
-                  {independentReview.status === 'NOT_PURCHASED' && `Purchase an independent review by a Health & Safety professional for £${independentReview.feeGbp} excl. VAT.`}
+                  {independentReview.status === 'APPROVED' && `Your business has achieved Enhanced ${independentReview.tier ? independentReview.tier[0] + independentReview.tier.slice(1).toLowerCase() : ''} Verification level. ${independentReviewTierDescription(independentReview.tier)}`}
+                  {independentReview.status === 'PURCHASED' && 'Your review has been purchased. A Health & Safety professional will contact you about the next steps.'}
+                  {independentReview.status === 'DECLINED' && 'Your last review was not approved. You can purchase another review at any time.'}
+                  {independentReview.status === 'NOT_PURCHASED' && `Purchase a review by a Health & Safety professional for £${independentReview.feeGbp} excl. VAT.`}
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <StatusBadge status={independentReview.status === 'APPROVED' ? 'approved' : independentReview.status === 'PURCHASED' ? 'pending' : independentReview.status === 'DECLINED' ? 'attention' : 'neutral'}>
-                  {independentReview.status === 'APPROVED' ? 'Independently Verified' : independentReview.status === 'PURCHASED' ? 'Awaiting review' : independentReview.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
+                  {independentReview.status === 'APPROVED' ? (independentReview.tier === 'SILVER' ? 'Silver' : independentReview.tier === 'GOLD' ? 'Gold' : 'Bronze') : independentReview.status === 'PURCHASED' ? 'Awaiting review' : independentReview.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
                 </StatusBadge>
                 {(independentReview.status === 'NOT_PURCHASED' || independentReview.status === 'DECLINED') && (
                   <Link href="/retailer/independent-review"><Button>Purchase review</Button></Link>
@@ -201,9 +204,9 @@ export default function RetailerProfilePage() {
           </div>
           {editing ? (
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
-              <FieldGroup><Label htmlFor="companyName">Company name</Label><Input id="companyName" value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} /></FieldGroup>
+              <FieldGroup><Label htmlFor="companyName">Company name</Label><Input id="companyName" required value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} /></FieldGroup>
               <FieldGroup><Label htmlFor="companyNumber">Company number</Label><Input id="companyNumber" value={form.companyNumber} onChange={(event) => setForm({ ...form, companyNumber: event.target.value })} placeholder="Companies House number" /></FieldGroup>
-              <label className="flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-concrete-grey sm:col-span-2"><input type="checkbox" checked={form.isSoleTrader} onChange={(event) => setForm({ ...form, isSoleTrader: event.target.checked })} className="mt-1 h-4 w-4 accent-safety-amber" /><span><span className="font-semibold text-foundation-navy">I operate as a sole trader</span><span className="mt-1 block text-xs">Sole trader profiles cannot be AI verified. Quotes will show a Sole Trader status instead so Contractors can complete their own due diligence.</span></span></label>
+              <FieldGroup><Label htmlFor="companyType">Company type</Label><select id="companyType" required value={form.companyType} onChange={(event) => setForm({ ...form, companyType: event.target.value as Profile['companyType'] })} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm">{COMPANY_TYPES.map((type) => <option key={type} value={type}>{COMPANY_TYPE_LABELS[type]}</option>)}</select>{form.companyType === 'SOLE_TRADER' && <p className="mt-1 text-xs text-concrete-grey">Sole traders can become AI verified by uploading self-employment evidence on the verification page instead of legal-entity documents.</p>}</FieldGroup>
               <FieldGroup wide><Label htmlFor="address">Registered or trading address</Label><Textarea id="address" rows={3} value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></FieldGroup>
               <FieldGroup><Label htmlFor="standardQuoteValidityDays">Standard quote validity (days)</Label><Input id="standardQuoteValidityDays" type="number" min="1" max="365" step="1" value={form.standardQuoteValidityDays} onChange={(event) => setForm({ ...form, standardQuoteValidityDays: Number(event.target.value) })} /><p className="mt-1 text-xs text-concrete-grey">Applied automatically to every quote you submit and shown to the purchasing Client.</p></FieldGroup>
               <FieldGroup wide>
@@ -229,7 +232,7 @@ export default function RetailerProfilePage() {
               <div className="flex items-end gap-3 sm:col-span-2"><Button variant="secondary" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button><Button onClick={saveProfile} loading={saving}>Save profile</Button></div>
             </div>
           ) : (
-            <dl className="mt-6 grid gap-5 sm:grid-cols-2"><ProfileValue label="Company name" value={profile.companyName} /><ProfileValue label="Company number" value={profile.companyNumber ?? 'Not provided'} /><ProfileValue label="Trading status" value={profile.isSoleTrader ? 'Sole trader' : 'Company or organisation'} /><ProfileValue label="Address" value={profile.address ?? 'Not provided'} wide /><ProfileValue label="Standard quote validity" value={`${profile.standardQuoteValidityDays} days`} /><ProfileValue label="Operating area" value={profile.coverageScope === 'UK' ? 'UK-wide (all regions)' : profile.coverageScope === 'REGION' ? (profile.regions || 'Not configured') : (profile.counties || 'Not configured')} /><ProfileValue label="Services provided" value={profile.categories || 'Not configured'} /><ProfileValue label="Master user" value={teamMembers.find((member) => member.userId === profile.masterUserId)?.user.email ?? 'Not assigned'} /></dl>
+            <dl className="mt-6 grid gap-5 sm:grid-cols-2"><ProfileValue label="Company name" value={profile.companyName} /><ProfileValue label="Company number" value={profile.companyNumber ?? 'Not provided'} /><ProfileValue label="Company type" value={COMPANY_TYPE_LABELS[profile.companyType]} /><ProfileValue label="Address" value={profile.address ?? 'Not provided'} wide /><ProfileValue label="Standard quote validity" value={`${profile.standardQuoteValidityDays} days`} /><ProfileValue label="Operating area" value={profile.coverageScope === 'UK' ? 'UK-wide (all regions)' : profile.coverageScope === 'REGION' ? (profile.regions || 'Not configured') : (profile.counties || 'Not configured')} /><ProfileValue label="Services provided" value={profile.categories || 'Not configured'} /><ProfileValue label="Master user" value={teamMembers.find((member) => member.userId === profile.masterUserId)?.user.email ?? 'Not assigned'} /></dl>
           )}
         </Card>
 

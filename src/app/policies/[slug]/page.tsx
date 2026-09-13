@@ -103,19 +103,19 @@ const policies = [
     sections: [
       {
         heading: 'What verification does and does not do',
-        content: 'Verification reviews submitted evidence for service eligibility, legal entity information, document completeness, and service-specific requirements. Bronze, Silver, and Gold review outcomes describe the evidence reviewed and the review status; they are not guarantees of workmanship, legal compliance, insurance coverage, or final transaction outcomes.',
+        content: 'Verification reviews submitted evidence for service eligibility, legal entity information, document completeness, and service-specific requirements. Verification outcomes describe the evidence reviewed and the review level; they are not guarantees of workmanship, legal compliance, insurance coverage, or final transaction outcomes.',
       },
       {
-        heading: 'Independent verification tiers',
-        content: 'Bronze means legal requirements such as permits, insurances, and competent advice have been reviewed as evidenced. Silver means the Provider has met the Bronze criteria and provided sufficient evidence of industry-specific employee and managerial training. Gold means the Provider has met the Bronze and Silver criteria and has evidenced either a comprehensive management system or validated SSIP membership.',
+        heading: 'Verification levels',
+        content: 'The platform defines six verification statuses for documentation and assessment purposes:\n\n1. Unverified: No approved verification evidence is recorded on the platform (Banner label: Unverified).\n2. Sole trader AI Verified: Automated evidence assessment confirmed self-employment credentials (HMRC UTR confirmation, SA302 tax calculation, VAT registration certificate, CIS registration proof, insurance, bank statement, invoices, quotations/contracts, trade body membership, or trading activity evidence) (Banner label: Verified).\n3. Incorporated AI Verified: Automated evidence assessment confirmed legal entity standing, mandatory Certificate of Incorporation (required for Limited Company, LLP, and PLC company types), and required service evidence (Banner label: Verified).\n4. Enhanced Bronze Verification: Health & Safety professional reviewed legal requirements such as permits, insurances, and competent advice (Banner label: Bronze).\n5. Enhanced Silver Verification: Health & Safety professional reviewed Bronze criteria plus evidence of industry-specific employee and managerial training (Banner label: Silver).\n6. Enhanced Gold Verification: Health & Safety professional reviewed Bronze and Silver criteria plus either a comprehensive management system or validated SSIP membership (Banner label: Gold).',
       },
       {
         heading: 'Evidence and review process',
-        content: 'Providers submit evidence, which is checked against the declared category and service scope. Validation may include document checks, policy compliance checks, and service-eligibility review. Trade Tender may reject, request more information, or suspend a profile where evidence is incomplete, inconsistent, or materially misleading.',
+        content: 'Providers submit evidence according to their declared company type and service scope. For incorporated company types (Limited Company, LLP, PLC), uploading a Certificate of Incorporation is mandatory. For sole traders, uploading self-employment evidence (either one strong document or two moderate documents) is required. Trade Tender may reject, request more information, or suspend a profile where evidence is incomplete, inconsistent, or materially misleading.',
       },
       {
         heading: 'Sole trader status',
-        content: 'A Provider may declare that they operate as a sole trader in their profile. Sole trader profiles are not eligible for Trade Tender AI verification because the automated legal-entity evidence route is not suitable for that status. Quotes from sole traders display a Sole Trader flag with explanatory text so Contractors can complete appropriate identity, insurance, competence, and commercial due diligence before appointment.',
+        content: 'A Provider may declare that they operate as a sole trader by selecting Sole Trader as their company type. Sole trader Providers can become Sole trader AI Verified by uploading self-employment evidence. Quotes from sole traders who have not yet completed verification display a Sole Trader flag (Banner label: Sole Trader) with explanatory text so Contractors can complete appropriate identity, insurance, competence, and commercial due diligence before appointment.',
       },
       {
         heading: 'User due diligence',

@@ -19,12 +19,12 @@ test('quote sorting and filter toggles expose accessible state for assistive tec
   assert.match(opportunitiesExplorer, /aria-label=.*category|aria-label=.*urgency/i);
 });
 
-test('quote comparison documents sole trader status separately from AI verification', () => {
+test('quote comparison documents sole trader status and allows sole traders to become AI verified', () => {
   const quoteComparison = readFileSync('src/components/quotes/QuoteComparison.tsx', 'utf8');
 
   assert.match(quoteComparison, /Sole Trader/);
   assert.match(quoteComparison, /sole trader/i);
-  assert.match(quoteComparison, /not AI verified/i);
+  assert.match(quoteComparison, /Sole trader AI Verified/);
   assert.match(quoteComparison, /providerIsSoleTrader/);
 });
 

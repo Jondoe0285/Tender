@@ -99,6 +99,15 @@ enum ProviderVerificationStatus {
   EXPIRED
 }
 
+enum CompanyType {
+  SOLE_TRADER
+  LIMITED_COMPANY
+  PARTNERSHIP
+  LIMITED_LIABILITY_PARTNERSHIP
+  PUBLIC_LIMITED_COMPANY
+  OTHER
+}
+
 enum IndependentReviewStatus {
   NOT_PURCHASED
   PURCHASED
@@ -434,7 +443,8 @@ model RetailerProfile {
   companyName       String
   companyNumber     String?
   address           String?
-  isSoleTrader      Boolean               @default(false)
+  companyType       CompanyType           @default(LIMITED_COMPANY)
+  isSoleTrader      Boolean               @default(false) // kept in sync with companyType == SOLE_TRADER for existing call sites
   coverageScope     RetailerCoverageScope @default(COUNTY)
   counties          String                @default("") // comma-separated UK county names, used when coverageScope = COUNTY
   regions           String                @default("") // comma-separated UK region names, used when coverageScope = REGION
@@ -469,6 +479,15 @@ enum ProviderVerificationDocumentType {
   PROFESSIONAL_QUALIFICATIONS
   PROFESSIONAL_INDEMNITY_INSURANCE
   SSIP_ACCREDITATION
+  HMRC_UTR_CONFIRMATION
+  SA302_TAX_CALCULATION
+  VAT_REGISTRATION_CERTIFICATE
+  CIS_REGISTRATION_PROOF
+  BUSINESS_BANK_STATEMENT
+  CUSTOMER_INVOICES
+  CUSTOMER_QUOTATIONS_OR_CONTRACTS
+  TRADE_BODY_MEMBERSHIP
+  TRADING_ACTIVITY_EVIDENCE
 }
 
 /** One uploaded evidence file per document type/slot; re-uploading replaces the prior file for that slot. */

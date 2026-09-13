@@ -64,6 +64,7 @@ export async function getUserAnalyticsProfile(userId: string, period: ActivityPe
     totalTimeOnlineSeconds: user.totalTimeOnlineSeconds,
     company,
     address,
+    isSoleTrader: user.retailerProfile?.isSoleTrader ?? false,
     launchCreditsLeft: user.retailerProfile?.launchCreditsLeft ?? null,
     releaseCreditsLeft: user.clientCompanyMembership?.company.releaseCreditsLeft ?? null,
     verificationStatus: user.retailerProfile?.verificationStatus ?? null,

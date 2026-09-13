@@ -34,7 +34,7 @@ test('independent review renewal is owner controlled and visible to eligible pro
 
   assert.match(settings, /INDEPENDENT_REVIEW_RENEWAL_ACTIVE: 'false'/);
   assert.match(settings, /INDEPENDENT_REVIEW_RENEWAL_FEE_GBP: '100'/);
-  assert.match(ownerPanel, /Independent review renewal/);
+  assert.match(ownerPanel, /Enhanced review renewal/);
   assert.match(providerPage, /Renew now/);
   assert.match(apiRoute, /mode.*RENEWAL/);
 });

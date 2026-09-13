@@ -83,47 +83,47 @@ export default function IndependentReviewPage() {
     await load();
   }
 
-  if (loading) return <AppShell role="retailer" title="Independent H&amp;S Review"><p className="text-sm text-concrete-grey">Loading...</p></AppShell>;
+  if (loading) return <AppShell role="retailer" title="Enhanced H&amp;S Review"><p className="text-sm text-concrete-grey">Loading...</p></AppShell>;
 
   return (
-    <AppShell role="retailer" title="Independent H&S Review">
+    <AppShell role="retailer" title="Enhanced H&S Review">
       <div className="mx-auto max-w-2xl space-y-6">
         <Link href="/retailer/profile" className="inline-block text-sm font-semibold text-concrete-grey hover:text-foundation-navy">&larr; Back to profile</Link>
 
         {message && <p role="status" className="rounded-lg border border-steel-blue/20 bg-steel-blue/5 px-4 py-3 text-sm text-steel-blue">{message}</p>}
 
         <Card>
-          <h2 className="font-heading text-xl font-bold text-foundation-navy">Independent Health &amp; Safety review</h2>
+          <h2 className="font-heading text-xl font-bold text-foundation-navy">Enhanced Health &amp; Safety review</h2>
           <p className="mt-2 text-sm text-concrete-grey">
-            Purchase an independent review of your business by a Health &amp; Safety professional. Once purchased, a
+            Purchase a professional review of your business by a Health &amp; Safety professional. Once purchased, a
             Health &amp; Safety professional will contact you directly about the next steps. The review considers
             legal-compliance evidence only and does not replace a client&rsquo;s own suitable due diligence before any
             formal agreement. If your business is deemed to meet the review requirements, your account is marked
-            Independently Verified and every quote you submit shows a green independently-verified indicator.
+            Enhanced Verified and every quote you submit shows a green Enhanced Verified indicator.
           </p>
 
           <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-foundation-navy">Independent verification tiers</p>
+            <p className="text-sm font-semibold text-foundation-navy">Enhanced verification tiers</p>
             <dl className="mt-3 grid gap-3 text-sm text-concrete-grey">
               {(Object.keys(INDEPENDENT_REVIEW_TIER_DESCRIPTIONS) as IndependentReviewTier[]).map((tier) => <div key={tier}><dt className="font-semibold text-foundation-navy">{INDEPENDENT_REVIEW_TIER_LABELS[tier]}</dt><dd>{INDEPENDENT_REVIEW_TIER_DESCRIPTIONS[tier]}</dd></div>)}
             </dl>
           </div>
 
-          {!state?.active && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Independent review purchases are not currently available.</p>}
+          {!state?.active && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Enhanced review purchases are not currently available.</p>}
 
-          {state?.active && !state.eligible && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Independent review is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers.</p>}
+          {state?.active && !state.eligible && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Enhanced review is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers.</p>}
 
           {state?.active && state.eligible && (
             <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="text-2xl font-heading font-bold text-foundation-navy">£{state.feeGbp} excl. VAT</p>
                 <StatusBadge status={state.status === 'APPROVED' ? 'approved' : state.status === 'PURCHASED' ? 'pending' : state.status === 'DECLINED' ? 'attention' : 'neutral'}>
-                    {state.status === 'APPROVED' ? `Independently Verified${state.tier ? ` · ${state.tier[0] + state.tier.slice(1).toLowerCase()}` : ''}` : state.status === 'PURCHASED' ? 'Awaiting review' : state.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
+                    {state.status === 'APPROVED' ? `Enhanced Verified${state.tier ? ` · ${state.tier[0] + state.tier.slice(1).toLowerCase()}` : ''}` : state.status === 'PURCHASED' ? 'Awaiting review' : state.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
                 </StatusBadge>
-                {state.expiresAt && <p className="mt-2 text-sm text-concrete-grey">Independent verification expires on {new Date(state.expiresAt).toLocaleDateString('en-GB')}.</p>}
+                {state.expiresAt && <p className="mt-2 text-sm text-concrete-grey">Enhanced verification expires on {new Date(state.expiresAt).toLocaleDateString('en-GB')}.</p>}
                 {state.renewalActive && state.renewalOpenAt && !state.renewalAvailable && state.status === 'APPROVED' && !state.expired && <p className="mt-2 text-sm text-concrete-grey">Renewal opens on {new Date(state.renewalOpenAt).toLocaleDateString('en-GB')}.</p>}
                 {state.renewalAvailable && <p className="mt-2 text-sm font-semibold text-steel-blue">Renew now for £{state.renewalFeeGbp} excl. VAT before your current verification expires.</p>}
-                {state.expired && <p className="mt-2 text-sm font-semibold text-attention">Your independent verification has expired. Purchase a new review to regain independent verification.</p>}
+                {state.expired && <p className="mt-2 text-sm font-semibold text-attention">Your enhanced verification has expired. Purchase a new review to regain enhanced verification.</p>}
               </div>
               {(state.status === 'NOT_PURCHASED' || state.status === 'DECLINED') && !pendingPayment && (
                 <Button onClick={() => handlePurchase()} loading={purchasing}>Pay now</Button>
@@ -139,7 +139,7 @@ export default function IndependentReviewPage() {
 
           {state?.status === 'PURCHASED' && <p className="mt-4 text-sm text-concrete-grey">Your review has been purchased. A Health &amp; Safety professional will contact you about the next steps.</p>}
           {state?.status === 'DECLINED' && state.note && <p className="mt-4 text-sm text-concrete-grey">Outcome note: {state.note}</p>}
-          {state?.status === 'APPROVED' && <p className="mt-4 text-sm text-approved font-semibold">Your business is Independently Verified.</p>}
+          {state?.status === 'APPROVED' && <p className="mt-4 text-sm text-approved font-semibold">Your business is Enhanced Verified.</p>}
 
           {pendingPayment && (
             <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">

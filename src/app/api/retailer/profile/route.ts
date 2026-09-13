@@ -13,7 +13,7 @@ const updateProfileSchema = z.object({
   companyName: z.string().min(1, 'Company name is required').max(200),
   companyNumber: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
-  isSoleTrader: z.boolean().optional(),
+  companyType: z.enum(['SOLE_TRADER', 'LIMITED_COMPANY', 'PARTNERSHIP', 'LIMITED_LIABILITY_PARTNERSHIP', 'PUBLIC_LIMITED_COMPANY', 'OTHER']),
   standardQuoteValidityDays: z.coerce.number().int().positive().max(365).optional(),
   coverageScope: z.enum(['COUNTY', 'REGION', 'UK']),
   counties: z.string(), // comma-separated
@@ -51,14 +51,18 @@ export async function PUT(req: NextRequest) {
     }
 
     // Update profile
+    const companyTypeChanged = parsed.companyType !== profile.companyType;
+    const isSoleTrader = parsed.companyType === 'SOLE_TRADER';
     const updated = await prisma.retailerProfile.update({
       where: { userId: user.id },
       data: {
         companyName: parsed.companyName,
         companyNumber: parsed.companyNumber || null,
         address: parsed.address || null,
-        isSoleTrader: parsed.isSoleTrader ?? profile.isSoleTrader,
-        ...(parsed.isSoleTrader ? { verificationStatus: 'UNVERIFIED' as const, verificationDecidedAt: new Date(), verificationNote: 'Sole trader declaration: AI verification is not available for this profile.' } : {}),
+        companyType: parsed.companyType,
+        isSoleTrader,
+        // Evidence requirements differ by company type, so a change requires re-verification under the new type.
+        ...(companyTypeChanged ? { verificationStatus: 'UNVERIFIED' as const, verificationDecidedAt: new Date(), verificationNote: 'Company type changed: verification must be completed again for the new company type.' } : {}),
         standardQuoteValidityDays: parsed.standardQuoteValidityDays ?? profile.standardQuoteValidityDays,
         coverageScope: parsed.coverageScope,
         counties: parsed.counties,

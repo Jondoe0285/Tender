@@ -1,7 +1,7 @@
 import { prisma } from '@/server/data/prisma';
 import { ForbiddenError } from '@/server/auth/session';
 import { recordAuditEvent } from '@/server/audit/auditLog';
-import { getApplicableVerificationDocuments, isVerificationDocumentApplicable, VERIFICATION_DOCUMENT_TYPES, type VerificationDocumentType } from '@/lib/verification-documents';
+import { getApplicableVerificationDocuments, getRequiredVerificationDocumentTypes, isDocumentApplicableForProfile, isSoleTraderEvidenceSufficient, SOLE_TRADER_EVIDENCE_DOCUMENT_TYPES, type VerificationDocumentType } from '@/lib/verification-documents';
 import type { UploadVerificationDocumentInput } from '@/lib/schemas/verificationDocument';
 import { assessVerificationDocument } from '@/server/domain/verificationAiAssessment';
 import { getVerificationDocumentRequirements, verificationDocumentRequirementKey } from '@/server/domain/platformSettings';
@@ -36,7 +36,7 @@ export async function uploadVerificationDocument(userId: string, input: UploadVe
   if (profile.verificationStatus === 'VERIFIED') {
     throw new ForbiddenError('This account is already verified');
   }
-  if (!isVerificationDocumentApplicable(input.documentType as VerificationDocumentType, profile.categories)) {
+  if (!isDocumentApplicableForProfile(input.documentType as VerificationDocumentType, profile.categories, profile.isSoleTrader)) {
     throw new ForbiddenError('This document is not applicable to the services offered by this account');
   }
 
@@ -108,12 +108,11 @@ export type VerificationEvaluation = {
 };
 
 /** Aggregates the per-document AI assessments into one decision: auto-approve, or send for human review. */
-export async function evaluateProviderVerification(retailerProfileId: string, categories: string): Promise<VerificationEvaluation> {
+export async function evaluateProviderVerification(retailerProfileId: string, categories: string, companyType?: string | null): Promise<VerificationEvaluation> {
   const requirements = await getVerificationDocumentRequirements();
   const services = categories.split(',').map((value) => value.trim()).filter(Boolean);
-  const requiredTypes = getApplicableVerificationDocuments(categories)
-    .filter((document) => services.some((service) => requirements[verificationDocumentRequirementKey(service, document.type)] === true))
-    .map((document) => document.type);
+  const requiredTypes = getRequiredVerificationDocumentTypes(categories, companyType)
+    .filter((type) => type === 'CERTIFICATE_OF_INCORPORATION' || services.some((service) => requirements[verificationDocumentRequirementKey(service, type)] === true));
   const documents = await prisma.verificationDocument.findMany({ where: { retailerProfileId } });
   const applicableTypes = new Set(getApplicableVerificationDocuments(categories).map((document) => document.type));
   const reviewDocuments = documents.filter((document) => applicableTypes.has(document.documentType));
@@ -122,7 +121,9 @@ export async function evaluateProviderVerification(retailerProfileId: string, ca
 
   const missingOrExpiredRequiredTypes = requiredTypes.filter((type) => {
     const document = documentsByType.get(type);
-    return !document || document.expiryDate === null || document.expiryDate <= now;
+    if (!document) return true;
+    if (document.expiryDate === null) return false;
+    return document.expiryDate <= now;
   });
 
   if (missingOrExpiredRequiredTypes.length > 0) {
@@ -152,9 +153,41 @@ export async function evaluateProviderVerification(retailerProfileId: string, ca
   return { canProceed: true, requiresHumanReview, confidencePercent, report, missingOrExpiredRequiredTypes: [] };
 }
 
+/** Sole trader evidence rule: any one strong document (e.g. HMRC UTR, SA302, VAT certificate, CIS proof, PLI/PII insurance), or at least two distinct moderate documents (bank statement, invoices, quotations/contracts, trade body membership, trading activity evidence). */
+export async function evaluateSoleTraderVerification(retailerProfileId: string): Promise<VerificationEvaluation> {
+  const now = new Date();
+  const documents = await prisma.verificationDocument.findMany({ where: { retailerProfileId, documentType: { in: [...SOLE_TRADER_EVIDENCE_DOCUMENT_TYPES] } } });
+  const validDocuments = documents.filter((document) => document.expiryDate === null || document.expiryDate > now);
+  const validTypes = validDocuments.map((document) => document.documentType);
+
+  if (!isSoleTraderEvidenceSufficient(validTypes)) {
+    return {
+      canProceed: false,
+      requiresHumanReview: true,
+      confidencePercent: 0,
+      report: 'Insufficient sole trader evidence: upload one strong document (HMRC UTR confirmation, SA302 tax calculation, VAT registration certificate, CIS registration proof, or public liability/professional indemnity insurance), or at least two moderate documents (business bank statement, customer invoices, customer quotations or contracts, trade body membership, or trading activity evidence).',
+      missingOrExpiredRequiredTypes: [],
+    };
+  }
+
+  const confidencePercent = validDocuments.length > 0 ? Math.min(...validDocuments.map((document) => document.aiConfidencePercent ?? 0)) : 0;
+  const requiresHumanReview = confidencePercent < 90 || validDocuments.some((document) => document.aiRequiresHumanReview);
+
+  const report = [
+    'Sole trader self-employment evidence assessment.',
+    `Overall AI confidence score: ${confidencePercent}%.`,
+    `Human review required: ${requiresHumanReview ? 'yes' : 'no'}.`,
+    ...validDocuments.map((document) => `- ${document.documentType}: ${document.aiSummary ?? 'No assessment recorded.'}`),
+  ].join('\n');
+
+  return { canProceed: true, requiresHumanReview, confidencePercent, report, missingOrExpiredRequiredTypes: [] };
+}
+
 /** Marks every currently-uploaded applicable document as verified evidence, shown to Contractors as the "what was checked" list. */
-export async function markUploadedDocumentsVerified(retailerProfileId: string, categories: string, verified: boolean) {
-  const applicableTypes = VERIFICATION_DOCUMENT_TYPES.filter((doc) => isVerificationDocumentApplicable(doc.type, categories)).map((doc) => doc.type);
+export async function markUploadedDocumentsVerified(retailerProfileId: string, categories: string, verified: boolean, isSoleTrader = false) {
+  const applicableTypes = isSoleTrader
+    ? [...SOLE_TRADER_EVIDENCE_DOCUMENT_TYPES]
+    : getApplicableVerificationDocuments(categories).map((doc) => doc.type);
   await prisma.verificationDocument.updateMany({ where: { retailerProfileId, documentType: { in: applicableTypes } }, data: { verified } });
 }
 
@@ -163,13 +196,24 @@ export async function syncVerificationExpiryForUserIds(userIds: string[]): Promi
   if (userIds.length === 0) return;
   const profiles = await prisma.retailerProfile.findMany({
     where: { userId: { in: userIds }, verificationStatus: 'VERIFIED' },
-    select: { id: true, userId: true, categories: true },
+    select: { id: true, userId: true, categories: true, isSoleTrader: true },
   });
   if (profiles.length === 0) return;
   const now = new Date();
   const requirements = await getVerificationDocumentRequirements();
 
   for (const profile of profiles) {
+    if (profile.isSoleTrader) {
+      const documents = await prisma.verificationDocument.findMany({ where: { retailerProfileId: profile.id, documentType: { in: [...SOLE_TRADER_EVIDENCE_DOCUMENT_TYPES] } } });
+      const validTypes = documents.filter((document) => document.expiryDate === null || document.expiryDate > now).map((document) => document.documentType);
+      if (isSoleTraderEvidenceSufficient(validTypes)) continue;
+
+      await prisma.retailerProfile.update({ where: { id: profile.id }, data: { verificationStatus: 'EXPIRED' } });
+      await markUploadedDocumentsVerified(profile.id, profile.categories, false, true);
+      await recordAuditEvent({ actorId: null, action: 'PROVIDER_VERIFICATION_EXPIRED', targetType: 'RetailerProfile', targetId: profile.id, metadata: { reason: 'sole_trader_evidence_expired' } });
+      continue;
+    }
+
     const services = profile.categories.split(',').map((value) => value.trim()).filter(Boolean);
     const requiredTypes = getApplicableVerificationDocuments(profile.categories)
       .filter((document) => services.some((service) => requirements[verificationDocumentRequirementKey(service, document.type)] === true))

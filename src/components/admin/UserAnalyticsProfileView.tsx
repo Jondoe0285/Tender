@@ -70,10 +70,10 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
     const response = await fetch(`/api/super-user/users/${profile.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, tier: independentReviewTier || undefined, note: independentReviewComment || undefined }) });
     const data = await response.json().catch(() => null);
     setDecidingIndependentReview(false);
-    if (!response.ok) return setMessage(data?.error ?? 'Unable to update independent review status.');
+    if (!response.ok) return setMessage(data?.error ?? 'Unable to update enhanced review status.');
     setIndependentReviewStatus(data.independentReviewStatus);
     setIndependentReviewTier(data.independentReviewTier ?? null);
-    setMessage('Independent review status updated.');
+    setMessage('Enhanced review status updated.');
   }
 
   async function toggleEntitlement(type: 'membership' | 'subscription', planId: string, active: boolean) {
@@ -160,7 +160,7 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
           </div>
           <div className="flex items-center gap-3">
             <StatusBadge status={verificationStatus === 'VERIFIED' ? 'approved' : verificationStatus === 'PENDING' ? 'pending' : verificationStatus === 'REJECTED' || verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
-              {verificationStatus === 'VERIFIED' ? 'Verified by Ai' : verificationStatus === 'PENDING' ? 'Pending review' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : 'Unverified'}
+              {verificationStatus === 'VERIFIED' ? 'Verified' : verificationStatus === 'PENDING' ? 'Pending review' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : (profile.isSoleTrader ? 'Sole Trader' : 'Unverified')}
             </StatusBadge>
           </div>
         </div>
@@ -210,11 +210,11 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
       {profile.verificationEligible && independentReviewStatus !== null && independentReviewStatus !== 'NOT_PURCHASED' && <Card>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Independent H&amp;S review</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Enhanced H&amp;S review</p>
             <p className="mt-1 text-sm text-concrete-grey">Purchased {profile.independentReviewPurchasedAt ? formatDateTime(profile.independentReviewPurchasedAt) : 'never'}.</p>
           </div>
           <StatusBadge status={independentReviewStatus === 'APPROVED' ? 'approved' : independentReviewStatus === 'PURCHASED' ? 'pending' : 'attention'}>
-            {independentReviewStatus === 'APPROVED' ? `Independently Verified${independentReviewTier ? ` · ${independentReviewTier[0] + independentReviewTier.slice(1).toLowerCase()}` : ''}` : independentReviewStatus === 'PURCHASED' ? 'Awaiting review' : 'Declined'}
+            {independentReviewStatus === 'APPROVED' ? (independentReviewTier === 'SILVER' ? 'Silver' : independentReviewTier === 'GOLD' ? 'Gold' : 'Bronze') : independentReviewStatus === 'PURCHASED' ? 'Awaiting review' : 'Declined'}
           </StatusBadge>
         </div>
         {profile.independentReviewNote && <p className="mt-3 text-sm text-concrete-grey">Previous note: {profile.independentReviewNote}</p>}

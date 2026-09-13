@@ -5,7 +5,7 @@ import { rejectCrossOrigin } from '@/server/http/origin';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { toErrorResponse } from '@/server/http/errors';
 import { isVerificationEligible } from '@/lib/categories';
-import { evaluateProviderVerification, markUploadedDocumentsVerified } from '@/server/domain/verificationDocumentService';
+import { evaluateProviderVerification, evaluateSoleTraderVerification, markUploadedDocumentsVerified } from '@/server/domain/verificationDocumentService';
 import { isHumanReviewActive } from '@/server/domain/platformSettings';
 import { providerVerificationReviewRequiredTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
@@ -20,10 +20,6 @@ export async function POST(request: Request) {
     const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id } });
     if (!profile) return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
 
-    if (profile.isSoleTrader) {
-      return NextResponse.json({ error: 'Sole trader profiles cannot be AI verified. Your quotes will show a Sole Trader status instead.' }, { status: 403 });
-    }
-
     if (!isVerificationEligible(profile.categories)) {
       return NextResponse.json({ error: 'Verification is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers' }, { status: 403 });
     }
@@ -31,9 +27,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'A verification request is already pending or approved for this account' }, { status: 409 });
     }
 
-    const evaluation = await evaluateProviderVerification(profile.id, profile.categories);
+    const evaluation = profile.isSoleTrader
+      ? await evaluateSoleTraderVerification(profile.id)
+      : await evaluateProviderVerification(profile.id, profile.categories, profile.companyType);
     if (!evaluation.canProceed) {
-      return NextResponse.json({ error: 'Upload every required document, with a future expiry date, before submitting for review' }, { status: 400 });
+      return NextResponse.json({ error: profile.isSoleTrader ? evaluation.report : 'Upload every required document, with a future expiry date, before submitting for review' }, { status: 400 });
     }
 
     const now = new Date();
@@ -49,7 +47,7 @@ export async function POST(request: Request) {
           verificationReport: evaluation.report,
         },
       });
-      await markUploadedDocumentsVerified(profile.id, profile.categories, true);
+      await markUploadedDocumentsVerified(profile.id, profile.categories, true, profile.isSoleTrader);
       await recordAuditEvent({ actorId: user.id, action: 'PROVIDER_VERIFICATION_AUTO_APPROVED', targetType: 'User', targetId: user.id, metadata: { confidencePercent: evaluation.confidencePercent } });
       return NextResponse.json({ verificationStatus: updated.verificationStatus, verificationRequestedAt: updated.verificationRequestedAt }, { status: 200 });
     }

@@ -27,11 +27,22 @@ export type DocumentAssessmentResult = {
 };
 
 // Insurance and waste-permit evidence always needs a human reviewer regardless of AI score (per policy).
+// Sole trader self-employment evidence (tax, VAT, CIS, and trading-activity documents) is also always
+// human-reviewed because the rule-based checker cannot confirm HMRC/financial records.
 const ALWAYS_HUMAN_REVIEW_TYPES: readonly VerificationDocumentType[] = [
   'PUBLIC_LIABILITY_INSURANCE',
   'EMPLOYERS_LIABILITY_INSURANCE',
   'PROFESSIONAL_INDEMNITY_INSURANCE',
   'WASTE_CARRIERS_LICENCE',
+  'HMRC_UTR_CONFIRMATION',
+  'SA302_TAX_CALCULATION',
+  'VAT_REGISTRATION_CERTIFICATE',
+  'CIS_REGISTRATION_PROOF',
+  'BUSINESS_BANK_STATEMENT',
+  'CUSTOMER_INVOICES',
+  'CUSTOMER_QUOTATIONS_OR_CONTRACTS',
+  'TRADE_BODY_MEMBERSHIP',
+  'TRADING_ACTIVITY_EVIDENCE',
 ];
 
 function normalise(value: string): string {

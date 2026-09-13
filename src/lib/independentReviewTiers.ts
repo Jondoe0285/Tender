@@ -13,5 +13,5 @@ export const INDEPENDENT_REVIEW_TIER_DESCRIPTIONS: Record<IndependentReviewTier,
 };
 
 export function independentReviewTierDescription(tier: IndependentReviewTier | null | undefined): string {
-  return tier ? INDEPENDENT_REVIEW_TIER_DESCRIPTIONS[tier] : 'Independent verification confirms that a Health and Safety professional reviewed the Provider evidence available at the time of review.';
+  return tier ? INDEPENDENT_REVIEW_TIER_DESCRIPTIONS[tier] : 'Enhanced verification confirms that a Health and Safety professional reviewed the Provider evidence available at the time of review.';
 }

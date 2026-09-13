@@ -96,12 +96,12 @@ export function quoteReminderTemplate(input: { quoteReference: string; tenderRef
 
 export function independentReviewRenewalReminderTemplate(input: { companyName: string; expiryDate: Date; renewalFeeGbp: number; renewalPath: string }): EmailTemplate {
   return {
-    subject: 'Independent verification renewal due soon',
+    subject: 'Enhanced verification renewal due soon',
     html: layout({
-      eyebrow: 'Independent verification renewal',
-      title: 'Your independent verification is due to expire',
-      intro: `${input.companyName}'s independent verification is due to expire on ${input.expiryDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`,
-      body: detailRows([['Company', input.companyName], ['Expiry date', input.expiryDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })], ['Renewal fee', `£${input.renewalFeeGbp} excl. VAT`], ['Action required', 'Renew before expiry to use the lower renewal price and avoid a gap in independent verification status.']]),
+      eyebrow: 'Enhanced verification renewal',
+      title: 'Your enhanced verification is due to expire',
+      intro: `${input.companyName}'s enhanced verification is due to expire on ${input.expiryDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`,
+      body: detailRows([['Company', input.companyName], ['Expiry date', input.expiryDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })], ['Renewal fee', `£${input.renewalFeeGbp} excl. VAT`], ['Action required', 'Renew before expiry to use the lower renewal price and avoid a gap in enhanced verification status.']]),
       action: { label: 'Renew now', href: appUrl(input.renewalPath) },
     }),
   };
@@ -266,11 +266,11 @@ export function providerVerificationReviewRequiredTemplate(input: { confidencePe
 /** Deliberately excludes payment amounts and account identifiers beyond what the Provider already knows. */
 export function independentReviewPurchasedTemplate(_input: Record<string, never>): EmailTemplate {
   return {
-    subject: 'Independent H&S review purchased',
+    subject: 'Enhanced H&S review purchased',
     html: layout({
-      eyebrow: 'Independent review',
-      title: 'Your independent review has been purchased',
-      intro: 'Thank you for purchasing an independent review of your business by a Health & Safety professional.',
+      eyebrow: 'Enhanced review',
+      title: 'Your enhanced review has been purchased',
+      intro: 'Thank you for purchasing a review of your business by a Health & Safety professional.',
       body: '<p style="font-size:14px;line-height:1.6">A Health &amp; Safety professional will contact you directly about the next steps. No further action is required from you at this time.</p>',
       action: { label: 'View your profile', href: appUrl('/retailer/profile') },
     }),
