@@ -212,6 +212,23 @@ export async function isIndependentReviewActive(): Promise<boolean> {
   return await getPlatformSetting('INDEPENDENT_REVIEW_ACTIVE') === 'true';
 }
 
+/** Renewal and reassessment SKUs were removed; keep these no-ops so remaining callers type-check. */
+export async function isIndependentReviewRenewalActive(): Promise<boolean> {
+  return false;
+}
+
+export async function getIndependentReviewRenewalFeeGbp(): Promise<number> {
+  return 0;
+}
+
+export async function isIndependentReviewReassessmentActive(): Promise<boolean> {
+  return false;
+}
+
+export async function getIndependentReviewReassessmentFeeGbp(): Promise<number> {
+  return 0;
+}
+
 const TIER_FEE_KEYS: Record<IndependentReviewTier, keyof typeof defaultSettings> = {
   BRONZE: 'INDEPENDENT_REVIEW_FEE_BRONZE_GBP',
   SILVER: 'INDEPENDENT_REVIEW_FEE_SILVER_GBP',

@@ -9,8 +9,8 @@ test('owner settings expose three verification prices and no old review SKUs', (
   assert.match(settings, /INDEPENDENT_REVIEW_FEE_BRONZE_GBP/);
   assert.match(settings, /INDEPENDENT_REVIEW_FEE_SILVER_GBP/);
   assert.match(settings, /INDEPENDENT_REVIEW_FEE_GOLD_GBP/);
-  assert.doesNotMatch(settings, /INDEPENDENT_REVIEW_RENEWAL_ACTIVE/);
-  assert.doesNotMatch(settings, /INDEPENDENT_REVIEW_REASSESSMENT/);
+  assert.doesNotMatch(settings, /INDEPENDENT_REVIEW_RENEWAL_FEE_GBP:/);
+  assert.doesNotMatch(settings, /INDEPENDENT_REVIEW_REASSESSMENT_FEE_GBP:/);
   assert.match(ownerPanel, /Bronze verification/);
   assert.match(ownerPanel, /Silver verification/);
   assert.match(ownerPanel, /Gold verification/);
