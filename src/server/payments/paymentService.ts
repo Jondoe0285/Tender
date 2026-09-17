@@ -1,8 +1,9 @@
 import { prisma } from '@/server/data/prisma';
 import { getStripeClient, isStripeConfigured } from '@/server/payments/stripeClient';
 import type { PaymentType } from '@prisma/client';
-import { buildPaymentAmounts, getClientReleaseFeeGbp, getPaymentFeeGbp, getTenderUnlockFeeGbp, getVatPercentage } from '@/server/domain/platformSettings';
+import { buildPaymentAmounts, getClientReleaseFeeGbp, getIndependentReviewFeeGbp, getPaymentFeeGbp, getTenderUnlockFeeGbp, getVatPercentage } from '@/server/domain/platformSettings';
 import { appUrl } from '@/server/config/appUrl';
+import { INDEPENDENT_REVIEW_TIER_LABELS, isIndependentReviewTier, type IndependentReviewTier } from '@/lib/independentReviewTiers';
 
 type CreatePaymentResult = {
   paymentId: string;
@@ -36,9 +37,9 @@ export async function createPayment(params: {
   contractMonths?: 6 | 12;
   quoteId?: string;
   quotePriceGbp?: number;
-  feeOverrideGbp?: number;
   discountPercentage?: number;
   mobileReturnUrl?: string;
+  independentReviewTier?: IndependentReviewTier;
 }): Promise<CreatePaymentResult> {
   if (params.mobileReturnUrl !== undefined && params.mobileReturnUrl !== MOBILE_PAYMENT_RETURN_URL) {
     throw new Error('Invalid mobile payment return URL');
@@ -50,10 +51,11 @@ export async function createPayment(params: {
       : null;
     if (!tier?.active) throw new Error('Membership tier is not available');
     netFeeGbp = tier.monthlyPriceGbp;
+  } else if (params.type === 'INDEPENDENT_REVIEW') {
+    if (!isIndependentReviewTier(params.independentReviewTier)) throw new Error('A Bronze, Silver, or Gold product is required');
+    netFeeGbp = await getIndependentReviewFeeGbp(params.independentReviewTier);
   } else {
-    netFeeGbp = params.type === 'INDEPENDENT_REVIEW' && params.feeOverrideGbp !== undefined
-      ? params.feeOverrideGbp
-      : params.type === 'CLIENT_RELEASE' && params.quotePriceGbp !== undefined
+    netFeeGbp = params.type === 'CLIENT_RELEASE' && params.quotePriceGbp !== undefined
       ? await getClientReleaseFeeGbp(params.quotePriceGbp)
       : params.type === 'RETAILER_UNLOCK' && params.tenderId
         ? await getTenderUnlockFeeGbp(params.tenderId)
@@ -76,6 +78,7 @@ export async function createPayment(params: {
       tierId: params.tierId,
       contractMonths: params.contractMonths,
       quoteId: params.quoteId,
+      independentReviewTier: params.type === 'INDEPENDENT_REVIEW' ? params.independentReviewTier : undefined,
       status: 'PENDING',
     },
   });
@@ -93,7 +96,7 @@ export async function createPayment(params: {
         price_data: {
           currency: 'gbp',
           unit_amount: netPence,
-          product_data: { name: `${params.type === 'RETAILER_UNLOCK' ? 'Tender unlock fee' : params.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : params.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : params.type === 'INDEPENDENT_REVIEW' ? 'Independent H&S review' : params.type === 'DIRECT_CONTACT' ? 'Direct contact request fee' : 'Accepted quote release fee'} (excl. VAT)` },
+          product_data: { name: `${params.type === 'RETAILER_UNLOCK' ? 'Tender unlock fee' : params.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : params.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : params.type === 'INDEPENDENT_REVIEW' ? `Enhanced verification — ${INDEPENDENT_REVIEW_TIER_LABELS[params.independentReviewTier!]}` : params.type === 'DIRECT_CONTACT' ? 'Direct contact request fee' : 'Accepted quote release fee'} (excl. VAT)` },
         },
         quantity: 1,
       },
@@ -108,7 +111,7 @@ export async function createPayment(params: {
     ],
     success_url: params.mobileReturnUrl ? `${params.mobileReturnUrl}?payment_id=${encodeURIComponent(payment.id)}&result=success` : appUrl(`/payment/success?payment_id=${payment.id}`),
     cancel_url: params.mobileReturnUrl ? `${params.mobileReturnUrl}?payment_id=${encodeURIComponent(payment.id)}&result=cancelled` : appUrl(`/payment/cancelled?payment_id=${payment.id}`),
-    metadata: { paymentId: payment.id, vatPercentage: String(vatPercentage) },
+    metadata: { paymentId: payment.id, vatPercentage: String(vatPercentage), ...(params.independentReviewTier ? { independentReviewTier: params.independentReviewTier } : {}) },
   });
 
   await prisma.payment.update({

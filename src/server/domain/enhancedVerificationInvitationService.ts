@@ -1,11 +1,13 @@
-import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { prisma } from '@/server/data/prisma';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { appUrl, enhancedVerificationInvitationTemplate } from '@/server/notifications/emailTemplates';
 import { getIndependentReviewPartnerUrl, getIndependentReviewSharedSecret } from '@/server/domain/platformSettings';
+import { enhancedVerificationProductCode, isIndependentReviewTier, type IndependentReviewTier } from '@/lib/independentReviewTiers';
 
 const INVITATION_EXPIRY_DAYS = 30;
+const DEV_SIGNING_SECRET = 'dev-enhanced-verification-secret-key-32chars-min';
 
 export function resolveSigningSecret(providedSecret?: string | null): string {
   const secret = providedSecret?.trim()
@@ -14,14 +16,12 @@ export function resolveSigningSecret(providedSecret?: string | null): string {
     || process.env.VERIFICATION_OUTBOUND_SECRET_TRADE_TENDER_VERIFICATION
     || process.env.ENHANCED_VERIFICATION_SHARED_SECRET
     || process.env.INDEPENDENT_REVIEW_SHARED_SECRET
-    || process.env.NEXTAUTH_SECRET
-    || process.env.SECRET_KEY
-    || process.env.MOBILE_TOKEN_SECRET;
+    || '';
   if (!secret) {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error('Server secret is required for signing invitation tokens');
+      throw new Error('Enhanced verification signing secret is required');
     }
-    return 'dev-enhanced-verification-secret-key-32chars-min';
+    return DEV_SIGNING_SECRET;
   }
   return secret;
 }
@@ -40,7 +40,9 @@ export function verifyInvitationToken(signedToken: string, secret?: string | nul
 
     const [payloadBase64, providedSignature] = parts;
     const expectedSignature = createHmac('sha256', resolveSigningSecret(secret)).update(payloadBase64).digest('hex');
-    if (providedSignature !== expectedSignature) return null;
+    const providedBuffer = Buffer.from(providedSignature, 'utf8');
+    const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+    if (providedBuffer.length !== expectedBuffer.length || !timingSafeEqual(providedBuffer, expectedBuffer)) return null;
 
     const jsonStr = Buffer.from(payloadBase64, 'base64url').toString('utf8');
     const parsed = JSON.parse(jsonStr);
@@ -68,21 +70,17 @@ export type CreateInvitationInput = {
   paymentId: string;
   recipientEmail: string;
   recipientName?: string | null;
-  registrationUrl?: string | null;
-  ipAddress?: string | null;
+  purchasedTier: IndependentReviewTier;
 };
 
 export type InvitationResult = {
   status: 'SUCCESS';
-  Status: 'SUCCESS';
   invitationId: string;
-  InvitationId: string;
   expiryUtc: string;
-  ExpiryUtc: string;
   emailSent: boolean;
-  EmailSent: boolean;
   registrationLink: string;
   signedToken: string;
+  purchasedTier: IndependentReviewTier;
 };
 
 export async function createEnhancedVerificationInvitation(input: CreateInvitationInput): Promise<InvitationResult> {
@@ -90,8 +88,10 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
   if (!recipientEmail || !recipientEmail.includes('@')) {
     throw new Error('A valid recipient email address is required');
   }
+  if (!isIndependentReviewTier(input.purchasedTier)) {
+    throw new Error('A Bronze, Silver, or Gold product is required');
+  }
 
-  // 1. Verify user account & tenant status
   const user = await prisma.user.findUnique({
     where: { id: input.userId },
     select: { id: true, email: true, suspended: true },
@@ -101,7 +101,6 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
     throw new Error('Enhanced Verification has not been purchased or payment is incomplete.');
   }
 
-  // 2. Verify payment record & status
   const payment = await prisma.payment.findUnique({
     where: { id: input.paymentId },
     include: { reversals: true },
@@ -116,23 +115,55 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
   const belongsToUser = payment.userId === input.userId;
   const isNotRefunded = payment.status !== 'REFUNDED' && payment.status !== 'REVERSED';
   const hasNoActiveReversal = payment.reversals.length === 0;
+  const paymentTier = isIndependentReviewTier(payment.independentReviewTier) ? payment.independentReviewTier : input.purchasedTier;
+  if (payment.independentReviewTier && payment.independentReviewTier !== input.purchasedTier) {
+    throw new Error('Enhanced Verification has not been purchased or payment is incomplete.');
+  }
 
   if (!isConfirmed || !isTypeMatch || !belongsToUser || !isNotRefunded || !hasNoActiveReversal) {
     throw new Error('Enhanced Verification has not been purchased or payment is incomplete.');
   }
 
-  // 3. Generate Invitation details
+  const outboundSent = await prisma.auditLog.findFirst({
+    where: { action: 'ENHANCED_VERIFICATION_OUTBOUND_SENT', targetType: 'Payment', targetId: input.paymentId },
+    select: { id: true },
+  });
+  const existing = await prisma.enhancedVerificationInvitation.findFirst({
+    where: { paymentId: input.paymentId },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (existing && outboundSent) {
+    return {
+      status: 'SUCCESS',
+      invitationId: existing.id,
+      expiryUtc: existing.expiresAt.toISOString(),
+      emailSent: true,
+      registrationLink: '',
+      signedToken: '',
+      purchasedTier: paymentTier,
+    };
+  }
+  if (existing) {
+    await prisma.enhancedVerificationInvitation.update({
+      where: { id: existing.id },
+      data: { status: 'REVOKED' },
+    });
+  }
+
   const invitationId = randomUUID();
   const now = new Date();
   const expiresAt = new Date(now.getTime() + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
   const nonce = randomBytes(32).toString('base64url');
+  const productCode = enhancedVerificationProductCode(input.purchasedTier);
 
   const payload = {
     InvitationId: invitationId,
     TenantId: input.userId,
     Email: recipientEmail,
     Module: 'VERIFICATION',
-    Product: 'ENHANCED_VERIFICATION',
+    Product: productCode,
+    PurchasedTier: input.purchasedTier,
+    PaymentId: input.paymentId,
     IssuedAt: now.toISOString(),
     ExpiresAt: expiresAt.toISOString(),
     Nonce: nonce,
@@ -143,7 +174,6 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
   const signedToken = signInvitationPayload(payload, sharedSecret);
   const tokenHash = hashInvitationToken(signedToken);
 
-  // 4. Save Invitation Record in database (storing tokenHash only)
   await prisma.enhancedVerificationInvitation.create({
     data: {
       id: invitationId,
@@ -152,57 +182,15 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
       recipientEmail,
       recipientName: input.recipientName?.trim() || null,
       moduleCode: 'VERIFICATION',
-      productCode: 'ENHANCED_VERIFICATION',
+      productCode,
       tokenHash,
       status: 'PENDING',
       expiresAt,
     },
   });
 
-  // 5. Construct Registration Link (defined URL incorporating secret token)
-  const configuredPartnerUrl = (await getIndependentReviewPartnerUrl()).trim();
-  let targetUrl = configuredPartnerUrl;
+  const registrationLink = buildRegistrationLink(await getIndependentReviewPartnerUrl(), signedToken);
 
-  if (input.registrationUrl?.trim()) {
-    const candidateUrl = input.registrationUrl.trim();
-    try {
-      const candidateOrigin = new URL(candidateUrl).origin;
-      let allowedAppOrigin: string | null = null;
-      if (process.env.NEXTAUTH_URL) {
-        try {
-          allowedAppOrigin = new URL(process.env.NEXTAUTH_URL).origin;
-        } catch {
-          allowedAppOrigin = null;
-        }
-      }
-      const allowedPartnerOrigin = configuredPartnerUrl ? new URL(configuredPartnerUrl).origin : null;
-      const allowlistEnv = process.env.VERIFICATION_RETURN_URL_ALLOWLIST_TRADE_TENDER_VERIFICATION ?? process.env.ADDITIONAL_ALLOWED_ORIGINS ?? '';
-      const allowedOrigins = allowlistEnv.split(',').map((item) => item.trim()).filter(Boolean);
-      const hasConfiguredAllowlist = Boolean(configuredPartnerUrl || allowedOrigins.length > 0);
-      const isAllowed = (allowedAppOrigin !== null && candidateOrigin === allowedAppOrigin) ||
-        (allowedPartnerOrigin !== null && candidateOrigin === allowedPartnerOrigin) ||
-        allowedOrigins.some((allowed) => {
-          try { return new URL(allowed).origin === candidateOrigin; } catch { return false; }
-        });
-
-      if (isAllowed || !hasConfiguredAllowlist) {
-        targetUrl = candidateUrl;
-      }
-    } catch {
-      targetUrl = configuredPartnerUrl;
-    }
-  }
-
-  let registrationLink: string;
-
-  if (targetUrl) {
-    const separator = targetUrl.includes('?') ? '&' : '?';
-    registrationLink = `${targetUrl}${separator}token=${encodeURIComponent(signedToken)}&verificationToken=${encodeURIComponent(signedToken)}`;
-  } else {
-    registrationLink = appUrl(`/register?token=${encodeURIComponent(signedToken)}&verificationToken=${encodeURIComponent(signedToken)}`);
-  }
-
-  // 6. Send Email
   const template = enhancedVerificationInvitationTemplate({
     recipientName: input.recipientName,
     inviteLink: registrationLink,
@@ -214,7 +202,6 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
     reason: error instanceof Error ? error.message : 'Email delivery failed',
   }));
 
-  // 7. Audit Logging
   await recordAuditEvent({
     actorId: input.userId,
     action: emailResult.sent ? 'ENHANCED_VERIFICATION_INVITATION_CREATED' : 'ENHANCED_VERIFICATION_INVITATION_EMAIL_FAILED',
@@ -224,24 +211,105 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
       paymentId: input.paymentId,
       recipientEmail,
       recipientName: input.recipientName,
+      purchasedTier: input.purchasedTier,
       expiresAt: expiresAt.toISOString(),
       emailSent: emailResult.sent,
-      ipAddress: input.ipAddress ?? undefined,
     },
   });
 
   return {
     status: 'SUCCESS',
-    Status: 'SUCCESS',
     invitationId,
-    InvitationId: invitationId,
     expiryUtc: expiresAt.toISOString(),
-    ExpiryUtc: expiresAt.toISOString(),
     emailSent: emailResult.sent,
-    EmailSent: emailResult.sent,
     registrationLink,
     signedToken,
+    purchasedTier: input.purchasedTier,
   };
+}
+
+function buildRegistrationLink(configuredPartnerUrl: string, signedToken: string): string {
+  const targetUrl = configuredPartnerUrl.trim();
+  if (targetUrl) {
+    const separator = targetUrl.includes('?') ? '&' : '?';
+    return `${targetUrl}${separator}token=${encodeURIComponent(signedToken)}&verificationToken=${encodeURIComponent(signedToken)}`;
+  }
+  return appUrl(`/register?token=${encodeURIComponent(signedToken)}&verificationToken=${encodeURIComponent(signedToken)}`);
+}
+
+export async function notifyConsulthubOfPurchase(input: {
+  invitation: InvitationResult;
+  userId: string;
+  paymentId: string;
+  purchasedTier: IndependentReviewTier;
+  companyName: string;
+  recipientEmail: string;
+}) {
+  const alreadySent = await prisma.auditLog.findFirst({
+    where: { action: 'ENHANCED_VERIFICATION_OUTBOUND_SENT', targetType: 'Payment', targetId: input.paymentId },
+    select: { id: true },
+  });
+  if (alreadySent) return { sent: true, skipped: true };
+
+  const outboundUrl = (await getIndependentReviewPartnerUrl()).trim();
+  const secret = await getIndependentReviewSharedSecret();
+  if (!outboundUrl || !secret) {
+    const message = 'Enhanced verification outbound URL or signing secret is not configured';
+    if (process.env.NODE_ENV === 'production') throw new Error(message);
+    await recordAuditEvent({
+      actorId: input.userId,
+      action: 'ENHANCED_VERIFICATION_OUTBOUND_SKIPPED',
+      targetType: 'Payment',
+      targetId: input.paymentId,
+      metadata: { reason: message, purchasedTier: input.purchasedTier },
+    });
+    return { sent: false, skipped: true };
+  }
+
+  const body = JSON.stringify({
+    invitationId: input.invitation.invitationId,
+    tenantId: input.userId,
+    userId: input.userId,
+    email: input.recipientEmail,
+    companyName: input.companyName,
+    purchasedTier: input.purchasedTier,
+    paymentId: input.paymentId,
+    issuedAt: new Date().toISOString(),
+    expiresAt: input.invitation.expiryUtc,
+    callbackUrl: appUrl('/api/partner/enhanced-verification/status'),
+    token: input.invitation.signedToken,
+  });
+  const signature = createHmac('sha256', resolveSigningSecret(secret)).update(body).digest('hex');
+
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(outboundUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Hub-Signature-256': `sha256=${signature}`,
+          'Idempotency-Key': input.paymentId,
+        },
+        body,
+      });
+      if (!response.ok) {
+        throw new Error(`Consulthub onboarding returned ${response.status}`);
+      }
+      await recordAuditEvent({
+        actorId: input.userId,
+        action: 'ENHANCED_VERIFICATION_OUTBOUND_SENT',
+        targetType: 'Payment',
+        targetId: input.paymentId,
+        metadata: { invitationId: input.invitation.invitationId, purchasedTier: input.purchasedTier, attempt },
+      });
+      return { sent: true, skipped: false };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Outbound onboarding failed');
+    }
+  }
+
+  throw lastError ?? new Error('Outbound onboarding failed');
 }
 
 export async function verifyAndConsumeInvitationToken(signedToken: string, consumerUserId?: string) {

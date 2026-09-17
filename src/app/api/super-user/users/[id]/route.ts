@@ -8,6 +8,7 @@ import { createPasswordResetToken, PASSWORD_RESET_EXPIRY_LABEL } from '@/server/
 import { appUrl, passwordResetTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { markUploadedDocumentsVerified } from '@/server/domain/verificationDocumentService';
+import { independentReviewTierRank } from '@/lib/independentReviewTiers';
 
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -185,7 +186,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     if (user.role !== 'USER') {
       return NextResponse.json({ error: 'Independent review only applies to Provider accounts' }, { status: 400 });
     }
-    const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { id: true, independentReviewStatus: true } });
+    const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { id: true, independentReviewStatus: true, independentReviewPurchasedTier: true, independentReviewPurchasedPaymentId: true } });
     if (!profile) {
       return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
     }
@@ -195,6 +196,13 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const nextStatus = action === 'approve-independent-review' ? 'APPROVED' : 'DECLINED';
     const tier = body?.tier === 'BRONZE' || body?.tier === 'SILVER' || body?.tier === 'GOLD' ? body.tier : null;
     if (action === 'approve-independent-review' && !tier) return NextResponse.json({ error: 'A Bronze, Silver, or Gold tier is required when approving an independent review' }, { status: 400 });
+    const purchasedTier = profile.independentReviewPurchasedTier;
+    if (action === 'approve-independent-review' && !purchasedTier) {
+      return NextResponse.json({ error: 'Purchased verification tier is missing for this account' }, { status: 400 });
+    }
+    if (action === 'approve-independent-review' && purchasedTier && independentReviewTierRank(tier) > independentReviewTierRank(purchasedTier)) {
+      return NextResponse.json({ error: 'Awarded tier cannot exceed the purchased verification product' }, { status: 400 });
+    }
     const note = typeof body?.note === 'string' ? body.note.slice(0, 500) : null;
     await prisma.retailerProfile.update({
       where: { userId: user.id },

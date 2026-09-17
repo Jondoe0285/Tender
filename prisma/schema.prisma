@@ -491,6 +491,9 @@ model RetailerProfile {
   verificationReport      String? // AI + review summary; Super User visibility only, never returned to the Provider
   independentReviewStatus IndependentReviewStatus @default(NOT_PURCHASED)
   independentReviewTier IndependentReviewTier?
+  independentReviewPurchasedTier IndependentReviewTier?
+  independentReviewPurchasedPaymentId String?
+  independentReviewPurchasedPayment Payment? @relation("IndependentReviewPurchasedPayment", fields: [independentReviewPurchasedPaymentId], references: [id], onDelete: SetNull)
   independentReviewPurchasedAt DateTime?
   independentReviewDecidedAt   DateTime?
   independentReviewNote        String?
@@ -499,6 +502,8 @@ model RetailerProfile {
 
   teamMembers       RetailerTeamMember[]
   verificationDocuments VerificationDocument[]
+
+  @@index([independentReviewPurchasedPaymentId])
 }
 
 enum ProviderVerificationDocumentType {
@@ -799,6 +804,7 @@ model Payment {
   stripeReceiptUrl      String?
   accountingRecordPath  String?
   quoteId               String?       @unique
+  independentReviewTier IndependentReviewTier?
   paymentWaiverId       String?
   paymentWaiver         PaymentWaiver? @relation(fields: [paymentWaiverId], references: [id], onDelete: Restrict)
   createdAt             DateTime      @default(now())
@@ -812,6 +818,7 @@ model Payment {
   directContactRequest  DirectContactRequest?
   reversals             PaymentReversal[]
   enhancedVerificationInvitations EnhancedVerificationInvitation[] @relation("PaymentEnhancedVerificationInvitations")
+  independentReviewEntitlements RetailerProfile[] @relation("IndependentReviewPurchasedPayment")
 
   @@index([paymentWaiverId])
 }

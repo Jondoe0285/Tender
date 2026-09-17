@@ -4,19 +4,16 @@ import { z } from 'zod';
 import { prisma } from '@/server/data/prisma';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { toErrorResponse } from '@/server/http/errors';
+import { createRateLimitResponse } from '@/server/http/rateLimit';
 import { getIndependentReviewSharedSecret } from '@/server/domain/platformSettings';
-import { resolveSigningSecret, verifyAndConsumeInvitationToken, verifyInvitationToken } from '@/server/domain/enhancedVerificationInvitationService';
+import { resolveSigningSecret, verifyInvitationToken } from '@/server/domain/enhancedVerificationInvitationService';
+import { independentReviewTierAtMost, isIndependentReviewTier, type IndependentReviewTier } from '@/lib/independentReviewTiers';
 
 const statusUpdateSchema = z.object({
   token: z.string().optional().nullable(),
   verificationToken: z.string().optional().nullable(),
   invitationToken: z.string().optional().nullable(),
   invitationId: z.string().optional().nullable(),
-  userId: z.string().optional().nullable(),
-  providerUserId: z.string().optional().nullable(),
-  tenantId: z.string().optional().nullable(),
-  email: z.string().trim().toLowerCase().optional().nullable(),
-  recipientEmail: z.string().trim().toLowerCase().optional().nullable(),
   paymentId: z.string().optional().nullable(),
   status: z.enum(['APPROVED', 'DECLINED', 'PASSED', 'FAILED']),
   tier: z.enum(['BRONZE', 'SILVER', 'GOLD']).optional().nullable(),
@@ -34,9 +31,9 @@ function safeSecretMatch(provided: string, expected: string): boolean {
 
 async function authenticatePartnerRequest(request: Request, rawBodyText: string): Promise<boolean> {
   const configuredSecret = await getIndependentReviewSharedSecret();
-  const activeSecret = configuredSecret || resolveSigningSecret();
+  if (!configuredSecret) return false;
+  const activeSecret = resolveSigningSecret(configuredSecret);
 
-  // 1. Check direct header secret (X-Shared-Secret or Bearer token)
   const sharedSecretHeader = request.headers.get('x-shared-secret')
     || request.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1];
 
@@ -44,7 +41,6 @@ async function authenticatePartnerRequest(request: Request, rawBodyText: string)
     return true;
   }
 
-  // 2. Check HMAC signature header (X-Signature or X-Hub-Signature-256)
   const signatureHeader = request.headers.get('x-signature')
     || request.headers.get('x-hub-signature-256')?.replace(/^sha256=/i, '');
 
@@ -60,6 +56,9 @@ async function authenticatePartnerRequest(request: Request, rawBodyText: string)
 
 export async function POST(request: Request) {
   try {
+    const rateLimitError = await createRateLimitResponse(request, 'enhanced-verification-callback', { maxRequests: 30, windowMs: 60_000 });
+    if (rateLimitError) return rateLimitError;
+
     const rawBodyText = await request.text();
     const authenticated = await authenticatePartnerRequest(request, rawBodyText);
 
@@ -82,101 +81,95 @@ export async function POST(request: Request) {
     const input = parsed.data;
     const token = input.token || input.verificationToken || input.invitationToken;
     const invitationId = input.invitationId;
-    const rawUserId = input.userId || input.providerUserId || input.tenantId;
-    const rawEmail = input.email || input.recipientEmail;
     const paymentId = input.paymentId;
     const rawStatus = input.status;
     const nextStatus = (rawStatus === 'APPROVED' || rawStatus === 'PASSED') ? 'APPROVED' : 'DECLINED';
     const note = input.note || input.comments || null;
 
-    let targetUserId: string | null = null;
-    let targetInvitationId: string | null = invitationId ?? null;
+    let invitation = invitationId
+      ? await prisma.enhancedVerificationInvitation.findUnique({ where: { id: invitationId } })
+      : null;
 
-    // 1. Find user from token or invitation record
-    if (token) {
+    if (!invitation && token) {
       const payload = verifyInvitationToken(token);
-      if (payload?.TenantId && typeof payload.TenantId === 'string') {
-        targetUserId = payload.TenantId;
-      }
-      await verifyAndConsumeInvitationToken(token).catch(() => null);
-    }
-
-    if (!targetUserId && targetInvitationId) {
-      const invitation = await prisma.enhancedVerificationInvitation.findUnique({
-        where: { id: targetInvitationId },
-      });
-      if (invitation) {
-        targetUserId = invitation.userId;
-        await prisma.enhancedVerificationInvitation.update({
-          where: { id: invitation.id },
-          data: { status: 'USED', usedAt: new Date() },
-        }).catch(() => null);
+      const tokenInvitationId = typeof payload?.InvitationId === 'string' ? payload.InvitationId : null;
+      if (tokenInvitationId) {
+        invitation = await prisma.enhancedVerificationInvitation.findUnique({ where: { id: tokenInvitationId } });
       }
     }
 
-    // 2. Find user from direct identifier fields
-    if (!targetUserId && rawUserId) {
-      targetUserId = rawUserId;
-    }
-
-    if (!targetUserId && paymentId) {
-      const payment = await prisma.payment.findUnique({
-        where: { id: paymentId },
-        select: { userId: true },
+    if (!invitation && paymentId) {
+      invitation = await prisma.enhancedVerificationInvitation.findFirst({
+        where: { paymentId, status: { in: ['PENDING', 'USED'] } },
+        orderBy: { createdAt: 'desc' },
       });
-      if (payment) targetUserId = payment.userId;
     }
 
-    if (!targetUserId && rawEmail) {
-      const user = await prisma.user.findUnique({
-        where: { email: rawEmail },
-        select: { id: true },
-      });
-      if (user) targetUserId = user.id;
-    }
-
-    if (!targetUserId) {
+    if (!invitation) {
       return NextResponse.json({ error: 'Provider account not found for provided identifiers' }, { status: 404 });
     }
 
-    // 3. Find retailer profile
-    const profile = await prisma.retailerProfile.findUnique({
-      where: { userId: targetUserId },
-      select: { id: true, userId: true, independentReviewTier: true, user: { select: { email: true } } },
-    });
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
-    }
-
-    // 4. Require confirmed payment record before granting verification
     const confirmedPayment = await prisma.payment.findFirst({
       where: {
-        userId: profile.userId,
+        id: invitation.paymentId,
+        userId: invitation.userId,
         type: 'INDEPENDENT_REVIEW',
         status: 'CONFIRMED',
         reversals: { none: {} },
       },
+      select: { id: true, independentReviewTier: true, userId: true },
     });
 
     if (!confirmedPayment) {
       return NextResponse.json({ error: 'Enhanced Verification has not been purchased or payment is incomplete for this provider' }, { status: 400 });
     }
 
-    const tier = nextStatus === 'APPROVED' ? (input.tier ?? profile.independentReviewTier ?? 'BRONZE') : null;
+    const purchasedTier: IndependentReviewTier | null = isIndependentReviewTier(confirmedPayment.independentReviewTier)
+      ? confirmedPayment.independentReviewTier
+      : null;
+    if (!purchasedTier) {
+      return NextResponse.json({ error: 'Purchased verification tier is missing for this payment' }, { status: 400 });
+    }
 
-    // 5. Update retailer profile verification status
+    let awardedTier: IndependentReviewTier | null = null;
+    if (nextStatus === 'APPROVED') {
+      if (!isIndependentReviewTier(input.tier)) {
+        return NextResponse.json({ error: 'An awarded Bronze, Silver, or Gold tier is required' }, { status: 400 });
+      }
+      if (!independentReviewTierAtMost(input.tier, purchasedTier)) {
+        return NextResponse.json({ error: 'Awarded tier cannot exceed the purchased verification product' }, { status: 400 });
+      }
+      awardedTier = input.tier;
+    }
+
+    const profile = await prisma.retailerProfile.findUnique({
+      where: { userId: invitation.userId },
+      select: { id: true, userId: true, user: { select: { email: true } } },
+    });
+
+    if (!profile) {
+      return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
+    }
+
     await prisma.retailerProfile.update({
       where: { id: profile.id },
       data: {
         independentReviewStatus: nextStatus,
-        independentReviewTier: tier,
+        independentReviewTier: awardedTier,
+        independentReviewPurchasedTier: purchasedTier,
+        independentReviewPurchasedPaymentId: confirmedPayment.id,
         independentReviewDecidedAt: new Date(),
         independentReviewNote: note,
       },
     });
 
-    // 5. Audit log
+    if (invitation.status === 'PENDING') {
+      await prisma.enhancedVerificationInvitation.updateMany({
+        where: { id: invitation.id, status: 'PENDING' },
+        data: { status: 'USED', usedAt: new Date() },
+      });
+    }
+
     await recordAuditEvent({
       actorId: null,
       action: nextStatus === 'APPROVED' ? 'INDEPENDENT_REVIEW_APPROVED' : 'INDEPENDENT_REVIEW_DECLINED',
@@ -185,8 +178,11 @@ export async function POST(request: Request) {
       metadata: {
         email: profile.user.email,
         note: note ?? undefined,
-        tier: tier ?? undefined,
+        tier: awardedTier ?? undefined,
+        purchasedTier,
         source: 'PARTNER_CALLBACK',
+        invitationId: invitation.id,
+        paymentId: confirmedPayment.id,
       },
     });
 
@@ -194,7 +190,7 @@ export async function POST(request: Request) {
       status: 'SUCCESS',
       userId: profile.userId,
       independentReviewStatus: nextStatus,
-      independentReviewTier: tier,
+      independentReviewTier: awardedTier,
     }, { status: 200 });
 
   } catch (error) {

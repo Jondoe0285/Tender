@@ -293,3 +293,66 @@ test('a reversed direct-contact payment clears the released contact state', asyn
 
   assert.equal((await prisma.directContactRequest.findUniqueOrThrow({ where: { paymentId } })).releasedAt, null);
 });
+
+test('a refund of the current enhanced verification payment removes the public award', async (context) => {
+  const suffix = randomUUID();
+  let retailerId: string | undefined;
+  let paymentId: string | undefined;
+
+  context.after(async () => {
+    if (paymentId) await prisma.paymentReversal.deleteMany({ where: { paymentId } });
+    if (retailerId) await prisma.retailerProfile.deleteMany({ where: { userId: retailerId } });
+    if (paymentId) await prisma.payment.deleteMany({ where: { id: paymentId } });
+    if (retailerId) await prisma.user.deleteMany({ where: { id: retailerId } });
+  });
+
+  const retailer = await prisma.user.create({
+    data: {
+      email: `review-reversal-${suffix}@example.test`,
+      passwordHash: 'not-used',
+      role: 'USER',
+      contactName: 'Review Reversal',
+      retailerProfile: {
+        create: {
+          companyName: 'Review Reversal Ltd',
+          categories: 'Materials',
+          coverageAreas: '',
+          independentReviewStatus: 'APPROVED',
+          independentReviewTier: 'SILVER',
+          independentReviewPurchasedTier: 'SILVER',
+        },
+      },
+    },
+  });
+  retailerId = retailer.id;
+  const payment = await prisma.payment.create({
+    data: {
+      type: 'INDEPENDENT_REVIEW',
+      amountGbp: 250,
+      vatPercentage: 20,
+      vatGbp: 50,
+      totalAmountGbp: 300,
+      status: 'CONFIRMED',
+      independentReviewTier: 'SILVER',
+      userId: retailerId,
+      stripePaymentIntentId: `pi_review_${suffix}`,
+      confirmedAt: new Date(),
+    },
+  });
+  paymentId = payment.id;
+  await prisma.retailerProfile.update({
+    where: { userId: retailerId },
+    data: { independentReviewPurchasedPaymentId: payment.id },
+  });
+
+  await reversePaymentEntitlements({
+    stripePaymentIntentId: payment.stripePaymentIntentId!,
+    stripeEventId: `evt_review_${suffix}`,
+    providerObjectId: `ch_review_${suffix}`,
+    type: 'REFUND',
+  });
+
+  const profile = await prisma.retailerProfile.findUniqueOrThrow({ where: { userId: retailerId } });
+  assert.equal(profile.independentReviewStatus, 'NOT_PURCHASED');
+  assert.equal(profile.independentReviewTier, null);
+});

@@ -6,6 +6,7 @@ import { prisma } from '../../src/server/data/prisma';
 import {
   createEnhancedVerificationInvitation,
   hashInvitationToken,
+  notifyConsulthubOfPurchase,
   signInvitationPayload,
   verifyAndConsumeInvitationToken,
   verifyInvitationToken,
@@ -33,7 +34,6 @@ describe('enhanced verification invitation service', () => {
     });
     userId = user.id;
 
-    // Unconfirmed / Pending payment
     const pendingPayment = await prisma.payment.create({
       data: {
         type: 'INDEPENDENT_REVIEW',
@@ -41,6 +41,7 @@ describe('enhanced verification invitation service', () => {
         totalAmountGbp: 180,
         vatGbp: 30,
         status: 'PENDING',
+        independentReviewTier: 'BRONZE',
         userId,
       },
     });
@@ -52,6 +53,7 @@ describe('enhanced verification invitation service', () => {
           userId,
           paymentId: pendingPayment.id,
           recipientEmail: `recipient-${suffix}@example.test`,
+          purchasedTier: 'BRONZE',
         });
       },
       {
@@ -88,6 +90,7 @@ describe('enhanced verification invitation service', () => {
         totalAmountGbp: 180,
         vatGbp: 30,
         status: 'CONFIRMED',
+        independentReviewTier: 'BRONZE',
         userId,
       },
     });
@@ -99,6 +102,7 @@ describe('enhanced verification invitation service', () => {
           userId,
           paymentId: payment.id,
           recipientEmail: `recipient-${suffix}@example.test`,
+          purchasedTier: 'BRONZE',
         });
       },
       {
@@ -107,7 +111,7 @@ describe('enhanced verification invitation service', () => {
     );
   });
 
-  test('successful invitation creation: validates purchase, generates token, stores token hash, sends email, and logs audit', async (context) => {
+  test('successful invitation creation: validates purchase, generates token, stores token hash, and logs audit', async (context) => {
     const suffix = randomUUID();
     let userId: string | undefined;
     let paymentId: string | undefined;
@@ -137,6 +141,7 @@ describe('enhanced verification invitation service', () => {
         totalAmountGbp: 180,
         vatGbp: 30,
         status: 'CONFIRMED',
+        independentReviewTier: 'SILVER',
         userId,
       },
     });
@@ -148,18 +153,16 @@ describe('enhanced verification invitation service', () => {
       paymentId: payment.id,
       recipientEmail,
       recipientName: 'Nominated Reviewer',
-      ipAddress: '127.0.0.1',
+      purchasedTier: 'SILVER',
     });
 
     invitationId = result.invitationId;
 
     assert.equal(result.status, 'SUCCESS');
-    assert.equal(result.Status, 'SUCCESS');
     assert.ok(result.invitationId);
     assert.ok(result.expiryUtc);
     assert.ok(result.registrationLink.includes('token='));
 
-    // Verify DB record
     const dbRecord = await prisma.enhancedVerificationInvitation.findUnique({
       where: { id: invitationId },
     });
@@ -168,153 +171,45 @@ describe('enhanced verification invitation service', () => {
     assert.equal(dbRecord.paymentId, payment.id);
     assert.equal(dbRecord.recipientEmail, recipientEmail);
     assert.equal(dbRecord.moduleCode, 'VERIFICATION');
-    assert.equal(dbRecord.productCode, 'ENHANCED_VERIFICATION');
+    assert.equal(dbRecord.productCode, 'ENHANCED_VERIFICATION_SILVER');
     assert.equal(dbRecord.status, 'PENDING');
     assert.equal(dbRecord.tokenHash, hashInvitationToken(result.signedToken));
 
-    // Verify signature
     const parsedPayload = verifyInvitationToken(result.signedToken);
     assert.ok(parsedPayload);
     assert.equal(parsedPayload.Module, 'VERIFICATION');
-    assert.equal(parsedPayload.Product, 'ENHANCED_VERIFICATION');
+    assert.equal(parsedPayload.Product, 'ENHANCED_VERIFICATION_SILVER');
+    assert.equal(parsedPayload.PurchasedTier, 'SILVER');
     assert.equal(parsedPayload.Email, recipientEmail);
 
-    // Consume token
     const consumed = await verifyAndConsumeInvitationToken(result.signedToken);
     assert.ok(consumed);
     assert.equal(consumed.id, invitationId);
     assert.equal(consumed.status, 'USED');
 
-    // Double consumption fails
     const reConsumed = await verifyAndConsumeInvitationToken(result.signedToken);
     assert.equal(reConsumed, null);
   });
 
-  test('custom defined registration URL incorporates secret token in query parameters', async (context) => {
-    const suffix = randomUUID();
-    let userId: string | undefined;
-    let paymentId: string | undefined;
-    let invitationId: string | undefined;
-
-    const previousAllowlist = process.env.VERIFICATION_RETURN_URL_ALLOWLIST_TRADE_TENDER_VERIFICATION;
-    process.env.VERIFICATION_RETURN_URL_ALLOWLIST_TRADE_TENDER_VERIFICATION = 'https://hsqeconsulthub.co.uk';
-
-    context.after(async () => {
-      if (invitationId) await prisma.enhancedVerificationInvitation.deleteMany({ where: { id: invitationId } });
-      if (paymentId) await prisma.payment.deleteMany({ where: { id: paymentId } });
-      if (userId) await prisma.user.deleteMany({ where: { id: userId } });
-      if (previousAllowlist !== undefined) {
-        process.env.VERIFICATION_RETURN_URL_ALLOWLIST_TRADE_TENDER_VERIFICATION = previousAllowlist;
-      } else {
-        delete process.env.VERIFICATION_RETURN_URL_ALLOWLIST_TRADE_TENDER_VERIFICATION;
-      }
-    });
-
-    const user = await prisma.user.create({
-      data: {
-        email: `custom-url-${suffix}@example.test`,
-        passwordHash: 'hash',
-        role: 'USER',
-        contactName: 'Custom URL Purchaser',
-      },
-    });
-    userId = user.id;
-
-    const payment = await prisma.payment.create({
-      data: {
-        type: 'INDEPENDENT_REVIEW',
-        amountGbp: 150,
-        totalAmountGbp: 180,
-        vatGbp: 30,
-        status: 'CONFIRMED',
-        userId,
-      },
-    });
-    paymentId = payment.id;
-
-    const customPartnerUrl = 'https://hsqeconsulthub.co.uk/register';
-    const result = await createEnhancedVerificationInvitation({
-      userId,
-      paymentId: payment.id,
-      recipientEmail: `custom-partner-${suffix}@example.test`,
-      registrationUrl: customPartnerUrl,
-    });
-
-    invitationId = result.invitationId;
-    assert.ok(result.registrationLink.startsWith('https://hsqeconsulthub.co.uk/register?token='));
-    assert.ok(result.registrationLink.includes('&verificationToken='));
+  test('uses the configured partner URL and does not accept a caller-supplied registration URL', () => {
+    const service = readFileSync('src/server/domain/enhancedVerificationInvitationService.ts', 'utf8');
+    assert.match(service, /getIndependentReviewPartnerUrl/);
+    assert.doesNotMatch(service, /registrationUrl/);
+    assert.match(service, /notifyConsulthubOfPurchase/);
+    assert.match(service, /Idempotency-Key/);
   });
 
-  test('rejects unlisted registrationUrl origin when partner URL allowlist is set', async (context) => {
-    const suffix = randomUUID();
-    let userId: string | undefined;
-    let paymentId: string | undefined;
-    let invitationId: string | undefined;
-
-    const previousAllowlist = process.env.VERIFICATION_RETURN_URL_ALLOWLIST_TRADE_TENDER_VERIFICATION;
-    process.env.VERIFICATION_RETURN_URL_ALLOWLIST_TRADE_TENDER_VERIFICATION = 'https://hsqeconsulthub.co.uk';
-
-    context.after(async () => {
-      if (invitationId) await prisma.enhancedVerificationInvitation.deleteMany({ where: { id: invitationId } });
-      if (paymentId) await prisma.payment.deleteMany({ where: { id: paymentId } });
-      if (userId) await prisma.user.deleteMany({ where: { id: userId } });
-      if (previousAllowlist !== undefined) {
-        process.env.VERIFICATION_RETURN_URL_ALLOWLIST_TRADE_TENDER_VERIFICATION = previousAllowlist;
-      } else {
-        delete process.env.VERIFICATION_RETURN_URL_ALLOWLIST_TRADE_TENDER_VERIFICATION;
-      }
-    });
-
-    const user = await prisma.user.create({
-      data: {
-        email: `unlisted-url-${suffix}@example.test`,
-        passwordHash: 'hash',
-        role: 'USER',
-        contactName: 'Unlisted Purchaser',
-      },
-    });
-    userId = user.id;
-
-    const payment = await prisma.payment.create({
-      data: {
-        type: 'INDEPENDENT_REVIEW',
-        amountGbp: 150,
-        totalAmountGbp: 180,
-        vatGbp: 30,
-        status: 'CONFIRMED',
-        userId,
-      },
-    });
-    paymentId = payment.id;
-
-    const unlistedUrl = 'https://phishing-site.com/claim';
-    const result = await createEnhancedVerificationInvitation({
-      userId,
-      paymentId: payment.id,
-      recipientEmail: `phish-target-${suffix}@example.test`,
-      registrationUrl: unlistedUrl,
-    });
-
-    invitationId = result.invitationId;
-    assert.ok(!result.registrationLink.includes('phishing-site.com'));
-  });
-
-  test('email template includes required prompt elements', () => {
-    const emailTemplates = readFileSync('src/server/notifications/emailTemplates.ts', 'utf8');
-
-    assert.match(emailTemplates, /Enhanced Verification Registration Invitation/);
-    assert.match(emailTemplates, /You have been nominated to complete Enhanced Verification/);
-    assert.match(emailTemplates, /Important:/);
-    assert.match(emailTemplates, /This link is unique/);
-    assert.match(emailTemplates, /It can only be used once/);
-    assert.match(emailTemplates, /Verification Team/);
-  });
-
-  test('invite API route requires authenticated user and payment verification', () => {
+  test('invite API route is Owner/Super User resend only and does not return the signed token', () => {
     const route = readFileSync('src/app/api/retailer/independent-review/invite/route.ts', 'utf8');
 
-    assert.match(route, /requireRole\('USER'\)/);
+    assert.match(route, /requireRole\('SUPER_USER'\)/);
     assert.match(route, /createEnhancedVerificationInvitation/);
-    assert.match(route, /Enhanced Verification has not been purchased/);
+    assert.doesNotMatch(route, /signedToken/);
+    assert.doesNotMatch(route, /registrationUrl/);
+  });
+
+  test('notifyConsulthubOfPurchase is exported for payment confirmation', () => {
+    assert.equal(typeof notifyConsulthubOfPurchase, 'function');
+    assert.equal(typeof signInvitationPayload, 'function');
   });
 });

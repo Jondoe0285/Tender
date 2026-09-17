@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
 import { isVerificationEligible } from '@/lib/categories';
 import { markUploadedDocumentsVerified, syncVerificationExpiry } from '@/server/domain/verificationDocumentService';
+import { INDEPENDENT_REVIEW_RESET_DATA } from '@/server/domain/independentReviewService';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,10 +73,7 @@ export async function PUT(req: NextRequest) {
           verificationDecidedAt: new Date(),
           verificationNote: companyTypeChanged ? 'Company type changed: verification must be completed again for the new company type.' : 'Service scope changed: verification reset due to modified service requirements.',
         } : {}),
-        ...(resetIndependent ? {
-          independentReviewStatus: 'NOT_PURCHASED' as const,
-          independentReviewNote: 'Service scope changed: enhanced verification reset due to the addition of new legal and compliance requirements.',
-        } : {}),
+        ...(resetIndependent ? INDEPENDENT_REVIEW_RESET_DATA : {}),
         standardQuoteValidityDays: parsed.standardQuoteValidityDays ?? profile.standardQuoteValidityDays,
         coverageScope: parsed.coverageScope,
         counties: parsed.counties,

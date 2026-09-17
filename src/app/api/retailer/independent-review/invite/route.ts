@@ -4,13 +4,13 @@ import { requireRole } from '@/server/auth/session';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { createRateLimitResponse } from '@/server/http/rateLimit';
 import { toErrorResponse } from '@/server/http/errors';
+import { recordAuditEvent } from '@/server/audit/auditLog';
 import { createEnhancedVerificationInvitation } from '@/server/domain/enhancedVerificationInvitationService';
+import { isIndependentReviewTier } from '@/lib/independentReviewTiers';
+import { prisma } from '@/server/data/prisma';
 
 const inviteSchema = z.object({
   paymentId: z.string().min(1, 'Payment transaction ID is required'),
-  recipientEmail: z.string().trim().toLowerCase().email('A valid recipient email address is required'),
-  recipientName: z.string().trim().max(120).optional().nullable(),
-  registrationUrl: z.string().trim().url().optional().nullable(),
 });
 
 export async function POST(request: Request) {
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
 
-    const user = await requireRole('USER');
+    const admin = await requireRole('SUPER_USER');
     const body = await request.json().catch(() => null);
     const parsed = inviteSchema.safeParse(body);
 
@@ -32,26 +32,35 @@ export async function POST(request: Request) {
       );
     }
 
-    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+    const payment = await prisma.payment.findUnique({
+      where: { id: parsed.data.paymentId },
+      include: { user: { select: { id: true, email: true, contactName: true } } },
+    });
+    if (!payment || payment.type !== 'INDEPENDENT_REVIEW' || !isIndependentReviewTier(payment.independentReviewTier)) {
+      return NextResponse.json({ error: 'Enhanced Verification has not been purchased or payment is incomplete.' }, { status: 400 });
+    }
 
     const result = await createEnhancedVerificationInvitation({
-      userId: user.id,
-      paymentId: parsed.data.paymentId,
-      recipientEmail: parsed.data.recipientEmail,
-      recipientName: parsed.data.recipientName,
-      registrationUrl: parsed.data.registrationUrl,
-      ipAddress: clientIp,
+      userId: payment.user.id,
+      paymentId: payment.id,
+      recipientEmail: payment.user.email,
+      recipientName: payment.user.contactName,
+      purchasedTier: payment.independentReviewTier,
+    });
+
+    await recordAuditEvent({
+      actorId: admin.id,
+      action: 'ENHANCED_VERIFICATION_INVITATION_RESENT',
+      targetType: 'EnhancedVerificationInvitation',
+      targetId: result.invitationId,
+      metadata: { paymentId: payment.id },
     });
 
     return NextResponse.json({
       status: result.status,
-      Status: result.Status,
       invitationId: result.invitationId,
-      InvitationId: result.InvitationId,
       expiryUtc: result.expiryUtc,
-      ExpiryUtc: result.ExpiryUtc,
       emailSent: result.emailSent,
-      EmailSent: result.EmailSent,
     }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message.includes('Enhanced Verification has not been purchased')) {

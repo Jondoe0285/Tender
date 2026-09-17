@@ -10,7 +10,7 @@ test('accepted quote release fee is based on the full submitted quote value', ()
   assert.match(contactReleaseService, /getClientReleaseFeeGbp\(quote\.priceGbp\)/);
   assert.match(contactReleaseService, /createPayment\(\{ type: 'CLIENT_RELEASE', userId: clientId, quoteId, quotePriceGbp: quote\.priceGbp/);
   assert.doesNotMatch(acceptRoute, /selected|lineIds|quoteLineIds|partial/i);
-  assert.match(paymentService, /params\.type === 'INDEPENDENT_REVIEW' && params\.feeOverrideGbp !== undefined/);
+  assert.match(paymentService, /independentReviewTier/);
 });
 
 test('quote comparison tells the user acceptance applies to the full quote value', () => {

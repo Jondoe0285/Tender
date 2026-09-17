@@ -1,10 +1,34 @@
 export type IndependentReviewTier = 'BRONZE' | 'SILVER' | 'GOLD';
 
+export const INDEPENDENT_REVIEW_TIERS: IndependentReviewTier[] = ['BRONZE', 'SILVER', 'GOLD'];
+
+export const INDEPENDENT_REVIEW_TIER_RANK: Record<IndependentReviewTier, number> = {
+  BRONZE: 1,
+  SILVER: 2,
+  GOLD: 3,
+};
+
 export const INDEPENDENT_REVIEW_TIER_LABELS: Record<IndependentReviewTier, string> = {
   BRONZE: 'Bronze',
   SILVER: 'Silver',
   GOLD: 'Gold',
 };
+
+export function isIndependentReviewTier(value: unknown): value is IndependentReviewTier {
+  return value === 'BRONZE' || value === 'SILVER' || value === 'GOLD';
+}
+
+export function independentReviewTierRank(tier: IndependentReviewTier | null | undefined): number {
+  return tier ? INDEPENDENT_REVIEW_TIER_RANK[tier] : 0;
+}
+
+export function independentReviewTierAtMost(awarded: IndependentReviewTier, purchased: IndependentReviewTier): boolean {
+  return independentReviewTierRank(awarded) <= independentReviewTierRank(purchased);
+}
+
+export function enhancedVerificationProductCode(tier: IndependentReviewTier): string {
+  return `ENHANCED_VERIFICATION_${tier}`;
+}
 
 export const INDEPENDENT_REVIEW_TIER_DESCRIPTIONS: Record<IndependentReviewTier, string> = {
   BRONZE: 'Bronze means legal requirements such as permits, insurances, and competent advice have been reviewed as evidenced.',

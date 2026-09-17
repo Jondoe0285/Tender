@@ -13,6 +13,7 @@ import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
 import { parseServiceProvisions, serialiseServiceProvisions } from '@/lib/service-provisions';
 import { markUploadedDocumentsVerified } from '@/server/domain/verificationDocumentService';
+import { INDEPENDENT_REVIEW_RESET_DATA } from '@/server/domain/independentReviewService';
 import { Prisma } from '@prisma/client';
 
 const COMPANY_OPERATING_LOCATIONS = ['United Kingdom', ...UK_COUNTIES, ...UK_REGIONS] as const;
@@ -143,10 +144,7 @@ export async function PUT(request: Request) {
               verificationDecidedAt: new Date(),
               verificationNote: 'Service scope changed: verification reset due to modified service requirements.',
             } : {}),
-            ...(resetIndependent ? {
-              independentReviewStatus: 'NOT_PURCHASED',
-              independentReviewNote: 'Service scope changed: enhanced verification reset due to the addition of new legal and compliance requirements.',
-            } : {}),
+            ...(resetIndependent ? INDEPENDENT_REVIEW_RESET_DATA : {}),
           },
         });
         if (resetVerification && newCategories) {

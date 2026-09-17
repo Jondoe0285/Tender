@@ -1,6 +1,7 @@
 import { Prisma, type PaymentReversalType } from '@prisma/client';
 import { prisma } from '@/server/data/prisma';
 import { recordAuditEvent } from '@/server/audit/auditLog';
+import { revokeIndependentReviewForPayment } from '@/server/domain/independentReviewService';
 
 type ReversalInput = {
   stripePaymentIntentId: string;
@@ -48,6 +49,10 @@ export async function reversePaymentEntitlements(input: ReversalInput): Promise<
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return null;
     throw error;
+  }
+
+  if (payment.type === 'INDEPENDENT_REVIEW') {
+    await revokeIndependentReviewForPayment(payment.id);
   }
 
   const affectedUserIds = new Set([payment.userId]);

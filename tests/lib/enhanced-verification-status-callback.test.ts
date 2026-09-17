@@ -11,7 +11,7 @@ import {
 
 test('shared secret custom signing and token verification', () => {
   const customSecret = 'custom-shared-secret-1234567890';
-  const payload = { Email: 'test@example.com', Module: 'VERIFICATION', Product: 'ENHANCED_VERIFICATION' };
+  const payload = { Email: 'test@example.com', Module: 'VERIFICATION', Product: 'ENHANCED_VERIFICATION_GOLD' };
 
   const token = signInvitationPayload(payload, customSecret);
   assert.ok(token);
@@ -20,12 +20,11 @@ test('shared secret custom signing and token verification', () => {
   assert.ok(verified);
   assert.equal(verified.Email, 'test@example.com');
 
-  // Rejects if wrong secret is supplied
   const invalid = verifyInvitationToken(token, 'wrong-secret-999999999');
   assert.equal(invalid, null);
 });
 
-test('partner status callback route requires valid shared secret authentication', () => {
+test('partner status callback route requires valid shared secret authentication and binds to invitation payment', () => {
   const route = readFileSync('src/app/api/partner/enhanced-verification/status/route.ts', 'utf8');
 
   assert.match(route, /getIndependentReviewSharedSecret/);
@@ -33,23 +32,13 @@ test('partner status callback route requires valid shared secret authentication'
   assert.match(route, /x-signature/i);
   assert.match(route, /timingSafeEqual/);
   assert.match(route, /Unauthorized: Invalid or missing shared secret/);
+  assert.match(route, /Awarded tier cannot exceed the purchased verification product/);
+  assert.doesNotMatch(route, /rawEmail/);
+  assert.doesNotMatch(route, /providerUserId/);
 });
 
-test('partner status update via API updates RetailerProfile and consumes invitation', async (context) => {
+async function seedPurchasedProvider(tier: 'BRONZE' | 'SILVER' | 'GOLD') {
   const suffix = randomUUID();
-  let userId: string | undefined;
-  let paymentId: string | undefined;
-  let invitationId: string | undefined;
-
-  context.after(async () => {
-    if (invitationId) await prisma.enhancedVerificationInvitation.deleteMany({ where: { id: invitationId } });
-    if (paymentId) await prisma.payment.deleteMany({ where: { id: paymentId } });
-    if (userId) {
-      await prisma.retailerProfile.deleteMany({ where: { userId } });
-      await prisma.user.deleteMany({ where: { id: userId } });
-    }
-  });
-
   const user = await prisma.user.create({
     data: {
       email: `status-callback-${suffix}@example.test`,
@@ -65,8 +54,6 @@ test('partner status update via API updates RetailerProfile and consumes invitat
       },
     },
   });
-  userId = user.id;
-
   const payment = await prisma.payment.create({
     data: {
       type: 'INDEPENDENT_REVIEW',
@@ -74,60 +61,81 @@ test('partner status update via API updates RetailerProfile and consumes invitat
       totalAmountGbp: 180,
       vatGbp: 30,
       status: 'CONFIRMED',
-      userId,
+      independentReviewTier: tier,
+      userId: user.id,
     },
   });
-  paymentId = payment.id;
-
-  const sharedSecret = 'test-secret-123456';
-  process.env.ENHANCED_VERIFICATION_SHARED_SECRET = sharedSecret;
-
   const invitation = await createEnhancedVerificationInvitation({
-    userId,
+    userId: user.id,
     paymentId: payment.id,
     recipientEmail: user.email,
+    purchasedTier: tier,
+  });
+  return { user, payment, invitation, suffix };
+}
+
+test('partner status update via API awards a tier at or below the purchased product', async (context) => {
+  const sharedSecret = 'test-secret-123456';
+  process.env.ENHANCED_VERIFICATION_SHARED_SECRET = sharedSecret;
+  const { user, payment, invitation } = await seedPurchasedProvider('GOLD');
+  context.after(async () => {
+    await prisma.enhancedVerificationInvitation.deleteMany({ where: { id: invitation.invitationId } });
+    await prisma.payment.deleteMany({ where: { id: payment.id } });
+    await prisma.retailerProfile.deleteMany({ where: { userId: user.id } });
+    await prisma.user.deleteMany({ where: { id: user.id } });
+    delete process.env.ENHANCED_VERIFICATION_SHARED_SECRET;
   });
 
-  invitationId = invitation.invitationId;
-
-  // Import route handler dynamically to test status callback execution
   const { POST } = await import('../../src/app/api/partner/enhanced-verification/status/route');
-
   const payload = {
     token: invitation.signedToken,
     status: 'APPROVED',
-    tier: 'GOLD',
+    tier: 'SILVER',
     note: 'HSQE Consult Hub review completed successfully.',
   };
-
   const bodyText = JSON.stringify(payload);
   const signature = createHmac('sha256', sharedSecret).update(bodyText).digest('hex');
-
-  const request = new Request('http://localhost/api/partner/enhanced-verification/status', {
+  const response = await POST(new Request('http://localhost/api/partner/enhanced-verification/status', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Signature': signature,
-    },
+    headers: { 'Content-Type': 'application/json', 'X-Signature': signature },
     body: bodyText,
-  });
-
-  const response = await POST(request);
+  }));
   assert.equal(response.status, 200);
-
   const data = await response.json();
-  assert.equal(data.status, 'SUCCESS');
-  assert.equal(data.userId, userId);
-  assert.equal(data.independentReviewStatus, 'APPROVED');
-  assert.equal(data.independentReviewTier, 'GOLD');
-
-  // Verify RetailerProfile state in DB
-  const profile = await prisma.retailerProfile.findUnique({
-    where: { userId },
-  });
+  assert.equal(data.independentReviewTier, 'SILVER');
+  const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id } });
   assert.equal(profile?.independentReviewStatus, 'APPROVED');
-  assert.equal(profile?.independentReviewTier, 'GOLD');
-  assert.equal(profile?.independentReviewNote, 'HSQE Consult Hub review completed successfully.');
+  assert.equal(profile?.independentReviewTier, 'SILVER');
+  assert.equal(profile?.independentReviewPurchasedTier, 'GOLD');
+});
 
-  delete process.env.ENHANCED_VERIFICATION_SHARED_SECRET;
+test('partner status callback rejects an awarded tier above the purchased product', async (context) => {
+  const sharedSecret = 'test-secret-123456';
+  process.env.ENHANCED_VERIFICATION_SHARED_SECRET = sharedSecret;
+  const { user, payment, invitation } = await seedPurchasedProvider('BRONZE');
+  context.after(async () => {
+    await prisma.enhancedVerificationInvitation.deleteMany({ where: { id: invitation.invitationId } });
+    await prisma.payment.deleteMany({ where: { id: payment.id } });
+    await prisma.retailerProfile.deleteMany({ where: { userId: user.id } });
+    await prisma.user.deleteMany({ where: { id: user.id } });
+    delete process.env.ENHANCED_VERIFICATION_SHARED_SECRET;
+  });
+
+  const { POST } = await import('../../src/app/api/partner/enhanced-verification/status/route');
+  const payload = { invitationId: invitation.invitationId, status: 'APPROVED', tier: 'GOLD' };
+  const bodyText = JSON.stringify(payload);
+  const signature = createHmac('sha256', sharedSecret).update(bodyText).digest('hex');
+  const response = await POST(new Request('http://localhost/api/partner/enhanced-verification/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Signature': signature },
+    body: bodyText,
+  }));
+  assert.equal(response.status, 400);
+  const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id } });
+  assert.notEqual(profile?.independentReviewStatus, 'APPROVED');
+});
+
+test('partner status callback rejects unbound email identifiers', async () => {
+  const route = readFileSync('src/app/api/partner/enhanced-verification/status/route.ts', 'utf8');
+  assert.doesNotMatch(route, /findUnique\(\{\s*where: \{ email: rawEmail \}/);
 });

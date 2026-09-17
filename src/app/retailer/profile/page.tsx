@@ -63,7 +63,7 @@ export default function RetailerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [independentReview, setIndependentReview] = useState<{ active: boolean; feeGbp: number; eligible: boolean; status: 'NOT_PURCHASED' | 'PURCHASED' | 'APPROVED' | 'DECLINED'; tier: 'BRONZE' | 'SILVER' | 'GOLD' | null; note: string | null; renewalActive: boolean; renewalFeeGbp: number; renewalAvailable: boolean; reassessmentActive: boolean; reassessmentFeeGbp: number; reassessmentAvailable: boolean } | null>(null);
+  const [independentReview, setIndependentReview] = useState<{ active: boolean; fees: Record<'BRONZE' | 'SILVER' | 'GOLD', number>; eligible: boolean; status: 'NOT_PURCHASED' | 'PURCHASED' | 'APPROVED' | 'DECLINED'; tier: 'BRONZE' | 'SILVER' | 'GOLD' | null; note: string | null; purchasableTiers: Array<'BRONZE' | 'SILVER' | 'GOLD'>; expired: boolean } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -181,21 +181,18 @@ export default function RetailerProfilePage() {
                 <p className="font-heading text-lg font-bold text-foundation-navy">Enhanced H&amp;S review</p>
                 <p className="mt-1 max-w-xl text-sm text-concrete-grey">
                   {independentReview.status === 'APPROVED' && `Your business has achieved Enhanced ${independentReview.tier ? independentReview.tier[0] + independentReview.tier.slice(1).toLowerCase() : ''} Verification level. ${independentReviewTierDescription(independentReview.tier)}`}
-                  {independentReview.status === 'PURCHASED' && 'Your review has been purchased. A Health & Safety professional will contact you about the next steps.'}
-                  {independentReview.status === 'DECLINED' && 'Your last review was not approved. You can purchase another review at any time.'}
-                  {independentReview.status === 'NOT_PURCHASED' && independentReview.note?.includes('Service scope changed') && 'Changing your service scope reset your enhanced verification due to the addition of new legal and compliance requirements. You can purchase an updated assessment below.'}
-                  {independentReview.status === 'NOT_PURCHASED' && !independentReview.note?.includes('Service scope changed') && `Purchase a review by a Health & Safety professional for £${independentReview.feeGbp} excl. VAT.`}
+                  {independentReview.status === 'PURCHASED' && 'Your review has been purchased. HSQE Consult Hub will contact you to complete onboarding.'}
+                  {independentReview.status === 'DECLINED' && 'Your last review was not approved. You can purchase a verification tier at any time.'}
+                  {independentReview.status === 'NOT_PURCHASED' && independentReview.note?.includes('Service scope changed') && 'Changing your service scope reset your enhanced verification due to the addition of new legal and compliance requirements. Purchase a Bronze, Silver, or Gold verification below.'}
+                  {independentReview.status === 'NOT_PURCHASED' && !independentReview.note?.includes('Service scope changed') && `Purchase Bronze (£${independentReview.fees.BRONZE}), Silver (£${independentReview.fees.SILVER}), or Gold (£${independentReview.fees.GOLD}) excl. VAT.`}
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <StatusBadge status={independentReview.status === 'APPROVED' ? 'approved' : independentReview.status === 'PURCHASED' ? 'pending' : independentReview.status === 'DECLINED' ? 'attention' : 'neutral'}>
-                  {independentReview.status === 'APPROVED' ? (independentReview.tier === 'SILVER' ? 'Silver' : independentReview.tier === 'GOLD' ? 'Gold' : 'Bronze') : independentReview.status === 'PURCHASED' ? 'Awaiting review' : independentReview.status === 'DECLINED' ? 'Not approved' : (independentReview.reassessmentAvailable ? 'Re-assessment required' : 'Not purchased')}
+                  {independentReview.status === 'APPROVED' ? (independentReview.tier === 'SILVER' ? 'Silver' : independentReview.tier === 'GOLD' ? 'Gold' : 'Bronze') : independentReview.status === 'PURCHASED' ? 'Awaiting review' : independentReview.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
                 </StatusBadge>
-                {independentReview.reassessmentAvailable && (independentReview.status === 'NOT_PURCHASED' || independentReview.status === 'DECLINED') && (
-                  <Link href="/retailer/independent-review"><Button>Purchase updated assessment (£{independentReview.reassessmentFeeGbp} excl. VAT)</Button></Link>
-                )}
-                {!independentReview.reassessmentAvailable && (independentReview.status === 'NOT_PURCHASED' || independentReview.status === 'DECLINED') && (
-                  <Link href="/retailer/independent-review"><Button>Purchase review</Button></Link>
+                {(independentReview.status !== 'PURCHASED') && independentReview.purchasableTiers.length > 0 && (
+                  <Link href="/retailer/independent-review"><Button>{independentReview.status === 'APPROVED' ? 'Upgrade verification' : 'Purchase verification'}</Button></Link>
                 )}
               </div>
             </div>

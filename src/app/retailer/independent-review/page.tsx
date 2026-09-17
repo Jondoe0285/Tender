@@ -6,25 +6,20 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { INDEPENDENT_REVIEW_TIER_DESCRIPTIONS, INDEPENDENT_REVIEW_TIER_LABELS, type IndependentReviewTier } from '@/lib/independentReviewTiers';
+import { INDEPENDENT_REVIEW_TIER_DESCRIPTIONS, INDEPENDENT_REVIEW_TIER_LABELS, INDEPENDENT_REVIEW_TIERS, type IndependentReviewTier } from '@/lib/independentReviewTiers';
 
 type Status = 'NOT_PURCHASED' | 'PURCHASED' | 'APPROVED' | 'DECLINED';
 
 type ReviewState = {
   active: boolean;
-  feeGbp: number;
-  renewalActive: boolean;
-  renewalFeeGbp: number;
-  renewalAvailable: boolean;
-  renewalOpenAt: string | null;
-  reassessmentActive: boolean;
-  reassessmentFeeGbp: number;
-  reassessmentAvailable: boolean;
+  fees: Record<IndependentReviewTier, number>;
+  purchasableTiers: IndependentReviewTier[];
   expiresAt: string | null;
   expired: boolean;
   eligible: boolean;
   status: Status;
   tier: IndependentReviewTier | null;
+  purchasedTier: IndependentReviewTier | null;
   purchasedAt: string | null;
   decidedAt: string | null;
   note: string | null;
@@ -33,7 +28,7 @@ type ReviewState = {
 export default function IndependentReviewPage() {
   const [state, setState] = useState<ReviewState | null>(null);
   const [loading, setLoading] = useState(true);
-  const [purchasing, setPurchasing] = useState(false);
+  const [purchasing, setPurchasing] = useState<IndependentReviewTier | null>(null);
   const [pendingPayment, setPendingPayment] = useState<{ paymentId: string; totalAmountGbp: number; feeGbp: number; vatGbp: number } | null>(null);
   const [simulating, setSimulating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -47,12 +42,12 @@ export default function IndependentReviewPage() {
 
   useEffect(() => { void load(); }, []);
 
-  async function handlePurchase(mode: 'NEW' | 'RENEWAL' | 'REASSESSMENT' = 'NEW') {
-    setPurchasing(true);
+  async function handlePurchase(tier: IndependentReviewTier) {
+    setPurchasing(tier);
     setMessage(null);
-    const response = await fetch('/api/retailer/independent-review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
+    const response = await fetch('/api/retailer/independent-review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tier }) });
     const data = await response.json().catch(() => null);
-    setPurchasing(false);
+    setPurchasing(null);
     if (!response.ok) {
       setMessage(data?.error ?? 'Unable to start payment.');
       return;
@@ -83,7 +78,7 @@ export default function IndependentReviewPage() {
       return;
     }
     setPendingPayment(null);
-    setMessage('Purchase confirmed. A Health & Safety professional will contact you about the next steps.');
+    setMessage('Purchase confirmed. HSQE Consult Hub will contact you to complete onboarding.');
     await load();
   }
 
@@ -91,77 +86,63 @@ export default function IndependentReviewPage() {
 
   return (
     <AppShell role="retailer" title="Enhanced H&S Review">
-      <div className="mx-auto max-w-2xl space-y-6">
+      <div className="mx-auto max-w-3xl space-y-6">
         <Link href="/retailer/profile" className="inline-block text-sm font-semibold text-concrete-grey hover:text-foundation-navy">&larr; Back to profile</Link>
 
         {message && <p role="status" className="rounded-lg border border-steel-blue/20 bg-steel-blue/5 px-4 py-3 text-sm text-steel-blue">{message}</p>}
 
         <Card>
-          <h2 className="font-heading text-xl font-bold text-foundation-navy">Enhanced Health &amp; Safety review</h2>
+          <h2 className="font-heading text-xl font-bold text-foundation-navy">Enhanced Health &amp; Safety verification</h2>
           <p className="mt-2 text-sm text-concrete-grey">
-            Purchase a professional review of your business by a Health &amp; Safety professional. Once purchased, a
-            Health &amp; Safety professional will contact you directly about the next steps. The review considers
-            legal-compliance evidence only and does not replace a client&rsquo;s own suitable due diligence before any
-            formal agreement. If your business is deemed to meet the review requirements, your account is marked
-            Enhanced Verified and every quote you submit shows a green Enhanced Verified indicator.
+            Choose Bronze, Silver, or Gold. After payment, HSQE Consult Hub starts onboarding. The auditor may award the purchased tier or a lower tier based on evidence. This does not replace a client&rsquo;s own due diligence.
           </p>
 
-          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-foundation-navy">Enhanced verification outcome tiers</p>
-            <p className="mt-1 text-xs text-concrete-grey">
-              You purchase a single Enhanced Verification assessment. Individual tiers cannot be purchased separately; the Health &amp; Safety auditor awards Bronze, Silver, or Gold based on the evidence reviewed.
-            </p>
-            <dl className="mt-3 grid gap-3 text-sm text-concrete-grey">
-              {(Object.keys(INDEPENDENT_REVIEW_TIER_DESCRIPTIONS) as IndependentReviewTier[]).map((tier) => <div key={tier}><dt className="font-semibold text-foundation-navy">{INDEPENDENT_REVIEW_TIER_LABELS[tier]}</dt><dd>{INDEPENDENT_REVIEW_TIER_DESCRIPTIONS[tier]}</dd></div>)}
-            </dl>
-          </div>
-
-          {!state?.active && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Enhanced review purchases are not currently available.</p>}
-
-          {state?.active && !state.eligible && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Enhanced review is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers.</p>}
-
-          {state?.reassessmentAvailable && (
+          {state?.note?.includes('Service scope changed') && (
             <div className="mt-4 rounded-lg border-l-4 border-safety-amber bg-amber-50/40 p-4">
               <p className="text-sm font-semibold text-foundation-navy">Service scope updated</p>
-              <p className="mt-2 text-sm text-concrete-grey">
-                Changing your service scope reset your enhanced verification due to the addition of new legal and compliance requirements for your updated services. A minor re-verification is required to assess your new service scope.
-              </p>
+              <p className="mt-2 text-sm text-concrete-grey">Changing your service scope reset your enhanced verification. Purchase the tier you need for your updated services.</p>
             </div>
           )}
+
+          {!state?.active && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Enhanced verification purchases are not currently available.</p>}
+          {state?.active && !state.eligible && <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-concrete-grey">Enhanced review is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers.</p>}
 
           {state?.active && state.eligible && (
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-2xl font-heading font-bold text-foundation-navy">
-                  £{state.reassessmentAvailable ? state.reassessmentFeeGbp : state.renewalAvailable ? state.renewalFeeGbp : state.feeGbp} excl. VAT
-                </p>
+            <div className="mt-5 space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
                 <StatusBadge status={state.status === 'APPROVED' ? 'approved' : state.status === 'PURCHASED' ? 'pending' : state.status === 'DECLINED' ? 'attention' : 'neutral'}>
-                    {state.status === 'APPROVED' ? `Enhanced Verified${state.tier ? ` · ${state.tier[0] + state.tier.slice(1).toLowerCase()}` : ''}` : state.status === 'PURCHASED' ? 'Awaiting review' : state.status === 'DECLINED' ? 'Not approved' : (state.reassessmentAvailable ? 'Re-assessment required' : 'Not purchased')}
+                  {state.status === 'APPROVED' ? `Enhanced Verified · ${state.tier ? INDEPENDENT_REVIEW_TIER_LABELS[state.tier] : 'Bronze'}` : state.status === 'PURCHASED' ? 'Awaiting review' : state.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
                 </StatusBadge>
-                {state.expiresAt && <p className="mt-2 text-sm text-concrete-grey">Enhanced verification expires on {new Date(state.expiresAt).toLocaleDateString('en-GB')}.</p>}
-                {state.renewalActive && state.renewalOpenAt && !state.renewalAvailable && state.status === 'APPROVED' && !state.expired && <p className="mt-2 text-sm text-concrete-grey">Renewal opens on {new Date(state.renewalOpenAt).toLocaleDateString('en-GB')}.</p>}
-                {state.renewalAvailable && <p className="mt-2 text-sm font-semibold text-steel-blue">Renew now for £{state.renewalFeeGbp} excl. VAT before your current verification expires.</p>}
-                {state.reassessmentAvailable && <p className="mt-2 text-sm font-semibold text-steel-blue">Purchase an updated assessment for £{state.reassessmentFeeGbp} excl. VAT to re-verify your updated service scope.</p>}
-                {state.expired && <p className="mt-2 text-sm font-semibold text-attention">Your enhanced verification has expired. Purchase a new review to regain enhanced verification.</p>}
+                {state.expiresAt && <p className="text-sm text-concrete-grey">Expires on {new Date(state.expiresAt).toLocaleDateString('en-GB')}.</p>}
+                {state.expired && <p className="text-sm font-semibold text-attention">Your enhanced verification has expired. Purchase a tier to restore it.</p>}
               </div>
-              {(state.status === 'NOT_PURCHASED' || state.status === 'DECLINED') && !state.reassessmentAvailable && !pendingPayment && (
-                <Button onClick={() => handlePurchase()} loading={purchasing}>Pay now</Button>
-              )}
-              {state.reassessmentAvailable && !pendingPayment && (
-                <Button onClick={() => handlePurchase('REASSESSMENT')} loading={purchasing}>Purchase updated assessment</Button>
-              )}
-              {state.renewalAvailable && !pendingPayment && (
-                <Button onClick={() => handlePurchase('RENEWAL')} loading={purchasing}>Renew now</Button>
-              )}
-              {state.expired && !pendingPayment && (
-                <Button onClick={() => handlePurchase()} loading={purchasing}>Purchase new review</Button>
-              )}
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                {INDEPENDENT_REVIEW_TIERS.map((tier) => {
+                  const available = state.purchasableTiers.includes(tier);
+                  return (
+                    <div key={tier} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                      <p className="font-heading text-lg font-bold text-foundation-navy">{INDEPENDENT_REVIEW_TIER_LABELS[tier]}</p>
+                      <p className="mt-1 text-2xl font-heading font-bold text-foundation-navy">£{state.fees[tier]} <span className="text-sm font-semibold text-concrete-grey">excl. VAT</span></p>
+                      <p className="mt-2 text-xs text-concrete-grey">{INDEPENDENT_REVIEW_TIER_DESCRIPTIONS[tier]}</p>
+                      {available && !pendingPayment && (
+                        <Button className="mt-4 w-full" onClick={() => handlePurchase(tier)} loading={purchasing === tier}>
+                          {state.status === 'APPROVED' && !state.expired ? `Upgrade to ${INDEPENDENT_REVIEW_TIER_LABELS[tier]}` : `Purchase ${INDEPENDENT_REVIEW_TIER_LABELS[tier]}`}
+                        </Button>
+                      )}
+                      {!available && state.status === 'APPROVED' && state.tier === tier && !state.expired && (
+                        <p className="mt-4 text-xs font-semibold text-approved">Current award</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
-          {state?.status === 'PURCHASED' && <p className="mt-4 text-sm text-concrete-grey">Your review has been purchased. A Health &amp; Safety professional will contact you about the next steps.</p>}
+          {state?.status === 'PURCHASED' && <p className="mt-4 text-sm text-concrete-grey">Your {state.purchasedTier ? INDEPENDENT_REVIEW_TIER_LABELS[state.purchasedTier] : 'enhanced'} verification has been purchased. HSQE Consult Hub will contact you to complete onboarding.</p>}
           {state?.status === 'DECLINED' && state.note && <p className="mt-4 text-sm text-concrete-grey">Outcome note: {state.note}</p>}
-          {state?.status === 'APPROVED' && <p className="mt-4 text-sm text-approved font-semibold">Your business is Enhanced Verified.</p>}
+          {state?.status === 'APPROVED' && <p className="mt-4 text-sm text-approved font-semibold">Your business is Enhanced Verified{state.tier ? ` at ${INDEPENDENT_REVIEW_TIER_LABELS[state.tier]}` : ''}.</p>}
 
           {pendingPayment && (
             <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">

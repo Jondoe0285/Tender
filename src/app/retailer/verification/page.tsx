@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { VERIFICATION_DOCUMENT_TYPES, verificationDocumentExpires, type VerificationDocumentType } from '@/lib/verification-documents';
 import { buildSafeAttachmentName } from '@/lib/attachment-utils';
-import { INDEPENDENT_REVIEW_TIER_DESCRIPTIONS, INDEPENDENT_REVIEW_TIER_LABELS, type IndependentReviewTier } from '@/lib/independentReviewTiers';
+import { INDEPENDENT_REVIEW_TIER_DESCRIPTIONS, INDEPENDENT_REVIEW_TIER_LABELS, INDEPENDENT_REVIEW_TIERS, type IndependentReviewTier } from '@/lib/independentReviewTiers';
 
 type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
 const REOPEN_STATUSES: VerificationStatus[] = ['UNVERIFIED', 'REJECTED', 'EXPIRED'];
@@ -45,13 +45,11 @@ export default function ProviderVerificationPage() {
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [enhancedReview, setEnhancedReview] = useState<{
     active: boolean;
-    feeGbp: number;
+    fees: Record<IndependentReviewTier, number>;
     status: string;
     tier: IndependentReviewTier | null;
-    reassessmentAvailable: boolean;
-    reassessmentFeeGbp: number;
-    renewalAvailable: boolean;
-    renewalFeeGbp: number;
+    purchasableTiers: IndependentReviewTier[];
+    expired: boolean;
   } | null>(null);
   const [pendingFiles, setPendingFiles] = useState<Record<string, File>>({});
   const [expiryDates, setExpiryDates] = useState<Record<string, string>>({});
@@ -229,10 +227,10 @@ export default function ProviderVerificationPage() {
                 </StatusBadge>
               </div>
               <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-steel-blue">
-                Professional H&amp;S Review &middot; £{enhancedReview?.reassessmentAvailable ? enhancedReview.reassessmentFeeGbp : (enhancedReview?.feeGbp ?? 150)} excl. VAT
+                Professional H&amp;S Review &middot; Bronze £{enhancedReview?.fees.BRONZE ?? 150} / Silver £{enhancedReview?.fees.SILVER ?? 250} / Gold £{enhancedReview?.fees.GOLD ?? 400} excl. VAT
               </p>
               <p className="mt-2 text-xs leading-relaxed text-concrete-grey">
-                In-depth review by a Health &amp; Safety professional. The auditor awards a Bronze, Silver, or Gold safety competency tier based on the evidence submitted (individual tiers cannot be purchased separately).
+                Purchase Bronze, Silver, or Gold. After payment, HSQE Consult Hub starts onboarding. The auditor may award the purchased tier or a lower tier.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
@@ -244,7 +242,7 @@ export default function ProviderVerificationPage() {
                 </Button>
                 <Link href="/retailer/independent-review">
                   <Button variant="secondary" size="md">
-                    {enhancedReview?.reassessmentAvailable ? 'Purchase Assessment' : 'Proceed to Enhanced Review →'}
+                    Choose a verification tier →
                   </Button>
                 </Link>
               </div>
@@ -262,14 +260,14 @@ export default function ProviderVerificationPage() {
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-sm font-semibold text-foundation-navy">Safety Competency Tiers (Assessed Outcomes)</p>
+              <p className="text-sm font-semibold text-foundation-navy">Verification products</p>
               <p className="mt-1 text-xs text-concrete-grey">
-                Individual tiers are awarded by the Health &amp; Safety auditor based on evidence quality and cannot be purchased separately.
+                Choose the product to purchase. The auditor may award that tier or a lower tier, never a higher unpaid product.
               </p>
               <dl className="mt-3 grid gap-3 text-sm text-concrete-grey sm:grid-cols-3">
-                {(Object.keys(INDEPENDENT_REVIEW_TIER_DESCRIPTIONS) as IndependentReviewTier[]).map((tier) => (
+                {INDEPENDENT_REVIEW_TIERS.map((tier) => (
                   <div key={tier} className="rounded-md border border-slate-100 bg-slate-50 p-3">
-                    <dt className="font-bold text-foundation-navy">{INDEPENDENT_REVIEW_TIER_LABELS[tier]}</dt>
+                    <dt className="font-bold text-foundation-navy">{INDEPENDENT_REVIEW_TIER_LABELS[tier]} · £{enhancedReview?.fees[tier] ?? '—'} excl. VAT</dt>
                     <dd className="mt-1 text-xs">{INDEPENDENT_REVIEW_TIER_DESCRIPTIONS[tier]}</dd>
                   </div>
                 ))}
@@ -277,17 +275,12 @@ export default function ProviderVerificationPage() {
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-              <div>
-                <p className="text-2xl font-heading font-bold text-foundation-navy">
-                  £{enhancedReview?.reassessmentAvailable ? enhancedReview.reassessmentFeeGbp : (enhancedReview?.feeGbp ?? 150)} excl. VAT
-                </p>
-                <StatusBadge status={enhancedReview?.status === 'APPROVED' ? 'approved' : enhancedReview?.status === 'PURCHASED' ? 'pending' : enhancedReview?.status === 'DECLINED' ? 'attention' : 'neutral'}>
-                  {enhancedReview?.status === 'APPROVED' ? `Enhanced Verified · ${enhancedReview.tier ?? 'Bronze'}` : enhancedReview?.status === 'PURCHASED' ? 'Awaiting review' : enhancedReview?.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
-                </StatusBadge>
-              </div>
+              <StatusBadge status={enhancedReview?.status === 'APPROVED' ? 'approved' : enhancedReview?.status === 'PURCHASED' ? 'pending' : enhancedReview?.status === 'DECLINED' ? 'attention' : 'neutral'}>
+                {enhancedReview?.status === 'APPROVED' ? `Enhanced Verified · ${enhancedReview.tier ?? 'Bronze'}` : enhancedReview?.status === 'PURCHASED' ? 'Awaiting review' : enhancedReview?.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
+              </StatusBadge>
               <Link href="/retailer/independent-review">
                 <Button>
-                  {enhancedReview?.reassessmentAvailable ? 'Purchase Updated Assessment' : enhancedReview?.renewalAvailable ? 'Renew Enhanced Verification' : 'Purchase Enhanced Review'}
+                  {enhancedReview?.purchasableTiers?.length ? 'Purchase or upgrade' : 'View enhanced verification'}
                 </Button>
               </Link>
             </div>
