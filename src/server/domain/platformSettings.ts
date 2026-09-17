@@ -73,7 +73,7 @@ export async function getSupportRecipientEmail(): Promise<string | null> {
 
 export async function getPaymentFeeGbp(type: PaymentType): Promise<number> {
   if (type === 'INDEPENDENT_REVIEW') {
-    throw new Error('Enhanced verification fees are resolved per Bronze, Silver, or Gold tier');
+    return getIndependentReviewFeeGbp('BRONZE');
   }
   const key = type === 'RETAILER_UNLOCK'
     ? 'RETAILER_UNLOCK_FEE_GBP'
