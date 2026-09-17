@@ -2,6 +2,7 @@ import type { PaymentType } from '@prisma/client';
 import { prisma } from '@/server/data/prisma';
 import { CLIENT_RELEASE_FEE_GBP, RETAILER_UNLOCK_FEE_GBP } from '@/lib/categories';
 import { SERVICE_NAMES } from '@/lib/categories';
+import { type IndependentReviewTier } from '@/lib/independentReviewTiers';
 import { VERIFICATION_DOCUMENT_TYPES, type VerificationDocumentType } from '@/lib/verification-documents';
 import { applyMasterEstimateReduction, estimateTenderQuoteValue, getReviewedQuoteEstimateBaselines } from '@/server/domain/quoteEstimateService';
 
@@ -26,12 +27,10 @@ const defaultSettings: Record<string, string> = {
   MEMBERSHIP_TIERS_ACTIVE: 'false',
   RETAILER_LAUNCH_CREDITS_DEFAULT: '3',
   ADSPACE_ACTIVE: 'false',
-  INDEPENDENT_REVIEW_ACTIVE: 'false',
-  INDEPENDENT_REVIEW_FEE_GBP: '150',
-  INDEPENDENT_REVIEW_RENEWAL_ACTIVE: 'false',
-  INDEPENDENT_REVIEW_RENEWAL_FEE_GBP: '100',
-  INDEPENDENT_REVIEW_REASSESSMENT_ACTIVE: 'false',
-  INDEPENDENT_REVIEW_REASSESSMENT_FEE_GBP: '50',
+  INDEPENDENT_REVIEW_ACTIVE: 'true',
+  INDEPENDENT_REVIEW_FEE_BRONZE_GBP: '150',
+  INDEPENDENT_REVIEW_FEE_SILVER_GBP: '250',
+  INDEPENDENT_REVIEW_FEE_GOLD_GBP: '400',
   DIRECT_CONTACT_ACTIVE: 'false',
   DIRECT_CONTACT_FEE_GBP: '25',
   HUMAN_REVIEW_ACTIVE: 'true',
@@ -73,13 +72,14 @@ export async function getSupportRecipientEmail(): Promise<string | null> {
 }
 
 export async function getPaymentFeeGbp(type: PaymentType): Promise<number> {
+  if (type === 'INDEPENDENT_REVIEW') {
+    throw new Error('Enhanced verification fees are resolved per Bronze, Silver, or Gold tier');
+  }
   const key = type === 'RETAILER_UNLOCK'
     ? 'RETAILER_UNLOCK_FEE_GBP'
     : type === 'SPONSORED_PLACEMENT'
       ? 'SPONSORED_PLACEMENT_FEE_GBP'
-      : type === 'INDEPENDENT_REVIEW'
-        ? 'INDEPENDENT_REVIEW_FEE_GBP'
-        : type === 'DIRECT_CONTACT'
+      : type === 'DIRECT_CONTACT'
           ? 'DIRECT_CONTACT_FEE_GBP'
           : 'CLIENT_RELEASE_FEE_GBP';
   const value = Number(await getPlatformSetting(key));
@@ -212,20 +212,34 @@ export async function isIndependentReviewActive(): Promise<boolean> {
   return await getPlatformSetting('INDEPENDENT_REVIEW_ACTIVE') === 'true';
 }
 
-export async function isIndependentReviewRenewalActive(): Promise<boolean> {
-  return await getPlatformSetting('INDEPENDENT_REVIEW_RENEWAL_ACTIVE') === 'true';
+const TIER_FEE_KEYS: Record<IndependentReviewTier, keyof typeof defaultSettings> = {
+  BRONZE: 'INDEPENDENT_REVIEW_FEE_BRONZE_GBP',
+  SILVER: 'INDEPENDENT_REVIEW_FEE_SILVER_GBP',
+  GOLD: 'INDEPENDENT_REVIEW_FEE_GOLD_GBP',
+};
+
+export async function getIndependentReviewFeeGbp(tier: IndependentReviewTier): Promise<number> {
+  return getConfiguredFeeGbp(TIER_FEE_KEYS[tier]);
 }
 
-export async function getIndependentReviewRenewalFeeGbp(): Promise<number> {
-  return getConfiguredFeeGbp('INDEPENDENT_REVIEW_RENEWAL_FEE_GBP');
+export async function getIndependentReviewFeesGbp(): Promise<Record<IndependentReviewTier, number>> {
+  const [BRONZE, SILVER, GOLD] = await Promise.all([
+    getIndependentReviewFeeGbp('BRONZE'),
+    getIndependentReviewFeeGbp('SILVER'),
+    getIndependentReviewFeeGbp('GOLD'),
+  ]);
+  return { BRONZE, SILVER, GOLD };
 }
 
-export async function isIndependentReviewReassessmentActive(): Promise<boolean> {
-  return await getPlatformSetting('INDEPENDENT_REVIEW_REASSESSMENT_ACTIVE') === 'true';
-}
-
-export async function getIndependentReviewReassessmentFeeGbp(): Promise<number> {
-  return getConfiguredFeeGbp('INDEPENDENT_REVIEW_REASSESSMENT_FEE_GBP');
+export async function assertIndependentReviewFeeOrder(key: string, nextValue: number): Promise<string | null> {
+  const fees = await getIndependentReviewFeesGbp();
+  if (key === 'INDEPENDENT_REVIEW_FEE_BRONZE_GBP') fees.BRONZE = nextValue;
+  if (key === 'INDEPENDENT_REVIEW_FEE_SILVER_GBP') fees.SILVER = nextValue;
+  if (key === 'INDEPENDENT_REVIEW_FEE_GOLD_GBP') fees.GOLD = nextValue;
+  if (fees.BRONZE > fees.SILVER || fees.SILVER > fees.GOLD) {
+    return 'Bronze, Silver, and Gold prices must be in non-decreasing order';
+  }
+  return null;
 }
 
 export async function getIndependentReviewPartnerUrl(): Promise<string> {
@@ -310,11 +324,9 @@ export async function getAdminSettings(includeSupportRecipient = false) {
       retailerLaunchCreditsDefault: Number(settings.find((setting) => setting.key === 'RETAILER_LAUNCH_CREDITS_DEFAULT')?.value ?? defaultSettings.RETAILER_LAUNCH_CREDITS_DEFAULT),
       adspaceActive: (settings.find((setting) => setting.key === 'ADSPACE_ACTIVE')?.value ?? defaultSettings.ADSPACE_ACTIVE) === 'true',
       independentReviewActive: (settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_ACTIVE')?.value ?? defaultSettings.INDEPENDENT_REVIEW_ACTIVE) === 'true',
-      independentReviewFeeGbp: Number(settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_FEE_GBP')?.value ?? defaultSettings.INDEPENDENT_REVIEW_FEE_GBP),
-      independentReviewRenewalActive: (settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_RENEWAL_ACTIVE')?.value ?? defaultSettings.INDEPENDENT_REVIEW_RENEWAL_ACTIVE) === 'true',
-      independentReviewRenewalFeeGbp: Number(settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_RENEWAL_FEE_GBP')?.value ?? defaultSettings.INDEPENDENT_REVIEW_RENEWAL_FEE_GBP),
-      independentReviewReassessmentActive: (settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_REASSESSMENT_ACTIVE')?.value ?? defaultSettings.INDEPENDENT_REVIEW_REASSESSMENT_ACTIVE) === 'true',
-      independentReviewReassessmentFeeGbp: Number(settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_REASSESSMENT_FEE_GBP')?.value ?? defaultSettings.INDEPENDENT_REVIEW_REASSESSMENT_FEE_GBP),
+      independentReviewFeeBronzeGbp: Number(settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_FEE_BRONZE_GBP')?.value ?? defaultSettings.INDEPENDENT_REVIEW_FEE_BRONZE_GBP),
+      independentReviewFeeSilverGbp: Number(settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_FEE_SILVER_GBP')?.value ?? defaultSettings.INDEPENDENT_REVIEW_FEE_SILVER_GBP),
+      independentReviewFeeGoldGbp: Number(settings.find((setting) => setting.key === 'INDEPENDENT_REVIEW_FEE_GOLD_GBP')?.value ?? defaultSettings.INDEPENDENT_REVIEW_FEE_GOLD_GBP),
       directContactActive: (settings.find((setting) => setting.key === 'DIRECT_CONTACT_ACTIVE')?.value ?? defaultSettings.DIRECT_CONTACT_ACTIVE) === 'true',
       directContactFeeGbp: Number(settings.find((setting) => setting.key === 'DIRECT_CONTACT_FEE_GBP')?.value ?? defaultSettings.DIRECT_CONTACT_FEE_GBP),
       humanReviewActive: (settings.find((setting) => setting.key === 'HUMAN_REVIEW_ACTIVE')?.value ?? defaultSettings.HUMAN_REVIEW_ACTIVE) === 'true',
