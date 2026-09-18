@@ -1,6 +1,7 @@
 'use client';
 
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { CATEGORIES } from '@/lib/categories';
@@ -114,6 +115,39 @@ export function ExecutiveDashboard({ data }: Props) {
         <Metric label="VAT collected" value={money.format(data.financialQuarter.vatCollectedGbp)} hint={data.financialQuarter.label} />
       </div>
 
+      <Card className="mb-8">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-lg font-bold text-foundation-navy">Pricing intelligence</h2>
+            <p className="mt-1 text-sm text-concrete-grey">Overall estimate accuracy by product category. Master fee-basis reduction: {data.pricingIntelligence.masterReductionPercent.toFixed(2)}%.</p>
+          </div>
+          <StatusBadge status={Math.abs(data.pricingIntelligence.averageVariancePercent) <= 15 ? 'approved' : 'pending'}>
+            {String(Math.abs(data.pricingIntelligence.averageVariancePercent) <= 15 ? 'Market aligned' : 'Review variance')}
+          </StatusBadge>
+        </div>
+        <div className="grid gap-5 lg:grid-cols-[1fr_260px] lg:items-center">
+          <div className="h-56">
+            {data.pricingIntelligence.itemCount === 0 ? <EmptyChart /> : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.pricingIntelligence.accuracyBands}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis dataKey="label" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#1D3D5C" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-concrete-grey">
+            <p><span className="font-semibold text-foundation-navy">Average variance:</span> {data.pricingIntelligence.averageVariancePercent.toFixed(2)}%</p>
+            <p className="mt-2"><span className="font-semibold text-foundation-navy">Tracked categories:</span> {data.pricingIntelligence.itemCount}</p>
+            <p className="mt-2"><span className="font-semibold text-foundation-navy">Live samples:</span> {data.pricingIntelligence.sampleSize}</p>
+            <Link href="/super-user/pricing-intelligence" className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-foundation-navy px-4 text-sm font-semibold text-white hover:bg-steel-blue">Open pricing intelligence</Link>
+          </div>
+        </div>
+      </Card>
+
       <Card className="mb-8 border-l-4 border-l-safety-amber bg-amber-50/40">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -130,6 +164,17 @@ export function ExecutiveDashboard({ data }: Props) {
         </div>
       </Card>
 
+      <Card className="mb-8">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-lg font-bold text-foundation-navy">Tender detail drilldown</h2>
+            <p className="mt-1 text-sm text-concrete-grey">Individual filtered tenders with client, quote, acceptance, and value detail.</p>
+          </div>
+          <span className="text-xs font-semibold uppercase tracking-wide text-steel-blue">{data.tenderDetails.length} result{data.tenderDetails.length === 1 ? '' : 's'}</span>
+        </div>
+        {data.tenderDetails.length === 0 ? <EmptyChart /> : <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-sm"><thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-concrete-grey"><tr><th className="pb-3">Tender</th><th className="pb-3">Client</th><th className="pb-3">Category</th><th className="pb-3">Quotes</th><th className="pb-3">Accepted</th><th className="pb-3">Quoted value</th><th className="pb-3">Open</th></tr></thead><tbody className="divide-y divide-slate-100">{data.tenderDetails.map((item) => <tr key={item.id}><td className="py-3"><Link href={`/super-user/tenders/${item.id}`} className="font-semibold text-steel-blue hover:text-foundation-navy hover:underline">{item.reference}</Link><p className="text-xs text-concrete-grey">{item.location}</p></td><td className="py-3"><Link href={`/super-user/users/${item.client.id}`} className="font-semibold text-foundation-navy hover:text-steel-blue">{item.client.contactName}</Link><p className="text-xs text-concrete-grey">{item.client.email}</p></td><td className="py-3 text-concrete-grey">{item.category}</td><td className="py-3 text-concrete-grey">{item.quotes}</td><td className="py-3 text-concrete-grey">{item.acceptedQuotes}</td><td className="py-3 text-concrete-grey">{money.format(item.quotedValue)}</td><td className="py-3"><Link href={`/super-user/tenders/${item.id}`} className="font-semibold text-steel-blue hover:underline">Details</Link></td></tr>)}</tbody></table></div>}
+      </Card>
+
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
           <div className="mb-5 flex items-center justify-between gap-3">
@@ -137,7 +182,7 @@ export function ExecutiveDashboard({ data }: Props) {
               <h2 className="font-heading text-lg font-bold text-foundation-navy">Tender volume</h2>
               <p className="mt-1 text-sm text-concrete-grey">Demand trend for the selected period.</p>
             </div>
-            <a href="/super-user/tenders" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">Drill down &rarr;</a>
+            <Link href="/super-user/tenders" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">Drill down &rarr;</Link>
           </div>
           <div className="h-64">
             {data.monthly.length ? <ResponsiveContainer width="100%" height="100%"><LineChart data={data.monthly}><CartesianGrid stroke="#E2E8F0" vertical={false} /><XAxis dataKey="month" tick={{ fontSize: 12 }} /><YAxis allowDecimals={false} tick={{ fontSize: 12 }} /><Tooltip /><Line type="monotone" dataKey="tenders" stroke="#1D3D5C" strokeWidth={3} dot={{ r: 3 }} /></LineChart></ResponsiveContainer> : <EmptyChart />}
@@ -150,19 +195,24 @@ export function ExecutiveDashboard({ data }: Props) {
               <h2 className="font-heading text-lg font-bold text-foundation-navy">Conversion rates</h2>
               <p className="mt-1 text-sm text-concrete-grey">Where demand progresses or falls away.</p>
             </div>
-            <a href="/super-user/analytics" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">Drill down &rarr;</a>
+            <Link href="/super-user/analytics" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">Drill down &rarr;</Link>
           </div>
           <div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={[{ name: 'Match', rate: data.rates.matchRate }, { name: 'Quote', rate: data.rates.quoteRate }, { name: 'Accept', rate: data.rates.acceptanceRate }]}><CartesianGrid stroke="#E2E8F0" vertical={false} /><XAxis dataKey="name" tick={{ fontSize: 12 }} /><YAxis domain={[0, 100]} unit="%" tick={{ fontSize: 12 }} /><Tooltip formatter={(value) => `${value}%`} /><Bar dataKey="rate" fill="#F5A524" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
         </Card>
 
         <Card>
-          <div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="font-heading text-lg font-bold text-foundation-navy">Regional activity</h2><p className="mt-1 text-sm text-concrete-grey">Locations generating the most demand.</p></div><a href="/super-user/tenders" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">View tenders &rarr;</a></div>
+          <div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="font-heading text-lg font-bold text-foundation-navy">Regional activity</h2><p className="mt-1 text-sm text-concrete-grey">Locations generating the most demand.</p></div><Link href="/super-user/tenders" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">View tenders &rarr;</Link></div>
           <div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={data.regions} layout="vertical" margin={{ left: 12, right: 12 }}><CartesianGrid stroke="#E2E8F0" horizontal={false} /><XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} /><YAxis type="category" dataKey="region" width={80} tick={{ fontSize: 12 }} /><Tooltip /><Bar dataKey="tenders" name="Tenders" fill="#1D3D5C" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer></div>
         </Card>
 
         <Card>
-          <div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="font-heading text-lg font-bold text-foundation-navy">Category performance</h2><p className="mt-1 text-sm text-concrete-grey">Demand and quote acceptance by category.</p></div><a href="/super-user/categories" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">Manage categories &rarr;</a></div>
+          <div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="font-heading text-lg font-bold text-foundation-navy">Category performance</h2><p className="mt-1 text-sm text-concrete-grey">Demand and quote acceptance by category.</p></div><Link href="/super-user/categories" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">Manage categories &rarr;</Link></div>
           <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-concrete-grey"><tr><th className="pb-3">Category</th><th className="pb-3">Tenders</th><th className="pb-3">Quotes</th><th className="pb-3">Quoted value</th><th className="pb-3">Accept</th></tr></thead><tbody className="divide-y divide-slate-100">{data.categories.map((item) => <tr key={item.category}><td className="py-3 font-semibold text-foundation-navy">{item.category}</td><td className="py-3 text-concrete-grey">{item.tenders}</td><td className="py-3 text-concrete-grey">{item.quotes}</td><td className="py-3 text-concrete-grey">{money.format(item.value)}</td><td className="py-3"><StatusBadge status={item.acceptanceRate >= 25 ? 'approved' : 'pending'}>{`${item.acceptanceRate}%`}</StatusBadge></td></tr>)}</tbody></table></div>
+        </Card>
+
+        <Card>
+          <div className="mb-5"><h2 className="font-heading text-lg font-bold text-foundation-navy">Quote acceptance by Provider verification status</h2><p className="mt-1 text-sm text-concrete-grey">Quotes submitted vs. accepted, grouped by the submitting Provider&apos;s current verification status.</p></div>
+          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-concrete-grey"><tr><th className="pb-3">Verification status</th><th className="pb-3">Quotes submitted</th><th className="pb-3">Quotes accepted</th><th className="pb-3">Ratio</th></tr></thead><tbody className="divide-y divide-slate-100">{data.verificationBreakdown.map((item) => <tr key={item.tier}><td className="py-3 font-semibold text-foundation-navy">{item.label}</td><td className="py-3 text-concrete-grey">{item.submitted}</td><td className="py-3 text-concrete-grey">{item.accepted}</td><td className="py-3"><StatusBadge status={item.acceptanceRate >= 25 ? 'approved' : 'pending'}>{`${item.accepted} / ${item.submitted} (${item.acceptanceRate}%)`}</StatusBadge></td></tr>)}</tbody></table></div>
         </Card>
       </div>
     </div>

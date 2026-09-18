@@ -1,3 +1,4 @@
+import { ClerkProvider } from '@clerk/nextjs';
 import { Montserrat, Source_Sans_3 } from 'next/font/google';
 import { AuthSessionProvider } from '@/components/providers/AuthSessionProvider';
 import './globals.css';
@@ -30,7 +31,9 @@ export default function RootLayout({
   return (
     <html lang="en-GB" className={`${montserrat.variable} ${sourceSans.variable}`}>
       <body className="min-h-screen bg-site-white font-sans text-foundation-navy antialiased">
-        <AuthSessionProvider>{children}</AuthSessionProvider>
+        <ClerkProvider>
+          <AuthSessionProvider>{children}</AuthSessionProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

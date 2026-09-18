@@ -88,24 +88,32 @@ export function OpportunitiesExplorer({ opportunities }: { opportunities: Opport
   return (
     <div>
       <Card className="mb-6 flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Input
-            placeholder="Search by location or tender ID"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="max-w-xs"
-          />
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex min-w-0 flex-col gap-2">
+            <label htmlFor="opportunity-search" className="text-sm font-semibold text-foundation-navy">Search tenders</label>
+            <Input
+              id="opportunity-search"
+              placeholder="Search by location or tender ID"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="max-w-xs"
+            />
+          </div>
           {newCount > 0 && (
             <span className="text-sm font-semibold text-safety-amber">{newCount} new since you last checked</span>
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <fieldset className="min-w-0">
+          <legend className="mb-2 text-sm font-semibold text-foundation-navy">Filters</legend>
+          <div className="flex flex-wrap gap-2">
           {CATEGORY_NAMES.map((category) => (
             <button
               key={category}
               type="button"
               onClick={() => toggle(categories, setCategories, category)}
+              aria-pressed={categories.includes(category)}
+              aria-label={`${categories.includes(category) ? 'Remove' : 'Add'} ${category} filter`}
               className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                 categories.includes(category)
                   ? 'border-safety-amber bg-safety-amber/10 text-foundation-navy'
@@ -120,6 +128,8 @@ export function OpportunitiesExplorer({ opportunities }: { opportunities: Opport
               key={urgency}
               type="button"
               onClick={() => toggle(urgencies, setUrgencies, urgency)}
+              aria-pressed={urgencies.includes(urgency)}
+              aria-label={`${urgencies.includes(urgency) ? 'Remove' : 'Add'} ${urgency} urgency filter`}
               className={`rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
                 urgencies.includes(urgency)
                   ? 'border-steel-blue bg-steel-blue/10 text-foundation-navy'
@@ -129,16 +139,21 @@ export function OpportunitiesExplorer({ opportunities }: { opportunities: Opport
               {urgency}
             </button>
           ))}
-        </div>
+          </div>
+        </fieldset>
 
-        <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
-          <Input
-            placeholder="Name this search…"
-            value={savedSearchName}
-            onChange={(event) => setSavedSearchName(event.target.value)}
-            className="max-w-[12rem]"
-          />
-          <Button variant="secondary" onClick={saveCurrentSearch} className="h-9 px-4 text-sm">
+        <div className="flex flex-wrap items-end gap-2 border-t border-slate-100 pt-4">
+          <div className="flex min-w-0 flex-col gap-2">
+            <label htmlFor="saved-search-name" className="text-sm font-semibold text-foundation-navy">Saved search name</label>
+            <Input
+              id="saved-search-name"
+              placeholder="Name this search…"
+              value={savedSearchName}
+              onChange={(event) => setSavedSearchName(event.target.value)}
+              className="max-w-[12rem]"
+            />
+          </div>
+          <Button variant="secondary" onClick={saveCurrentSearch} className="h-11 px-4 text-sm">
             Save search
           </Button>
           {savedSearches.map((saved) => (
@@ -146,7 +161,7 @@ export function OpportunitiesExplorer({ opportunities }: { opportunities: Opport
               key={saved.name}
               className="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-foundation-navy"
             >
-              <button type="button" onClick={() => applySavedSearch(saved)} className="hover:underline">
+              <button type="button" onClick={() => applySavedSearch(saved)} className="min-h-11 hover:underline" aria-label={`Apply saved search ${saved.name}`}>
                 {saved.name}
               </button>
               <button
@@ -164,7 +179,7 @@ export function OpportunitiesExplorer({ opportunities }: { opportunities: Opport
 
       {filtered.length === 0 ? (
         <Card className="py-16 text-center text-sm text-concrete-grey">
-          No matching tenders. Try a different search or filter.
+          <p role="status">No matching tenders. Try a different search or filter.</p>
         </Card>
       ) : (
         <div className="flex flex-col gap-4">

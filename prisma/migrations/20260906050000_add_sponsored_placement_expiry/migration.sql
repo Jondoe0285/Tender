@@ -1,0 +1,2 @@
+ALTER TABLE "RetailerSponsoredPlacement" ADD COLUMN "expiresAt" TIMESTAMP(3);
+CREATE INDEX "RetailerSponsoredPlacement_retailerId_active_expiresAt_idx" ON "RetailerSponsoredPlacement"("retailerId", "active", "expiresAt");

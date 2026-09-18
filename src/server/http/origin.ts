@@ -1,18 +1,33 @@
 import { NextResponse } from 'next/server';
 import { additionalAllowedOrigins } from '@/server/config/appUrl';
 
-function requestOrigin(request: Request): string {
+function requestOrigin(request: Request): string | null {
   const forwardedHost = request.headers.get('x-forwarded-host');
   const forwardedProto = request.headers.get('x-forwarded-proto');
   if (forwardedHost && forwardedProto) {
-    return `${forwardedProto.split(',')[0].trim()}://${forwardedHost.split(',')[0].trim()}`;
+    const candidate = `${forwardedProto.split(',')[0].trim()}://${forwardedHost.split(',')[0].trim()}`;
+    try {
+      const candidateOrigin = new URL(candidate).origin;
+      if (
+        isConfiguredApplicationOrigin(candidateOrigin) ||
+        isAdditionalAllowedOrigin(candidateOrigin) ||
+        isLocalDevelopmentOrigin(candidateOrigin)
+      ) {
+        return candidateOrigin;
+      }
+    } catch {
+      return null;
+    }
   }
 
-  return new URL(request.url).origin;
+  return null;
 }
 
 function permittedOrigins(request: Request): string[] {
-  return [...new Set([new URL(request.url).origin, requestOrigin(request)])];
+  const origins = [new URL(request.url).origin];
+  const forwarded = requestOrigin(request);
+  if (forwarded) origins.push(forwarded);
+  return [...new Set(origins)];
 }
 
 function isConfiguredApplicationOrigin(origin: string): boolean {

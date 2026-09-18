@@ -45,10 +45,17 @@ test('treats a missing api key as unconfigured', () => {
 });
 
 test('names the environment in the delivery test and leaks no account data', () => {
-  const sentAt = new Date('2026-08-30T12:00:00.000Z');
-  const template = configurationTestTemplate({ environment: 'staging', sentAt });
+  const previousAppUrl = process.env.NEXTAUTH_URL;
+  process.env.NEXTAUTH_URL = 'https://tender.example.test';
+  try {
+    const sentAt = new Date('2026-08-30T12:00:00.000Z');
+    const template = configurationTestTemplate({ environment: 'staging', sentAt });
 
-  assert.match(template.subject, /staging/);
-  assert.ok(template.html.includes('2026-08-30T12:00:00.000Z'));
-  assert.ok(template.html.includes('No account, tender, quote, or contact information is included'));
+    assert.match(template.subject, /staging/);
+    assert.ok(template.html.includes('2026-08-30T12:00:00.000Z'));
+    assert.ok(template.html.includes('No account, tender, quote, or contact information is included'));
+  } finally {
+    if (previousAppUrl === undefined) delete process.env.NEXTAUTH_URL;
+    else process.env.NEXTAUTH_URL = previousAppUrl;
+  }
 });

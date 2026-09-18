@@ -18,11 +18,6 @@ const portals = [
     description:
       'Review matched tender opportunities by category and coverage area, unlock full details, and submit a formal quote.',
   },
-  {
-    eyebrow: 'For Super Users',
-    title: 'Keep the marketplace running smoothly.',
-    description: 'Manage users, categories, pricing, and platform activity from one view.',
-  },
 ];
 
 export default function HomePage() {
@@ -35,7 +30,7 @@ export default function HomePage() {
           <div className="absolute inset-0 -z-10 bg-foundation-navy/85" />
           <div className="mx-auto flex min-h-[600px] max-w-6xl items-center px-6 py-20 sm:px-10">
             <div className="max-w-2xl border-l-4 border-safety-amber pl-6 sm:pl-8">
-              <p className="mb-5 text-xs font-semibold uppercase tracking-widest text-hi-viz-tint">The tender platform for construction supply</p>
+              <p className="mb-5 text-xs font-semibold uppercase tracking-widest text-sky-blue">The tender platform for construction supply</p>
               <h1 className="font-heading text-4xl font-bold leading-tight text-site-white sm:text-6xl">Trade Tender</h1>
               <p className="mt-4 font-heading text-2xl font-semibold text-safety-amber sm:text-3xl">Connect. Compare. Construct.</p>
               <p className="mt-6 max-w-xl text-lg leading-relaxed text-site-white/80">
@@ -49,7 +44,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section aria-label="Trade Tender workspaces" className="mx-auto grid max-w-6xl gap-4 px-6 py-14 sm:grid-cols-3 sm:px-10">
+        <section aria-label="Trade Tender workspaces" className="mx-auto grid max-w-6xl gap-4 px-6 py-14 sm:grid-cols-2 sm:px-10">
           {portals.map((portal) => (
             <Card key={portal.title} interactive className="flex min-h-[250px] flex-col border-t-4 border-t-steel-blue">
               <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-steel-blue">

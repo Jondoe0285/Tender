@@ -1,8 +1,9 @@
 import { z } from 'zod';
+import { passwordSchema } from '@/lib/schemas/password';
 
 export const passwordResetSchema = z.object({
   token: z.string().min(1).max(200),
-  password: z.string().min(10).max(200),
+  password: passwordSchema,
 });
 
 export const passwordResetRequestSchema = z.object({

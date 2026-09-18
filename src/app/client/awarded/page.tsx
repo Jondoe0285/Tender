@@ -7,7 +7,7 @@ import { prisma } from '@/server/data/prisma';
 
 export default async function AwardedProjectsPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'CONTRACTOR') redirect('/login');
+  if (!user || user.role !== 'USER') redirect('/login');
 
   const awardedQuotes = await prisma.quote.findMany({
     where: { tender: { clientId: user.id }, status: 'ACCEPTED' },
@@ -19,7 +19,7 @@ export default async function AwardedProjectsPage() {
     <AppShell role="client" title="Awarded Projects">
       <div className="mx-auto max-w-4xl">
         <p className="mb-6 max-w-xl text-sm text-concrete-grey">
-          Projects where you&rsquo;ve accepted a Retailer&rsquo;s quote.
+          Projects where you&rsquo;ve accepted a Provider&rsquo;s quote.
         </p>
         {awardedQuotes.length === 0 ? (
           <Card className="py-16 text-center text-sm text-concrete-grey">No awarded projects are recorded for this account.</Card>

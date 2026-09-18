@@ -17,6 +17,8 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
 const DEPLOYMENT_DIR = 'docs/health-check/deployments';
+const HIGH_RISK_ATTESTATION = 'HIGH RISK STAGING CONTROLS VERIFIED';
+const PRODUCTION_PROVIDER_ATTESTATION = 'PRODUCTION PROVIDER CONTROLS VERIFIED';
 
 const EXPECTED_STATEMENT = {
   'staging-branch': 'PROMOTE APPROVED COMMIT TO STAGING BRANCH',
@@ -69,6 +71,24 @@ if (args.statement !== EXPECTED_STATEMENT[target]) {
   block(`The approval statement must be exactly: ${EXPECTED_STATEMENT[target]}`);
 } else {
   pass('Approval statement matches exactly');
+}
+
+if (target === 'staging') {
+  const attestation = (args['high-risk-attestation'] ?? '').trim();
+  if (attestation !== HIGH_RISK_ATTESTATION) {
+    block(`The high-risk staging attestation must be exactly: ${HIGH_RISK_ATTESTATION}`);
+  } else {
+    pass('High-risk staging controls attestation is present');
+  }
+}
+
+if (target === 'production') {
+  const attestation = (args['provider-controls-attestation'] ?? '').trim();
+  if (attestation !== PRODUCTION_PROVIDER_ATTESTATION) {
+    block(`The production provider-controls attestation must be exactly: ${PRODUCTION_PROVIDER_ATTESTATION}`);
+  } else {
+    pass('Production provider-controls attestation is present');
+  }
 }
 
 // 2. The commit SHA must be a real value, not an unfilled placeholder.

@@ -7,6 +7,9 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { finalizeSponsoredPlacementWithPayment } from '@/server/domain/sponsoredPlacementService';
 import { finalizeMembershipTierWithPayment } from '@/server/domain/membershipService';
+import { finalizeIndependentReviewWithPayment } from '@/server/domain/independentReviewService';
+import { finalizeDirectContactWithPayment } from '@/server/domain/directContactService';
+import { finalizeProfessionalInterestWithPayment } from '@/server/domain/professionalInterestService';
 
 const bodySchema = z.object({ paymentId: z.string().min(1) });
 
@@ -39,6 +42,9 @@ export async function POST(request: Request) {
   await confirmPayment(payment.id);
   if (payment.type === 'SPONSORED_PLACEMENT') await finalizeSponsoredPlacementWithPayment(user.id, payment.id);
   if (payment.type === 'MEMBERSHIP_TIER' && payment.tierId) await finalizeMembershipTierWithPayment(user.id, payment.tierId, payment.id);
+  if (payment.type === 'INDEPENDENT_REVIEW') await finalizeIndependentReviewWithPayment(user.id, payment.id);
+  if (payment.type === 'DIRECT_CONTACT') await finalizeDirectContactWithPayment(user.id, payment.id);
+  if (payment.type === 'PROFESSIONAL_INTEREST') await finalizeProfessionalInterestWithPayment(user.id, payment.id);
   await recordAuditEvent({
     actorId: user.id,
     action: 'PAYMENT_CONFIRMED_DEV',

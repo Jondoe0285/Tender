@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { QuoteComparison } from '@/components/quotes/QuoteComparison';
 import { TenderMessages } from '@/components/quotes/TenderMessages';
 import { REQUIREMENT_OPTIONS } from '@/lib/categories';
+import { PageLoadState } from '@/components/ui/PageLoadState';
 
 type Tender = {
   id: string;
@@ -18,6 +19,7 @@ type Tender = {
   location: string;
   urgency: string;
   closingDate: string;
+  status: 'DRAFT' | 'OPEN' | 'CLOSED';
   supplyDate: string | null;
   requirements: string;
   description: string;
@@ -25,23 +27,37 @@ type Tender = {
   attachments: { id: string; fileName: string; mimeType: string; sizeBytes: number }[];
 };
 
-type Quote = {
+type QuoteCommon = {
   id: string;
   reference: string;
+  validityDays: number;
+  status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
+  submittedAt: string;
+  expiresAt: string;
+  sponsoredPlacementActive?: boolean;
+  providerIsSoleTrader: boolean;
+  providerVerificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
+  verifiedDocumentLabels: string[];
+  independentlyVerified: boolean;
+  independentReviewTier: 'BRONZE' | 'SILVER' | 'GOLD' | null;
+};
+
+type Quote = QuoteCommon & ({
+  expired: false;
   priceGbp: number;
   leadTimeDays: number;
   deliveryDateConfirmed: boolean;
   deliveryInfo: string;
-  validityDays: number;
   lines: { tenderItemId: string; priceGbp: number | null; available: boolean; tenderItem: { category: string; subcategory: string; item: string | null; quantity: string } }[];
   charges: { id: string; description: string; priceGbp: number }[];
-  status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
-  submittedAt: string;
-  sponsoredPlacementActive?: boolean;
   releaseFeeGbp: number;
-};
+} | {
+  expired: true;
+  expiryMessage: string;
+});
 
 type Contact = { contactName: string; contactPhone: string | null; email: string };
+type DirectContact = { id: string; releasedAt: string | null; contact: Contact & { companyName: string; categories: string } };
 
 export default function ClientTenderDetailPage() {
   const params = useParams<{ id: string }>();
@@ -50,6 +66,8 @@ export default function ClientTenderDetailPage() {
   const [busyQuoteId, setBusyQuoteId] = useState<string | null>(null);
   const [pendingPayment, setPendingPayment] = useState<{ quoteId: string; paymentId: string; checkoutUrl: string | null } | null>(null);
   const [contacts, setContacts] = useState<Record<string, Contact>>({});
+  const [professionalInterests, setProfessionalInterests] = useState<Array<{ id: string; contact: Contact }>>([]);
+  const [directContacts, setDirectContacts] = useState<DirectContact[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -66,6 +84,16 @@ export default function ClientTenderDetailPage() {
     } else if (!tender) {
       const data = await tenderResponse.json().catch(() => null);
       setLoadError(data?.error ?? 'Unable to load this tender.');
+    }
+    const interestResponse = await fetch(`/api/tenders/${params.id}/professional-interest`);
+    const directContactResponse = await fetch(`/api/tenders/${params.id}/direct-contact`);
+    if (interestResponse.ok) {
+      const interestData = await interestResponse.json() as { interests?: Array<{ id: string; contact: Contact }> };
+      setProfessionalInterests(interestData.interests ?? []);
+    }
+    if (directContactResponse.ok) {
+      const directContactData = await directContactResponse.json() as { contacts?: DirectContact[] };
+      setDirectContacts(directContactData.contacts ?? []);
     }
     if (quotesResponse.ok) {
       const nextQuotes: Quote[] = (await quotesResponse.json()).quotes;
@@ -99,10 +127,14 @@ export default function ClientTenderDetailPage() {
     }
   }
 
-  async function handleAccept(quoteId: string) {
+  async function handleAccept(quoteId: string, declarationAccepted = false) {
     setBusyQuoteId(quoteId);
     setMessage(null);
-    const response = await fetch(`/api/quotes/${quoteId}/accept`, { method: 'POST' });
+    const response = await fetch(`/api/quotes/${quoteId}/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ declarationAccepted }),
+    });
     const data = await response.json();
     setBusyQuoteId(null);
 
@@ -133,9 +165,10 @@ export default function ClientTenderDetailPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paymentId: pendingPayment.paymentId }),
     });
+    const confirmData = await confirmResponse.json().catch(() => null);
     if (!confirmResponse.ok) {
       setBusyQuoteId(null);
-      setMessage('Dev payment simulation failed.');
+      setMessage(confirmData?.error ?? 'Dev payment simulation failed.');
       return;
     }
 
@@ -192,7 +225,7 @@ export default function ClientTenderDetailPage() {
   if (!tender) {
     return (
       <AppShell role="client" title="Tender">
-        <p className="text-sm text-concrete-grey">{loadError ?? 'Loading\u2026'}</p>
+        <PageLoadState error={loadError} onRetry={loadError ? () => { setLoadError(null); void load(); } : undefined} />
       </AppShell>
     );
   }
@@ -212,6 +245,11 @@ export default function ClientTenderDetailPage() {
           <Button variant="secondary" onClick={() => setEditing((current) => !current)}>
             {editing ? 'Cancel edit' : 'Edit tender'}
           </Button>
+          {(tender.status === 'CLOSED' || new Date(tender.closingDate).getTime() <= Date.now()) && (
+            <Link href={`/user/tenders/new?copyFrom=${encodeURIComponent(tender.id)}`} className="inline-flex h-11 items-center justify-center rounded-lg bg-safety-amber px-5 text-sm font-semibold text-foundation-navy shadow-soft hover:bg-sky-blue hover:shadow-soft-md">
+              Re-tender
+            </Link>
+          )}
         </div>
         {editing ? (
           <Card className="mt-5">
@@ -302,6 +340,37 @@ export default function ClientTenderDetailPage() {
             )}
           </Card>
         )}
+        {professionalInterests.length > 0 && (
+          <Card className="mt-5">
+            <h3 className="font-heading text-lg font-bold text-foundation-navy">Professional interests</h3>
+            <ul className="mt-3 flex flex-col gap-3">
+              {professionalInterests.map((interest) => (
+                <li key={interest.id} className="border-l-4 border-steel-blue/40 pl-4 text-sm text-concrete-grey">
+                  <p className="font-semibold text-foundation-navy">{interest.contact.contactName}</p>
+                  <p>{interest.contact.email}</p>
+                  {interest.contact.contactPhone && <p>{interest.contact.contactPhone}</p>}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+        {directContacts.length > 0 && (
+          <Card className="mt-5">
+            <h3 className="font-heading text-lg font-bold text-foundation-navy">Direct contact requests</h3>
+            <p className="mt-1 text-sm text-concrete-grey">These Providers paid the approved direct-contact fee to share their own details for this Contractor or Professional Services tender. Your contact details remain private unless released through an approved workflow.</p>
+            <ul className="mt-3 flex flex-col gap-3">
+              {directContacts.map((request) => (
+                <li key={request.id} className="border-l-4 border-steel-blue/40 pl-4 text-sm text-concrete-grey">
+                  <p className="font-semibold text-foundation-navy">{request.contact.companyName}</p>
+                  <p>{request.contact.contactName}</p>
+                  <p>{request.contact.email}</p>
+                  {request.contact.contactPhone && <p>{request.contact.contactPhone}</p>}
+                  <p className="mt-1 text-xs">{request.contact.categories}</p>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
       </section>
 
       <section className="mx-auto max-w-6xl">
@@ -319,13 +388,13 @@ export default function ClientTenderDetailPage() {
         {message && <p className="mb-4 text-sm font-semibold text-attention">{message}</p>}
         {quotes.length === 0 ? (
           <Card className="py-16 text-center text-sm text-concrete-grey">
-            No quotes have been submitted. Matched Retailers will appear here once they respond.
+            No quotes have been submitted. Matched Providers will appear here once they respond.
           </Card>
         ) : (
           <>
             <p className="mb-4 text-sm text-concrete-grey">
-              Compare the commercial details first. Accepting a quote starts the contact-release payment shown against
-              that quote; contact details remain hidden until payment is confirmed.
+              Compare the commercial details first. Accepting a quote releases contact details for that Provider quote only;
+              the release fee is based on the full submitted quote value, not selected quote lines.
             </p>
             <QuoteComparison
               quotes={quotes}
@@ -339,7 +408,7 @@ export default function ClientTenderDetailPage() {
             />
           </>
         )}
-        {quotes.map((quote) => (
+        {quotes.filter((quote) => !quote.expired).map((quote) => (
           <div key={quote.id} className="mt-6">
             <TenderMessages tenderId={params.id} quoteId={quote.id} role="client" />
           </div>

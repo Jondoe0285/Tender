@@ -97,6 +97,7 @@ export function AccountantManagementPanel({ initialAccountants }: { initialAccou
             <label className="text-sm text-concrete-grey">
               <span className="mb-1 block font-medium text-foundation-navy">Initial password</span>
               <input required type="text" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30" />
+              <span className="mt-1 block text-xs text-concrete-grey">Use 10-200 characters, including a capital letter and a special character.</span>
             </label>
             <label className="text-sm text-concrete-grey">
               <span className="mb-1 block font-medium text-foundation-navy">Phone</span>

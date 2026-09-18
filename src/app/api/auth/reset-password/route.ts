@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = passwordResetSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Password must be at least 10 characters' }, { status: 400 });
+    return NextResponse.json({ error: 'Password must be 10-200 characters and include a capital letter and special character' }, { status: 400 });
   }
 
   const passwordHash = await hashPassword(parsed.data.password);

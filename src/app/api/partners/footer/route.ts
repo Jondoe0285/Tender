@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const partners = await prisma.partner.findMany({
-      where: { active: true, displayLocation: 'FOOTER' },
+      where: { active: true, displayLocation: 'FOOTER', OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       select: { id: true, name: true, logoPath: true, destinationUrl: true },
     });

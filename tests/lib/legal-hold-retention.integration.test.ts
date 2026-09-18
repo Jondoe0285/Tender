@@ -24,15 +24,15 @@ test('active legal holds exclude expired quotes and tender attachments until rel
 
   const [admin, client, retailer] = await Promise.all([
     prisma.user.create({ data: { email: `hold-admin-${suffix}@example.test`, passwordHash: 'not-used', role: 'SUPER_USER', contactName: 'Hold Admin' } }),
-    prisma.user.create({ data: { email: `hold-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CONTRACTOR', contactName: 'Hold Client' } }),
-    prisma.user.create({ data: { email: `hold-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Hold Retailer' } }),
+    prisma.user.create({ data: { email: `hold-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Hold Client' } }),
+    prisma.user.create({ data: { email: `hold-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Hold Retailer' } }),
   ]);
   adminId = admin.id;
   clientId = client.id;
   retailerId = retailer.id;
 
   const tender = await prisma.tender.create({
-    data: { reference: `HOLD-${suffix}`, clientId, category: 'Materials', subcategory: 'Aggregate', location: 'Leeds', quantity: '20 tonnes', urgency: 'Standard', closingDate: new Date('2026-01-02T00:00:00.000Z'), requirements: 'Delivery', description: 'Fictional legal hold test tender' },
+    data: { reference: `HOLD-${suffix}`, clientId, category: 'Materials', subcategory: 'Aggregate', location: 'Leeds', quantity: '20 tonnes', urgency: 'Standard', status: 'CLOSED', closingDate: new Date('2026-01-02T00:00:00.000Z'), requirements: 'Delivery', description: 'Fictional legal hold test tender' },
   });
   tenderId = tender.id;
   const [quote, attachment] = await Promise.all([
@@ -49,6 +49,10 @@ test('active legal holds exclude expired quotes and tender attachments until rel
 
   await releaseLegalHold(admin.id, tenderHold.id, 'Investigation concluded and retention may resume.');
   const deleted = await purgeExpiredUnpurchasedQuotes(new Date('2026-03-01T00:00:00.000Z'));
-  assert.deepEqual(deleted, { quotesDeleted: 1, documentsDeleted: 1 });
+  assert.equal(deleted.quotesDeleted, 1);
+  assert.equal(deleted.documentsDeleted, 1);
+  assert.equal(typeof deleted.emailVerificationTokensDeleted, 'number');
+  assert.equal(typeof deleted.passwordResetTokensDeleted, 'number');
+  assert.equal(typeof deleted.pageViewsDeleted, 'number');
   assert.equal(await prisma.auditLog.count({ where: { action: 'LEGAL_HOLD_RELEASED', targetId: tender.id } }), 1);
 });

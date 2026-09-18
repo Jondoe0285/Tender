@@ -32,7 +32,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (user.role !== 'PROVIDER') {
+    if (user.role !== 'USER') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -106,7 +106,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (user.role !== 'PROVIDER') {
+    if (user.role !== 'USER') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

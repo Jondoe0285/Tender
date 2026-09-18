@@ -2,21 +2,24 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { CATEGORY_NAMES } from '@/lib/categories';
+import { SERVICE_CATALOG, SERVICE_NAMES } from '@/lib/categories';
+import { COMPANY_TYPE_LABELS, COMPANY_TYPES } from '@/lib/companyTypes';
 import { FieldGroup, Input, Label, PasswordInput } from '@/components/ui/Field';
 import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
 import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [role, setRole] = useState<'CONTRACTOR' | 'PROVIDER'>('CONTRACTOR');
   const [coverageScope, setCoverageScope] = useState<'COUNTY' | 'REGION' | 'UK'>('COUNTY');
   const [counties, setCounties] = useState<string[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
+  const [services, setServices] = useState<string[]>([]);
+  const [serviceProvisions, setServiceProvisions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -26,8 +29,6 @@ export default function RegisterPage() {
     setError(null);
 
     const form = new FormData(event.currentTarget);
-    const categories = form.getAll('categories') as string[];
-
     const response = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -38,14 +39,17 @@ export default function RegisterPage() {
         firstName: form.get('firstName'),
         lastName: form.get('lastName'),
         contactPhone: form.get('contactPhone') || undefined,
-        role,
+        role: 'USER',
         termsAccepted: form.get('termsAccepted') === 'on',
+        privacyAccepted: form.get('privacyAccepted') === 'on',
         companyName: form.get('companyName') || undefined,
-        categories: role === 'PROVIDER' ? categories : undefined,
-        coverageAreas: form.get('coverageAreas') || undefined,
-        coverageScope: role === 'PROVIDER' ? coverageScope : undefined,
-        counties: role === 'PROVIDER' && coverageScope === 'COUNTY' ? counties : undefined,
-        regions: role === 'PROVIDER' && coverageScope === 'REGION' ? regions : undefined,
+        companyType: form.get('companyType') || undefined,
+        branchIdentifier: form.get('branchIdentifier') || undefined,
+        categories: services,
+        serviceProvisions,
+        coverageScope,
+        counties: coverageScope === 'COUNTY' ? counties : undefined,
+        regions: coverageScope === 'REGION' ? regions : undefined,
       }),
     });
 
@@ -66,31 +70,7 @@ export default function RegisterPage() {
           <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-steel-blue">Create an account</p>
           <h1 className="font-heading text-3xl font-bold tracking-tight text-foundation-navy">Create your Trade Tender account</h1>
           <p className="mt-3 text-sm leading-relaxed text-concrete-grey">
-            Select the account type that matches your role in the construction supply chain.
-          </p>
-
-          <div className="mt-6 flex gap-2 rounded-lg bg-slate-100 p-1" role="radiogroup" aria-label="Account type">
-            {(['CONTRACTOR', 'PROVIDER'] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                role="radio"
-                aria-checked={role === option}
-                onClick={() => setRole(option)}
-                className={`flex-1 rounded-md px-4 py-2.5 text-sm font-semibold transition-colors ${
-                  role === option
-                    ? 'bg-white text-foundation-navy shadow-soft'
-                    : 'text-concrete-grey hover:text-foundation-navy'
-                }`}
-              >
-                {option === 'CONTRACTOR' ? 'Contractor' : 'Provider'}
-              </button>
-            ))}
-          </div>
-          <p className="mt-3 text-xs text-concrete-grey">
-            {role === 'CONTRACTOR'
-              ? 'For construction businesses raising requirements and comparing trade prices.'
-              : 'For providers responding to matched construction demand.'}
+            Set up your business to raise tenders and receive relevant tender opportunities.
           </p>
 
           <Card className="mt-6">
@@ -116,25 +96,50 @@ export default function RegisterPage() {
               <FieldGroup>
                 <Label htmlFor="password">Password</Label>
                 <PasswordInput id="password" name="password" minLength={10} required autoComplete="new-password" />
-                <p className="text-xs text-concrete-grey">Use at least 10 characters.</p>
+                <p className="text-xs text-concrete-grey">Use 10-200 characters, including a capital letter and a special character.</p>
               </FieldGroup>
               <FieldGroup>
                 <Label htmlFor="companyName">Company name</Label>
                 <Input id="companyName" name="companyName" required autoComplete="organization" />
               </FieldGroup>
+              <FieldGroup>
+                <Label htmlFor="companyType">Company type</Label>
+                <select id="companyType" name="companyType" required defaultValue="LIMITED_COMPANY" className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm">
+                  {COMPANY_TYPES.map((type) => (
+                    <option key={type} value={type}>{COMPANY_TYPE_LABELS[type]}</option>
+                  ))}
+                </select>
+              </FieldGroup>
+              <FieldGroup>
+                <Label htmlFor="branchIdentifier">Branch or location</Label>
+                <Input id="branchIdentifier" name="branchIdentifier" required placeholder="e.g. Leeds branch or Head Office" />
+                <p className="text-xs text-concrete-grey">This distinguishes businesses with the same company name.</p>
+              </FieldGroup>
 
-              {role === 'PROVIDER' && (
-                <>
-                  <fieldset className="flex flex-col gap-2">
+              <fieldset className="flex flex-col gap-2">
                     <legend className="text-sm font-semibold text-foundation-navy">Categories you provide</legend>
                     <p className="text-xs text-concrete-grey">These categories determine which tender opportunities are matched to you.</p>
-                    {CATEGORY_NAMES.map((category) => (
+                    {SERVICE_NAMES.map((category) => (
                       <label key={category} className="flex items-center gap-3 text-sm text-concrete-grey">
-                        <input type="checkbox" name="categories" value={category} className="h-4 w-4 accent-safety-amber" />
+                        <input type="checkbox" name="categories" value={category} checked={services.includes(category)} onChange={() => setServices((current) => {
+                          const nextServices = current.includes(category) ? current.filter((service) => service !== category) : [...current, category];
+                          setServiceProvisions((provisions) => provisions.filter((entry) => nextServices.includes(entry.split('::')[0] ?? '')));
+                          return nextServices;
+                        })} className="h-4 w-4 accent-safety-amber" />
                         {category}
                       </label>
                     ))}
                   </fieldset>
+                  {services.map((service) => (
+                    <fieldset key={service} className="flex flex-col gap-2">
+                      <legend className="text-sm font-semibold text-foundation-navy">{service} provisions (optional)</legend>
+                      <p className="text-xs text-concrete-grey">Select the areas your business provides to refine your profile.</p>
+                      {Object.keys(SERVICE_CATALOG[service as keyof typeof SERVICE_CATALOG]).map((provision) => {
+                        const value = `${service}::${provision}`;
+                        return <label key={value} className="flex items-center gap-3 text-sm text-concrete-grey"><input type="checkbox" checked={serviceProvisions.includes(value)} onChange={() => setServiceProvisions((current) => current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value])} className="h-4 w-4 accent-safety-amber" />{provision}</label>;
+                      })}
+                    </fieldset>
+                  ))}
                   <FieldGroup>
                     <Label htmlFor="coverageScope">Operating area</Label>
                     <div className="flex flex-wrap gap-4">
@@ -175,17 +180,13 @@ export default function RegisterPage() {
                       />
                     </FieldGroup>
                   )}
-                  <FieldGroup>
-                    <Label htmlFor="coverageAreas">Coverage towns (optional)</Label>
-                    <Input id="coverageAreas" name="coverageAreas" placeholder="e.g. Leeds, Manchester, Sheffield" />
-                    <p className="text-xs text-concrete-grey">Used only to estimate distance on opportunity listings, in addition to the service areas above.</p>
-                  </FieldGroup>
-                </>
-              )}
-
               <label className="flex items-start gap-3 text-sm text-concrete-grey">
                 <input type="checkbox" name="termsAccepted" required className="mt-1 h-4 w-4 accent-safety-amber" />
-                I accept the Trade Tender Terms of Use.
+                I accept the <Link href="/policies/platform-terms" className="font-semibold text-steel-blue underline underline-offset-4">Trade Tender Terms of Use</Link>.
+              </label>
+              <label className="flex items-start gap-3 text-sm text-concrete-grey">
+                <input type="checkbox" name="privacyAccepted" required className="mt-1 h-4 w-4 accent-safety-amber" />
+                I acknowledge the <Link href="/policies/privacy" className="font-semibold text-steel-blue underline underline-offset-4">Privacy Policy</Link>.
               </label>
 
               {error && (

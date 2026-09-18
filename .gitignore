@@ -5,6 +5,8 @@ node_modules/
 
 # Testing
 coverage/
+mobile-stress-test-results/
+mobile-stress-test-evidence/
 
 # Production
 build/
@@ -47,3 +49,6 @@ prisma/dev.db-journal
 # Health-check disposable databases
 health-check*.db
 prisma/health-check*.db
+
+# Stress-test reports are generated evidence and should not be committed.
+stress-test-results/

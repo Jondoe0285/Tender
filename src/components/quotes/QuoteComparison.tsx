@@ -1,25 +1,65 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { independentReviewTierDescription } from '@/lib/independentReviewTiers';
 
-type Quote = {
+type QuoteCommon = {
   id: string;
   reference: string;
+  validityDays: number;
+  status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
+  submittedAt: string;
+  expiresAt: string;
+  sponsoredPlacementActive?: boolean;
+  providerIsSoleTrader: boolean;
+  providerVerificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
+  verifiedDocumentLabels: string[];
+  independentlyVerified: boolean;
+  independentReviewTier: 'BRONZE' | 'SILVER' | 'GOLD' | null;
+};
+
+type ActiveQuote = QuoteCommon & {
+  expired: false;
   priceGbp: number;
   leadTimeDays: number;
   deliveryDateConfirmed: boolean;
   deliveryInfo: string;
-  validityDays: number;
   lines: { tenderItemId: string; priceGbp: number | null; available: boolean; tenderItem: { category: string; subcategory: string; item: string | null; quantity: string } }[];
   charges: { id: string; description: string; priceGbp: number }[];
-  status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
-  submittedAt: string;
-  sponsoredPlacementActive?: boolean;
   releaseFeeGbp: number;
 };
+
+type ExpiredQuote = QuoteCommon & {
+  expired: true;
+  expiryMessage: string;
+};
+
+type Quote = ActiveQuote | ExpiredQuote;
+
+function ProviderVerificationBadge({ status, verifiedDocumentLabels, independentlyVerified, independentReviewTier, soleTrader }: { status: Quote['providerVerificationStatus']; verifiedDocumentLabels: string[]; independentlyVerified: boolean; independentReviewTier: Quote['independentReviewTier']; soleTrader: boolean }) {
+  if (independentlyVerified) {
+    const tier = independentReviewTier;
+    const bannerLabel = tier === 'BRONZE' ? 'Bronze' : tier === 'SILVER' ? 'Silver' : tier === 'GOLD' ? 'Gold' : 'Bronze';
+    const docLabel = tier === 'BRONZE' ? 'Enhanced Bronze Verification' : tier === 'SILVER' ? 'Enhanced Silver Verification' : 'Enhanced Gold Verification';
+    return <span title={`${docLabel} — ${independentReviewTierDescription(tier)} Sinclair Safety Solutions Ltd completed this professional review through the HSQE Consult Hub platform. This does not replace your own due diligence before any formal agreement.`}><StatusBadge status="approved">{bannerLabel}</StatusBadge></span>;
+  }
+  if (status === 'VERIFIED') {
+    const docLabel = soleTrader ? 'Sole trader AI Verified' : 'Incorporated AI Verified';
+    const evidenceLabel = soleTrader ? 'self-employment' : 'legal-compliance & incorporation';
+    const title = verifiedDocumentLabels.length > 0 ? `${docLabel} — Automated ${evidenceLabel} evidence reviewed: ${verifiedDocumentLabels.join(', ')}. AI may make mistakes; complete your own due diligence.` : `${docLabel} — Automated ${evidenceLabel} assessment passed. AI may make mistakes; complete your own due diligence.`;
+    return <span title={title}><StatusBadge status="approved">Verified</StatusBadge></span>;
+  }
+  if (soleTrader) {
+    return <span title="Sole Trader (Unverified) — This Provider declared sole-trader status and has not yet completed AI verification. Complete your own identity, insurance, competence, and commercial checks before appointing them."><StatusBadge status="neutral">Sole Trader</StatusBadge></span>;
+  }
+  if (status === 'PENDING') return <StatusBadge status="pending">Verification pending</StatusBadge>;
+  if (status === 'EXPIRED') return <span title="This Provider's verification lapsed because a document expired."><StatusBadge status="attention">Verification expired</StatusBadge></span>;
+  return <StatusBadge status="neutral">Unverified</StatusBadge>;
+}
 
 type SortKey = 'priceGbp' | 'leadTimeDays' | 'validityDays' | 'submittedAt';
 
@@ -29,7 +69,7 @@ type QuoteComparisonProps = {
   pendingPayment: { quoteId: string; paymentId: string } | null;
   pendingCheckoutUrl?: string | null;
   busyQuoteId: string | null;
-  onAccept: (quoteId: string) => void;
+  onAccept: (quoteId: string, declarationAccepted?: boolean) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
 };
@@ -47,14 +87,16 @@ export function QuoteComparison({
   const [sortKey, setSortKey] = useState<SortKey>('priceGbp');
   const [sortAscending, setSortAscending] = useState(true);
 
-  const submittedQuotes = quotes.filter((quote) => quote.status === 'SUBMITTED');
+  const activeQuotes = quotes.filter((quote): quote is ActiveQuote => !quote.expired);
+  const submittedQuotes = activeQuotes.filter((quote) => quote.status === 'SUBMITTED');
   const fullySuppliedQuotes = submittedQuotes.filter((quote) => quote.lines.length > 0 && quote.lines.every((quoteLine) => quoteLine.available));
   const bestPrice = fullySuppliedQuotes.length ? Math.min(...fullySuppliedQuotes.map((quote) => quote.priceGbp)) : null;
   const bestLeadTime = submittedQuotes.length ? Math.min(...submittedQuotes.map((quote) => quote.leadTimeDays)) : null;
-  const sponsoredQuotes = quotes.filter((quote) => quote.sponsoredPlacementActive);
 
   const sortedQuotes = useMemo(() => {
     return [...quotes].sort((first, second) => {
+      if (first.expired !== second.expired) return first.expired ? 1 : -1;
+      if (first.expired || second.expired) return new Date(second.submittedAt).getTime() - new Date(first.submittedAt).getTime();
       const firstValue = first[sortKey];
       const secondValue = second[sortKey];
       const comparison = firstValue < secondValue ? -1 : firstValue > secondValue ? 1 : 0;
@@ -70,24 +112,35 @@ export function QuoteComparison({
     }
   }
 
+  const sortLabels: Record<SortKey, string> = {
+    priceGbp: 'Price excl. VAT',
+    leadTimeDays: 'Lead time',
+    validityDays: 'Validity',
+    submittedAt: 'Submitted date',
+  };
+
   return (
     <>
-      {sponsoredQuotes.length > 0 && (
-        <section className="mb-5 rounded-lg border border-safety-amber/50 bg-amber-50 px-5 py-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">Sponsored Retailer placement</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {sponsoredQuotes.map((quote) => (
-              <div key={quote.id} className="rounded-lg bg-white px-4 py-3 shadow-soft">
-                <p className="font-semibold text-foundation-navy">{quote.reference}</p>
-                <p className="mt-1 text-sm text-concrete-grey">£{quote.priceGbp} excl. VAT · {quote.leadTimeDays} days</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      <p className="sr-only" aria-live="polite">
+        Sorted by {sortLabels[sortKey]}, {sortAscending ? 'ascending' : 'descending'}
+      </p>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-concrete-grey">Compare {quotes.length} formal quote{quotes.length === 1 ? '' : 's'} side by side.</p>
         <p className="text-xs text-concrete-grey">Select a column heading to sort</p>
+      </div>
+
+      <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Verification key</p>
+        <div className="mt-3 grid gap-3 text-sm md:grid-cols-3 lg:grid-cols-6">
+          <div><StatusBadge status="neutral">Unverified</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Unverified</p><p className="mt-1 text-xs text-concrete-grey">No approved verification evidence recorded on the platform.</p></div>
+          <div><StatusBadge status="neutral">Sole Trader</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Sole Trader (Unverified)</p><p className="mt-1 text-xs text-concrete-grey">Declared sole trader status; complete suitable due diligence before appointment.</p></div>
+          <div><StatusBadge status="approved">Verified</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Sole trader AI Verified / Incorporated AI Verified</p><p className="mt-1 text-xs text-concrete-grey">Passed automated self-employment or incorporation &amp; legal-compliance checks.</p></div>
+          <div><StatusBadge status="approved">Bronze</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Enhanced Bronze Verification</p><p className="mt-1 text-xs text-concrete-grey">Health &amp; Safety legal requirements, permits, insurances, and competent advice reviewed.</p></div>
+          <div><StatusBadge status="approved">Silver</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Enhanced Silver Verification</p><p className="mt-1 text-xs text-concrete-grey">Bronze criteria plus employee &amp; managerial safety training evidence reviewed.</p></div>
+          <div><StatusBadge status="approved">Gold</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Enhanced Gold Verification</p><p className="mt-1 text-xs text-concrete-grey">Bronze &amp; Silver criteria plus comprehensive management system or SSIP membership reviewed.</p></div>
+        </div>
+        <p className="mt-3 text-xs text-concrete-grey">These statuses do not replace your own suitable due diligence before entering a formal agreement.</p>
+        <Link href="/policies/verification-policy" className="mt-2 inline-block text-xs font-semibold text-steel-blue hover:text-foundation-navy">Read the detailed verification policy</Link>
       </div>
 
       <div className="hidden overflow-x-auto rounded-card border border-slate-200 bg-white shadow-soft lg:block">
@@ -159,8 +212,13 @@ function SortableHeader({
 }) {
   const active = activeKey === sortKey;
   return (
-    <th className="px-5 py-4 font-semibold">
-      <button type="button" onClick={() => onSort(sortKey)} className="rounded px-1 py-1 text-left hover:text-foundation-navy">
+    <th className="px-5 py-4 font-semibold" aria-sort={active ? (ascending ? 'ascending' : 'descending') : 'none'}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        aria-label={`Sort by ${label}${active ? `, currently ${ascending ? 'ascending' : 'descending'}` : ''}`}
+        className="rounded px-1 py-1 text-left hover:text-foundation-navy"
+      >
         {label} {active ? (ascending ? '↑' : '↓') : '↕'}
       </button>
     </th>
@@ -179,11 +237,14 @@ function QuoteRow({
   onLoadContact,
   pendingCheckoutUrl,
 }: QuoteRowProps) {
+  if (quote.expired) return <ExpiredQuoteRow quote={quote} />;
+
   return (
-    <tr className="align-top">
+    <tr className={`align-top ${quote.independentlyVerified ? 'bg-approved/5' : ''}`}>
       <td className="px-5 py-5">
         <p className="font-semibold text-foundation-navy">{quote.reference}</p>
         <StatusBadge status={quote.status === 'ACCEPTED' ? 'approved' : 'neutral'}>{quote.status}</StatusBadge>
+        <div className="mt-2"><ProviderVerificationBadge status={quote.providerVerificationStatus} verifiedDocumentLabels={quote.verifiedDocumentLabels} independentlyVerified={quote.independentlyVerified} independentReviewTier={quote.independentReviewTier} soleTrader={quote.providerIsSoleTrader} /></div>
       </td>
       <td className="px-5 py-5">
         <p className="font-heading text-xl font-bold text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
@@ -226,12 +287,15 @@ function QuoteCard({
   onLoadContact,
   pendingCheckoutUrl,
 }: QuoteRowProps) {
+  if (quote.expired) return <ExpiredQuoteCard quote={quote} />;
+
   return (
-    <Card interactive>
+    <Card interactive className={quote.independentlyVerified ? 'border-approved/40 bg-approved/5' : ''}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">{quote.reference}</p>
           <p className="mt-1 font-heading text-2xl font-bold text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
+          <div className="mt-2"><ProviderVerificationBadge status={quote.providerVerificationStatus} verifiedDocumentLabels={quote.verifiedDocumentLabels} independentlyVerified={quote.independentlyVerified} independentReviewTier={quote.independentReviewTier} soleTrader={quote.providerIsSoleTrader} /></div>
         </div>
         <StatusBadge status={quote.status === 'ACCEPTED' ? 'approved' : 'neutral'}>{quote.status}</StatusBadge>
       </div>
@@ -266,7 +330,7 @@ type QuoteRowProps = {
   contact?: Contact;
   isPendingPayment: boolean;
   busy: boolean;
-  onAccept: (quoteId: string) => void;
+  onAccept: (quoteId: string, declarationAccepted?: boolean) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
   pendingCheckoutUrl?: string | null;
@@ -274,7 +338,7 @@ type QuoteRowProps = {
 
 type Contact = { contactName: string; contactPhone: string | null; email: string };
 
-function QuoteBreakdown({ quote }: { quote: Quote }) {
+function QuoteBreakdown({ quote }: { quote: ActiveQuote }) {
   if (quote.lines.length === 0 && quote.charges.length === 0) return <p className="text-sm text-concrete-grey">Not itemized</p>;
 
   return (
@@ -296,7 +360,7 @@ function QuoteBreakdown({ quote }: { quote: Quote }) {
           </li>
         ))}
       </ul>
-      <p className="mt-2 border-t border-slate-200 pt-2 text-sm font-semibold text-foundation-navy">Total: £{quote.priceGbp} excl. VAT</p>
+      <p className="mt-2 border-t border-slate-200 pt-2 text-sm font-semibold text-foundation-navy">Full submitted quote value: £{quote.priceGbp} excl. VAT</p>
     </div>
   );
 }
@@ -310,6 +374,36 @@ function Detail({ label, value, highlight = false }: { label: string; value: str
   );
 }
 
+function ExpiredQuoteRow({ quote }: { quote: ExpiredQuote }) {
+  return (
+    <tr className="align-top bg-slate-50">
+      <td className="px-5 py-5">
+        <p className="font-semibold text-foundation-navy">{quote.reference}</p>
+        <StatusBadge status="attention">Expired</StatusBadge>
+      </td>
+      <td colSpan={6} className="px-5 py-5 text-sm text-concrete-grey">
+        <p className="font-semibold text-foundation-navy">{quote.expiryMessage}</p>
+        <p className="mt-1">Provider validity period: {quote.validityDays} days. Expired on {new Date(quote.expiresAt).toLocaleDateString('en-GB')}.</p>
+      </td>
+    </tr>
+  );
+}
+
+function ExpiredQuoteCard({ quote }: { quote: ExpiredQuote }) {
+  return (
+    <Card className="border-attention/30 bg-slate-50">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">{quote.reference}</p>
+          <p className="mt-2 text-sm font-semibold text-foundation-navy">{quote.expiryMessage}</p>
+          <p className="mt-1 text-sm text-concrete-grey">Provider validity period: {quote.validityDays} days. Expired on {new Date(quote.expiresAt).toLocaleDateString('en-GB')}.</p>
+        </div>
+        <StatusBadge status="attention">Expired</StatusBadge>
+      </div>
+    </Card>
+  );
+}
+
 function DecisionActions({
   quote,
   contact,
@@ -320,21 +414,45 @@ function DecisionActions({
   onLoadContact,
   pendingCheckoutUrl,
 }: {
-  quote: Quote;
+  quote: ActiveQuote;
   contact?: Contact;
   isPendingPayment: boolean;
   busy: boolean;
-  onAccept: (quoteId: string) => void;
+  onAccept: (quoteId: string, declarationAccepted?: boolean) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
   pendingCheckoutUrl?: string | null;
 }) {
+  const [showDeclaration, setShowDeclaration] = useState(false);
+  const [declarationChecked, setDeclarationChecked] = useState(false);
+
   if (quote.status === 'SUBMITTED') {
-    return <Button onClick={() => onAccept(quote.id)} loading={busy}>Accept quote · £{quote.releaseFeeGbp} excl. VAT release fee</Button>;
+    const requiresDeclaration = quote.providerVerificationStatus === 'VERIFIED' || quote.independentlyVerified;
+    return (
+      <>
+        <Button onClick={() => requiresDeclaration ? setShowDeclaration(true) : onAccept(quote.id)} loading={busy}>Accept full quote · £{quote.releaseFeeGbp} excl. VAT release fee</Button>
+        {showDeclaration && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-foundation-navy/50 p-4">
+            <Card className="max-w-lg">
+              <h3 className="font-heading text-lg font-bold text-foundation-navy">Before you proceed</h3>
+            <p className="mt-3 text-sm text-concrete-grey">Trade Tender&rsquo;s automated review assesses legal-compliance evidence only and may make mistakes. You retain full responsibility for suitable independent due diligence before entering any formal agreement, and Trade Tender accepts no liability for the Provider&rsquo;s work, conduct, or the outcome of your engagement with them.</p>
+              <label className="mt-4 flex items-start gap-3 text-sm text-foundation-navy">
+                <input type="checkbox" checked={declarationChecked} onChange={(event) => setDeclarationChecked(event.target.checked)} className="mt-1 h-4 w-4 accent-safety-amber" />
+                I have read and accept this declaration.
+              </label>
+              <div className="mt-5 flex justify-end gap-3">
+                <Button variant="secondary" onClick={() => { setShowDeclaration(false); setDeclarationChecked(false); }}>Cancel</Button>
+                <Button disabled={!declarationChecked} loading={busy} onClick={() => { setShowDeclaration(false); onAccept(quote.id, true); }}>Accept &amp; proceed</Button>
+              </div>
+            </Card>
+          </div>
+        )}
+      </>
+    );
   }
   if (quote.status === 'ACCEPTED' && isPendingPayment) {
     if (pendingCheckoutUrl) {
-      return <a href={pendingCheckoutUrl} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-safety-amber px-5 text-sm font-semibold text-foundation-navy shadow-soft hover:bg-hi-viz-tint">Continue payment</a>;
+      return <a href={pendingCheckoutUrl} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-safety-amber px-5 text-sm font-semibold text-foundation-navy shadow-soft hover:bg-sky-blue">Continue payment</a>;
     }
     return <Button onClick={onSimulateReleasePayment} loading={busy}>Pay release fee (dev)</Button>;
   }

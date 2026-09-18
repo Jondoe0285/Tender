@@ -3,18 +3,33 @@ import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { createPayment } from '@/server/payments/paymentService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
-import { ForbiddenError } from '@/server/auth/session';
+import { ForbiddenError, ValidationError } from '@/server/auth/session';
 import { getClientReleaseFeeGbp } from '@/server/domain/platformSettings';
+import { isQuoteExpired } from '@/server/domain/quoteService';
 import { contactReleaseTemplate, quoteAcceptedTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { getPurchasedRetentionDeadline } from '@/server/domain/retentionService';
+import { consumePaymentWaiver } from '@/server/domain/paymentWaiverService';
+import { syncVerificationExpiry } from '@/server/domain/verificationDocumentService';
 
 type AcceptOutcome = { status: 'PAYMENT_REQUIRED' | 'RELEASED_WITH_CREDIT'; paymentId: string; checkoutUrl: string | null; devMode: boolean; feeGbp: number; vatGbp: number; totalAmountGbp: number; creditsLeft?: number };
 
 /** Accepting a quote enters a pending release-fee state — no contact data is exposed yet (SEC-035). */
-export async function acceptQuote(clientId: string, quoteId: string): Promise<AcceptOutcome> {
+export async function acceptQuote(clientId: string, quoteId: string, mobileReturnUrl?: string, declarationAccepted = false): Promise<AcceptOutcome> {
   const quote = await prisma.quote.findUnique({ where: { id: quoteId }, include: { tender: true, retailer: { select: { email: true } }, releasePayment: true } });
   if (!quote || quote.tender.clientId !== clientId) throw new ForbiddenError('Quote not found for this Client');
+  if (quote.status === 'SUBMITTED' || quote.status === 'ACCEPTED') {
+    await syncVerificationExpiry(quote.retailerId);
+    const retailerProfile = await prisma.retailerProfile.findUnique({ where: { userId: quote.retailerId }, select: { verificationStatus: true, independentReviewStatus: true } });
+    const requiresDeclaration = retailerProfile?.verificationStatus === 'VERIFIED' || retailerProfile?.independentReviewStatus === 'APPROVED';
+    if (requiresDeclaration && !quote.verificationDeclarationAcceptedAt && !declarationAccepted) {
+      throw new ValidationError('You must accept the verification declaration before accepting a quote from a verified Provider');
+    }
+    if (declarationAccepted && !quote.verificationDeclarationAcceptedAt) {
+      await prisma.quote.update({ where: { id: quote.id }, data: { verificationDeclarationAcceptedAt: new Date() } });
+      await recordAuditEvent({ actorId: clientId, action: 'VERIFICATION_DECLARATION_ACCEPTED', targetType: 'Quote', targetId: quoteId, metadata: { tenderId: quote.tenderId, retailerId: quote.retailerId } });
+    }
+  }
   if (quote.status === 'ACCEPTED' && quote.releasePayment) {
     return {
       status: 'PAYMENT_REQUIRED',
@@ -27,6 +42,9 @@ export async function acceptQuote(clientId: string, quoteId: string): Promise<Ac
     };
   }
   if (quote.status !== 'SUBMITTED' && quote.status !== 'ACCEPTED') throw new ForbiddenError('Quote is not in a state that can be accepted');
+  if (quote.status === 'SUBMITTED' && isQuoteExpired(quote.submittedAt, quote.validityDays)) {
+    throw new ValidationError("This quote has exceeded the Provider's validity period and is no longer valid.");
+  }
 
   if (quote.status === 'SUBMITTED') {
     const retentionLockedUntil = getPurchasedRetentionDeadline();
@@ -44,6 +62,12 @@ export async function acceptQuote(clientId: string, quoteId: string): Promise<Ac
   }
 
   const releaseFeeGbp = await getClientReleaseFeeGbp(quote.priceGbp);
+  const waiverUse = await consumePaymentWaiver({ userId: clientId, feeType: 'CLIENT_RELEASE', quoteId });
+  if (waiverUse) {
+    await finalizeContactRelease(clientId, quoteId, waiverUse.payment.id);
+    return { status: 'RELEASED_WITH_CREDIT', paymentId: waiverUse.payment.id, checkoutUrl: null, devMode: false, feeGbp: 0, vatGbp: 0, totalAmountGbp: 0 };
+  }
+
   const clientCompanyMembership = await prisma.clientCompanyMember.findUnique({
     where: { userId: clientId },
     select: { company: { select: { id: true, releaseCreditsLeft: true } } },
@@ -78,7 +102,7 @@ export async function acceptQuote(clientId: string, quoteId: string): Promise<Ac
 
   let payment: AcceptOutcome;
   try {
-    payment = { status: 'PAYMENT_REQUIRED', ...(await createPayment({ type: 'CLIENT_RELEASE', userId: clientId, quoteId, quotePriceGbp: quote.priceGbp })), feeGbp: releaseFeeGbp };
+    payment = { status: 'PAYMENT_REQUIRED', ...(await createPayment({ type: 'CLIENT_RELEASE', userId: clientId, quoteId, quotePriceGbp: quote.priceGbp, mobileReturnUrl })), feeGbp: releaseFeeGbp };
   } catch (error) {
     // A concurrent accept already created the release payment (Payment.quoteId is unique) — return it instead of failing.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -99,20 +123,28 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
   const quote = await prisma.quote.findUnique({ where: { id: quoteId }, include: { tender: true } });
   if (!quote || quote.tender.clientId !== clientId) throw new ForbiddenError('Quote not found for this Client');
   if (quote.status !== 'ACCEPTED') throw new ForbiddenError('Quote has not been accepted');
-
-  const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
-  if (!payment || payment.userId !== clientId || payment.quoteId !== quoteId || payment.type !== 'CLIENT_RELEASE' || payment.status !== 'CONFIRMED') {
-    throw new ForbiddenError('Payment is not a confirmed release payment for this Client');
+  await syncVerificationExpiry(quote.retailerId);
+  const retailerProfile = await prisma.retailerProfile.findUnique({ where: { userId: quote.retailerId }, select: { verificationStatus: true, independentReviewStatus: true } });
+  if ((retailerProfile?.verificationStatus === 'VERIFIED' || retailerProfile?.independentReviewStatus === 'APPROVED') && !quote.verificationDeclarationAcceptedAt) {
+    throw new ValidationError('The verification declaration must be accepted before contact details can be released');
   }
-
-  const existing = await prisma.contactRelease.findUnique({ where: { quoteId } });
-  if (existing) return existing;
 
   let release;
   try {
     const releasedAt = new Date();
     const correlationId = randomUUID();
     release = await prisma.$transaction(async (transaction) => {
+      // Check payment state in the same serializable transaction that creates the release so a
+      // concurrent refund/dispute cannot leave a release authorised by stale payment state.
+      const payment = await transaction.payment.findFirst({
+        where: { id: paymentId, userId: clientId, quoteId, type: 'CLIENT_RELEASE', status: 'CONFIRMED' },
+        select: { id: true },
+      });
+      if (!payment) throw new ForbiddenError('Payment is not a confirmed release payment for this Client');
+
+      const existing = await transaction.contactRelease.findUnique({ where: { quoteId } });
+      if (existing) return existing;
+
       const createdRelease = await transaction.contactRelease.create({
         data: {
           tenderId: quote.tenderId,
@@ -155,7 +187,7 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
         },
       });
       return createdRelease;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (error) {
     // The quoteId unique constraint rejects a concurrent duplicate finalisation; return the row it created.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -196,7 +228,9 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
 
 /** Returns the counterparty's contact details only if a release event authorises this requester. */
 export async function getReleasedContact(userId: string, quoteId: string) {
-  const release = await prisma.contactRelease.findFirst({ where: { quoteId } });
+  const release = await prisma.contactRelease.findFirst({
+    where: { quoteId, authorizingPayment: { status: 'CONFIRMED' } },
+  });
   if (!release || (release.clientId !== userId && release.retailerId !== userId)) {
     throw new ForbiddenError('Contact details have not been released to this user');
   }

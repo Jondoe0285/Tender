@@ -1,52 +1,31 @@
 export type NavItem = { label: string; href: string; ownerOnly?: boolean };
 export type NavGroup = { label: string | null; items: NavItem[] };
-export type ApprovedRole = 'SUPER_USER' | 'CONTRACTOR' | 'PROVIDER';
+export type ApprovedRole = 'SUPER_USER' | 'USER';
 
 export function workspaceForRole(role: string | undefined): string | null {
-  if (role === 'CONTRACTOR') return '/contractor';
-  if (role === 'PROVIDER') return '/provider';
+  if (role === 'USER') return '/user';
   if (role === 'SUPER_USER') return '/super-user';
   return null;
 }
 
-/** Contractor nav: raise and track tenders through to award and payment. */
-export const CLIENT_NAV: NavGroup[] = [
-  { label: null, items: [{ label: 'Dashboard', href: '/contractor' }] },
+/** User navigation combines tender ownership and matched opportunity workflows. */
+export const USER_NAV: NavGroup[] = [
+  { label: null, items: [{ label: 'Dashboard', href: '/user' }] },
   {
     label: 'Tendering',
     items: [
-      { label: 'Create Tender', href: '/contractor/tenders/new' },
-      { label: 'My Tenders', href: '/contractor/tenders' },
-      { label: 'Quotes Received', href: '/contractor/quotes' },
-      { label: 'Awarded Projects', href: '/contractor/awarded' },
+      { label: 'Create Tender', href: '/user/tenders/new' },
+      { label: 'My Tenders', href: '/user/tenders' },
+      { label: 'Tender Opportunities', href: '/user/opportunities' },
+      { label: 'Submitted Quotes', href: '/user/quotes' },
     ],
   },
   {
     label: 'Account',
     items: [
-      { label: 'Billing', href: '/contractor/billing' },
-      { label: 'Profile', href: '/contractor/profile' },
-    ],
-  },
-];
-
-/** Provider nav: find matched demand, unlock it, and track quote performance. */
-export const RETAILER_NAV: NavGroup[] = [
-  { label: null, items: [{ label: 'Dashboard', href: '/provider' }] },
-  {
-    label: 'Tendering',
-    items: [
-      { label: 'New Opportunities', href: '/provider/opportunities' },
-      { label: 'Unlocked Tenders', href: '/provider/unlocked' },
-      { label: 'Submitted Quotes', href: '/provider/quotes' },
-      { label: 'Performance', href: '/provider/performance' },
-    ],
-  },
-  {
-    label: 'Account',
-    items: [
-      { label: 'Billing', href: '/provider/billing' },
-      { label: 'Profile', href: '/provider/profile' },
+      { label: 'Activity History', href: '/user/billing' },
+      { label: 'Profile', href: '/user/profile' },
+      { label: 'Support requests', href: '/user/support' },
     ],
   },
 ];
@@ -58,8 +37,7 @@ export const SUPER_USER_NAV: NavGroup[] = [
     label: 'Marketplace',
     items: [
       { label: 'Tender Management', href: '/super-user/tenders' },
-      { label: 'Provider Management', href: '/super-user/retailers' },
-      { label: 'Contractor Management', href: '/super-user/clients' },
+      { label: 'User Management', href: '/super-user/retailers' },
       { label: 'Payment Monitoring', href: '/super-user/payments' },
     ],
   },
@@ -69,6 +47,8 @@ export const SUPER_USER_NAV: NavGroup[] = [
       { label: 'Tender Monitoring', href: '/super-user/compliance' },
       { label: 'Activity Log', href: '/super-user/activity-log' },
       { label: 'Analytics', href: '/super-user/analytics' },
+      { label: 'Pricing Intelligence', href: '/super-user/pricing-intelligence' },
+      { label: 'Support requests', href: '/super-user/support' },
     ],
   },
   {
@@ -76,9 +56,9 @@ export const SUPER_USER_NAV: NavGroup[] = [
     items: [
       { label: 'Categories', href: '/super-user/categories' },
       { label: 'Partner Management', href: '/super-user/partners' },
-      { label: 'Site Settings', href: '/super-user/settings' },
       { label: 'Accountant Management', href: '/super-user/accountants' },
       { label: 'Accounting Space', href: '/super-user/accounting' },
+      { label: 'Security', href: '/account/security' },
     ],
   },
   {

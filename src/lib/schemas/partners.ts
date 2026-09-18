@@ -19,7 +19,14 @@ const partnerFieldsSchema = z.object({
   displayLocation: z.enum(partnerDisplayLocations),
   campaignSource: z.string().trim().min(1).max(160).optional(),
   active: z.boolean(),
-}).strict();
+  expiresAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expiry date must be a valid date').optional(),
+}).strict().superRefine((value, context) => {
+  if (!value.expiresAt) return;
+  const expiresAt = new Date(`${value.expiresAt}T23:59:59.999Z`);
+  if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['expiresAt'], message: 'Expiry date must be in the future' });
+  }
+});
 
 export const partnerRequestSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('create'), partner: partnerFieldsSchema }).strict(),

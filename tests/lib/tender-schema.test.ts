@@ -14,6 +14,7 @@ const VALID_TENDER = {
   subcategory: 'Aggregates',
   location: 'Leeds LS10 2AB',
   quantity: '20 tonnes',
+  itemDescription: 'Aggregate must meet the project specification and include delivery assumptions.',
   urgency: 'standard' as const,
   closingDate: '2099-08-27',
   description: 'Twenty tonnes of aggregate with delivery to the project site.',
@@ -121,6 +122,7 @@ test('requires both exact retailer capability and configured coverage before cre
   assert.equal(retailerCanMatchTender(eligibleRetailer, 'Bristol BS1 4DJ', ['Materials']), false);
   assert.equal(retailerCanMatchTender(eligibleRetailer, 'Leeds LS10 2AB', ['Waste']), false);
   assert.equal(retailerCanMatchTender({ ...eligibleRetailer, categories: 'Material' }, 'Leeds LS10 2AB', ['Materials']), false);
+  assert.equal(retailerCanMatchTender({ ...eligibleRetailer, categories: '' }, 'Leeds LS10 2AB', ['Materials']), false);
 });
 
 test('does not match when a Retailer has not configured any counties or regions', () => {
@@ -154,7 +156,7 @@ test('excludes active direct and tender legal holds from retention purge decisio
   assert.deepEqual(expiredQuotePurgeWhere(cutoff).legalHolds, { none: { releasedAt: null } });
   assert.deepEqual(expiredQuotePurgeWhere(cutoff).tender, { legalHolds: { none: { releasedAt: null } } });
   assert.deepEqual(expiredAttachmentPurgeWhere(cutoff).legalHolds, { none: { releasedAt: null } });
-  assert.deepEqual(expiredAttachmentPurgeWhere(cutoff).tender, { legalHolds: { none: { releasedAt: null } } });
+  assert.deepEqual(expiredAttachmentPurgeWhere(cutoff).tender, { status: { not: 'OPEN' }, legalHolds: { none: { releasedAt: null } } });
 });
 
 test('calculates progressive percentage release fees across all three bands', () => {
@@ -176,8 +178,8 @@ test('accepts Contractor and Professional Services tender provisions', () => {
   const professionalService = createTenderSchema.safeParse({
     ...VALID_TENDER,
     category: 'Professional Services',
-    subcategory: 'Surveying, Design & Engineering',
-    item: 'Surveying, architecture, engineering, project management and technical design',
+    subcategory: 'Health, Safety & CDM Consultancy',
+    item: 'Retained health and safety consultancy',
   });
 
   assert.equal(contractorService.success, true);
@@ -214,6 +216,7 @@ test('accepts a valid structured construction tender', () => {
     subcategory: 'Aggregates',
     location: 'Leeds LS10 2AB',
     quantity: '20 tonnes',
+    itemDescription: 'Aggregate must meet the project specification and include delivery assumptions.',
     urgency: 'standard',
     closingDate: '2099-08-27',
     requirements: ['Delivery to site required'],
@@ -223,7 +226,7 @@ test('accepts a valid structured construction tender', () => {
   assert.equal(result.success, true);
 });
 
-test('accepts a tender without specification notes', () => {
+test('rejects a tender without specification notes', () => {
   const result = createTenderSchema.safeParse({
     projectName: 'Ready mix concrete delivery',
     category: 'Materials',
@@ -231,8 +234,10 @@ test('accepts a tender without specification notes', () => {
     item: 'Ready-mix concrete',
     location: 'Leeds LS10 2AB',
     quantity: '10 m³',
+    itemDescription: 'Concrete supply specification must include mix design and delivery assumptions.',
     urgency: 'standard',
     closingDate: '2099-08-27',
+    itemDescription: '',
     description: '',
     items: [{
       category: 'Plant Hire',
@@ -243,7 +248,7 @@ test('accepts a tender without specification notes', () => {
     }],
   });
 
-  assert.equal(result.success, true);
+  assert.equal(result.success, false);
 });
 
 test('rejects a supply date in the past', () => {
@@ -271,6 +276,7 @@ test('accepts selectable quote requirements', () => {
     item: 'Mini excavators approx. 1.5-3 tonnes',
     location: 'Leeds LS10 2AB',
     quantity: '1 unit',
+    itemDescription: 'Operated plant hire must include machine specification and delivery constraints.',
     urgency: 'standard',
     closingDate: '2099-08-27',
     requirements: ['Driver or operator required', 'Timed delivery required', 'Site induction required'],
@@ -287,6 +293,7 @@ test('rejects a subcategory from a different category', () => {
     subcategory: 'Aggregates',
     location: 'Leeds LS10 2AB',
     quantity: '1 unit',
+    itemDescription: 'The plant requirement must include specification and expected site constraints.',
     urgency: 'urgent',
     closingDate: '2099-08-27',
     description: 'An excavator is required for groundworks on site.',

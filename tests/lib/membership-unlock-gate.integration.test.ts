@@ -8,6 +8,7 @@ test('a zero-cost unlock fee waives payment and opens the tender immediately', a
   const suffix = randomUUID();
   let clientId: string | undefined;
   let retailerId: string | undefined;
+  let companyId: string | undefined;
   let tenderId: string | undefined;
   const originalMembershipTiersSetting = await prisma.platformSetting.findUnique({ where: { key: 'MEMBERSHIP_TIERS_ACTIVE' } });
   const originalUnlockFeeSetting = await prisma.platformSetting.findUnique({ where: { key: 'RETAILER_UNLOCK_FEE_GBP' } });
@@ -18,16 +19,17 @@ test('a zero-cost unlock fee waives payment and opens the tender immediately', a
     if (tenderId) await prisma.tenderMatch.deleteMany({ where: { tenderId } });
     if (tenderId) await prisma.tenderItem.deleteMany({ where: { tenderId } });
     if (tenderId) await prisma.tender.deleteMany({ where: { id: tenderId } });
+    if (companyId) await prisma.clientCompany.deleteMany({ where: { id: companyId } });
     if (retailerId) await prisma.retailerProfile.deleteMany({ where: { userId: retailerId } });
     const userIds = [clientId, retailerId].filter((id): id is string => Boolean(id));
     if (userIds.length > 0) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     if (originalMembershipTiersSetting) {
-      await prisma.platformSetting.upsert({ where: { key: 'MEMBERSHIP_TIERS_ACTIVE' }, update: { value: originalMembershipTiersSetting.value }, create: { key: 'MEMBERSHIP_TIERS_ACTIVE', value: originalMembershipTiersSetting.value } });
+      await prisma.platformSetting.update({ where: { id: originalMembershipTiersSetting.id }, data: { value: originalMembershipTiersSetting.value } });
     } else {
       await prisma.platformSetting.deleteMany({ where: { key: 'MEMBERSHIP_TIERS_ACTIVE' } });
     }
     if (originalUnlockFeeSetting) {
-      await prisma.platformSetting.upsert({ where: { key: 'RETAILER_UNLOCK_FEE_GBP' }, update: { value: originalUnlockFeeSetting.value }, create: { key: 'RETAILER_UNLOCK_FEE_GBP', value: originalUnlockFeeSetting.value } });
+      await prisma.platformSetting.update({ where: { id: originalUnlockFeeSetting.id }, data: { value: originalUnlockFeeSetting.value } });
     } else {
       await prisma.platformSetting.deleteMany({ where: { key: 'RETAILER_UNLOCK_FEE_GBP' } });
     }
@@ -45,11 +47,23 @@ test('a zero-cost unlock fee waives payment and opens the tender immediately', a
   });
 
   const [client, retailer] = await Promise.all([
-    prisma.user.create({ data: { email: `zero-fee-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CONTRACTOR', contactName: 'Zero Fee Client' } }),
-    prisma.user.create({ data: { email: `zero-fee-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Zero Fee Retailer' } }),
+    prisma.user.create({ data: { email: `zero-fee-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Zero Fee Client' } }),
+    prisma.user.create({ data: { email: `zero-fee-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Zero Fee Retailer' } }),
   ]);
   clientId = client.id;
   retailerId = retailer.id;
+
+  const company = await prisma.clientCompany.create({
+    data: {
+      companyName: `Zero Fee Test Supplies ${suffix}`,
+      branchIdentifier: suffix,
+      primaryUserId: retailerId,
+      services: 'Construction Materials',
+      operatingLocations: 'United Kingdom',
+      members: { create: { userId: retailerId } },
+    },
+  });
+  companyId = company.id;
 
   await prisma.retailerProfile.create({
     data: { userId: retailerId, companyName: 'Zero Fee Test Supplies', coverageScope: 'UK', counties: '', regions: '', categories: 'Construction Materials', coverageAreas: '', launchCreditsLeft: 0 },
@@ -84,6 +98,7 @@ test('an active membership allowance cannot unlock a tender while membership tie
   const suffix = randomUUID();
   let clientId: string | undefined;
   let retailerId: string | undefined;
+  let companyId: string | undefined;
   let tenderId: string | undefined;
   let tierId: string | undefined;
   const originalMembershipTiersSetting = await prisma.platformSetting.findUnique({ where: { key: 'MEMBERSHIP_TIERS_ACTIVE' } });
@@ -95,6 +110,7 @@ test('an active membership allowance cannot unlock a tender while membership tie
     if (tenderId) await prisma.tenderItem.deleteMany({ where: { tenderId } });
     if (tenderId) await prisma.tender.deleteMany({ where: { id: tenderId } });
     if (retailerId) await prisma.retailerMembership.deleteMany({ where: { retailerId } });
+    if (companyId) await prisma.clientCompany.deleteMany({ where: { id: companyId } });
     if (retailerId) await prisma.retailerProfile.deleteMany({ where: { userId: retailerId } });
     const userIds = [clientId, retailerId].filter((id): id is string => Boolean(id));
     if (userIds.length > 0) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
@@ -118,11 +134,23 @@ test('an active membership allowance cannot unlock a tender while membership tie
   });
 
   const [client, retailer] = await Promise.all([
-    prisma.user.create({ data: { email: `membership-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'CONTRACTOR', contactName: 'Membership Client' } }),
-    prisma.user.create({ data: { email: `membership-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'PROVIDER', contactName: 'Membership Retailer' } }),
+    prisma.user.create({ data: { email: `membership-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Membership Client' } }),
+    prisma.user.create({ data: { email: `membership-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Membership Retailer' } }),
   ]);
   clientId = client.id;
   retailerId = retailer.id;
+
+  const company = await prisma.clientCompany.create({
+    data: {
+      companyName: `Membership Test Supplies ${suffix}`,
+      branchIdentifier: suffix,
+      primaryUserId: retailerId,
+      services: 'Construction Materials',
+      operatingLocations: 'United Kingdom',
+      members: { create: { userId: retailerId } },
+    },
+  });
+  companyId = company.id;
 
   await prisma.retailerProfile.create({
     data: { userId: retailerId, companyName: 'Membership Test Supplies', coverageScope: 'UK', counties: '', regions: '', categories: 'Construction Materials', coverageAreas: '', launchCreditsLeft: 0 },

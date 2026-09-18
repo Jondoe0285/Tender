@@ -1,0 +1,9 @@
+ALTER TYPE "ProviderVerificationDocumentType" ADD VALUE 'HMRC_UTR_CONFIRMATION';
+ALTER TYPE "ProviderVerificationDocumentType" ADD VALUE 'SA302_TAX_CALCULATION';
+ALTER TYPE "ProviderVerificationDocumentType" ADD VALUE 'VAT_REGISTRATION_CERTIFICATE';
+ALTER TYPE "ProviderVerificationDocumentType" ADD VALUE 'CIS_REGISTRATION_PROOF';
+ALTER TYPE "ProviderVerificationDocumentType" ADD VALUE 'BUSINESS_BANK_STATEMENT';
+ALTER TYPE "ProviderVerificationDocumentType" ADD VALUE 'CUSTOMER_INVOICES';
+ALTER TYPE "ProviderVerificationDocumentType" ADD VALUE 'CUSTOMER_QUOTATIONS_OR_CONTRACTS';
+ALTER TYPE "ProviderVerificationDocumentType" ADD VALUE 'TRADE_BODY_MEMBERSHIP';
+ALTER TYPE "ProviderVerificationDocumentType" ADD VALUE 'TRADING_ACTIVITY_EVIDENCE';

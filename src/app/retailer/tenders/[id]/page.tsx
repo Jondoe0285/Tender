@@ -10,6 +10,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Label, Input, Textarea, FieldGroup } from '@/components/ui/Field';
 import { TenderMessages } from '@/components/quotes/TenderMessages';
 import { extractPostcode } from '@/lib/geography';
+import { PageLoadState } from '@/components/ui/PageLoadState';
 
 type TenderSummary = {
   id: string;
@@ -17,7 +18,6 @@ type TenderSummary = {
   category: string;
   packageCategories?: string[];
   packageCount?: number;
-  clientTradeTenderId: string | null;
   location: string;
   urgency: string;
   closingDate: string;
@@ -38,6 +38,8 @@ type TenderFull = Omit<TenderSummary, 'items'> & {
   items: { id: string; category: string; subcategory: string; item: string | null; quantity: string; description: string }[];
 };
 
+type DirectContactStatus = { active: boolean; available: boolean; feeGbp: number; released: boolean; paymentId: string | null; checkoutUrl: string | null; paymentStatus: string | null };
+
 export default function RetailerTenderDetailPage() {
   const params = useParams<{ id: string }>();
   const [tender, setTender] = useState<TenderSummary | TenderFull | null>(null);
@@ -48,15 +50,26 @@ export default function RetailerTenderDetailPage() {
   const [unlocking, setUnlocking] = useState(false);
   const [simulating, setSimulating] = useState(false);
   const [submittingQuote, setSubmittingQuote] = useState(false);
+  const [interestRegistered, setInterestRegistered] = useState(false);
   const [linePrices, setLinePrices] = useState<Record<string, string>>({});
   const [unavailableItemIds, setUnavailableItemIds] = useState<string[]>([]);
   const [charges, setCharges] = useState<{ id: string; description: string; priceGbp: string }[]>([]);
+  const [standardQuoteValidityDays, setStandardQuoteValidityDays] = useState(30);
+  const [directContactStatus, setDirectContactStatus] = useState<DirectContactStatus | null>(null);
+  const [directContactPaymentId, setDirectContactPaymentId] = useState<string | null>(null);
+  const [professionalInterestFeeGbp, setProfessionalInterestFeeGbp] = useState<number | null>(null);
+  const [professionalInterestPaymentId, setProfessionalInterestPaymentId] = useState<string | null>(null);
+  const [professionalInterestContact, setProfessionalInterestContact] = useState<{ contactName: string; contactPhone: string | null; email: string } | null>(null);
 
   async function load() {
-    const response = await fetch(`/api/tenders/${params.id}`);
+    const [response, profileResponse, directContactResponse, professionalInterestResponse] = await Promise.all([fetch(`/api/tenders/${params.id}`), fetch('/api/retailer/profile'), fetch(`/api/tenders/${params.id}/direct-contact`), fetch(`/api/tenders/${params.id}/professional-interest`)]);
     if (!response.ok) {
       setMessage('Unable to load this tender.');
       return;
+    }
+    if (profileResponse.ok) {
+      const profile = await profileResponse.json() as { standardQuoteValidityDays?: number };
+      setStandardQuoteValidityDays(profile.standardQuoteValidityDays ?? 30);
     }
     const data = await response.json();
     setTender(data.tender);
@@ -64,6 +77,24 @@ export default function RetailerTenderDetailPage() {
     setLinePrices({});
     setUnavailableItemIds([]);
     setCharges([]);
+    if (directContactResponse.ok) {
+      const status = await directContactResponse.json() as DirectContactStatus;
+      setDirectContactStatus(status);
+      setDirectContactPaymentId(status.paymentStatus === 'PENDING' ? status.paymentId : null);
+    }
+    if (professionalInterestResponse.ok) {
+      const status = await professionalInterestResponse.json() as {
+        feeGbp?: number;
+        registered?: boolean;
+        paymentId?: string | null;
+        paymentStatus?: string | null;
+        contact?: { contactName: string; contactPhone: string | null; email: string } | null;
+      };
+      if (typeof status.feeGbp === 'number') setProfessionalInterestFeeGbp(status.feeGbp);
+      setInterestRegistered(Boolean(status.registered));
+      setProfessionalInterestPaymentId(status.paymentStatus === 'PENDING' ? status.paymentId ?? null : null);
+      setProfessionalInterestContact(status.contact ?? null);
+    }
   }
 
   useEffect(() => {
@@ -96,6 +127,83 @@ export default function RetailerTenderDetailPage() {
     }
   }
 
+  async function handleRegisterInterest() {
+    setUnlocking(true);
+    setMessage(null);
+    const response = await fetch(`/api/tenders/${params.id}/professional-interest`, { method: 'POST' });
+    const data = await response.json().catch(() => null) as { status?: string; paymentId?: string; checkoutUrl?: string; error?: string } | null;
+    setUnlocking(false);
+    if (!response.ok) {
+      setMessage(data?.error ?? 'Unable to register your interest.');
+      return;
+    }
+    if (data?.status === 'REGISTERED') {
+      setInterestRegistered(true);
+      setProfessionalInterestPaymentId(null);
+      return;
+    }
+    if (data?.checkoutUrl) {
+      window.location.href = data.checkoutUrl;
+      return;
+    }
+    if (data?.paymentId) {
+      setProfessionalInterestPaymentId(data.paymentId);
+      setMessage('Payment required. This environment has no Stripe keys configured — use the dev payment simulation below.');
+    }
+  }
+
+  async function handleSimulateProfessionalInterestPayment() {
+    if (!professionalInterestPaymentId) return;
+    setSimulating(true);
+    setMessage(null);
+    const response = await fetch('/api/dev/confirm-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentId: professionalInterestPaymentId }) });
+    const data = await response.json().catch(() => null);
+    setSimulating(false);
+    if (!response.ok) {
+      setMessage(data?.error ?? 'Dev payment simulation failed.');
+      return;
+    }
+    setProfessionalInterestPaymentId(null);
+    setInterestRegistered(true);
+    await load();
+  }
+
+  async function handleDirectContactRequest() {
+    setUnlocking(true);
+    setMessage(null);
+    const response = await fetch(`/api/tenders/${params.id}/direct-contact`, { method: 'POST' });
+    const data = await response.json().catch(() => null) as { paymentId?: string; checkoutUrl?: string; error?: string } | null;
+    setUnlocking(false);
+    if (!response.ok) {
+      setMessage(data?.error ?? 'Unable to start direct contact request.');
+      return;
+    }
+    if (data?.checkoutUrl) {
+      window.location.href = data.checkoutUrl;
+      return;
+    }
+    if (data?.paymentId) {
+      setDirectContactPaymentId(data.paymentId);
+      setMessage('Payment required. This environment has no Stripe keys configured — use the dev payment simulation below.');
+    }
+    await load();
+  }
+
+  async function handleSimulateDirectContactPayment() {
+    if (!directContactPaymentId) return;
+    setSimulating(true);
+    setMessage(null);
+    const response = await fetch('/api/dev/confirm-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentId: directContactPaymentId }) });
+    const data = await response.json().catch(() => null);
+    setSimulating(false);
+    if (!response.ok) {
+      setMessage(data?.error ?? 'Dev payment simulation failed.');
+      return;
+    }
+    setDirectContactPaymentId(null);
+    await load();
+  }
+
   async function handleSimulatePayment() {
     if (!pendingPaymentId) return;
     setSimulating(true);
@@ -106,9 +214,10 @@ export default function RetailerTenderDetailPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paymentId: pendingPaymentId }),
     });
+    const confirmData = await confirmResponse.json().catch(() => null);
     if (!confirmResponse.ok) {
       setSimulating(false);
-      setMessage('Dev payment simulation failed.');
+      setMessage(confirmData?.error ?? 'Dev payment simulation failed.');
       return;
     }
 
@@ -147,7 +256,6 @@ export default function RetailerTenderDetailPage() {
         leadTimeDays: form.get('leadTimeDays'),
         deliveryDateConfirmed: form.get('deliveryDateConfirmed') === 'on',
         deliveryInfo: form.get('deliveryInfo'),
-        validityDays: form.get('validityDays'),
       }),
     });
     setSubmittingQuote(false);
@@ -162,12 +270,13 @@ export default function RetailerTenderDetailPage() {
   if (!tender) {
     return (
       <AppShell role="retailer" title="Tender">
-        <p className="text-sm text-concrete-grey">{message ?? 'Loading…'}</p>
+        <PageLoadState error={message} onRetry={message ? () => { setMessage(null); void load(); } : undefined} />
       </AppShell>
     );
   }
 
   const full = unlocked ? (tender as TenderFull) : null;
+  const isProfessionalTender = tender.category === 'Professional Services';
   const itemsTotal = full?.items.reduce((total, item) => (
     unavailableItemIds.includes(item.id) ? total : total + Number(linePrices[item.id] || 0)
   ), 0) ?? 0;
@@ -196,7 +305,6 @@ export default function RetailerTenderDetailPage() {
 
       <section className="mx-auto mt-6 max-w-2xl">
           <Card className="mb-6">
-            {tender.clientTradeTenderId && <p className="text-sm font-semibold text-steel-blue">Client Trade Tender ID: {tender.clientTradeTenderId}</p>}
             <p className="text-sm text-concrete-grey">Location: {tender.location}</p>
             {deliveryPostcode && <p className="mt-1 text-sm font-semibold text-foundation-navy">Delivery postcode: {deliveryPostcode}</p>}
             <p className="mt-1 text-sm text-concrete-grey">Urgency: {tender.urgency}</p>
@@ -207,14 +315,15 @@ export default function RetailerTenderDetailPage() {
 
           {!unlocked && (
             <Card>
-              <h2 className="font-heading text-lg font-bold text-foundation-navy">Commercial fit assessment</h2>
+              <h2 className="font-heading text-lg font-bold text-foundation-navy">{isProfessionalTender ? 'Professional interest' : 'Commercial fit assessment'}</h2>
               <p className="mt-2 text-sm leading-relaxed text-concrete-grey">
-                Unlock to see the full specification, quantity, requirements, and site details needed to prepare a quote.
-                Client contact details remain private until a quote is accepted and the release fee is paid.
+                {isProfessionalTender
+                  ? 'Pay the Professional Services fee to register your interest. Client contact details are released after the tender deadline, and only if that fee has been paid.'
+                  : 'Unlock to see the full specification, quantity, requirements, and site details needed to prepare a quote. Client contact details remain private until a quote is accepted and the release fee is paid.'}
               </p>
-              <p className="mt-3 text-sm font-semibold text-steel-blue">
-                Cost: £{tender.unlockFeeGbp ?? 0} excl. VAT, unless you have a launch credit available.
-              </p>
+              {isProfessionalTender
+                ? <p className="mt-3 text-sm font-semibold text-steel-blue">Cost: £{professionalInterestFeeGbp ?? tender.unlockFeeGbp ?? 0} excl. VAT.</p>
+                : <p className="mt-3 text-sm font-semibold text-steel-blue">Cost: £{tender.unlockFeeGbp ?? 0} excl. VAT, unless you have a launch credit available.</p>}
               {tender.items.length > 0 && (
                 <div className="mt-4">
                   <h3 className="text-sm font-semibold text-foundation-navy">Items requested</h3>
@@ -230,7 +339,22 @@ export default function RetailerTenderDetailPage() {
                 </div>
               )}
               {message && <p className="mb-4 mt-4 text-sm font-semibold text-attention">{message}</p>}
-              {pendingPaymentId ? (
+              {isProfessionalTender ? (
+                professionalInterestContact ? (
+                  <div className="mt-4 text-sm text-concrete-grey">
+                    <p className="font-semibold text-approved">Interest paid. Client contact details:</p>
+                    <p className="mt-2 font-semibold text-foundation-navy">{professionalInterestContact.contactName}</p>
+                    <p>{professionalInterestContact.email}</p>
+                    {professionalInterestContact.contactPhone && <p>{professionalInterestContact.contactPhone}</p>}
+                  </div>
+                ) : interestRegistered ? (
+                  <p className="mt-4 text-sm font-semibold text-approved">Interest registered. Contact details will be released after the deadline.</p>
+                ) : professionalInterestPaymentId ? (
+                  <Button className="mt-4" onClick={handleSimulateProfessionalInterestPayment} loading={simulating} size="lg">Pay professional interest fee (dev)</Button>
+                ) : (
+                  <Button onClick={handleRegisterInterest} loading={unlocking} size="lg">{`Register interest — £${professionalInterestFeeGbp ?? tender.unlockFeeGbp ?? 0} excl. VAT`}</Button>
+                )
+              ) : pendingPaymentId ? (
                 <Button onClick={handleSimulatePayment} loading={simulating} size="lg">
                   Simulate payment (dev)
                 </Button>
@@ -239,10 +363,23 @@ export default function RetailerTenderDetailPage() {
                   {`Unlock full details — £${tender.unlockFeeGbp ?? 0} excl. VAT`}
                 </Button>
               )}
+              {directContactStatus?.active && directContactStatus.available && (
+                <div className="mt-5 rounded-md border border-steel-blue/20 bg-steel-blue/5 p-4">
+                  <p className="text-sm font-semibold text-foundation-navy">Direct contact request</p>
+                  <p className="mt-1 text-sm text-concrete-grey">Pay the approved fee to share your Provider contact details with the purchasing Client for this Contractor or Professional Services tender. This does not release the Client&apos;s contact details to you.</p>
+                  {directContactStatus.released ? (
+                    <p className="mt-3 text-sm font-semibold text-approved">Your contact details have been shared with the Client.</p>
+                  ) : directContactPaymentId ? (
+                    <Button className="mt-3" onClick={handleSimulateDirectContactPayment} loading={simulating}>Pay direct contact fee (dev)</Button>
+                  ) : (
+                    <Button className="mt-3" variant="secondary" onClick={handleDirectContactRequest} loading={unlocking}>Share contact details · £{directContactStatus.feeGbp} excl. VAT</Button>
+                  )}
+                </div>
+              )}
             </Card>
           )}
 
-          {full && (
+          {full && !isProfessionalTender && (
             <>
               <Card className="mb-6">
                 <h2 className="font-heading text-lg font-bold text-foundation-navy">Tender requirements</h2>
@@ -254,8 +391,7 @@ export default function RetailerTenderDetailPage() {
                   </div>
                 )}
                 <div className="mt-4 flex flex-col gap-4">
-                  <TenderItemDetail subcategory={full.subcategory} item={null} quantity={full.quantity} description={full.description} />
-                  {full.items.slice(1).map((item) => (
+                  {full.items.map((item) => (
                     <TenderItemDetail key={item.id} subcategory={item.subcategory} item={item.item} quantity={item.quantity} description={item.description} />
                   ))}
                 </div>
@@ -404,10 +540,10 @@ export default function RetailerTenderDetailPage() {
                       <Label htmlFor="deliveryInfo">Delivery information</Label>
                       <Textarea id="deliveryInfo" name="deliveryInfo" rows={3} placeholder="Delivery window, charges, and access requirements" required />
                     </FieldGroup>
-                    <FieldGroup>
-                      <Label htmlFor="validityDays">Quote valid for (days)</Label>
-                      <Input id="validityDays" name="validityDays" type="number" min="1" required defaultValue={30} />
-                    </FieldGroup>
+                    <div className="rounded-md bg-slate-50 px-4 py-3 text-sm text-concrete-grey">
+                      <p className="font-semibold text-foundation-navy">Quote validity: {standardQuoteValidityDays} days</p>
+                      <p className="mt-1">This is applied from your Provider profile to every quote you submit.</p>
+                    </div>
                     {message && <p className="text-sm font-semibold text-attention">{message}</p>}
                     <Button type="submit" loading={submittingQuote} className="self-start">
                       Submit quote

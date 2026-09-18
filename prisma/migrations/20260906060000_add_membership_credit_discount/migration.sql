@@ -1,0 +1,1 @@
+ALTER TABLE "MembershipTier" ADD COLUMN "additionalCreditDiscountPercentage" DOUBLE PRECISION NOT NULL DEFAULT 0;

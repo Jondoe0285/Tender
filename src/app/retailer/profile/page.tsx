@@ -2,12 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Input, Label, Textarea, FieldGroup } from '@/components/ui/Field';
 import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
 import { CATEGORIES } from '@/lib/categories';
+import { COMPANY_TYPE_LABELS, COMPANY_TYPES } from '@/lib/companyTypes';
+import { independentReviewTierDescription } from '@/lib/independentReviewTiers';
 import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 
 type TeamMember = {
@@ -17,16 +21,23 @@ type TeamMember = {
   user: { email: string; contactName: string };
 };
 
+type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
+
 type Profile = {
   id: string;
   companyName: string;
   companyNumber: string | null;
   address: string | null;
+  companyType: 'SOLE_TRADER' | 'LIMITED_COMPANY' | 'PARTNERSHIP' | 'LIMITED_LIABILITY_PARTNERSHIP' | 'PUBLIC_LIMITED_COMPANY' | 'OTHER';
+  isSoleTrader: boolean;
   coverageScope: 'COUNTY' | 'REGION' | 'UK';
   counties: string;
   regions: string;
   categories: string;
   masterUserId: string | null;
+  standardQuoteValidityDays: number;
+  verificationStatus: VerificationStatus;
+  verificationEligible: boolean;
 };
 
 const permissions = [
@@ -44,7 +55,7 @@ export default function RetailerProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [form, setForm] = useState({ companyName: '', companyNumber: '', address: '', coverageScope: 'COUNTY' as 'COUNTY' | 'REGION' | 'UK', counties: [] as string[], regions: [] as string[], categories: [] as string[], masterUserId: '' });
+  const [form, setForm] = useState({ companyName: '', companyNumber: '', address: '', companyType: 'LIMITED_COMPANY' as Profile['companyType'], standardQuoteValidityDays: 30, coverageScope: 'COUNTY' as 'COUNTY' | 'REGION' | 'UK', counties: [] as string[], regions: [] as string[], categories: [] as string[], masterUserId: '' });
   const [email, setEmail] = useState('');
   const [newPermissions, setNewPermissions] = useState<string[]>(['VIEW']);
   const [editing, setEditing] = useState(false);
@@ -52,16 +63,18 @@ export default function RetailerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [independentReview, setIndependentReview] = useState<{ active: boolean; fees: Record<'BRONZE' | 'SILVER' | 'GOLD', number>; eligible: boolean; status: 'NOT_PURCHASED' | 'PURCHASED' | 'APPROVED' | 'DECLINED'; tier: 'BRONZE' | 'SILVER' | 'GOLD' | null; note: string | null; purchasableTiers: Array<'BRONZE' | 'SILVER' | 'GOLD'>; expired: boolean } | null>(null);
 
   async function load() {
     setLoading(true);
-    const [profileResponse, teamResponse] = await Promise.all([fetch('/api/retailer/profile'), fetch('/api/retailer/team')]);
+    const [profileResponse, teamResponse, independentReviewResponse] = await Promise.all([fetch('/api/retailer/profile'), fetch('/api/retailer/team'), fetch('/api/retailer/independent-review')]);
     if (profileResponse.ok) {
       const data: Profile = await profileResponse.json();
       setProfile(data);
-      setForm({ companyName: data.companyName, companyNumber: data.companyNumber ?? '', address: data.address ?? '', coverageScope: data.coverageScope, counties: splitValues(data.counties), regions: splitValues(data.regions), categories: splitValues(data.categories), masterUserId: data.masterUserId ?? '' });
+      setForm({ companyName: data.companyName, companyNumber: data.companyNumber ?? '', address: data.address ?? '', companyType: data.companyType, standardQuoteValidityDays: data.standardQuoteValidityDays, coverageScope: data.coverageScope, counties: splitValues(data.counties), regions: splitValues(data.regions), categories: splitValues(data.categories), masterUserId: data.masterUserId ?? '' });
     }
     if (teamResponse.ok) setTeamMembers(await teamResponse.json());
+    if (independentReviewResponse.ok) setIndependentReview(await independentReviewResponse.json());
     setLoading(false);
   }
 
@@ -132,6 +145,59 @@ export default function RetailerProfilePage() {
     <AppShell role="retailer" title="Profile">
       <div className="mx-auto max-w-4xl space-y-6">
         {message && <p role="status" className="rounded-lg border border-steel-blue/20 bg-steel-blue/5 px-4 py-3 text-sm text-steel-blue">{message}</p>}
+        {profile.verificationEligible && (
+          <Card className="border-l-4 border-safety-amber bg-amber-50/40">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="font-heading text-lg font-bold text-foundation-navy">Provider verification</p>
+                <p className="mt-1 max-w-xl text-sm text-concrete-grey">
+                  {profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business is Sole trader AI Verified based on your uploaded self-employment evidence. This is shown to Contractors on every quote you submit.'}
+                  {profile.isSoleTrader && profile.verificationStatus !== 'VERIFIED' && 'Your profile is marked as a sole trader. Upload self-employment evidence to become AI verified; until then your quotes show a Sole Trader status so Contractors can complete suitable checks.'}
+                  {!profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business is Incorporated AI Verified based on your Certificate of Incorporation and required service evidence. This is shown to Contractors on every quote you submit.'}
+                  {profile.verificationStatus === 'PENDING' && 'Your verification request is under review. We will update your status once it has been checked.'}
+                  {profile.verificationStatus === 'REJECTED' && 'Your last verification request was not approved. You can request verification again at any time.'}
+                  {profile.verificationStatus === 'EXPIRED' && 'One or more of your verification documents have expired, so your verified status has been removed. Upload a replacement to restart the review.'}
+                  {!profile.isSoleTrader && profile.verificationStatus === 'UNVERIFIED' && 'Materials, Waste, Plant Hire, Contractor Services, and Professional Services providers can complete a verification check. Verified status is shown to Contractors on every quote you submit.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <StatusBadge status={profile.verificationStatus === 'VERIFIED' ? 'approved' : profile.verificationStatus === 'PENDING' ? 'pending' : profile.verificationStatus === 'REJECTED' || profile.verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
+                  {profile.verificationStatus === 'VERIFIED' ? 'Verified' : profile.verificationStatus === 'PENDING' ? 'Pending review' : profile.verificationStatus === 'REJECTED' ? 'Not approved' : profile.verificationStatus === 'EXPIRED' ? 'Expired' : (profile.isSoleTrader ? 'Sole Trader' : 'Unverified')}
+                </StatusBadge>
+                {(profile.verificationStatus === 'UNVERIFIED' || profile.verificationStatus === 'REJECTED' || profile.verificationStatus === 'EXPIRED') && (
+                  <Link href="/retailer/verification"><Button>Become Verified</Button></Link>
+                )}
+                {(profile.verificationStatus === 'PENDING' || profile.verificationStatus === 'VERIFIED') && (
+                  <Link href="/retailer/verification" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">View documents</Link>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
+        {independentReview?.active && independentReview.eligible && (
+          <Card className="border-l-4 border-approved bg-approved/5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="font-heading text-lg font-bold text-foundation-navy">Enhanced H&amp;S review</p>
+                <p className="mt-1 max-w-xl text-sm text-concrete-grey">
+                  {independentReview.status === 'APPROVED' && `Your business has achieved Enhanced ${independentReview.tier ? independentReview.tier[0] + independentReview.tier.slice(1).toLowerCase() : ''} Verification level. ${independentReviewTierDescription(independentReview.tier)}`}
+                  {independentReview.status === 'PURCHASED' && 'Your review has been purchased. HSQE Consult Hub will contact you to complete onboarding.'}
+                  {independentReview.status === 'DECLINED' && 'Your last review was not approved. You can purchase a verification tier at any time.'}
+                  {independentReview.status === 'NOT_PURCHASED' && independentReview.note?.includes('Service scope changed') && 'Changing your service scope reset your enhanced verification due to the addition of new legal and compliance requirements. Purchase a Bronze, Silver, or Gold verification below.'}
+                  {independentReview.status === 'NOT_PURCHASED' && !independentReview.note?.includes('Service scope changed') && `Purchase Bronze (£${independentReview.fees.BRONZE}), Silver (£${independentReview.fees.SILVER}), or Gold (£${independentReview.fees.GOLD}) excl. VAT.`}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <StatusBadge status={independentReview.status === 'APPROVED' ? 'approved' : independentReview.status === 'PURCHASED' ? 'pending' : independentReview.status === 'DECLINED' ? 'attention' : 'neutral'}>
+                  {independentReview.status === 'APPROVED' ? (independentReview.tier === 'SILVER' ? 'Silver' : independentReview.tier === 'GOLD' ? 'Gold' : 'Bronze') : independentReview.status === 'PURCHASED' ? 'Awaiting review' : independentReview.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}
+                </StatusBadge>
+                {(independentReview.status !== 'PURCHASED') && independentReview.purchasableTiers.length > 0 && (
+                  <Link href="/retailer/independent-review"><Button>{independentReview.status === 'APPROVED' ? 'Upgrade verification' : 'Purchase verification'}</Button></Link>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
         <Card>
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
             <div><h2 className="font-heading text-xl font-bold text-foundation-navy">Company profile</h2><p className="mt-1 text-sm text-concrete-grey">Keep the details used for matching and commercial correspondence current.</p></div>
@@ -139,9 +205,11 @@ export default function RetailerProfilePage() {
           </div>
           {editing ? (
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
-              <FieldGroup><Label htmlFor="companyName">Company name</Label><Input id="companyName" value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} /></FieldGroup>
+              <FieldGroup><Label htmlFor="companyName">Company name</Label><Input id="companyName" required value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} /></FieldGroup>
               <FieldGroup><Label htmlFor="companyNumber">Company number</Label><Input id="companyNumber" value={form.companyNumber} onChange={(event) => setForm({ ...form, companyNumber: event.target.value })} placeholder="Companies House number" /></FieldGroup>
+              <FieldGroup><Label htmlFor="companyType">Company type</Label><select id="companyType" required value={form.companyType} onChange={(event) => setForm({ ...form, companyType: event.target.value as Profile['companyType'] })} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm">{COMPANY_TYPES.map((type) => <option key={type} value={type}>{COMPANY_TYPE_LABELS[type]}</option>)}</select>{form.companyType === 'SOLE_TRADER' && <p className="mt-1 text-xs text-concrete-grey">Sole traders can become AI verified by uploading self-employment evidence on the verification page instead of legal-entity documents.</p>}</FieldGroup>
               <FieldGroup wide><Label htmlFor="address">Registered or trading address</Label><Textarea id="address" rows={3} value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></FieldGroup>
+              <FieldGroup><Label htmlFor="standardQuoteValidityDays">Standard quote validity (days)</Label><Input id="standardQuoteValidityDays" type="number" min="1" max="365" step="1" value={form.standardQuoteValidityDays} onChange={(event) => setForm({ ...form, standardQuoteValidityDays: Number(event.target.value) })} /><p className="mt-1 text-xs text-concrete-grey">Applied automatically to every quote you submit and shown to the purchasing Client.</p></FieldGroup>
               <FieldGroup wide>
                 <Label htmlFor="coverageScope">Operating area</Label>
                 <div className="flex flex-wrap gap-4">
@@ -160,12 +228,12 @@ export default function RetailerProfilePage() {
               {form.coverageScope === 'REGION' && (
                 <FieldGroup><Label htmlFor="regions">Operational regions</Label><MultiSelectDropdown options={UK_REGIONS.map((region) => ({ label: region, value: region }))} selected={form.regions} onChange={(regions) => setForm({ ...form, regions })} placeholder="Select one or more regions" /></FieldGroup>
               )}
-              <FieldGroup><Label htmlFor="categories">Services provided</Label><MultiSelectDropdown options={Object.keys(CATEGORIES).map((category) => ({ label: category, value: category }))} selected={form.categories} onChange={(categories) => setForm({ ...form, categories })} placeholder="Select service categories" /></FieldGroup>
+              <FieldGroup><Label htmlFor="categories">Services provided</Label><MultiSelectDropdown options={Object.keys(CATEGORIES).map((category) => ({ label: category, value: category }))} selected={form.categories} onChange={(categories) => setForm({ ...form, categories })} placeholder="Select service categories" /><p className="mt-1 text-xs font-semibold text-safety-amber">Note: Modifying your services or company type resets your AI verification and enhanced verification statuses due to new legal and compliance requirements for the updated service scope.</p></FieldGroup>
               <FieldGroup><Label htmlFor="masterUserId">Master user</Label><select id="masterUserId" value={form.masterUserId} onChange={(event) => setForm({ ...form, masterUserId: event.target.value })} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm"><option value="">Select a team member</option>{teamMembers.map((member) => <option key={member.userId} value={member.userId}>{member.user.contactName} ({member.user.email})</option>)}</select></FieldGroup>
               <div className="flex items-end gap-3 sm:col-span-2"><Button variant="secondary" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button><Button onClick={saveProfile} loading={saving}>Save profile</Button></div>
             </div>
           ) : (
-            <dl className="mt-6 grid gap-5 sm:grid-cols-2"><ProfileValue label="Company name" value={profile.companyName} /><ProfileValue label="Company number" value={profile.companyNumber ?? 'Not provided'} /><ProfileValue label="Address" value={profile.address ?? 'Not provided'} wide /><ProfileValue label="Operating area" value={profile.coverageScope === 'UK' ? 'UK-wide (all regions)' : profile.coverageScope === 'REGION' ? (profile.regions || 'Not configured') : (profile.counties || 'Not configured')} /><ProfileValue label="Services provided" value={profile.categories || 'Not configured'} /><ProfileValue label="Master user" value={teamMembers.find((member) => member.userId === profile.masterUserId)?.user.email ?? 'Not assigned'} /></dl>
+            <dl className="mt-6 grid gap-5 sm:grid-cols-2"><ProfileValue label="Company name" value={profile.companyName} /><ProfileValue label="Company number" value={profile.companyNumber ?? 'Not provided'} /><ProfileValue label="Company type" value={COMPANY_TYPE_LABELS[profile.companyType] ?? 'Limited company'} /><ProfileValue label="Address" value={profile.address ?? 'Not provided'} wide /><ProfileValue label="Standard quote validity" value={`${profile.standardQuoteValidityDays} days`} /><ProfileValue label="Operating area" value={profile.coverageScope === 'UK' ? 'UK-wide (all regions)' : profile.coverageScope === 'REGION' ? (profile.regions || 'Not configured') : (profile.counties || 'Not configured')} /><ProfileValue label="Services provided" value={profile.categories || 'Not configured'} /><ProfileValue label="Master user" value={teamMembers.find((member) => member.userId === profile.masterUserId)?.user.email ?? 'Not assigned'} /></dl>
           )}
         </Card>
 

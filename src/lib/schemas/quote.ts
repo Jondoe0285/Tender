@@ -23,7 +23,7 @@ export const submitQuoteSchema = z.object({
   leadTimeDays: z.coerce.number().int().nonnegative().max(365),
   deliveryDateConfirmed: z.boolean(),
   deliveryInfo: z.string().trim().min(5).max(1000),
-  validityDays: z.coerce.number().int().positive().max(365),
+  validityDays: z.coerce.number().int().positive().max(365).optional(),
 }).refine((value) => value.lineItems.some((line) => line.available), {
   message: 'Quote at least one tender item',
   path: ['lineItems'],

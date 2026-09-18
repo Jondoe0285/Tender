@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { passwordSchema } from '@/lib/schemas/password';
 import { prisma } from '@/server/data/prisma';
 import { hashPassword, verifyPassword } from '@/server/auth/password';
 import { requireRole } from '@/server/auth/session';
@@ -7,8 +8,15 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { isPrimaryClientUser } from '@/lib/client-company';
 import { toErrorResponse } from '@/server/http/errors';
-import { SERVICE_NAMES } from '@/lib/categories';
+import { SERVICE_CATALOG, SERVICE_NAMES } from '@/lib/categories';
 import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
+import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
+import { parseServiceProvisions, serialiseServiceProvisions } from '@/lib/service-provisions';
+import { markUploadedDocumentsVerified } from '@/server/domain/verificationDocumentService';
+import { INDEPENDENT_REVIEW_RESET_DATA } from '@/server/domain/independentReviewService';
+import { Prisma } from '@prisma/client';
+
+const COMPANY_OPERATING_LOCATIONS = ['United Kingdom', ...UK_COUNTIES, ...UK_REGIONS] as const;
 
 const personalProfileSchema = z.object({
   firstName: z.string().trim().min(1).max(80),
@@ -19,17 +27,32 @@ const personalProfileSchema = z.object({
 
 const profileUpdateSchema = personalProfileSchema.extend({
   companyName: z.string().trim().min(2).max(160).optional(),
+  branchIdentifier: z.string().trim().min(2).max(120).optional(),
+  companyType: z.enum(['SOLE_TRADER', 'LIMITED_COMPANY', 'PARTNERSHIP', 'LIMITED_LIABILITY_PARTNERSHIP', 'PUBLIC_LIMITED_COMPANY', 'OTHER']).optional(),
   services: z.array(z.enum(SERVICE_NAMES)).max(SERVICE_NAMES.length).optional(),
-  operatingLocations: z.array(z.enum([...UK_COUNTIES, ...UK_REGIONS])).max(UK_COUNTIES.length + UK_REGIONS.length).optional(),
+  serviceProvisions: z.array(z.string().trim().min(1).max(160)).max(100).optional(),
+  operatingLocations: z.array(z.enum(COMPANY_OPERATING_LOCATIONS)).max(COMPANY_OPERATING_LOCATIONS.length).optional(),
+}).superRefine((value, context) => {
+  if (value.serviceProvisions === undefined) return;
+  const selectedServices = value.services !== undefined ? new Set(value.services) : null;
+  value.serviceProvisions.forEach((entry, index) => {
+    const [service, ...provisionParts] = entry.split('::');
+    const provision = provisionParts.join('::');
+    const categories = SERVICE_CATALOG[service as keyof typeof SERVICE_CATALOG];
+    const invalidService = selectedServices !== null && !selectedServices.has(service as typeof SERVICE_NAMES[number]);
+    if (!service || !provision || invalidService || !categories || !(provision in categories)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ['serviceProvisions', index], message: 'Select valid provisions for the services offered by your company' });
+    }
+  });
 });
 
-const passwordSchema = z.object({
+const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1).max(200),
-  newPassword: z.string().min(10).max(200),
+  newPassword: passwordSchema,
 });
 
 const additionalUserSchema = personalProfileSchema.extend({
-  password: z.string().min(10).max(200),
+  password: passwordSchema,
 });
 
 async function getClientCompanyMembership(userId: string) {
@@ -41,13 +64,19 @@ async function getClientCompanyMembership(userId: string) {
 
 export async function GET() {
   try {
-    const user = await requireRole('CONTRACTOR');
-    const [account, membership] = await Promise.all([
+    const user = await requireRole('USER');
+    const [account, membership, retailerProfile, warnings] = await Promise.all([
       prisma.user.findUniqueOrThrow({
         where: { id: user.id },
         select: { firstName: true, lastName: true, contactName: true, email: true, contactPhone: true },
       }),
       getClientCompanyMembership(user.id),
+        prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { verificationStatus: true } }),
+      prisma.tenderWarning.findMany({
+        where: { recipientId: user.id, active: true },
+        select: { id: true, reason: true, note: true, createdAt: true, tender: { select: { reference: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
     ]);
 
     return NextResponse.json({
@@ -56,10 +85,14 @@ export async function GET() {
       email: account.email,
       phoneNumber: account.contactPhone ?? '',
       companyName: membership?.company.companyName ?? null,
+      companyType: membership?.company.companyType ?? 'LIMITED_COMPANY',
+      branchIdentifier: membership?.company.branchIdentifier ?? null,
       services: membership?.company.services ? membership.company.services.split(',').filter(Boolean) : [],
+      serviceProvisions: parseServiceProvisions(membership?.company.serviceProvisions, membership?.company.services.split(',').filter(Boolean) ?? []),
       operatingLocations: membership?.company.operatingLocations ? membership.company.operatingLocations.split(',').filter(Boolean) : [],
       tradeTenderId: membership?.company.tradeTenderId ?? null,
       isPrimaryUser: membership ? isPrimaryClientUser(membership.company.primaryUserId, user.id) : false,
+        verificationStatus: retailerProfile?.verificationStatus ?? null,
       additionalUsers: membership && isPrimaryClientUser(membership.company.primaryUserId, user.id)
         ? await prisma.clientCompanyMember.findMany({
             where: { companyId: membership.companyId, NOT: { userId: user.id } },
@@ -67,6 +100,7 @@ export async function GET() {
             orderBy: { createdAt: 'asc' },
           })
         : [],
+        warnings: warnings.map((warning) => ({ id: warning.id, reason: warning.reason, note: warning.note, createdAt: warning.createdAt, tenderReference: warning.tender.reference })),
     });
   } catch (error) {
     return toErrorResponse(error);
@@ -77,18 +111,48 @@ export async function PUT(request: Request) {
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
-    const user = await requireRole('CONTRACTOR');
+    const user = await requireRole('USER');
     const parsed = profileUpdateSchema.safeParse(await request.json().catch(() => null));
-    if (!parsed.success) return NextResponse.json({ error: 'Invalid profile details' }, { status: 400 });
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid profile details', issues: parsed.error.flatten() }, { status: 400 });
+    }
 
     const membership = await getClientCompanyMembership(user.id);
     if (!membership) return NextResponse.json({ error: 'Client company membership is required' }, { status: 409 });
     const isPrimaryUser = isPrimaryClientUser(membership.company.primaryUserId, user.id);
-    if ((parsed.data.companyName !== undefined || parsed.data.services !== undefined || parsed.data.operatingLocations !== undefined) && !isPrimaryUser) {
+    const companyProfileChanged = parsed.data.services !== undefined || parsed.data.operatingLocations !== undefined;
+    if ((parsed.data.companyName !== undefined || parsed.data.branchIdentifier !== undefined || parsed.data.companyType !== undefined || parsed.data.services !== undefined || parsed.data.serviceProvisions !== undefined || parsed.data.operatingLocations !== undefined) && !isPrimaryUser) {
       return NextResponse.json({ error: 'Only the primary user can update company details' }, { status: 403 });
     }
 
     const contactName = `${parsed.data.firstName} ${parsed.data.lastName}`;
+    const retailerProfile = await prisma.retailerProfile.findUnique({ where: { userId: user.id } });
+    const newCategories = parsed.data.services !== undefined ? parsed.data.services.join(',') : retailerProfile?.categories;
+    const newCompanyType = parsed.data.companyType !== undefined ? parsed.data.companyType : retailerProfile?.companyType;
+    const servicesChanged = retailerProfile && (newCategories !== retailerProfile.categories || newCompanyType !== retailerProfile.companyType);
+
+    if (servicesChanged && retailerProfile) {
+      const resetVerification = retailerProfile.verificationStatus === 'VERIFIED' || retailerProfile.verificationStatus === 'PENDING';
+      const resetIndependent = retailerProfile.independentReviewStatus === 'APPROVED' || retailerProfile.independentReviewStatus === 'PURCHASED';
+
+      if (resetVerification || resetIndependent) {
+        await prisma.retailerProfile.update({
+          where: { id: retailerProfile.id },
+          data: {
+            ...(resetVerification ? {
+              verificationStatus: 'UNVERIFIED',
+              verificationDecidedAt: new Date(),
+              verificationNote: 'Service scope changed: verification reset due to modified service requirements.',
+            } : {}),
+            ...(resetIndependent ? INDEPENDENT_REVIEW_RESET_DATA : {}),
+          },
+        });
+        if (resetVerification && newCategories) {
+          await markUploadedDocumentsVerified(retailerProfile.id, newCategories, false, retailerProfile.isSoleTrader);
+        }
+      }
+    }
+
     await prisma.$transaction([
       prisma.user.update({
         where: { id: user.id },
@@ -100,12 +164,24 @@ export async function PUT(request: Request) {
           contactPhone: parsed.data.phoneNumber || null,
         },
       }),
-      ...(parsed.data.companyName !== undefined
-        ? [prisma.clientCompany.update({ where: { id: membership.companyId }, data: { companyName: parsed.data.companyName, ...(parsed.data.services !== undefined ? { services: parsed.data.services.join(',') } : {}), ...(parsed.data.operatingLocations !== undefined ? { operatingLocations: parsed.data.operatingLocations.join(',') } : {}) } })]
-        : parsed.data.services !== undefined || parsed.data.operatingLocations !== undefined
-          ? [prisma.clientCompany.update({ where: { id: membership.companyId }, data: { ...(parsed.data.services !== undefined ? { services: parsed.data.services.join(',') } : {}), ...(parsed.data.operatingLocations !== undefined ? { operatingLocations: parsed.data.operatingLocations.join(',') } : {}) } })]
+      ...(parsed.data.companyName !== undefined || parsed.data.branchIdentifier !== undefined || parsed.data.companyType !== undefined || parsed.data.services !== undefined || parsed.data.serviceProvisions !== undefined || parsed.data.operatingLocations !== undefined
+        ? [prisma.clientCompany.update({ where: { id: membership.companyId }, data: { ...(parsed.data.companyName !== undefined ? { companyName: parsed.data.companyName } : {}), ...(parsed.data.branchIdentifier !== undefined ? { branchIdentifier: parsed.data.branchIdentifier } : {}), ...(parsed.data.companyType !== undefined ? { companyType: parsed.data.companyType } : {}), ...(parsed.data.services !== undefined ? { services: parsed.data.services.join(',') } : {}), ...(parsed.data.serviceProvisions !== undefined ? { serviceProvisions: serialiseServiceProvisions(parsed.data.serviceProvisions) } : {}), ...(parsed.data.operatingLocations !== undefined ? { operatingLocations: parsed.data.operatingLocations.join(',') } : {}) } })]
+        : []),
+      ...(parsed.data.services !== undefined
+        ? [prisma.retailerProfile.updateMany({ where: { userId: user.id }, data: { categories: parsed.data.services.join(',') } })]
+        : []),
+      ...(parsed.data.operatingLocations !== undefined
+        ? [prisma.retailerProfile.updateMany({
+            where: { userId: user.id },
+            data: {
+              coverageScope: parsed.data.operatingLocations.includes('United Kingdom') ? 'UK' : parsed.data.operatingLocations.some((location) => UK_REGIONS.includes(location as typeof UK_REGIONS[number])) ? 'REGION' : 'COUNTY',
+              counties: parsed.data.operatingLocations.filter((location) => UK_COUNTIES.includes(location as typeof UK_COUNTIES[number])).join(','),
+              regions: parsed.data.operatingLocations.filter((location) => UK_REGIONS.includes(location as typeof UK_REGIONS[number])).join(','),
+            },
+          })]
         : []),
     ]);
+    if (companyProfileChanged) await matchRetailerToOpenTenders(user.id);
     await recordAuditEvent({ actorId: user.id, action: 'CLIENT_PROFILE_UPDATED', targetType: 'User', targetId: user.id });
     return NextResponse.json({ status: 'updated' });
   } catch (error) {
@@ -117,15 +193,15 @@ export async function PATCH(request: Request) {
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
-    const user = await requireRole('CONTRACTOR');
-    const parsed = passwordSchema.safeParse(await request.json().catch(() => null));
+    const user = await requireRole('USER');
+    const parsed = passwordChangeSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: 'Invalid password details' }, { status: 400 });
 
     const account = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { passwordHash: true } });
     if (!await verifyPassword(parsed.data.currentPassword, account.passwordHash)) {
       return NextResponse.json({ error: 'Unable to change password with those details' }, { status: 400 });
     }
-    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(parsed.data.newPassword) } });
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(parsed.data.newPassword), sessionVersion: { increment: 1 } } });
     await recordAuditEvent({ actorId: user.id, action: 'CLIENT_PASSWORD_CHANGED', targetType: 'User', targetId: user.id });
     return NextResponse.json({ status: 'updated' });
   } catch (error) {
@@ -137,36 +213,46 @@ export async function POST(request: Request) {
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
-    const user = await requireRole('CONTRACTOR');
+    const user = await requireRole('USER');
     const parsed = additionalUserSchema.safeParse(await request.json().catch(() => null));
-    if (!parsed.success) return NextResponse.json({ error: 'Invalid additional user details' }, { status: 400 });
+    if (!parsed.success) return NextResponse.json({ error: 'Invalid additional user details', issues: parsed.error.flatten() }, { status: 400 });
 
     const membership = await getClientCompanyMembership(user.id);
     if (!membership || !isPrimaryClientUser(membership.company.primaryUserId, user.id)) {
       return NextResponse.json({ error: 'Only the primary user can add additional users' }, { status: 403 });
     }
     const existing = await prisma.user.findUnique({ where: { email: parsed.data.email }, select: { id: true } });
-    if (existing) return NextResponse.json({ error: 'Unable to add a user with those details' }, { status: 409 });
+    if (existing) return NextResponse.json({ error: 'A User with that email address already exists' }, { status: 409 });
+
+    const opportunityProfile = await prisma.retailerProfile.findUnique({
+      where: { userId: user.id },
+      select: { companyName: true, companyNumber: true, address: true, coverageScope: true, counties: true, regions: true, categories: true, coverageAreas: true, accreditations: true },
+    });
 
     const contactName = `${parsed.data.firstName} ${parsed.data.lastName}`;
     const additionalUser = await prisma.user.create({
       data: {
         email: parsed.data.email,
         passwordHash: await hashPassword(parsed.data.password),
-        role: 'CONTRACTOR',
+        role: 'USER',
         firstName: parsed.data.firstName,
         lastName: parsed.data.lastName,
         contactName,
         contactPhone: parsed.data.phoneNumber || null,
         termsAcceptedAt: new Date(),
-        roleMemberships: { create: { role: 'CONTRACTOR' } },
+        roleMemberships: { create: { role: 'USER' } },
         clientCompanyMembership: { create: { companyId: membership.companyId } },
+        ...(opportunityProfile ? { retailerProfile: { create: opportunityProfile } } : {}),
       },
       select: { id: true, email: true, firstName: true, lastName: true, contactName: true },
     });
     await recordAuditEvent({ actorId: user.id, action: 'CLIENT_ADDITIONAL_USER_ADDED', targetType: 'User', targetId: additionalUser.id });
+    if (opportunityProfile) await matchRetailerToOpenTenders(additionalUser.id);
     return NextResponse.json({ user: additionalUser }, { status: 201 });
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: 'A User with those details already exists' }, { status: 409 });
+    }
     return toErrorResponse(error);
   }
 }

@@ -13,6 +13,10 @@ on:
         description: 'Must be exactly: DEPLOY APPROVED COMMIT TO STAGING'
         type: string
         required: true
+      high_risk_attestation:
+        description: 'Must be exactly: HIGH RISK STAGING CONTROLS VERIFIED'
+        type: string
+        required: true
 
 concurrency:
   group: deploy-staging
@@ -49,7 +53,8 @@ jobs:
             --target staging \
             --sha "${{ github.event.inputs.commit_sha }}" \
             --staging-ref origin/staging \
-            --statement "${{ github.event.inputs.staging_approval_statement }}"
+            --statement "${{ github.event.inputs.staging_approval_statement }}" \
+            --high-risk-attestation "${{ github.event.inputs.high_risk_attestation }}"
 
   deploy:
     name: Deploy to staging slot
@@ -150,16 +155,17 @@ jobs:
 
       - name: Run non-destructive verification
         id: checks
-        continue-on-error: true
         env:
           STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
         run: |
           node scripts/health-check/verify-deployment.mjs \
             --base-url "$STAGING_BASE_URL" \
             --target staging \
-            --sha "${{ github.event.inputs.commit_sha }}"
+            --sha "${{ github.event.inputs.commit_sha }}" \
+            --high-risk-attestation "${{ github.event.inputs.high_risk_attestation }}"
 
       - name: Upload the staging record
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: staging-deployment-record

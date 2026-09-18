@@ -32,3 +32,14 @@ test('rejects MIME spoofing and active PDF content', () => {
     dataBase64: Buffer.from('%PDF-1.7\n/OpenAction << /JS (alert) >>').toString('base64'),
   }), /Active PDF/);
 });
+
+test('does not reject ordinary PDF text containing active-content fragments', () => {
+  const pdfText = '%PDF-1.7\nThis certificate references JS and AA in ordinary text.';
+  const attachment = verifyTenderAttachment({
+    name: 'certificate.pdf',
+    mimeType: 'application/pdf',
+    dataBase64: Buffer.from(pdfText).toString('base64'),
+  });
+
+  assert.equal(attachment.mimeType, 'application/pdf');
+});

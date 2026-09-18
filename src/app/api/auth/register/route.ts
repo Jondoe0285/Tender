@@ -12,6 +12,9 @@ import { createEmailVerificationToken } from '@/server/auth/emailVerification';
 import { buildClientTradeTenderId } from '@/lib/identifiers';
 import { createRateLimitResponse } from '@/server/http/rateLimit';
 import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
+import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from '@/lib/legal/documentVersions';
+import { getPlatformSetting } from '@/server/domain/platformSettings';
+import { serialiseServiceProvisions } from '@/lib/service-provisions';
 
 async function sendVerificationEmail(userId: string, email: string) {
   const token = await createEmailVerificationToken(userId);
@@ -43,10 +46,13 @@ export async function POST(request: Request) {
     include: { roleMemberships: true },
   });
   if (existing) {
+    if (existing.role === 'SUPER_USER') {
+      return NextResponse.json({ status: 'verification_pending' }, { status: 202 });
+    }
     const validPassword = await verifyPassword(input.password, existing.passwordHash);
     const hasRole = existing.roleMemberships.some((membership) => membership.role === input.role) || existing.role === input.role;
     if (!validPassword || existing.suspended) {
-      return NextResponse.json({ error: 'Unable to complete registration with those details' }, { status: 400 });
+      return NextResponse.json({ status: 'verification_pending' }, { status: 202 });
     }
 
     if (hasRole && !existing.emailVerifiedAt) {
@@ -54,25 +60,27 @@ export async function POST(request: Request) {
       if (!emailResult.sent) return NextResponse.json({ error: 'Unable to send verification email. Please contact support.' }, { status: 503 });
       return NextResponse.json({ status: 'verification_sent' }, { status: 202 });
     }
-    if (hasRole) return NextResponse.json({ error: 'Unable to complete registration with those details' }, { status: 400 });
+    if (hasRole) return NextResponse.json({ status: 'verification_pending' }, { status: 202 });
 
     await prisma.$transaction(async (transaction) => {
       await transaction.userRole.create({ data: { userId: existing.id, role: input.role } });
-      if (input.role === 'PROVIDER') {
+      if (input.role === 'USER') {
         await transaction.retailerProfile.create({
               data: {
                 userId: existing.id,
                 companyName: input.companyName ?? '',
+                companyType: input.companyType ?? 'LIMITED_COMPANY',
+                isSoleTrader: input.companyType === 'SOLE_TRADER',
                 categories: (input.categories ?? []).join(','),
-                coverageAreas: input.coverageAreas ?? '',
+                coverageAreas: '',
                 coverageScope: input.coverageScope ?? 'COUNTY',
                 counties: (input.counties ?? []).join(','),
                 regions: (input.regions ?? []).join(','),
               },
             });
       }
-      if (input.role === 'CONTRACTOR') {
-        const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, primaryUserId: existing.id } });
+      if (input.role === 'USER') {
+        const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', companyType: input.companyType ?? 'LIMITED_COMPANY', services: (input.categories ?? []).join(','), serviceProvisions: serialiseServiceProvisions(input.serviceProvisions ?? []), primaryUserId: existing.id } });
         await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: existing.id } });
       }
     });
@@ -83,11 +91,13 @@ export async function POST(request: Request) {
       targetId: existing.id,
       metadata: { role: input.role },
     });
-    if (input.role === 'PROVIDER') await matchRetailerToOpenTenders(existing.id);
-    return NextResponse.json({ status: 'workspace_added' });
+    if (input.role === 'USER') await matchRetailerToOpenTenders(existing.id);
+    return NextResponse.json({ status: 'verification_pending' }, { status: 202 });
   }
 
   const passwordHash = await hashPassword(input.password);
+  const acceptedAt = new Date();
+  const defaultLaunchCredits = Math.max(0, Number(await getPlatformSetting('RETAILER_LAUNCH_CREDITS_DEFAULT')) || 0);
 
   const user = await prisma.$transaction(async (transaction) => {
     const createdUser = await transaction.user.create({
@@ -99,26 +109,39 @@ export async function POST(request: Request) {
       firstName: input.firstName ?? null,
       lastName: input.lastName ?? null,
       contactPhone: input.contactPhone ?? null,
-      termsAcceptedAt: new Date(),
+      termsAcceptedAt: acceptedAt,
+      termsVersion: CURRENT_TERMS_VERSION,
+      privacyAcceptedAt: acceptedAt,
+      privacyVersion: CURRENT_PRIVACY_VERSION,
       roleMemberships: { create: { role: input.role } },
-      ...(input.role === 'PROVIDER'
+      ...(input.role === 'USER'
         ? {
             retailerProfile: {
               create: {
                 companyName: input.companyName ?? '',
+                companyType: input.companyType ?? 'LIMITED_COMPANY',
+                isSoleTrader: input.companyType === 'SOLE_TRADER',
                 categories: (input.categories ?? []).join(','),
-                coverageAreas: input.coverageAreas ?? '',
+                coverageAreas: '',
                 coverageScope: input.coverageScope ?? 'COUNTY',
                 counties: (input.counties ?? []).join(','),
                 regions: (input.regions ?? []).join(','),
+                launchCreditsLeft: defaultLaunchCredits,
               },
             },
           }
         : {}),
       },
     });
-    if (input.role === 'CONTRACTOR') {
-      const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, primaryUserId: createdUser.id } });
+    await recordAuditEvent({
+      actorId: createdUser.id,
+      action: 'LEGAL_DOCUMENTS_ACCEPTED',
+      targetType: 'User',
+      targetId: createdUser.id,
+      metadata: { termsVersion: CURRENT_TERMS_VERSION, privacyVersion: CURRENT_PRIVACY_VERSION, acceptedAt: acceptedAt.toISOString() },
+    }, transaction);
+    if (input.role === 'USER') {
+      const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', companyType: input.companyType ?? 'LIMITED_COMPANY', services: (input.categories ?? []).join(','), serviceProvisions: serialiseServiceProvisions(input.serviceProvisions ?? []), primaryUserId: createdUser.id } });
       await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: createdUser.id } });
     }
     return createdUser;
@@ -131,7 +154,7 @@ export async function POST(request: Request) {
     targetId: user.id,
     metadata: { role: user.role },
   });
-  if (user.role === 'PROVIDER') await matchRetailerToOpenTenders(user.id);
+  if (user.role === 'USER') await matchRetailerToOpenTenders(user.id);
 
   const verificationResult = await sendVerificationEmail(user.id, user.email);
   if (!verificationResult.sent) {

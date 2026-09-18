@@ -36,6 +36,12 @@ export async function GET(request: Request) {
     [],
     ['Region', 'Tenders', 'Quotes', 'Accepted'],
     ...data.regions.map((item) => [item.region, item.tenders, item.quotes, item.accepted]),
+    [],
+    ['Verification status', 'Quotes submitted', 'Quotes accepted', 'Acceptance rate'],
+    ...data.verificationBreakdown.map((item) => [item.label, item.submitted, item.accepted, `${item.acceptanceRate}%`]),
+    [],
+    ['Tender reference', 'Client', 'Client email', 'Category', 'Location', 'Quotes', 'Accepted quotes', 'Quoted value GBP'],
+    ...data.tenderDetails.map((item) => [item.reference, item.client.contactName, item.client.email, item.category, item.location, item.quotes, item.acceptedQuotes, item.quotedValue]),
   ];
   const csv = rows.map((row) => row.map((cell) => csvCell(cell ?? '')).join(',')).join('\n');
 

@@ -3,11 +3,13 @@
  * Non-destructive post-deployment verification.
  *
  * Every check is read-only: no test tender, quote, payment or account is created, and no
- * production record is mutated. Checks that cannot be proven from outside the application are
- * reported as UNVERIFIED rather than being assumed to pass.
+ * production record is mutated. Checks that cannot be proven by an unauthenticated probe FAIL
+ * unless the operator supplies the exact staging or production attestation. UNVERIFIED never
+ * counts as success.
  *
  * Usage:
- *   node scripts/health-check/verify-deployment.mjs --base-url https://... --target staging
+ *   node scripts/health-check/verify-deployment.mjs --base-url https://... --target staging --high-risk-attestation "HIGH RISK STAGING CONTROLS VERIFIED"
+ *   node scripts/health-check/verify-deployment.mjs --base-url https://... --target production --provider-controls-attestation "PRODUCTION PROVIDER CONTROLS VERIFIED"
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 
@@ -19,6 +21,8 @@ for (let index = 2; index < process.argv.length; index += 2) {
 const baseUrl = (args['base-url'] ?? '').replace(/\/$/, '');
 const target = args.target ?? 'staging';
 const commitSha = args.sha ?? 'unknown';
+const HIGH_RISK_ATTESTATION = 'HIGH RISK STAGING CONTROLS VERIFIED';
+const PRODUCTION_PROVIDER_ATTESTATION = 'PRODUCTION PROVIDER CONTROLS VERIFIED';
 
 if (!baseUrl || /^\[.*\]$/.test(baseUrl)) {
   console.error('VERIFICATION FAILED: --base-url is required and must not be a placeholder.');
@@ -66,7 +70,7 @@ async function expectProtectedPage(name, pathname) {
   }
   if ([401, 403].includes(result.status)) return record(name, 'PASS', `denied unauthenticated access (${result.status})`);
   if (result.status === 404) return record(name, 'FAIL', 'route not found; the expected page is missing from this deployment');
-  record(name, 'UNVERIFIED', `unexpected status ${result.status}`);
+  record(name, 'FAIL', `unexpected status ${result.status}; authentication must deny or redirect`);
 }
 
 /** A protected API route must reject an unauthenticated caller without returning data. */
@@ -80,11 +84,33 @@ async function expectProtectedApi(name, pathname, method = 'GET') {
   if (result.status === 400 || result.status === 422) {
     return record(name, 'FAIL', `rejected on payload (${result.status}) before authentication; authentication must be checked first`);
   }
-  record(name, 'UNVERIFIED', `unexpected status ${result.status}`);
+  record(name, 'FAIL', `unexpected status ${result.status}; authentication must deny or redirect`);
 }
 
 console.log(`Verifying ${target} deployment at ${baseUrl}`);
 console.log(`Commit: ${commitSha}\n`);
+
+if (target === 'staging') {
+  args['high-risk-attestation'] === HIGH_RISK_ATTESTATION
+    ? record('High-risk controls attestation', 'PASS', 'payment/webhook, reversal, contact-release privacy, audit, email, Sentry, and retention were explicitly attested')
+    : record('High-risk controls attestation', 'FAIL', `must be exactly: ${HIGH_RISK_ATTESTATION}`);
+}
+
+if (target === 'production') {
+  args['provider-controls-attestation'] === PRODUCTION_PROVIDER_ATTESTATION
+    ? record('Provider controls attestation', 'PASS', 'payment/webhook, reversal, contact-release privacy, audit, email, Sentry, and retention were explicitly attested')
+    : record('Provider controls attestation', 'FAIL', `must be exactly: ${PRODUCTION_PROVIDER_ATTESTATION}`);
+}
+
+const providerControlsAttested = target === 'staging'
+  ? args['high-risk-attestation'] === HIGH_RISK_ATTESTATION
+  : args['provider-controls-attestation'] === PRODUCTION_PROVIDER_ATTESTATION;
+
+function recordAttestedControl(name, detail) {
+  providerControlsAttested
+    ? record(name, 'PASS', `${detail} Attested by the operator; not provable by unauthenticated probe.`)
+    : record(name, 'FAIL', `${detail} Missing required attestation.`);
+}
 
 // Application health and database connectivity.
 const health = await request('/api/health');
@@ -139,19 +165,27 @@ if (!webhook.ok) {
 } else if (webhook.status === 400 || webhook.status === 401) {
   record('Stripe webhook processing', 'PASS', `rejected an unsigned payload (${webhook.status})`);
 } else if (webhook.status === 501) {
-  record('Stripe webhook processing', target === 'production' ? 'FAIL' : 'UNVERIFIED', 'Stripe is not configured at this target');
+  if (target === 'production') {
+    record('Stripe webhook processing', 'FAIL', 'Stripe is not configured at this target');
+  } else if (providerControlsAttested) {
+    record('Stripe webhook processing', 'PASS', 'Stripe is not configured; staging payment controls were attested');
+  } else {
+    record('Stripe webhook processing', 'FAIL', 'Stripe is not configured and staging payment controls were not attested');
+  }
 } else {
   record('Stripe webhook processing', 'FAIL', `accepted or mishandled an unsigned payload (${webhook.status})`);
 }
 
-// Checks that cannot be proven from outside the application boundary.
-record('Resend delivery', 'UNVERIFIED', 'requires a provider-side delivery check; not provable by probe');
-record('Audit logging', 'UNVERIFIED', 'requires database inspection; not provable by unauthenticated probe');
-record('Error rates', 'UNVERIFIED', 'requires an observability platform; none is configured');
+recordAttestedControl('Resend delivery', 'Requires a provider-side delivery check.');
+recordAttestedControl('Audit logging', 'Requires database inspection.');
+recordAttestedControl('Sentry error reporting', 'Requires an observability event in the target project.');
+recordAttestedControl('Retention job', 'Requires a successful scheduled retention run against this origin.');
+recordAttestedControl('Payment reversal', 'Requires refund/dispute handling evidence.');
+recordAttestedControl('Contact-release privacy', 'Requires a post-deploy check that unreleased contacts stay hidden.');
 
 const failed = results.filter((entry) => entry.status === 'FAIL');
 const unverified = results.filter((entry) => entry.status === 'UNVERIFIED');
-const outcome = failed.length === 0 ? 'SUCCESSFUL' : 'FAILED';
+const outcome = failed.length === 0 && unverified.length === 0 ? 'SUCCESSFUL' : 'FAILED';
 
 const record_ = {
   target,
@@ -164,6 +198,8 @@ const record_ = {
   passed: results.filter((entry) => entry.status === 'PASS').length,
   failed: failed.length,
   unverified: unverified.length,
+  highRiskAttestation: target === 'staging' ? args['high-risk-attestation'] === HIGH_RISK_ATTESTATION : null,
+  providerControlsAttestation: target === 'production' ? args['provider-controls-attestation'] === PRODUCTION_PROVIDER_ATTESTATION : null,
   verification: results,
 };
 
@@ -185,6 +221,7 @@ if (process.env.GITHUB_STEP_SUMMARY) {
     '',
     `- Commit: \`${commitSha}\``,
     `- Actor: @${record_.actor}`,
+    `- Unverified checks: ${unverified.length}`,
     '',
     '| Check | Status | Detail |',
     '| --- | --- | --- |',
@@ -194,4 +231,4 @@ if (process.env.GITHUB_STEP_SUMMARY) {
   writeFileSync(process.env.GITHUB_STEP_SUMMARY, summary, { flag: 'a' });
 }
 
-if (failed.length > 0) process.exit(1);
+if (failed.length > 0 || unverified.length > 0) process.exit(1);

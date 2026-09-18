@@ -47,7 +47,7 @@ export async function consumePasswordResetToken(token: string, passwordHash: str
       await transaction.user.update({
         where: { id: record.userId },
         // Completing the reset proves control of the mailbox, so the account is verified.
-        data: { passwordHash, emailVerifiedAt: new Date() },
+        data: { passwordHash, emailVerifiedAt: new Date(), sessionVersion: { increment: 1 } },
       });
     });
   } catch {

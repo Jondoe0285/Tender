@@ -1,0 +1,1 @@
+ALTER TABLE "RetailerProfile" ADD COLUMN "standardQuoteValidityDays" INTEGER NOT NULL DEFAULT 30;

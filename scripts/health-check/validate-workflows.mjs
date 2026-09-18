@@ -118,10 +118,14 @@ if (productionWorkflow) {
   check(/verify-deployment-approval\.mjs/.test(productionWorkflow), 'deploy-production.yml must verify the approval before deploying.');
   check(/--staging-report/.test(productionWorkflow), 'deploy-production.yml must require a staging record.');
   check(/environment:\s*production/.test(productionWorkflow), 'deploy-production.yml must deploy through the protected production environment.');
-  check(/verify-deployment\.mjs/.test(productionWorkflow), 'deploy-production.yml must verify the deployment afterwards.');
+  check(/PRODUCTION PROVIDER CONTROLS VERIFIED/.test(productionWorkflow), 'deploy-production.yml must require the production provider-controls attestation.');
+  check(/--provider-controls-attestation/.test(productionWorkflow), 'deploy-production.yml must pass the provider-controls attestation to the verifier.');
   check(/rollback/i.test(productionWorkflow), 'deploy-production.yml must define a rollback path.');
   check(!/schedule:/.test(productionWorkflow), 'A deployment workflow must never be scheduled.');
   check(!/\bpush:/.test(productionWorkflow), 'deploy-production.yml must not deploy automatically on push.');
+  check(/mobile-stress-test:/.test(productionWorkflow), 'deploy-production.yml must define a mobile release readiness gate.');
+  check(/needs:\s*\[verify-authorisation, mobile-stress-test\]/.test(productionWorkflow), 'Production deployment must depend on the mobile release readiness gate.');
+  check(/npm run mobile-stress-test/.test(productionWorkflow), 'The mobile release readiness gate must run npm run mobile-stress-test.');
 }
 
 // Merging to main must never be the same action as releasing to production.
@@ -144,7 +148,7 @@ for (const [file, content] of contents) {
 
 // One authoritative scheduled audit only.
 const scheduled = [...contents.entries()].filter(([, content]) => /^\s*schedule:/m.test(content)).map(([file]) => file);
-const auditSchedules = scheduled.filter((file) => file !== 'quote-retention.yml');
+const auditSchedules = scheduled.filter((file) => !['quote-retention.yml', 'pricing-estimate-refresh.yml'].includes(file));
 check(auditSchedules.length <= 1, `More than one scheduled audit workflow is enabled: ${auditSchedules.join(', ')}. Exactly one authoritative audit schedule is permitted.`);
 
 if (problems.length > 0) {

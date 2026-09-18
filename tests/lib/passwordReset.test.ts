@@ -4,6 +4,13 @@ import { createHash } from 'node:crypto';
 import { passwordResetRequestSchema } from '../../src/lib/schemas/passwordReset';
 import { hashResetToken } from '../../src/server/auth/passwordReset';
 import { accountCreatedByAdminTemplate, passwordResetTemplate } from '../../src/server/notifications/emailTemplates';
+import { passwordSchema } from '../../src/lib/schemas/password';
+
+test('passwords require a capital letter and special character', () => {
+  assert.equal(passwordSchema.safeParse('lowercase-only-password').success, false);
+  assert.equal(passwordSchema.safeParse('NoSpecialCharacter').success, false);
+  assert.equal(passwordSchema.safeParse('ValidPassword!').success, true);
+});
 
 test('hashes reset tokens without retaining the raw token', () => {
   const token = 'a-raw-reset-token';
@@ -19,7 +26,7 @@ test('produces a different hash for every token', () => {
 
 test('invites an admin-created account without embedding a password', () => {
   const template = accountCreatedByAdminTemplate({
-    role: 'PROVIDER',
+    role: 'USER',
     contactName: 'Sam Mason',
     companyName: 'Mason Groundworks',
     resetLink: 'https://app.example/reset-password?token=abc123',
@@ -35,7 +42,7 @@ test('invites an admin-created account without embedding a password', () => {
 
 test('escapes account details rendered into the invitation', () => {
   const template = accountCreatedByAdminTemplate({
-    role: 'CONTRACTOR',
+    role: 'USER',
     contactName: '<script>alert(1)</script>',
     resetLink: 'https://app.example/reset-password?token=abc',
     expiresIn: '24 hours',

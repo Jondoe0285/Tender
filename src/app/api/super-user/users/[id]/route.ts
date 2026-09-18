@@ -7,6 +7,8 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { createPasswordResetToken, PASSWORD_RESET_EXPIRY_LABEL } from '@/server/auth/passwordReset';
 import { appUrl, passwordResetTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
+import { markUploadedDocumentsVerified } from '@/server/domain/verificationDocumentService';
+import { independentReviewTierRank } from '@/lib/independentReviewTiers';
 
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -39,6 +41,9 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   }
 
   if (action === 'suspend') {
+    if (!admin.isOwner) {
+      return NextResponse.json({ error: 'Owner access is required to suspend an account' }, { status: 403 });
+    }
     await prisma.user.update({
       where: { id: user.id },
       data: { suspended: true },
@@ -54,6 +59,9 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   }
 
   if (action === 'activate') {
+    if (!admin.isOwner) {
+      return NextResponse.json({ error: 'Owner access is required to reactivate an account' }, { status: 403 });
+    }
     await prisma.user.update({
       where: { id: user.id },
       data: { suspended: false },
@@ -91,7 +99,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   }
 
   if (action === 'set-release-credits') {
-    if (user.role !== 'CONTRACTOR') {
+    if (user.role !== 'USER') {
       return NextResponse.json({ error: 'Release credits only apply to Client accounts' }, { status: 400 });
     }
     const releaseCreditsLeft = Number(body?.releaseCreditsLeft);
@@ -122,7 +130,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   }
 
   if (action === 'set-launch-credits') {
-    if (user.role !== 'PROVIDER') {
+    if (user.role !== 'USER') {
       return NextResponse.json({ error: 'Launch credits only apply to Retailer accounts' }, { status: 400 });
     }
     const launchCreditsLeft = Number(body?.launchCreditsLeft);
@@ -144,6 +152,70 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       metadata: { email: user.email, previous: profile.launchCreditsLeft, next: launchCreditsLeft },
     });
     return NextResponse.json({ status: 'launch-credits-updated', launchCreditsLeft });
+  }
+
+  if (action === 'approve-verification' || action === 'reject-verification') {
+    if (user.role !== 'USER') {
+      return NextResponse.json({ error: 'Verification only applies to Provider accounts' }, { status: 400 });
+    }
+    const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { id: true, categories: true, verificationStatus: true, isSoleTrader: true } });
+    if (!profile) {
+      return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
+    }
+    if (profile.verificationStatus !== 'PENDING') {
+      return NextResponse.json({ error: 'Only a pending verification request can be decided' }, { status: 409 });
+    }
+    const nextStatus = action === 'approve-verification' ? 'VERIFIED' : 'REJECTED';
+    const note = typeof body?.note === 'string' ? body.note.slice(0, 500) : null;
+    await prisma.retailerProfile.update({
+      where: { userId: user.id },
+      data: { verificationStatus: nextStatus, verificationDecidedAt: new Date(), verificationNote: note },
+    });
+    await markUploadedDocumentsVerified(profile.id, profile.categories, action === 'approve-verification', profile.isSoleTrader);
+    await recordAuditEvent({
+      actorId: admin.id,
+      action: action === 'approve-verification' ? 'PROVIDER_VERIFICATION_APPROVED' : 'PROVIDER_VERIFICATION_REJECTED',
+      targetType: 'User',
+      targetId: user.id,
+      metadata: { email: user.email, note: note ?? undefined },
+    });
+    return NextResponse.json({ status: 'verification-decided', verificationStatus: nextStatus });
+  }
+
+  if (action === 'approve-independent-review' || action === 'decline-independent-review') {
+    if (user.role !== 'USER') {
+      return NextResponse.json({ error: 'Independent review only applies to Provider accounts' }, { status: 400 });
+    }
+    const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { id: true, independentReviewStatus: true, independentReviewPurchasedTier: true, independentReviewPurchasedPaymentId: true } });
+    if (!profile) {
+      return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
+    }
+    if (profile.independentReviewStatus !== 'PURCHASED') {
+      return NextResponse.json({ error: 'Only a purchased independent review can be decided' }, { status: 409 });
+    }
+    const nextStatus = action === 'approve-independent-review' ? 'APPROVED' : 'DECLINED';
+    const tier = body?.tier === 'BRONZE' || body?.tier === 'SILVER' || body?.tier === 'GOLD' ? body.tier : null;
+    if (action === 'approve-independent-review' && !tier) return NextResponse.json({ error: 'A Bronze, Silver, or Gold tier is required when approving an independent review' }, { status: 400 });
+    const purchasedTier = profile.independentReviewPurchasedTier;
+    if (action === 'approve-independent-review' && !purchasedTier) {
+      return NextResponse.json({ error: 'Purchased verification tier is missing for this account' }, { status: 400 });
+    }
+    if (action === 'approve-independent-review' && purchasedTier && independentReviewTierRank(tier) > independentReviewTierRank(purchasedTier)) {
+      return NextResponse.json({ error: 'Awarded tier cannot exceed the purchased verification product' }, { status: 400 });
+    }
+    const note = typeof body?.note === 'string' ? body.note.slice(0, 500) : null;
+    await prisma.retailerProfile.update({
+      where: { userId: user.id },
+      data: { independentReviewStatus: nextStatus, independentReviewTier: nextStatus === 'APPROVED' ? tier : null, independentReviewDecidedAt: new Date(), independentReviewNote: note },
+    });
+    await recordAuditEvent({
+      actorId: admin.id,
+      action: action === 'approve-independent-review' ? 'INDEPENDENT_REVIEW_APPROVED' : 'INDEPENDENT_REVIEW_DECLINED',
+      targetType: 'User',
+      targetId: user.id,
+      metadata: { email: user.email, note: note ?? undefined },
+    });
+    return NextResponse.json({ status: 'independent-review-decided', independentReviewStatus: nextStatus, independentReviewTier: tier });
   }
 
   return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });

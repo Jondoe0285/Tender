@@ -5,11 +5,11 @@ import { rejectCrossOrigin } from '@/server/http/origin';
 import { toErrorResponse } from '@/server/http/errors';
 import { listAvailableMembershipTiers, requestMembershipTierPurchase } from '@/server/domain/membershipService';
 
-const purchaseSchema = z.object({ tierId: z.string().min(1) });
+const purchaseSchema = z.object({ tierId: z.string().min(1), contractMonths: z.union([z.literal(6), z.literal(12)]) });
 
 export async function GET() {
   try {
-    const user = await requireRole('PROVIDER');
+    const user = await requireRole('USER');
     return NextResponse.json(await listAvailableMembershipTiers(user.id));
   } catch (error) {
     return toErrorResponse(error);
@@ -20,10 +20,10 @@ export async function POST(request: Request) {
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
-    const user = await requireRole('PROVIDER');
+    const user = await requireRole('USER');
     const parsed = purchaseSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: 'Invalid membership tier' }, { status: 400 });
-    return NextResponse.json(await requestMembershipTierPurchase(user.id, parsed.data.tierId));
+    return NextResponse.json(await requestMembershipTierPurchase(user.id, parsed.data.tierId, parsed.data.contractMonths));
   } catch (error) {
     return toErrorResponse(error);
   }

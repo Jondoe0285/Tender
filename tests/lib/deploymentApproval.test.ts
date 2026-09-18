@@ -26,7 +26,14 @@ function writeStagingRecord(name: string, record: Record<string, unknown>): void
   writeFileSync(`${DIR}/${name}.json`, JSON.stringify(record));
 }
 
-const PROD = ['--target', 'production', '--statement', 'DEPLOY APPROVED COMMIT TO PRODUCTION'];
+const PROD = [
+  '--target',
+  'production',
+  '--statement',
+  'DEPLOY APPROVED COMMIT TO PRODUCTION',
+  '--provider-controls-attestation',
+  'PRODUCTION PROVIDER CONTROLS VERIFIED',
+];
 
 test('rejects an unfilled placeholder commit SHA', () => {
   const result = runGate([...PROD, '--sha', '[PASTE STAGING-VALIDATED COMMIT SHA]', '--staging-report', 'anything']);
@@ -50,6 +57,21 @@ test('rejects an inexact approval statement', () => {
   const result = runGate(['--target', 'production', '--statement', 'deploy it', '--sha', headSha(), '--staging-report', 'x']);
   assert.equal(result.code, 1);
   assert.match(result.output, /must be exactly/);
+});
+
+test('rejects production without the provider-controls attestation', () => {
+  const result = runGate([
+    '--target',
+    'production',
+    '--statement',
+    'DEPLOY APPROVED COMMIT TO PRODUCTION',
+    '--sha',
+    headSha(),
+    '--staging-report',
+    'x',
+  ]);
+  assert.equal(result.code, 1);
+  assert.match(result.output, /PRODUCTION PROVIDER CONTROLS VERIFIED/);
 });
 
 test('accepts staging branch promotion approval for the current main commit', () => {
@@ -76,6 +98,8 @@ test('accepts staging deployment approval for the current staging commit', () =>
     headSha(),
     '--staging-ref',
     'HEAD',
+    '--high-risk-attestation',
+    'HIGH RISK STAGING CONTROLS VERIFIED',
   ]);
   rmSync('docs/health-check/deployment-approval.json', { force: true });
   assert.equal(result.code, 0);

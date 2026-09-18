@@ -15,6 +15,17 @@ test('accepts a complete formal quote', () => {
   assert.equal(result.success, true);
 });
 
+test('accepts a quote submission without per-quote validity because profile validity is applied server-side', () => {
+  const result = submitQuoteSchema.safeParse({
+    lineItems: [{ tenderItemId: 'tender-item-1', available: true, priceGbp: '2450' }],
+    leadTimeDays: '14',
+    deliveryDateConfirmed: true,
+    deliveryInfo: 'Delivery available Tuesday to Thursday, included in price.',
+  });
+
+  assert.equal(result.success, true);
+});
+
 test('rejects a quote item without a description or price', () => {
   const missingPrice = submitQuoteSchema.safeParse({
     lineItems: [{ tenderItemId: 'tender-item-1', available: true, priceGbp: 2450 }],

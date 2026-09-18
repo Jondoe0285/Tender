@@ -1,0 +1,69 @@
+name: Staging Stress Test
+
+# Manual, staging-only release evidence. This workflow never targets production by default.
+on:
+  workflow_dispatch:
+    inputs:
+      levels:
+        description: 'Comma-separated concurrency levels'
+        type: string
+        default: '100,500,1000'
+        required: true
+      sustainable_seconds:
+        description: 'Maximum sustainable-load duration'
+        type: string
+        default: '20'
+        required: true
+      database_probe:
+        description: 'Run isolated temporary-table database probe'
+        type: boolean
+        default: false
+        required: true
+
+concurrency:
+  group: staging-stress-test
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  stress-test:
+    name: Run staging stress test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: staging
+    env:
+      STRESS_TEST_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+      STRESS_TEST_LEVELS: ${{ inputs.levels }}
+      STRESS_TEST_SUSTAINABLE_SECONDS: ${{ inputs.sustainable_seconds }}
+      STRESS_TEST_DATABASE: ${{ inputs.database_probe && 'true' || 'false' }}
+      STRESS_TEST_DATABASE_URL: ${{ secrets.STRESS_TEST_DATABASE_URL }}
+      STRESS_TEST_REQUESTS_PER_LEVEL: '1'
+      STRESS_TEST_TIMEOUT_MS: '15000'
+    steps:
+      - name: Checkout staging
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run stress test
+        run: npm run stress-test
+
+      - name: Upload stress-test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-stress-test-results
+          path: stress-test-results/
+          retention-days: 90
+          if-no-files-found: error

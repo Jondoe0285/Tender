@@ -1,0 +1,4 @@
+ALTER TABLE "User" ADD COLUMN "mfaEnabled" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "User" ADD COLUMN "mfaSecretEncrypted" TEXT;
+ALTER TABLE "User" ADD COLUMN "mfaRecoveryCodesHash" TEXT;
+ALTER TABLE "User" ADD COLUMN "mfaVerifiedAt" TIMESTAMP(3);

@@ -1,0 +1,44 @@
+name: Pricing estimate refresh
+
+on:
+  schedule:
+    - cron: '11 3 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: pricing-estimate-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh-baselines:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Refresh quote estimate baselines
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL is not configured in the production GitHub Actions environment."
+            exit 1
+          fi
+          npx tsx scripts/refresh-quote-estimate-baselines.ts

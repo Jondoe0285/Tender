@@ -7,7 +7,7 @@ import { prisma } from '@/server/data/prisma';
 
 export default async function ClientBillingPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== 'CONTRACTOR') redirect('/login');
+  if (!user || user.role !== 'USER') redirect('/login');
 
   const payments = await prisma.payment.findMany({
     where: { userId: user.id, type: 'CLIENT_RELEASE' },
@@ -18,7 +18,7 @@ export default async function ClientBillingPage() {
     <AppShell role="client" title="Billing">
       <div className="mx-auto max-w-3xl">
         <p className="mb-6 max-w-xl text-sm text-concrete-grey">
-          Accepted Quote Release Fees charged when you accept a Retailer&rsquo;s quote.
+          Accepted Quote Release Fees charged when you accept a Provider&rsquo;s quote.
         </p>
         {payments.length === 0 ? (
           <Card className="py-16 text-center text-sm text-concrete-grey">No billing activity is recorded for this account.</Card>

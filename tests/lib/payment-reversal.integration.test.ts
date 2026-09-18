@@ -1,0 +1,358 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import test from 'node:test';
+import Stripe from 'stripe';
+import { POST } from '../../src/app/api/webhooks/stripe/route';
+import { ForbiddenError } from '../../src/server/auth/session';
+import { prisma } from '../../src/server/data/prisma';
+import { finalizeContactRelease, getReleasedContact } from '../../src/server/domain/contactReleaseService';
+import { reversePaymentEntitlements } from '../../src/server/payments/paymentReversalService';
+
+test('a refund revokes the paid unlock and duplicate Stripe delivery is idempotent', async (context) => {
+  const suffix = randomUUID();
+  let clientId: string | undefined;
+  let retailerId: string | undefined;
+  let tenderId: string | undefined;
+  let paymentId: string | undefined;
+
+  context.after(async () => {
+    if (paymentId) await prisma.paymentReversal.deleteMany({ where: { paymentId } });
+    if (tenderId) await prisma.unlock.deleteMany({ where: { tenderId } });
+    if (paymentId) await prisma.payment.deleteMany({ where: { id: paymentId } });
+    if (tenderId) await prisma.tender.deleteMany({ where: { id: tenderId } });
+    const userIds = [clientId, retailerId].filter((id): id is string => Boolean(id));
+    if (userIds.length > 0) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+  });
+
+  const [client, retailer] = await Promise.all([
+    prisma.user.create({ data: { email: `reversal-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Reversal Client' } }),
+    prisma.user.create({ data: { email: `reversal-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Reversal Retailer' } }),
+  ]);
+  clientId = client.id;
+  retailerId = retailer.id;
+
+  const tender = await prisma.tender.create({
+    data: {
+      reference: `REV-${suffix}`,
+      clientId,
+      category: 'Construction Materials',
+      subcategory: 'Aggregate',
+      location: 'Leeds',
+      quantity: '20 tonnes',
+      urgency: 'Standard',
+      closingDate: new Date(Date.now() + 86_400_000),
+      requirements: 'Delivery',
+      description: 'Fictional payment reversal test tender',
+    },
+  });
+  tenderId = tender.id;
+
+  const payment = await prisma.payment.create({
+    data: {
+      type: 'RETAILER_UNLOCK',
+      amountGbp: 10,
+      vatPercentage: 20,
+      vatGbp: 2,
+      totalAmountGbp: 12,
+      status: 'CONFIRMED',
+      userId: retailerId,
+      tenderId,
+      stripePaymentIntentId: `pi_${suffix}`,
+      confirmedAt: new Date(),
+    },
+  });
+  paymentId = payment.id;
+  await prisma.unlock.create({ data: { tenderId, retailerId, method: 'PAID', paymentId } });
+
+  const input = {
+    stripePaymentIntentId: payment.stripePaymentIntentId!,
+    stripeEventId: `evt_${suffix}`,
+    providerObjectId: `ch_${suffix}`,
+    type: 'REFUND' as const,
+  };
+  const reversal = await reversePaymentEntitlements(input);
+
+  assert.deepEqual(reversal, {
+    paymentId,
+    paymentType: 'RETAILER_UNLOCK',
+    affectedUserIds: [retailerId],
+  });
+  assert.equal((await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } })).status, 'REVERSED');
+  assert.equal(await prisma.unlock.count({ where: { paymentId } }), 0);
+  assert.equal(await prisma.paymentReversal.count({ where: { paymentId, stripeEventId: input.stripeEventId } }), 1);
+
+  assert.equal(await reversePaymentEntitlements(input), null);
+  assert.equal(await prisma.paymentReversal.count({ where: { paymentId } }), 1);
+});
+
+test('the Stripe webhook rejects a forged signature before processing payment state', async () => {
+  const previousSecretKey = process.env.STRIPE_SECRET_KEY;
+  const previousWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  process.env.STRIPE_SECRET_KEY = 'sk_test_payment_regression_only';
+  process.env.STRIPE_WEBHOOK_SECRET = 'whsec_payment_regression_only';
+
+  try {
+    const response = await POST(new Request('http://localhost/api/webhooks/stripe', {
+      method: 'POST',
+      headers: { 'stripe-signature': 't=0,v1=forged' },
+      body: JSON.stringify({ id: 'evt_forged', type: 'checkout.session.completed' }),
+    }));
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), { error: 'Invalid signature' });
+  } finally {
+    if (previousSecretKey === undefined) delete process.env.STRIPE_SECRET_KEY;
+    else process.env.STRIPE_SECRET_KEY = previousSecretKey;
+    if (previousWebhookSecret === undefined) delete process.env.STRIPE_WEBHOOK_SECRET;
+    else process.env.STRIPE_WEBHOOK_SECRET = previousWebhookSecret;
+  }
+});
+
+test('a reversed release payment cannot create or serve contact access', async (context) => {
+  const suffix = randomUUID();
+  let clientId: string | undefined;
+  let retailerId: string | undefined;
+  let tenderId: string | undefined;
+  let quoteId: string | undefined;
+  let paymentId: string | undefined;
+
+  context.after(async () => {
+    if (paymentId) await prisma.paymentReversal.deleteMany({ where: { paymentId } });
+    if (quoteId) await prisma.contactRelease.deleteMany({ where: { quoteId } });
+    if (paymentId) await prisma.payment.deleteMany({ where: { id: paymentId } });
+    if (tenderId) await prisma.quote.deleteMany({ where: { tenderId } });
+    if (tenderId) await prisma.tender.deleteMany({ where: { id: tenderId } });
+    const userIds = [clientId, retailerId].filter((id): id is string => Boolean(id));
+    if (userIds.length > 0) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+  });
+
+  const [client, retailer] = await Promise.all([
+    prisma.user.create({ data: { email: `release-reversal-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Release Reversal Client' } }),
+    prisma.user.create({ data: { email: `release-reversal-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Release Reversal Retailer' } }),
+  ]);
+  clientId = client.id;
+  retailerId = retailer.id;
+  const tender = await prisma.tender.create({
+    data: { reference: `RELEASE-REV-${suffix}`, clientId, category: 'Construction Materials', subcategory: 'Aggregate', location: 'Leeds', quantity: '20 tonnes', urgency: 'Standard', closingDate: new Date(Date.now() + 86_400_000), requirements: 'Delivery', description: 'Fictional release reversal test tender' },
+  });
+  tenderId = tender.id;
+  const quote = await prisma.quote.create({
+    data: { reference: `RELEASE-REV-${suffix}-Q01`, tenderId, retailerId, priceGbp: 1000, leadTimeDays: 2, deliveryInfo: 'Fictional delivery', validityDays: 14, status: 'ACCEPTED' },
+  });
+  quoteId = quote.id;
+  const payment = await prisma.payment.create({
+    data: { type: 'CLIENT_RELEASE', amountGbp: 10, totalAmountGbp: 10, status: 'CONFIRMED', userId: clientId, quoteId, stripePaymentIntentId: `pi_${suffix}`, confirmedAt: new Date() },
+  });
+  paymentId = payment.id;
+  await finalizeContactRelease(clientId, quoteId, paymentId);
+
+  await reversePaymentEntitlements({ stripePaymentIntentId: payment.stripePaymentIntentId!, stripeEventId: `evt_${suffix}`, providerObjectId: `ch_${suffix}`, type: 'REFUND' });
+
+  await assert.rejects(
+    () => getReleasedContact(clientId!, quoteId!),
+    (error: unknown) => error instanceof ForbiddenError
+  );
+  await assert.rejects(
+    () => finalizeContactRelease(clientId!, quoteId!, paymentId!),
+    (error: unknown) => error instanceof ForbiddenError
+  );
+});
+
+test('a signed completion event grants one unlock and replays without duplicate access', async (context) => {
+  const suffix = randomUUID();
+  const previousSecretKey = process.env.STRIPE_SECRET_KEY;
+  const previousWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  let clientId: string | undefined;
+  let retailerId: string | undefined;
+  let companyId: string | undefined;
+  let tenderId: string | undefined;
+  let paymentId: string | undefined;
+  const webhookSecret = `whsec_${suffix}`;
+
+  context.after(async () => {
+    if (tenderId) await prisma.unlock.deleteMany({ where: { tenderId } });
+    if (paymentId) await prisma.payment.deleteMany({ where: { id: paymentId } });
+    if (tenderId) await prisma.tenderMatch.deleteMany({ where: { tenderId } });
+    if (tenderId) await prisma.tenderItem.deleteMany({ where: { tenderId } });
+    if (tenderId) await prisma.tender.deleteMany({ where: { id: tenderId } });
+    if (companyId) await prisma.clientCompany.deleteMany({ where: { id: companyId } });
+    if (retailerId) await prisma.retailerProfile.deleteMany({ where: { userId: retailerId } });
+    const userIds = [clientId, retailerId].filter((id): id is string => Boolean(id));
+    if (userIds.length > 0) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+    if (previousSecretKey === undefined) delete process.env.STRIPE_SECRET_KEY;
+    else process.env.STRIPE_SECRET_KEY = previousSecretKey;
+    if (previousWebhookSecret === undefined) delete process.env.STRIPE_WEBHOOK_SECRET;
+    else process.env.STRIPE_WEBHOOK_SECRET = previousWebhookSecret;
+  });
+
+  process.env.STRIPE_SECRET_KEY = 'sk_test_payment_regression_only';
+  process.env.STRIPE_WEBHOOK_SECRET = webhookSecret;
+  const [client, retailer] = await Promise.all([
+    prisma.user.create({ data: { email: `signed-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Signed Event Client' } }),
+    prisma.user.create({ data: { email: `signed-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Signed Event Retailer' } }),
+  ]);
+  clientId = client.id;
+  retailerId = retailer.id;
+  const company = await prisma.clientCompany.create({
+    data: {
+      companyName: `Signed Event Supplies ${suffix}`,
+      branchIdentifier: suffix,
+      primaryUserId: retailerId,
+      services: 'Construction Materials',
+      operatingLocations: 'United Kingdom',
+      members: { create: { userId: retailerId } },
+    },
+  });
+  companyId = company.id;
+  await prisma.retailerProfile.create({
+    data: { userId: retailerId, companyName: company.companyName, coverageScope: 'UK', counties: '', regions: '', categories: 'Construction Materials', coverageAreas: '', launchCreditsLeft: 0 },
+  });
+  const tender = await prisma.tender.create({
+    data: {
+      reference: `SIGNED-${suffix}`,
+      clientId,
+      category: 'Construction Materials',
+      subcategory: 'Aggregate',
+      location: 'Leeds',
+      quantity: '20 tonnes',
+      urgency: 'Standard',
+      closingDate: new Date(Date.now() + 86_400_000),
+      requirements: 'Delivery',
+      description: 'Fictional signed webhook test tender',
+      items: { create: { category: 'Construction Materials', subcategory: 'Aggregate', item: 'MOT Type 1', quantity: '20 tonnes', description: 'Fictional item' } },
+    },
+  });
+  tenderId = tender.id;
+  await prisma.tenderMatch.create({ data: { tenderId, retailerId } });
+  const payment = await prisma.payment.create({
+    data: { type: 'RETAILER_UNLOCK', amountGbp: 10, vatPercentage: 20, vatGbp: 2, totalAmountGbp: 12, status: 'PENDING', userId: retailerId, tenderId },
+  });
+  paymentId = payment.id;
+
+  const payload = JSON.stringify({
+    id: `evt_${suffix}`,
+    object: 'event',
+    type: 'checkout.session.completed',
+    data: { object: { object: 'checkout.session', metadata: { paymentId }, payment_status: 'paid', amount_total: 1200, payment_intent: null } },
+  });
+  const signature = Stripe.webhooks.generateTestHeaderString({ payload, secret: webhookSecret });
+  const request = () => new Request('http://localhost/api/webhooks/stripe', { method: 'POST', headers: { 'stripe-signature': signature }, body: payload });
+
+  const unpaidPayload = JSON.stringify({
+    id: `evt_unpaid_${suffix}`,
+    object: 'event',
+    type: 'checkout.session.completed',
+    data: { object: { object: 'checkout.session', metadata: { paymentId }, payment_status: 'unpaid', amount_total: 1200, payment_intent: null } },
+  });
+  const unpaidSignature = Stripe.webhooks.generateTestHeaderString({ payload: unpaidPayload, secret: webhookSecret });
+  const unpaidResponse = await POST(new Request('http://localhost/api/webhooks/stripe', { method: 'POST', headers: { 'stripe-signature': unpaidSignature }, body: unpaidPayload }));
+  assert.equal(unpaidResponse.status, 200);
+  assert.equal((await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } })).status, 'PENDING');
+  assert.equal(await prisma.unlock.count({ where: { tenderId, retailerId, paymentId } }), 0);
+
+  assert.equal((await POST(request())).status, 200);
+  assert.equal((await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } })).status, 'CONFIRMED');
+  assert.equal(await prisma.unlock.count({ where: { tenderId, retailerId, paymentId } }), 1);
+  assert.equal((await POST(request())).status, 200);
+  assert.equal(await prisma.unlock.count({ where: { tenderId, retailerId, paymentId } }), 1);
+});
+
+test('a reversed direct-contact payment clears the released contact state', async (context) => {
+  const suffix = randomUUID();
+  let clientId: string | undefined;
+  let retailerId: string | undefined;
+  let tenderId: string | undefined;
+  let paymentId: string | undefined;
+
+  context.after(async () => {
+    if (paymentId) await prisma.paymentReversal.deleteMany({ where: { paymentId } });
+    if (paymentId) await prisma.directContactRequest.deleteMany({ where: { paymentId } });
+    if (paymentId) await prisma.payment.deleteMany({ where: { id: paymentId } });
+    if (tenderId) await prisma.tender.deleteMany({ where: { id: tenderId } });
+    const userIds = [clientId, retailerId].filter((id): id is string => Boolean(id));
+    if (userIds.length > 0) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+  });
+
+  const [client, retailer] = await Promise.all([
+    prisma.user.create({ data: { email: `direct-reversal-client-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Direct Reversal Client' } }),
+    prisma.user.create({ data: { email: `direct-reversal-retailer-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Direct Reversal Retailer' } }),
+  ]);
+  clientId = client.id;
+  retailerId = retailer.id;
+  const tender = await prisma.tender.create({
+    data: { reference: `DIRECT-REV-${suffix}`, clientId, category: 'Contractor Services', subcategory: 'Groundworks', location: 'Leeds', quantity: 'Project', urgency: 'Standard', closingDate: new Date(Date.now() + 86_400_000), requirements: 'Delivery', description: 'Fictional direct-contact reversal test tender' },
+  });
+  tenderId = tender.id;
+  const payment = await prisma.payment.create({
+    data: { type: 'DIRECT_CONTACT', amountGbp: 25, vatPercentage: 20, vatGbp: 5, totalAmountGbp: 30, status: 'CONFIRMED', userId: retailerId, tenderId, stripePaymentIntentId: `pi_${suffix}`, confirmedAt: new Date() },
+  });
+  paymentId = payment.id;
+  await prisma.directContactRequest.create({ data: { tenderId, requesterId: retailerId, paymentId, releasedAt: new Date() } });
+
+  await reversePaymentEntitlements({ stripePaymentIntentId: payment.stripePaymentIntentId!, stripeEventId: `evt_${suffix}`, providerObjectId: `ch_${suffix}`, type: 'REFUND' });
+
+  assert.equal((await prisma.directContactRequest.findUniqueOrThrow({ where: { paymentId } })).releasedAt, null);
+});
+
+test('a refund of the current enhanced verification payment removes the public award', async (context) => {
+  const suffix = randomUUID();
+  let retailerId: string | undefined;
+  let paymentId: string | undefined;
+
+  context.after(async () => {
+    if (paymentId) await prisma.paymentReversal.deleteMany({ where: { paymentId } });
+    if (retailerId) await prisma.retailerProfile.deleteMany({ where: { userId: retailerId } });
+    if (paymentId) await prisma.payment.deleteMany({ where: { id: paymentId } });
+    if (retailerId) await prisma.user.deleteMany({ where: { id: retailerId } });
+  });
+
+  const retailer = await prisma.user.create({
+    data: {
+      email: `review-reversal-${suffix}@example.test`,
+      passwordHash: 'not-used',
+      role: 'USER',
+      contactName: 'Review Reversal',
+      retailerProfile: {
+        create: {
+          companyName: 'Review Reversal Ltd',
+          categories: 'Materials',
+          coverageAreas: '',
+          independentReviewStatus: 'APPROVED',
+          independentReviewTier: 'SILVER',
+          independentReviewPurchasedTier: 'SILVER',
+        },
+      },
+    },
+  });
+  retailerId = retailer.id;
+  const payment = await prisma.payment.create({
+    data: {
+      type: 'INDEPENDENT_REVIEW',
+      amountGbp: 250,
+      vatPercentage: 20,
+      vatGbp: 50,
+      totalAmountGbp: 300,
+      status: 'CONFIRMED',
+      independentReviewTier: 'SILVER',
+      userId: retailerId,
+      stripePaymentIntentId: `pi_review_${suffix}`,
+      confirmedAt: new Date(),
+    },
+  });
+  paymentId = payment.id;
+  await prisma.retailerProfile.update({
+    where: { userId: retailerId },
+    data: { independentReviewPurchasedPaymentId: payment.id },
+  });
+
+  await reversePaymentEntitlements({
+    stripePaymentIntentId: payment.stripePaymentIntentId!,
+    stripeEventId: `evt_review_${suffix}`,
+    providerObjectId: `ch_review_${suffix}`,
+    type: 'REFUND',
+  });
+
+  const profile = await prisma.retailerProfile.findUniqueOrThrow({ where: { userId: retailerId } });
+  assert.equal(profile.independentReviewStatus, 'NOT_PURCHASED');
+  assert.equal(profile.independentReviewTier, null);
+});

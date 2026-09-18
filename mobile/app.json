@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Trade Tender",
+    "slug": "trade-tender",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "tradetender",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tradetender.app",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.tradetender.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#F2F4F7",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-font"
+    ]
+  }
+}

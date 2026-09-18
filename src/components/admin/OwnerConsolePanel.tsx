@@ -111,6 +111,7 @@ export function OwnerConsolePanel({ initialSuperUsers, currentUserId }: { initia
             <label className="text-sm text-concrete-grey">
               <span className="mb-1 block font-medium text-foundation-navy">Initial password</span>
               <PasswordInput required value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} />
+              <span className="mt-1 block text-xs text-concrete-grey">Use 10-200 characters, including a capital letter and a special character.</span>
             </label>
             <label className="text-sm text-concrete-grey">
               <span className="mb-1 block font-medium text-foundation-navy">Phone</span>

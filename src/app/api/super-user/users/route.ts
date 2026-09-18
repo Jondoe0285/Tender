@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/server/data/prisma';
 import { requireFullSuperUser } from '@/server/auth/session';
+import { getPlatformSetting } from '@/server/domain/platformSettings';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { isManagedAccountRole } from '@/lib/admin-permissions';
 import { hashPassword } from '@/server/auth/password';
@@ -14,7 +15,7 @@ import { accountCreatedByAdminTemplate, appUrl } from '@/server/notifications/em
  * Invites the account holder to set their own password. Delivery failure must not roll back
  * the account, so the outcome is recorded in the audit log and returned to the Super User.
  */
-async function sendAccountInvitation(user: { id: string; email: string; contactName: string }, role: 'CONTRACTOR' | 'PROVIDER', companyName: string | undefined, actorId: string) {
+async function sendAccountInvitation(user: { id: string; email: string; contactName: string }, role: 'USER' | 'USER', companyName: string | undefined, actorId: string) {
   const token = await createPasswordResetToken(user.id);
   const result = await sendTransactionalEmail(
     user.email,
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
 
   const input = parsed.data;
   if (!isManagedAccountRole(input.role)) {
-    return NextResponse.json({ error: 'Only Client and Retailer accounts can be created by the Super User' }, { status: 400 });
+    return NextResponse.json({ error: 'Only User accounts can be created by the Super User' }, { status: 400 });
   }
 
   const existing = await prisma.user.findUnique({
@@ -65,6 +66,9 @@ export async function POST(request: Request) {
   });
 
   if (existing) {
+    if (existing.role === 'SUPER_USER') {
+      return NextResponse.json({ error: 'Super User accounts cannot be managed as User accounts' }, { status: 409 });
+    }
     const hasRole = existing.roleMemberships.some((membership) => membership.role === input.role) || existing.role === input.role;
     if (hasRole || existing.suspended) {
       return NextResponse.json({ error: 'That account already has this role or is suspended' }, { status: 409 });
@@ -72,20 +76,20 @@ export async function POST(request: Request) {
 
     await prisma.$transaction([
       prisma.userRole.create({ data: { userId: existing.id, role: input.role } }),
-      ...(input.role === 'PROVIDER'
+      ...(input.role === 'USER'
         ? [
             prisma.retailerProfile.upsert({
               where: { userId: existing.id },
               update: {
                 companyName: input.companyName ?? existing.contactName,
                 categories: (input.categories ?? []).join(','),
-                coverageAreas: input.coverageAreas ?? '',
+                coverageAreas: '',
               },
               create: {
                 userId: existing.id,
                 companyName: input.companyName ?? existing.contactName,
                 categories: (input.categories ?? []).join(','),
-                coverageAreas: input.coverageAreas ?? '',
+                coverageAreas: '',
               },
             }),
           ]
@@ -106,27 +110,37 @@ export async function POST(request: Request) {
   }
 
   const passwordHash = await hashPassword(input.password);
-  const user = await prisma.user.create({
-    data: {
-      email: input.email,
-      passwordHash,
-      role: input.role,
-      contactName: input.contactName,
-      contactPhone: input.contactPhone ?? null,
-      termsAcceptedAt: new Date(),
-      roleMemberships: { create: { role: input.role } },
-      ...(input.role === 'PROVIDER'
-        ? {
-            retailerProfile: {
-              create: {
-                companyName: input.companyName ?? input.contactName,
-                categories: (input.categories ?? []).join(','),
-                coverageAreas: input.coverageAreas ?? '',
-              },
-            },
-          }
-        : {}),
-    },
+  const defaultLaunchCredits = Math.max(0, Number(await getPlatformSetting('RETAILER_LAUNCH_CREDITS_DEFAULT')) || 0);
+  const user = await prisma.$transaction(async (transaction) => {
+    const createdUser = await transaction.user.create({
+      data: {
+        email: input.email,
+        passwordHash,
+        role: input.role,
+        contactName: input.contactName,
+        contactPhone: input.contactPhone ?? null,
+        termsAcceptedAt: new Date(),
+        roleMemberships: { create: { role: input.role } },
+        retailerProfile: {
+          create: {
+            companyName: input.companyName ?? input.contactName,
+            categories: (input.categories ?? []).join(','),
+            coverageAreas: '',
+            launchCreditsLeft: defaultLaunchCredits,
+          },
+        },
+      },
+    });
+    const company = await transaction.clientCompany.create({
+      data: {
+        companyName: input.companyName ?? input.contactName,
+        services: (input.categories ?? []).join(','),
+        operatingLocations: '',
+        primaryUserId: createdUser.id,
+      },
+    });
+    await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: createdUser.id } });
+    return createdUser;
   });
 
   await recordAuditEvent({

@@ -7,6 +7,61 @@ on:
     branches: [ main, staging, development ]
 
 jobs:
+  dependency-audit:
+    name: Dependency security audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit high-severity dependencies
+        run: npm audit --audit-level=high
+
+  mobile:
+    name: Mobile type-check and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Type-check mobile app
+        working-directory: mobile
+        run: npm run type-check
+
+      - name: Test mobile app
+        working-directory: mobile
+        run: npm test
+
+      - name: Validate Expo configuration
+        working-directory: mobile
+        run: npx expo-doctor
+
   validate:
     name: Lint, type-check, tests, build
     runs-on: ubuntu-latest
@@ -53,6 +108,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
 
       - name: Apply database migrations
         run: npx prisma migrate deploy

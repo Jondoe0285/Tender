@@ -43,7 +43,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     }
 
     const temporaryPassword = generateTemporaryPassword();
-    await prisma.user.update({ where: { id: target.id }, data: { passwordHash: await hashPassword(temporaryPassword) } });
+    await prisma.user.update({ where: { id: target.id }, data: { passwordHash: await hashPassword(temporaryPassword), sessionVersion: { increment: 1 } } });
     await recordAuditEvent({ actorId: admin.id, action: 'ACCOUNTANT_PASSWORD_RESET', targetType: 'User', targetId: target.id, metadata: { email: target.email } });
     return NextResponse.json({ status: 'password-reset', temporaryPassword });
   } catch (error) {

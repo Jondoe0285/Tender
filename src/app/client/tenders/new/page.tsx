@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, type ChangeEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState, type ChangeEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
@@ -21,8 +21,8 @@ function getServiceSenseCheck(service: string | undefined, quantityValue: string
   if (!normalisedService) return {};
 
   if (normalisedService.includes('professional')) {
-    if (!hasValue) return { quantityError: 'Enter a number of days or weeks for this professional service.' };
-    if (!/\b(days?|weeks?)\b/i.test(quantityUnit)) {
+    if (!hasValue) return { quantityError: 'Enter the required service duration.' };
+    if (!/\b(days?|weeks?|months?)\b/i.test(quantityUnit)) {
       return { unitError: 'Select a duration unit such as days or weeks.' };
     }
     return { message: 'Professional services should be described by duration.' };
@@ -35,10 +35,8 @@ function getServiceSenseCheck(service: string | undefined, quantityValue: string
   }
 
   if (normalisedService.includes('ground') || normalisedService.includes('civil') || normalisedService.includes('construction') || normalisedService.includes('contractor')) {
-    if (hasValue || hasUnit) {
-      return { quantityError: 'Groundworks and construction services should not include a number or a unit unless the requirement is specifically itemised.' };
-    }
-    return { message: 'Groundworks should be described by scope rather than quantity units.' };
+    if (hasValue && !/\b(days?|weeks?|months?)\b/i.test(quantityUnit)) return { unitError: 'Select a duration unit or choose not applicable.' };
+    return { message: 'Contractor services should include a scope and, where known, the required support period.' };
   }
 
   if (normalisedService.includes('plant')) {
@@ -49,10 +47,14 @@ function getServiceSenseCheck(service: string | undefined, quantityValue: string
     return { message: 'Plant hire should include the hire duration.' };
   }
 
+  if (quantityUnit === 'not applicable') return {};
   return {};
 }
 
-const QUANTITY_UNITS = ['units', 'tonnes', 'bags', 'pallets', 'm³', 'skips', 'days', 'weeks'];
+const QUANTITY_UNITS = ['not applicable', 'units', 'tonnes', 'bags', 'pallets', 'm³', 'skips', 'days', 'weeks', 'months'];
+const DURATION_UNITS = ['days', 'weeks', 'months'];
+const SERVICE_MINIMUM_REQUIREMENTS = ['CSCS carded operatives required', 'SSIP membership required', 'CPCS or NPORS plant competence required', 'Trade-specific qualifications required', 'Public liability insurance evidence required', 'Employers liability insurance evidence required', 'RAMS required before works start', 'Permit to work required', 'DBS clearance required', 'Asbestos awareness required', 'Working at height competence required', 'Confined space competence required'];
+const PLANT_HIRE_SUPPORT_OPTIONS = ['Driver/operator required', 'Lift plan required', 'Delivery and collection required', 'Fuel included', 'Lifting accessories required', 'Banksman or slinger/signaller required', 'Ground protection mats required', 'Operator CPCS or NPORS evidence required', 'Thorough examination certificate required', 'Out-of-hours delivery required', 'Road permits or traffic management required', 'Machine insurance evidence required'];
 
 const STEPS: WizardStep[] = [
   { id: 1, label: 'Project Details' },
@@ -73,6 +75,20 @@ type FormState = {
   quantityValue: string;
   quantityUnit: string;
   description: string;
+  primaryItemDescription: string;
+  primaryProfessionalServiceType: string;
+  primaryProfessionalServiceOther: string;
+  primaryDurationValue: string;
+  primaryDurationUnit: string;
+  primaryScopeSize: string;
+  primaryWorkingHours: string;
+  primaryAccessRestrictions: string;
+  primarySiteConstraints: string;
+  primaryDeliverables: string;
+  primaryMinimumRequirements: string[];
+  primaryPlantRequirements: string[];
+  primaryDriverRequired: boolean;
+  primaryLiftPlanRequired: boolean;
   urgency: string;
   closingDate: string;
   supplyDate: string;
@@ -87,6 +103,19 @@ type TenderItem = {
   quantityValue: string;
   quantityUnit: string;
   description: string;
+  professionalServiceType: string;
+  professionalServiceOther: string;
+  durationValue: string;
+  durationUnit: string;
+  scopeSize: string;
+  workingHours: string;
+  accessRestrictions: string;
+  siteConstraints: string;
+  deliverables: string;
+  minimumRequirements: string[];
+  plantRequirements: string[];
+  driverRequired: boolean;
+  liftPlanRequired: boolean;
 };
 
 const EMPTY_FORM: FormState = {
@@ -100,6 +129,20 @@ const EMPTY_FORM: FormState = {
   quantityValue: '',
   quantityUnit: '',
   description: '',
+  primaryItemDescription: '',
+  primaryProfessionalServiceType: '',
+  primaryProfessionalServiceOther: '',
+  primaryDurationValue: '',
+  primaryDurationUnit: 'weeks',
+  primaryScopeSize: '',
+  primaryWorkingHours: '',
+  primaryAccessRestrictions: '',
+  primarySiteConstraints: '',
+  primaryDeliverables: '',
+  primaryMinimumRequirements: [],
+  primaryPlantRequirements: [],
+  primaryDriverRequired: false,
+  primaryLiftPlanRequired: false,
   urgency: '',
   closingDate: '',
   supplyDate: '',
@@ -114,9 +157,98 @@ function closingDatePreset(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+function splitQuantity(quantity: string): { quantityValue: string; quantityUnit: string } {
+  const unit = QUANTITY_UNITS.find((candidate) => quantity.endsWith(` ${candidate}`));
+  return unit ? { quantityValue: quantity.slice(0, -unit.length).trim(), quantityUnit: unit } : { quantityValue: quantity, quantityUnit: 'units' };
+}
+
+function packageLabels(service: string): { provision: string; detail: string } {
+  if (service === 'Materials') return { provision: 'Material category', detail: 'Material detail (optional)' };
+  if (service === 'Waste') return { provision: 'Waste type', detail: 'Waste detail (optional)' };
+  if (service === 'Plant Hire') return { provision: 'Plant category', detail: 'Plant detail (optional)' };
+  if (service === 'Professional Services') return { provision: 'Professional discipline', detail: 'Professional service needed' };
+  return { provision: 'Service provision', detail: 'Detailed provision (optional)' };
+}
+
+function isProfessionalService(service: string | undefined) {
+  return String(service ?? '').toLowerCase().includes('professional');
+}
+
+function isContractorService(service: string | undefined) {
+  return String(service ?? '').toLowerCase().includes('contractor');
+}
+
+function isPlantHire(service: string | undefined) {
+  return String(service ?? '').toLowerCase().includes('plant');
+}
+
+function packageQuantity(service: string, quantityValue: string, quantityUnit: string, durationValue: string, durationUnit: string) {
+  if (isProfessionalService(service) || isContractorService(service) || isPlantHire(service)) {
+    return durationValue.trim() ? `${durationValue.trim()} ${durationUnit}` : 'not applicable';
+  }
+  return quantityUnit === 'not applicable' ? 'not applicable' : `${quantityValue} ${quantityUnit}`.trim();
+}
+
+function packageItem(service: string, item: string, professionalServiceOther: string) {
+  if (!isProfessionalService(service)) return item;
+  return item === 'Other' ? `Other: ${professionalServiceOther.trim()}` : item;
+}
+
+function packageSpecification(baseDescription: string, service: string, professionalServiceType: string, professionalServiceOther: string, durationValue: string, durationUnit: string, scopeSize: string, workingHours: string, accessRestrictions: string, siteConstraints: string, deliverables: string, minimumRequirements: string[], plantRequirements: string[], driverRequired: boolean, liftPlanRequired: boolean) {
+  const details = [baseDescription.trim()];
+  if (isProfessionalService(service) && professionalServiceType) details.push(`Service needed: ${professionalServiceType === 'Other' ? professionalServiceOther.trim() : professionalServiceType}.`);
+  if ((isProfessionalService(service) || isContractorService(service) || isPlantHire(service)) && durationValue.trim()) details.push(`Required provision period: ${durationValue.trim()} ${durationUnit}.`);
+  if ((isContractorService(service) || isProfessionalService(service) || isPlantHire(service)) && scopeSize.trim()) details.push(`Size, scope or output quantity: ${scopeSize.trim()}.`);
+  if ((isContractorService(service) || isProfessionalService(service) || isPlantHire(service)) && workingHours.trim()) details.push(`Permitted working hours: ${workingHours.trim()}.`);
+  if ((isContractorService(service) || isProfessionalService(service) || isPlantHire(service)) && accessRestrictions.trim()) details.push(`Access restrictions: ${accessRestrictions.trim()}.`);
+  if ((isContractorService(service) || isProfessionalService(service) || isPlantHire(service)) && siteConstraints.trim()) details.push(`Site constraints: ${siteConstraints.trim()}.`);
+  if ((isContractorService(service) || isProfessionalService(service)) && deliverables.trim()) details.push(`Required outputs/deliverables: ${deliverables.trim()}.`);
+  if ((isContractorService(service) || isProfessionalService(service)) && minimumRequirements.length > 0) details.push(`Minimum requirements: ${minimumRequirements.join(', ')}.`);
+  if (isPlantHire(service) && plantRequirements.length > 0) details.push(`Plant hire requirements: ${plantRequirements.join(', ')}.`);
+  if (isPlantHire(service) && driverRequired) details.push('Driver/operator required.');
+  if (isPlantHire(service) && liftPlanRequired) details.push('Lift plan required.');
+  return details.filter(Boolean).join('\n');
+}
+
+function newTenderItem(service: string, id = `${Date.now()}-${Math.random().toString(16).slice(2)}`): TenderItem {
+  return {
+    id,
+    category: service,
+    subcategory: '',
+    item: '',
+    quantityValue: '',
+    quantityUnit: '',
+    description: '',
+    professionalServiceType: '',
+    professionalServiceOther: '',
+    durationValue: '',
+    durationUnit: 'weeks',
+    scopeSize: '',
+    workingHours: '',
+    accessRestrictions: '',
+    siteConstraints: '',
+    deliverables: '',
+    minimumRequirements: [],
+    plantRequirements: [],
+    driverRequired: false,
+    liftPlanRequired: false,
+  };
+}
+
 export default function NewTenderPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-site-white p-6 text-sm text-concrete-grey">Loading tender builder...</main>}>
+      <NewTenderForm />
+    </Suspense>
+  );
+}
+
+function NewTenderForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const copyFrom = searchParams.get('copyFrom');
   const [step, setStep] = useState(1);
+  const [furthestStep, setFurthestStep] = useState(1);
   const [activePackageIndex, setActivePackageIndex] = useState(0);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [files, setFiles] = useState<File[]>([]);
@@ -125,25 +257,79 @@ export default function NewTenderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [packagesNeedReset, setPackagesNeedReset] = useState(true);
   const [catalog, setCatalog] = useState<Record<string, Record<string, string[]>>>(() => Object.fromEntries(Object.entries(SERVICE_CATALOG).map(([service, categories]) => [service, Object.fromEntries(Object.entries(categories).map(([name, items]) => [name, [...items]]))])));
 
   const hasDetectedContactDetails = [
     getModerationMessage('description', form.description),
     ...form.items.map((item) => getModerationMessage(`item ${item.category}`, item.description)),
   ].some(Boolean);
+  const activeCategory = activePackageIndex === 0
+    ? form.category
+    : form.items[activePackageIndex - 1]?.category ?? form.category;
+  const activePackageLabels = packageLabels(activeCategory);
 
   // Restore a saved draft after mount only, so server and first client render still match.
   useEffect(() => {
+    if (copyFrom) return;
     try {
       const raw = window.localStorage.getItem(DRAFT_KEY);
       if (raw) {
         setForm((prev) => ({ ...prev, ...JSON.parse(raw) }));
         setDraftRestored(true);
+        setPackagesNeedReset(false);
       }
     } catch {
       // Corrupt or unavailable storage — start with a blank form.
     }
-  }, []);
+  }, [copyFrom]);
+
+  useEffect(() => {
+    if (!copyFrom) return;
+    const sourceTenderId = copyFrom;
+    let cancelled = false;
+
+    async function loadTenderForRetender() {
+      const response = await fetch(`/api/tenders/${encodeURIComponent(sourceTenderId)}`);
+      if (!response.ok) throw new Error('Unable to load tender');
+      const { tender } = await response.json() as { tender: { category: string; subcategory: string; item: string | null; location: string; quantity: string; urgency: string; closingDate: string; supplyDate: string | null; requirements: string; description: string; items: { id: string; category: string; subcategory: string; item: string | null; quantity: string; description: string }[]; attachments: { id: string; fileName: string; mimeType: string }[] } };
+      const tenderItems = tender.items.length > 0 ? tender.items : [{ id: 'primary', category: tender.category, subcategory: tender.subcategory, item: tender.item, quantity: tender.quantity, description: tender.description }];
+      const primaryItem = tenderItems[0]!;
+      const primaryQuantity = splitQuantity(primaryItem.quantity);
+      const attachments = await Promise.all(tender.attachments.map(async (attachment) => {
+        const attachmentResponse = await fetch(`/api/tenders/${encodeURIComponent(sourceTenderId)}/attachments/${encodeURIComponent(attachment.id)}`);
+        if (!attachmentResponse.ok) throw new Error('Unable to copy tender attachments');
+        return new File([await attachmentResponse.blob()], attachment.fileName, { type: attachment.mimeType });
+      }));
+      if (cancelled) return;
+      setForm({
+        ...EMPTY_FORM,
+        projectName: `${primaryItem.subcategory} re-tender`,
+        selectedServices: [...new Set(tenderItems.map((item) => item.category))],
+        category: primaryItem.category,
+        subcategory: primaryItem.subcategory,
+        item: primaryItem.item ?? '',
+        location: tender.location,
+        quantityValue: primaryQuantity.quantityValue,
+        quantityUnit: primaryQuantity.quantityUnit,
+        description: tender.description,
+        primaryItemDescription: primaryItem.description,
+        urgency: tender.urgency,
+        closingDate: '',
+        supplyDate: tender.supplyDate?.slice(0, 10) ?? '',
+        requirements: tender.requirements.split(',').filter(Boolean),
+        items: tenderItems.slice(1).map((item) => {
+          const quantity = splitQuantity(item.quantity);
+          return { ...newTenderItem(item.category, item.id), subcategory: item.subcategory, item: item.item ?? '', quantityValue: quantity.quantityValue, quantityUnit: quantity.quantityUnit, description: item.description };
+        }),
+      });
+      setFiles(attachments);
+      setPackagesNeedReset(false);
+    }
+
+    loadTenderForRetender().catch(() => setError('We could not prepare this tender for re-tendering.'));
+    return () => { cancelled = true; };
+  }, [copyFrom]);
 
   useEffect(() => {
     fetch('/api/categories').then((response) => response.ok ? response.json() : null).then((data: { catalog?: Record<string, Record<string, string[]>> } | null) => {
@@ -176,7 +362,37 @@ export default function NewTenderPage() {
     }));
   }
 
+  function togglePrimaryMinimumRequirement(option: string) {
+    setForm((prev) => ({
+      ...prev,
+      primaryMinimumRequirements: prev.primaryMinimumRequirements.includes(option)
+        ? prev.primaryMinimumRequirements.filter((item) => item !== option)
+        : [...prev.primaryMinimumRequirements, option],
+    }));
+  }
+
+  function togglePrimaryPlantRequirement(option: string) {
+    setForm((prev) => ({
+      ...prev,
+      primaryPlantRequirements: prev.primaryPlantRequirements.includes(option)
+        ? prev.primaryPlantRequirements.filter((item) => item !== option)
+        : [...prev.primaryPlantRequirements, option],
+    }));
+  }
+
+  function toggleItemArray(index: number, key: 'minimumRequirements' | 'plantRequirements', option: string) {
+    setForm((prev) => ({
+      ...prev,
+      items: prev.items.map((item, itemIndex) => {
+        if (itemIndex !== index) return item;
+        const values = item[key];
+        return { ...item, [key]: values.includes(option) ? values.filter((value) => value !== option) : [...values, option] };
+      }),
+    }));
+  }
+
   function toggleService(service: string) {
+    setPackagesNeedReset(true);
     setForm((current) => ({
       ...current,
       selectedServices: current.selectedServices.includes(service)
@@ -193,22 +409,17 @@ export default function NewTenderPage() {
   }
 
   function addAnotherItem() {
+    const category = activeCategory || form.selectedServices[0] || '';
+    setActivePackageIndex(form.items.length + 1);
     setForm((prev) => ({
       ...prev,
       items: [
         ...prev.items,
         {
-          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-          category: prev.category || prev.selectedServices[0] || '',
-          subcategory: '',
-          item: '',
-          quantityValue: '',
-          quantityUnit: '',
-          description: '',
+          ...newTenderItem(category),
         },
       ],
     }));
-    setActivePackageIndex((current) => current + 1);
   }
 
   function validateStep(targetStep: number): boolean {
@@ -229,36 +440,70 @@ export default function NewTenderPage() {
       if (activePackageIndex === 0) {
         if (!form.subcategory) next.subcategory = 'Select a service category.';
 
-        const packageSenseCheck = getServiceSenseCheck(form.category, form.quantityValue, form.quantityUnit);
-        if (packageSenseCheck.quantityError) next.quantityValue = packageSenseCheck.quantityError;
-        if (packageSenseCheck.unitError) next.quantityUnit = packageSenseCheck.unitError;
+        if (isContractorService(form.category) || isProfessionalService(form.category) || isPlantHire(form.category)) {
+          if (!form.primaryDurationValue.trim()) next.quantityValue = 'Enter the required service period.';
+          if (!form.primaryDurationUnit) next.quantityUnit = 'Select a duration unit.';
+          if (!form.primaryScopeSize.trim()) next.scopeSize = 'Describe the size, scope, or output quantity so Providers can price the work.';
+          if (!form.primaryWorkingHours.trim()) next.workingHours = 'State permitted working hours or time-of-day restrictions.';
+          if (!form.primaryAccessRestrictions.trim()) next.accessRestrictions = 'State site access restrictions, parking, delivery access, or write not applicable.';
+          if (!form.primarySiteConstraints.trim()) next.siteConstraints = 'State relevant site constraints or write not applicable.';
+        } else {
+          const packageSenseCheck = getServiceSenseCheck(form.category, form.quantityValue, form.quantityUnit);
+          if (packageSenseCheck.quantityError) next.quantityValue = packageSenseCheck.quantityError;
+          if (packageSenseCheck.unitError) next.quantityUnit = packageSenseCheck.unitError;
 
-        if (!packageSenseCheck.quantityError && !packageSenseCheck.unitError) {
-          if (!form.quantityValue.trim()) next.quantityValue = 'Enter a quantity.';
-          if (!form.quantityUnit) next.quantityUnit = 'Select a unit.';
+          if (!packageSenseCheck.quantityError && !packageSenseCheck.unitError) {
+            if (!form.quantityValue.trim() && form.quantityUnit !== 'not applicable') next.quantityValue = 'Enter a quantity.';
+            if (!form.quantityUnit) next.quantityUnit = 'Select a unit or not applicable.';
+          }
         }
+        if (isProfessionalService(form.category) && !form.item) next.item = 'Select the professional service needed.';
+        if (isProfessionalService(form.category) && form.item === 'Other' && form.primaryProfessionalServiceOther.trim().length < 5) next.item = 'Describe the other professional service needed.';
+        if ((isContractorService(form.category) || isProfessionalService(form.category)) && !form.primaryDeliverables.trim()) next.deliverables = 'State the works, outputs, report, visit, or deliverables required.';
+        if (form.primaryItemDescription.trim().length < 20) next.primaryItemDescription = 'Provide a detailed job specification for this package.';
       } else {
         const item = form.items[activePackageIndex - 1];
         const prefix = `item-${activePackageIndex - 1}-`;
         if (!item?.subcategory) next[`${prefix}subcategory`] = 'Select a service category.';
 
-        const itemSenseCheck = getServiceSenseCheck(item.category, item.quantityValue, item.quantityUnit);
-        if (itemSenseCheck.quantityError) next[`${prefix}quantity`] = itemSenseCheck.quantityError;
-        if (itemSenseCheck.unitError) next[`${prefix}unit`] = itemSenseCheck.unitError;
+        if (item && (isContractorService(item.category) || isProfessionalService(item.category) || isPlantHire(item.category))) {
+          if (!item.durationValue.trim()) next[`${prefix}quantity`] = 'Enter the required service period.';
+          if (!item.durationUnit) next[`${prefix}unit`] = 'Select a duration unit.';
+          if (!item.scopeSize.trim()) next[`${prefix}scopeSize`] = 'Describe the size, scope, or output quantity so Providers can price the work.';
+          if (!item.workingHours.trim()) next[`${prefix}workingHours`] = 'State permitted working hours or time-of-day restrictions.';
+          if (!item.accessRestrictions.trim()) next[`${prefix}accessRestrictions`] = 'State site access restrictions, parking, delivery access, or write not applicable.';
+          if (!item.siteConstraints.trim()) next[`${prefix}siteConstraints`] = 'State relevant site constraints or write not applicable.';
+        } else if (item) {
+          const itemSenseCheck = getServiceSenseCheck(item.category, item.quantityValue, item.quantityUnit);
+          if (itemSenseCheck.quantityError) next[`${prefix}quantity`] = itemSenseCheck.quantityError;
+          if (itemSenseCheck.unitError) next[`${prefix}unit`] = itemSenseCheck.unitError;
 
-        if (!itemSenseCheck.quantityError && !itemSenseCheck.unitError) {
-          if (!item?.quantityValue.trim()) next[`${prefix}quantity`] = 'Enter a quantity.';
-          if (!item?.quantityUnit) next[`${prefix}unit`] = 'Select a unit.';
+          if (!itemSenseCheck.quantityError && !itemSenseCheck.unitError) {
+            if (!item.quantityValue.trim() && item.quantityUnit !== 'not applicable') next[`${prefix}quantity`] = 'Enter a quantity.';
+            if (!item.quantityUnit) next[`${prefix}unit`] = 'Select a unit or not applicable.';
+          }
         }
+        if (item && isProfessionalService(item.category) && !item.item) next[`${prefix}item`] = 'Select the professional service needed.';
+        if (item && isProfessionalService(item.category) && item.item === 'Other' && item.professionalServiceOther.trim().length < 5) next[`${prefix}item`] = 'Describe the other professional service needed.';
+        if (item && (isContractorService(item.category) || isProfessionalService(item.category)) && !item.deliverables.trim()) next[`${prefix}deliverables`] = 'State the works, outputs, report, visit, or deliverables required.';
+        if (item && item.description.trim().length < 20) next[`${prefix}description`] = 'Provide a detailed job specification for this package.';
       }
     }
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
+  function currentPackageLabel(): string {
+    return activePackageIndex === 0 ? 'Package 1' : `Package ${activePackageIndex + 1}`;
+  }
+
   function goNext() {
-    if (!validateStep(step)) return;
-    if (step === 1) {
+    if (!validateStep(step)) {
+      setError(`${currentPackageLabel()} cannot continue yet. Please fix the highlighted details listed at the top of this package.`);
+      return;
+    }
+    setError(null);
+    if (step === 1 && packagesNeedReset) {
       const [primaryService, ...additionalServices] = form.selectedServices;
       setForm((current) => ({
         ...current,
@@ -267,22 +512,22 @@ export default function NewTenderPage() {
         item: '',
         quantityValue: '',
         quantityUnit: '',
-        items: additionalServices.map((service, index) => ({
-          id: `${Date.now()}-${index}`,
-          category: service,
-          subcategory: '',
-          item: '',
-          quantityValue: '',
-          quantityUnit: '',
-          description: '',
-        })),
+        items: additionalServices.map((service, index) => newTenderItem(service, `${Date.now()}-${index}`)),
       }));
+      setPackagesNeedReset(false);
     }
     if (step === 2 && activePackageIndex < form.items.length) {
       setActivePackageIndex((current) => current + 1);
       return;
     }
-    setStep((current) => Math.min(current + 1, STEPS.length));
+    const nextStep = Math.min(step + 1, STEPS.length);
+    setStep(nextStep);
+    setFurthestStep((current) => Math.max(current, nextStep));
+  }
+
+  function fastTravel(targetStep: number) {
+    setErrors({});
+    setStep(targetStep);
   }
 
   function goBack() {
@@ -358,9 +603,10 @@ export default function NewTenderPage() {
           projectName: form.projectName,
           category: form.category,
           subcategory: form.subcategory,
-          item: form.item,
+          item: packageItem(form.category, form.item, form.primaryProfessionalServiceOther),
           location: form.location,
-          quantity: `${form.quantityValue} ${form.quantityUnit}`.trim(),
+          quantity: packageQuantity(form.category, form.quantityValue, form.quantityUnit, form.primaryDurationValue, form.primaryDurationUnit),
+          itemDescription: packageSpecification(form.primaryItemDescription, form.category, form.item, form.primaryProfessionalServiceOther, form.primaryDurationValue, form.primaryDurationUnit, form.primaryScopeSize, form.primaryWorkingHours, form.primaryAccessRestrictions, form.primarySiteConstraints, form.primaryDeliverables, form.primaryMinimumRequirements, form.primaryPlantRequirements, form.primaryDriverRequired, form.primaryLiftPlanRequired),
           urgency: form.urgency,
           closingDate: form.closingDate,
           supplyDate: form.supplyDate || undefined,
@@ -369,9 +615,9 @@ export default function NewTenderPage() {
           items: form.items.map((item) => ({
             category: item.category,
             subcategory: item.subcategory,
-            item: item.item,
-            quantity: `${item.quantityValue} ${item.quantityUnit}`.trim(),
-            description: item.description,
+            item: packageItem(item.category, item.item, item.professionalServiceOther),
+            quantity: packageQuantity(item.category, item.quantityValue, item.quantityUnit, item.durationValue, item.durationUnit),
+            description: packageSpecification(item.description, item.category, item.item, item.professionalServiceOther, item.durationValue, item.durationUnit, item.scopeSize, item.workingHours, item.accessRestrictions, item.siteConstraints, item.deliverables, item.minimumRequirements, item.plantRequirements, item.driverRequired, item.liftPlanRequired),
           })),
           attachments: await prepareAttachments(),
         }),
@@ -409,10 +655,10 @@ export default function NewTenderPage() {
     <AppShell role="client" title="Create Tender">
       <div className="mx-auto max-w-2xl">
         <p className="mb-6 max-w-xl text-sm leading-relaxed text-concrete-grey">
-          Complete the project details, then provide requirements for each selected service. Providers only see full details once they unlock your tender.
+          {copyFrom ? 'Review the copied tender details, set a new quote deadline, and submit it as a new tender.' : 'Complete the project details, then provide requirements for each selected service. Providers only see full details once they unlock your tender.'}
         </p>
 
-        <Stepper steps={STEPS} currentStep={step} />
+        <Stepper steps={STEPS} currentStep={step} furthestStep={furthestStep} onStepClick={fastTravel} />
 
         {draftRestored && (
           <Card className="mb-6 flex items-center justify-between gap-4 border-l-4 border-l-steel-blue">
@@ -515,19 +761,28 @@ export default function NewTenderPage() {
 
         {step === 2 && (
           <Card className="flex flex-col gap-6">
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">{activePackageIndex === 0 ? form.category : form.items[activePackageIndex - 1]?.category} Requirements</h2>
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-concrete-grey">Complete this service package before moving to the next selected service.</p>
+            <h2 className="font-heading text-lg font-bold text-foundation-navy">{activeCategory} Requirements</h2>
+            <p className="text-sm text-concrete-grey">Complete {currentPackageLabel()} of {form.items.length + 1}. If more than one service was selected, Continue opens the next package before the Additional Requirements step.</p>
+            {Object.keys(errors).length > 0 && (
+              <div role="alert" className="rounded-lg border border-attention/40 bg-attention/5 px-4 py-3 text-sm text-attention">
+                <p className="font-semibold">{currentPackageLabel()} cannot continue yet.</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {Object.values(errors).map((message) => <li key={message}>{message}</li>)}
+                </ul>
+              </div>
+            )}
+            {activePackageIndex !== 0 && activeCategory === form.category && (
               <button
                 type="button"
-                onClick={addAnotherItem}
-                className="inline-flex items-center justify-center rounded-md border border-steel-blue/40 bg-steel-blue/5 px-3 py-2 text-xs font-semibold text-steel-blue hover:bg-steel-blue/10"
+                onClick={() => { setActivePackageIndex(0); setErrors({}); }}
+                className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm hover:border-steel-blue"
               >
-                Add another item
+                <span><span className="font-semibold text-foundation-navy">Package 1: {form.item || form.subcategory || 'Untitled package'}</span><span className="block text-xs text-concrete-grey">{form.category} {form.quantityValue && `${form.quantityValue} ${form.quantityUnit}`}</span></span>
+                <span className="text-xs font-semibold text-steel-blue">Edit</span>
               </button>
-            </div>
+            )}
             {activePackageIndex === 0 && <><FieldGroup>
-              <Label htmlFor="subcategory">Service provision</Label>
+              <Label htmlFor="subcategory">{activePackageLabels.provision}</Label>
               <Combobox
                 id="subcategory"
                 name="subcategory"
@@ -540,39 +795,43 @@ export default function NewTenderPage() {
               {errors.subcategory && <p className="text-sm font-semibold text-attention">{errors.subcategory}</p>}
             </FieldGroup>
             <FieldGroup>
-              <Label htmlFor="item">Detailed provision (optional)</Label>
+              <Label htmlFor="item">{activePackageLabels.detail}</Label>
               <Combobox id="item" name="item" value={form.item} onChange={(value) => update('item', value)} disabled={!form.subcategory} placeholder={form.subcategory ? 'Search detailed provisions…' : 'Choose a service provision first'} groups={form.category ? [{ label: form.subcategory, options: catalog[form.category]?.[form.subcategory] ?? [] }] : []} />
               {errors.item && <p className="text-sm font-semibold text-attention">{errors.item}</p>}
             </FieldGroup>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FieldGroup>
-                <Label htmlFor="quantity-value">Quantity</Label>
-                <Input id="quantity-value" placeholder={form.category?.toLowerCase().includes('plant') || form.category?.toLowerCase().includes('professional') ? 'e.g. 7 days' : 'e.g. 4,000'} value={form.quantityValue} onChange={(event) => update('quantityValue', event.target.value)} />
-                {errors.quantityValue && <p className="text-sm font-semibold text-attention">{errors.quantityValue}</p>}
-              </FieldGroup>
-              <FieldGroup>
-                <Label htmlFor="quantity-unit">Unit</Label>
-                <Select id="quantity-unit" value={form.quantityUnit} onChange={(event) => update('quantityUnit', event.target.value)}>
-                  <option value="" disabled>Select a unit</option>
-                  {QUANTITY_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
-                  <option value="days">days</option>
-                  <option value="weeks">weeks</option>
-                </Select>
-                {errors.quantityUnit && <p className="text-sm font-semibold text-attention">{errors.quantityUnit}</p>}
-              </FieldGroup>
-            </div></>}
+            {isProfessionalService(form.category) && form.item === 'Other' && <FieldGroup><Label htmlFor="professional-service-other">Other service details</Label><Input id="professional-service-other" value={form.primaryProfessionalServiceOther} onChange={(event) => update('primaryProfessionalServiceOther', event.target.value)} placeholder="Describe the service required" /></FieldGroup>}
+            {(isContractorService(form.category) || isProfessionalService(form.category) || isPlantHire(form.category)) ? <div className="grid gap-4 sm:grid-cols-2"><FieldGroup><Label htmlFor="duration-value">Required service period</Label><Input id="duration-value" placeholder="e.g. 3" value={form.primaryDurationValue} onChange={(event) => update('primaryDurationValue', event.target.value)} />{errors.quantityValue && <p className="text-sm font-semibold text-attention">{errors.quantityValue}</p>}</FieldGroup><FieldGroup><Label htmlFor="duration-unit">Duration unit</Label><Select id="duration-unit" value={form.primaryDurationUnit} onChange={(event) => update('primaryDurationUnit', event.target.value)}>{DURATION_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</Select>{errors.quantityUnit && <p className="text-sm font-semibold text-attention">{errors.quantityUnit}</p>}</FieldGroup></div> : <div className="grid gap-4 sm:grid-cols-2"><FieldGroup><Label htmlFor="quantity-value">Quantity</Label><Input id="quantity-value" placeholder="e.g. 4,000" value={form.quantityValue} onChange={(event) => update('quantityValue', event.target.value)} />{errors.quantityValue && <p className="text-sm font-semibold text-attention">{errors.quantityValue}</p>}</FieldGroup><FieldGroup><Label htmlFor="quantity-unit">Unit</Label><Select id="quantity-unit" value={form.quantityUnit} onChange={(event) => update('quantityUnit', event.target.value)}><option value="" disabled>Select a unit</option>{QUANTITY_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</Select>{errors.quantityUnit && <p className="text-sm font-semibold text-attention">{errors.quantityUnit}</p>}</FieldGroup></div>}
+            {(isContractorService(form.category) || isProfessionalService(form.category) || isPlantHire(form.category)) && <div className="grid gap-4 sm:grid-cols-2"><FieldGroup><Label htmlFor="scope-size">Size, scope or output quantity</Label><Input id="scope-size" value={form.primaryScopeSize} onChange={(event) => update('primaryScopeSize', event.target.value)} placeholder="e.g. 120 m drainage run, 3 site visits, weekly retained support" />{errors.scopeSize && <p className="text-sm font-semibold text-attention">{errors.scopeSize}</p>}</FieldGroup><FieldGroup><Label htmlFor="working-hours">Permitted working hours</Label><Input id="working-hours" value={form.primaryWorkingHours} onChange={(event) => update('primaryWorkingHours', event.target.value)} placeholder="e.g. Mon-Fri 08:00-17:00, no weekend work" />{errors.workingHours && <p className="text-sm font-semibold text-attention">{errors.workingHours}</p>}</FieldGroup><FieldGroup><Label htmlFor="access-restrictions">Access restrictions</Label><Textarea id="access-restrictions" rows={3} value={form.primaryAccessRestrictions} onChange={(event) => update('primaryAccessRestrictions', event.target.value)} placeholder="Gate widths, parking, loading area, permits, occupied premises, or not applicable." />{errors.accessRestrictions && <p className="text-sm font-semibold text-attention">{errors.accessRestrictions}</p>}</FieldGroup><FieldGroup><Label htmlFor="site-constraints">Site constraints</Label><Textarea id="site-constraints" rows={3} value={form.primarySiteConstraints} onChange={(event) => update('primarySiteConstraints', event.target.value)} placeholder="Live site, residents nearby, services, asbestos, fragile surfaces, traffic, noise limits, or not applicable." />{errors.siteConstraints && <p className="text-sm font-semibold text-attention">{errors.siteConstraints}</p>}</FieldGroup>{(isContractorService(form.category) || isProfessionalService(form.category)) && <FieldGroup wide><Label htmlFor="deliverables">Works, outputs or deliverables</Label><Textarea id="deliverables" rows={3} value={form.primaryDeliverables} onChange={(event) => update('primaryDeliverables', event.target.value)} placeholder="State what must be priced: works scope, drawings/reports, inspection frequency, attendance, exclusions, handover evidence." />{errors.deliverables && <p className="text-sm font-semibold text-attention">{errors.deliverables}</p>}</FieldGroup>}</div>}
+            {(isContractorService(form.category) || isProfessionalService(form.category)) && <fieldset className="rounded-md border border-slate-200 bg-slate-50 p-4"><legend className="px-1 text-sm font-semibold text-foundation-navy">Minimum requirements</legend><div className="mt-2 grid gap-3 sm:grid-cols-2">{SERVICE_MINIMUM_REQUIREMENTS.map((option) => <label key={option} className="flex items-center gap-3 text-sm text-concrete-grey"><input type="checkbox" checked={form.primaryMinimumRequirements.includes(option)} onChange={() => togglePrimaryMinimumRequirement(option)} className="h-4 w-4 accent-safety-amber" />{option}</label>)}</div></fieldset>}
+            {isPlantHire(form.category) && <fieldset className="rounded-md border border-slate-200 bg-slate-50 p-4"><legend className="px-1 text-sm font-semibold text-foundation-navy">Plant hire support</legend><div className="mt-2 grid gap-3 sm:grid-cols-2">{PLANT_HIRE_SUPPORT_OPTIONS.map((option) => <label key={option} className="flex items-center gap-3 text-sm text-concrete-grey"><input type="checkbox" checked={form.primaryPlantRequirements.includes(option) || (option === 'Driver/operator required' && form.primaryDriverRequired) || (option === 'Lift plan required' && form.primaryLiftPlanRequired)} onChange={() => { if (option === 'Driver/operator required') update('primaryDriverRequired', !form.primaryDriverRequired); else if (option === 'Lift plan required') update('primaryLiftPlanRequired', !form.primaryLiftPlanRequired); else togglePrimaryPlantRequirement(option); }} className="h-4 w-4 accent-safety-amber" />{option}</label>)}</div></fieldset>}
+            <FieldGroup>
+              <Label htmlFor="primary-item-description">Detailed job specification</Label>
+              <Textarea id="primary-item-description" rows={5} value={form.primaryItemDescription} placeholder="Set out the scope, standards, drawings/spec references, access constraints, expected outputs, exclusions, and quote assumptions needed for a Provider to price accurately." onChange={(event) => update('primaryItemDescription', event.target.value)} />
+              {errors.primaryItemDescription && <p className="text-xs font-semibold text-attention">{errors.primaryItemDescription}</p>}
+            </FieldGroup>
+            </>}
             <div className="border-t border-slate-200 pt-5 sm:col-span-2">
               <p className="text-xs text-concrete-grey">Package {activePackageIndex + 1} of {form.selectedServices.length}</p>
               {form.items.length > 0 && (
                 <div className="mt-5 flex flex-col gap-4">
-                  {form.items.map((item, index) => index === activePackageIndex - 1 && (
+                  {form.items.map((item, index) => {
+                    const isActive = index === activePackageIndex - 1;
+                    if (!isActive && item.category === activeCategory) {
+                      return (
+                        <button key={item.id} type="button" onClick={() => { setActivePackageIndex(index + 1); setErrors({}); }} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm hover:border-steel-blue">
+                          <span><span className="font-semibold text-foundation-navy">Package {index + 2}: {item.item || item.subcategory || 'Untitled package'}</span><span className="block text-xs text-concrete-grey">{item.category} {item.quantityValue && `${item.quantityValue} ${item.quantityUnit}`}</span></span>
+                          <span className="text-xs font-semibold text-steel-blue">Edit</span>
+                        </button>
+                      );
+                    }
+                    if (isActive) return (
                     <div key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <p className="text-sm font-semibold text-foundation-navy">{item.category}</p>
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <FieldGroup>
-                          <Label htmlFor={`item-${index}-subcategory`}>Service provision</Label>
+                          <Label htmlFor={`item-${index}-subcategory`}>{packageLabels(item.category).provision}</Label>
                           <Combobox
                             id={`item-${index}-subcategory`}
                             name={`item-${index}-subcategory-input`}
@@ -585,7 +844,7 @@ export default function NewTenderPage() {
                           {errors[`item-${index}-subcategory`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-subcategory`]}</p>}
                         </FieldGroup>
                         <FieldGroup>
-                          <Label htmlFor={`item-${index}-item`}>Detailed provision (optional)</Label>
+                          <Label htmlFor={`item-${index}-item`}>{packageLabels(item.category).detail}</Label>
                           <Combobox
                             id={`item-${index}-item`}
                             name={`item-${index}-item-input`}
@@ -597,7 +856,8 @@ export default function NewTenderPage() {
                           />
                           {errors[`item-${index}-item`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-item`]}</p>}
                         </FieldGroup>
-                        <FieldGroup>
+                        {isProfessionalService(item.category) && item.item === 'Other' && <FieldGroup><Label htmlFor={`item-${index}-professional-service-other`}>Other service details</Label><Input id={`item-${index}-professional-service-other`} value={item.professionalServiceOther} onChange={(event) => updateItem(index, 'professionalServiceOther', event.target.value)} placeholder="Describe the service required" /></FieldGroup>}
+                        {(isContractorService(item.category) || isProfessionalService(item.category) || isPlantHire(item.category)) ? <><FieldGroup><Label htmlFor={`item-${index}-duration`}>Required service period</Label><Input id={`item-${index}-duration`} value={item.durationValue} placeholder="e.g. 3" onChange={(event) => updateItem(index, 'durationValue', event.target.value)} />{errors[`item-${index}-quantity`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-quantity`]}</p>}</FieldGroup><FieldGroup><Label htmlFor={`item-${index}-duration-unit`}>Duration unit</Label><Select id={`item-${index}-duration-unit`} value={item.durationUnit} onChange={(event) => updateItem(index, 'durationUnit', event.target.value)}>{DURATION_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</Select>{errors[`item-${index}-unit`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-unit`]}</p>}</FieldGroup></> : <><FieldGroup>
                           <Label htmlFor={`item-${index}-quantity`}>Quantity</Label>
                           <Input id={`item-${index}-quantity`} value={item.quantityValue} placeholder={item.category?.toLowerCase().includes('plant') || item.category?.toLowerCase().includes('professional') ? 'e.g. 7 days' : 'e.g. 20'} onChange={(event) => updateItem(index, 'quantityValue', event.target.value)} />
                           {errors[`item-${index}-quantity`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-quantity`]}</p>}
@@ -607,21 +867,31 @@ export default function NewTenderPage() {
                           <Select id={`item-${index}-unit`} value={item.quantityUnit} onChange={(event) => updateItem(index, 'quantityUnit', event.target.value)}>
                             <option value="" disabled>Select a unit</option>
                             {QUANTITY_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
-                            <option value="days">days</option>
-                            <option value="weeks">weeks</option>
                           </Select>
                           {errors[`item-${index}-unit`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-unit`]}</p>}
-                        </FieldGroup>
+                        </FieldGroup></>}
                       </div>
+                      {(isContractorService(item.category) || isProfessionalService(item.category) || isPlantHire(item.category)) && <div className="mt-4 grid gap-4 sm:grid-cols-2"><FieldGroup><Label htmlFor={`item-${index}-scope-size`}>Size, scope or output quantity</Label><Input id={`item-${index}-scope-size`} value={item.scopeSize} onChange={(event) => updateItem(index, 'scopeSize', event.target.value)} placeholder="e.g. 120 m drainage run, 3 site visits, weekly retained support" />{errors[`item-${index}-scopeSize`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-scopeSize`]}</p>}</FieldGroup><FieldGroup><Label htmlFor={`item-${index}-working-hours`}>Permitted working hours</Label><Input id={`item-${index}-working-hours`} value={item.workingHours} onChange={(event) => updateItem(index, 'workingHours', event.target.value)} placeholder="e.g. Mon-Fri 08:00-17:00, no weekend work" />{errors[`item-${index}-workingHours`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-workingHours`]}</p>}</FieldGroup><FieldGroup><Label htmlFor={`item-${index}-access-restrictions`}>Access restrictions</Label><Textarea id={`item-${index}-access-restrictions`} rows={3} value={item.accessRestrictions} onChange={(event) => updateItem(index, 'accessRestrictions', event.target.value)} placeholder="Gate widths, parking, loading area, permits, occupied premises, or not applicable." />{errors[`item-${index}-accessRestrictions`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-accessRestrictions`]}</p>}</FieldGroup><FieldGroup><Label htmlFor={`item-${index}-site-constraints`}>Site constraints</Label><Textarea id={`item-${index}-site-constraints`} rows={3} value={item.siteConstraints} onChange={(event) => updateItem(index, 'siteConstraints', event.target.value)} placeholder="Live site, residents nearby, services, asbestos, fragile surfaces, traffic, noise limits, or not applicable." />{errors[`item-${index}-siteConstraints`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-siteConstraints`]}</p>}</FieldGroup>{(isContractorService(item.category) || isProfessionalService(item.category)) && <FieldGroup wide><Label htmlFor={`item-${index}-deliverables`}>Works, outputs or deliverables</Label><Textarea id={`item-${index}-deliverables`} rows={3} value={item.deliverables} onChange={(event) => updateItem(index, 'deliverables', event.target.value)} placeholder="State what must be priced: works scope, drawings/reports, inspection frequency, attendance, exclusions, handover evidence." />{errors[`item-${index}-deliverables`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-deliverables`]}</p>}</FieldGroup>}</div>}
+                      {(isContractorService(item.category) || isProfessionalService(item.category)) && <fieldset className="mt-4 rounded-md border border-slate-200 bg-white p-4"><legend className="px-1 text-sm font-semibold text-foundation-navy">Minimum requirements</legend><div className="mt-2 grid gap-3 sm:grid-cols-2">{SERVICE_MINIMUM_REQUIREMENTS.map((option) => <label key={option} className="flex items-center gap-3 text-sm text-concrete-grey"><input type="checkbox" checked={item.minimumRequirements.includes(option)} onChange={() => toggleItemArray(index, 'minimumRequirements', option)} className="h-4 w-4 accent-safety-amber" />{option}</label>)}</div></fieldset>}
+                      {isPlantHire(item.category) && <fieldset className="mt-4 rounded-md border border-slate-200 bg-white p-4"><legend className="px-1 text-sm font-semibold text-foundation-navy">Plant hire support</legend><div className="mt-2 grid gap-3 sm:grid-cols-2">{PLANT_HIRE_SUPPORT_OPTIONS.map((option) => <label key={option} className="flex items-center gap-3 text-sm text-concrete-grey"><input type="checkbox" checked={item.plantRequirements.includes(option) || (option === 'Driver/operator required' && item.driverRequired) || (option === 'Lift plan required' && item.liftPlanRequired)} onChange={() => { if (option === 'Driver/operator required') updateItem(index, 'driverRequired', !item.driverRequired); else if (option === 'Lift plan required') updateItem(index, 'liftPlanRequired', !item.liftPlanRequired); else toggleItemArray(index, 'plantRequirements', option); }} className="h-4 w-4 accent-safety-amber" />{option}</label>)}</div></fieldset>}
                       <FieldGroup>
-                        <Label htmlFor={`item-${index}-description`}>Item specification (optional)</Label>
-                        <Textarea id={`item-${index}-description`} rows={3} value={item.description} placeholder="Add the specification or delivery requirement for this item." onChange={(event) => updateItem(index, 'description', event.target.value)} />
+                        <Label htmlFor={`item-${index}-description`}>Detailed job specification</Label>
+                        <Textarea id={`item-${index}-description`} rows={5} value={item.description} placeholder="Set out the scope, standards, drawings/spec references, access constraints, expected outputs, exclusions, and quote assumptions needed for a Provider to price accurately." onChange={(event) => updateItem(index, 'description', event.target.value)} />
                         {errors[`item-${index}-description`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-description`]}</p>}
                       </FieldGroup>
                     </div>
-                  ))}
+                    );
+                    return null;
+                  })}
                 </div>
               )}
+              <button
+                type="button"
+                onClick={addAnotherItem}
+                className="mt-5 inline-flex items-center justify-center self-start rounded-md border border-steel-blue/40 bg-steel-blue/5 px-3 py-2 text-xs font-semibold text-steel-blue hover:bg-steel-blue/10"
+              >
+                Add another item
+              </button>
             </div>
           </Card>
         )}
@@ -629,19 +899,21 @@ export default function NewTenderPage() {
         {step === 3 && (
           <Card className="flex flex-col gap-6">
             <h2 className="font-heading text-lg font-bold text-foundation-navy">Additional Requirements</h2>
-            <fieldset className="flex flex-col gap-3">
+            <fieldset>
               <legend className="text-sm font-semibold text-foundation-navy">Site, delivery and supporting requirements</legend>
-              {REQUIREMENT_OPTIONS.map((option) => (
-                <label key={option} className="flex items-center gap-3 text-sm text-concrete-grey">
-                  <input
-                    type="checkbox"
-                    checked={form.requirements.includes(option)}
-                    onChange={() => toggleRequirement(option)}
-                    className="h-4 w-4 accent-safety-amber"
-                  />
-                  {option}
-                </label>
-              ))}
+              <div className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                {REQUIREMENT_OPTIONS.map((option) => (
+                  <label key={option} className="flex items-center gap-3 text-sm text-concrete-grey">
+                    <input
+                      type="checkbox"
+                      checked={form.requirements.includes(option)}
+                      onChange={() => toggleRequirement(option)}
+                      className="h-4 w-4 accent-safety-amber"
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
             </fieldset>
           </Card>
         )}
@@ -651,7 +923,7 @@ export default function NewTenderPage() {
             <h2 className="font-heading text-lg font-bold text-foundation-navy">Upload Files (optional)</h2>
             <p className="text-sm text-concrete-grey">
               Attach drawings, specifications, or site photos. These files are saved with the tender, but
-              Retailers cannot preview or download them until they unlock the full detail set.
+              Providers cannot preview or download them until they unlock the full detail set.
             </p>
             <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-6 py-10 text-center hover:border-steel-blue">
               <span className="text-sm font-semibold text-steel-blue">Choose files or drag them here</span>
@@ -686,21 +958,38 @@ export default function NewTenderPage() {
         {step === 5 && (
           <Card className="flex flex-col gap-5">
             <h2 className="font-heading text-lg font-bold text-foundation-navy">Review &amp; Submit</h2>
-            <dl className="grid gap-4 sm:grid-cols-2">
-              <ReviewItem label="Project name" value={form.projectName} />
-              <ReviewItem label="Selected services" value={form.selectedServices.join(', ')} />
-              <ReviewItem label="Jobsite or delivery postcode" value={form.location} />
+            <ReviewSection title="Project Details" onEdit={() => setStep(1)}>
+              <dl className="grid gap-4 sm:grid-cols-2">
+                <ReviewItem label="Project name" value={form.projectName} />
+                <ReviewItem label="Selected services" value={form.selectedServices.join(', ')} />
+                <ReviewItem label="Jobsite or delivery postcode" value={form.location} />
+                <ReviewItem label="Urgency" value={form.urgency} />
+                <ReviewItem label="Closing date" value={form.closingDate} />
+                <ReviewItem label="Planned works start date" value={form.supplyDate || 'Not specified'} />
+              </dl>
+              <div className="mt-4">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-concrete-grey">Project information</p>
+                <p className="whitespace-pre-line text-sm text-foundation-navy">{form.description || 'None'}</p>
+              </div>
+            </ReviewSection>
+            <ReviewSection title="Tender Packages" onEdit={() => { setActivePackageIndex(0); setStep(2); }}>
+              <dl className="grid gap-4 sm:grid-cols-2">
+                <ReviewItem label="Tender packages" value={`${form.items.length + 1} package(s)`} />
+                <ReviewItem label="Primary quantity" value={`${form.quantityValue} ${form.quantityUnit}`.trim()} />
+                <ReviewItem label="Primary specification" value={form.primaryItemDescription || 'None'} />
+              </dl>
+              {form.items.length > 0 && (
+                <ul className="mt-4 flex flex-col gap-2 text-sm text-foundation-navy">
+                  {form.items.map((item, index) => <li key={item.id}>{index + 2}. {item.category} / {item.subcategory} &middot; {item.quantityValue} {item.quantityUnit}</li>)}
+                </ul>
+              )}
+            </ReviewSection>
+            <ReviewSection title="Additional Requirements" onEdit={() => setStep(3)}>
               <ReviewItem label="Requirements" value={form.requirements.join(', ') || 'None'} />
-              <ReviewItem label="Quantity" value={`${form.quantityValue} ${form.quantityUnit}`.trim()} />
-              <ReviewItem label="Urgency" value={form.urgency} />
-              <ReviewItem label="Closing date" value={form.closingDate} />
-              <ReviewItem label="Planned works start date" value={form.supplyDate || 'Not specified'} />
-              <ReviewItem label="Tender packages" value={`${form.items.length + 1} package(s)`} />
-              <ReviewItem
-                label="Attachments"
-                value={files.length > 0 ? `${files.length} file(s) selected and saved with this tender` : 'None'}
-              />
-            </dl>
+            </ReviewSection>
+            <ReviewSection title="Attachments" onEdit={() => setStep(4)}>
+              <ReviewItem label="Files" value={files.length > 0 ? `${files.length} file(s) selected and saved with this tender` : 'None'} />
+            </ReviewSection>
             {hasDetectedContactDetails && (
               <div className="rounded-lg border border-attention/40 bg-attention/5 p-4">
                 <p className="text-sm font-semibold text-attention">Contact details were found in the tender notes.</p>
@@ -712,22 +1001,6 @@ export default function NewTenderPage() {
                     Remove contact details
                   </button>
                 </div>
-              </div>
-            )}
-            <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-concrete-grey">Specification</p>
-              <p className="whitespace-pre-line text-sm text-foundation-navy">{form.description}</p>
-            </div>
-            {form.items.length > 0 && (
-              <div className="border-t border-slate-200 pt-4">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-concrete-grey">Additional items</p>
-                <ul className="flex flex-col gap-2 text-sm text-foundation-navy">
-                  {form.items.map((item, index) => (
-                    <li key={item.id}>
-                      {index + 2}. {item.category} / {item.subcategory} &middot; {item.quantityValue} {item.quantityUnit}
-                    </li>
-                  ))}
-                </ul>
               </div>
             )}
           </Card>
@@ -762,6 +1035,18 @@ export default function NewTenderPage() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+function ReviewSection({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode }) {
+  return (
+    <section className="border-t border-slate-200 pt-5 first:border-t-0 first:pt-0">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="font-heading text-base font-bold text-foundation-navy">{title}</h3>
+        <button type="button" onClick={onEdit} className="text-xs font-semibold text-steel-blue hover:text-foundation-navy">Edit</button>
+      </div>
+      {children}
+    </section>
   );
 }
 
