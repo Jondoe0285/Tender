@@ -9,10 +9,24 @@ test('staging verification requires an explicit high-risk controls attestation',
 
   assert.match(verifier, /HIGH RISK STAGING CONTROLS VERIFIED/);
   assert.match(verifier, /High-risk controls attestation/);
-  assert.match(verifier, /UNVERIFIED/);
-  assert.match(verifier, /failed\.length === 0 && unverified\.length === 0|unverified\.length === 0/i);
+  assert.match(verifier, /recordAttestedControl/);
+  assert.match(verifier, /failed\.length === 0 && unverified\.length === 0/);
+  assert.match(verifier, /unexpected status \$\{result\.status\}; authentication must deny or redirect/);
   assert.match(approvalScript, /HIGH RISK STAGING CONTROLS VERIFIED/);
   assert.match(approvalScript, /high-risk-attestation|attestation/i);
   assert.match(workflow, /high_risk_attestation:/);
   assert.match(workflow, /--high-risk-attestation/);
+});
+
+test('production verification requires an explicit provider-controls attestation and owner-operated rollback redeploy', () => {
+  const verifier = readFileSync('scripts/health-check/verify-deployment.mjs', 'utf8');
+  const workflow = readFileSync('.github/workflows/deploy-production.yml', 'utf8');
+  const approvalScript = readFileSync('scripts/health-check/verify-deployment-approval.mjs', 'utf8');
+
+  assert.match(verifier, /PRODUCTION PROVIDER CONTROLS VERIFIED/);
+  assert.match(approvalScript, /PRODUCTION PROVIDER CONTROLS VERIFIED/);
+  assert.match(workflow, /provider_controls_attestation:/);
+  assert.match(workflow, /--provider-controls-attestation/);
+  assert.match(workflow, /RENDER_PRODUCTION_DEPLOY_HOOK/);
+  assert.match(workflow, /Rollback is not a report-only step/);
 });

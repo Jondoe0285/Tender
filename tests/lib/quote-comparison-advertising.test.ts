@@ -14,9 +14,12 @@ test('quote sorting and filter toggles expose accessible state for assistive tec
   const opportunitiesExplorer = readFileSync('src/components/retailer/OpportunitiesExplorer.tsx', 'utf8');
 
   assert.match(quoteComparison, /aria-sort=/i);
-  assert.match(quoteComparison, /aria-label=.*Sort by/i);
+  assert.match(quoteComparison, /aria-label=\{`Sort by \$\{label\}/);
+  assert.match(quoteComparison, /aria-live="polite"/);
   assert.match(opportunitiesExplorer, /aria-pressed=/i);
-  assert.match(opportunitiesExplorer, /aria-label=.*category|aria-label=.*urgency/i);
+  assert.match(opportunitiesExplorer, /htmlFor="opportunity-search"/);
+  assert.match(opportunitiesExplorer, /<fieldset/);
+  assert.match(opportunitiesExplorer, /aria-label=.*urgency filter/);
 });
 
 test('quote comparison documents sole trader status and allows sole traders to become AI verified', () => {

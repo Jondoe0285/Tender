@@ -36,12 +36,12 @@ This document is the detailed release review behind the summary in [Action-Track
 ### P0-C02: Make deployment approval fail closed
 
 - **Severity:** Critical
-- **Status:** Open; confirmed in workflow and verifier logic.
-- **Evidence:** `scripts/health-check/verify-deployment.mjs` can record `UNVERIFIED` checks while reporting success. The staging and production workflows now fail when the verifier exits non-zero, retain diagnostic records, and still require explicit attestation handling. Production rollback currently records a report but does not itself restore the previous deployment.
-- **Corrective action:** Treat required `UNVERIFIED` results as blocking, remove `continue-on-error` from mandatory verification, require explicit evidence for authentication, payment/webhooks, reversal, contact-release privacy, audit, email, Sentry, and retention, and implement or document an owner-operated rollback procedure that cannot be reported as automatic rollback unless it actually redeploys.
+- **Status:** Closed 2026-09-18 for repository gates. Live staging/production attestation on a real deploy remains an operator step (Before Production).
+- **Evidence:** `scripts/health-check/verify-deployment.mjs` no longer treats unprobeable checks as success. Staging requires `HIGH RISK STAGING CONTROLS VERIFIED`; production requires `PRODUCTION PROVIDER CONTROLS VERIFIED` on both approval and post-deploy verification. Unexpected HTTP statuses on protected probes are `FAIL`. Any `FAIL` or leftover `UNVERIFIED` exits non-zero. Production rollback POSTs the Render deploy hook for the previous SHA, then re-runs verification with the same attestation.
+- **Corrective action:** Completed in verifier, `verify-deployment-approval.mjs`, `deploy-production.yml`, and workflow validation tests.
 - **Can complete:** Yes for verifier and workflow logic.
-- **Requires input:** Render/GitHub deployment credentials, protected-environment policy, and named release/rollback owner for live verification and rollback.
-- **Acceptance evidence:** A missing required attestation fails the workflow; a failed post-deploy check prevents promotion; a tested rollback or approved manual rollback runbook is recorded.
+- **Requires input:** Operator attestation phrases on the next approved staging and production workflow runs; a live rollback after a failed production verify is still the first real-world proof of the hook.
+- **Acceptance evidence:** Missing attestation fails approval and verification; unexpected probe results fail closed; rollback is an owner-operated Render redeploy, not a report-only step.
 
 ## High-priority engineering actions
 
@@ -75,11 +75,12 @@ This document is the detailed release review behind the summary in [Action-Track
 ### P1-H04: Fix unlocked attachment authorization or revise the contract
 
 - **Severity:** High availability/privacy workflow defect
-- **Status:** Open; conflicting behavior is covered by an existing test.
-- **Evidence:** `src/server/domain/tenderAttachmentService.ts`, `src/server/domain/unlockService.ts`, `tests/lib/tender-attachment-access.integration.test.ts`. The workflow says matched unlocked Providers may access permitted attachments, while the current test expects a matched unlocked user to be denied.
-- **Corrective action:** Scope attachment access to a persisted unlock and eligible package/category, or formally revise the product/security requirement and UI so attachment access is not promised.
-- **Can complete:** Yes after the contract is decided.
-- **Requires input:** Product owner decision on tender-wide versus package-scoped attachment visibility.
+- **Status:** Closed 2026-09-18. Founder decision: matched unlocked Providers may download tender attachments. Implementation grants download to the owning Client company or a Provider with a persisted `Unlock` row; matched Providers without an unlock remain denied. Unlocked tender views now list attachment metadata (not file bytes). Coverage is in `tests/lib/tender-attachment-access.integration.test.ts`.
+- **Evidence:** `src/server/domain/tenderAttachmentService.ts`, `src/server/domain/unlockService.ts`, `tests/lib/tender-attachment-access.integration.test.ts`.
+- **Corrective action:** Complete. Tender-wide attachments are permitted after unlock; attachments are not package-scoped in the schema.
+- **Can complete:** Yes.
+- **Requires input:** None remaining for this item.
+- **Acceptance evidence:** The attachment test denies a matched locked Provider, allows the unlocking Provider and owning Client, and still withholds file bytes from the unlocked tender JSON payload.
 
 ### P1-H05: Add session, authorization, reversal, retention, and route-level rate-limit tests
 
@@ -92,11 +93,11 @@ This document is the detailed release review behind the summary in [Action-Track
 ### P1-H06: Separate sponsored content from quote comparison
 
 - **Severity:** High
-- **Status:** Open; confirmed in source and action tracker.
-- **Evidence:** `src/components/quotes/QuoteComparison.tsx`, `src/components/retailer/SponsoredPlacementCard.tsx`; sponsored content appears in the comparison/decision surface.
-- **Corrective action:** Remove sponsored placement from ranking, comparison, and acceptance flow. Put it on a separate, clearly labelled partner-information surface with explicit neutrality language and no influence on selection.
-- **Can complete:** Yes for implementation.
-- **Requires input:** Product owner must confirm whether sponsorship is permitted in the current release or must remain disabled.
+- **Status:** Closed 2026-09-18 as a Year 1 product decision: keep sponsorship on the quote comparison screen. No code change in this pass. Reopen if neutrality review later requires a separate partner surface.
+- **Evidence:** `src/components/quotes/QuoteComparison.tsx`, `src/components/retailer/SponsoredPlacementCard.tsx`; sponsored content appears in the comparison/decision surface by design for Year 1.
+- **Corrective action:** None for Year 1 launch.
+- **Can complete:** N/A.
+- **Requires input:** None remaining for Year 1.
 
 ### P1-H07: Complete shared brand contrast verification
 
@@ -110,11 +111,11 @@ This document is the detailed release review behind the summary in [Action-Track
 ### P1-H10: Resolve the role, pricing, and hosting documentation contradictions
 
 - **Severity:** High product/governance blocker
-- **Status:** Open; confirmed.
-- **Evidence:** `docs/TradeTender-Business-Plan.md`, `docs/Product-Requirements.md`, `docs/Architecture.md`, `docs/Security-Requirements.md`, and `docs/Action-Tracker.md` mix the retired Contractor/Provider model with the newer unified User model; historical £5/percentage fees remain beside the resolved £10 model; Render PostgreSQL remains in target architecture while `render.yaml` uses Neon Lakebase Postgres.
-- **Corrective action:** Approve one role model, fee model, and database/hosting description. Then update routes, labels, tests, security requirements, architecture, tracker, and release materials consistently.
-- **Can complete:** Documentation and implementation cleanup can follow the decision.
-- **Requires input:** Founder/product owner decision is mandatory before broad terminology or workflow changes.
+- **Status:** Decisions recorded 2026-09-18; documentation realignment remains open. Founder confirmed: unified `USER` (Client/Provider via profiles); Owner-set fees with £10 fixed default; Year 1 sponsorship on comparison; flat launch credits; self-serve matching; unlocked-Provider attachment download; 30-day quote retention. Database/hosting description (Neon vs Render PostgreSQL) was not re-opened and remains Neon Lakebase Postgres per `render.yaml`.
+- **Evidence:** `docs/TradeTender-Business-Plan.md`, `docs/Product-Requirements.md`, `docs/Architecture.md`, `docs/Security-Requirements.md`, and `docs/Action-Tracker.md` still mix some retired Contractor/Provider wording and historical fee figures.
+- **Corrective action:** Update routes, labels, tests, security requirements, architecture, tracker, and release materials to match the recorded decisions.
+- **Can complete:** Documentation and remaining terminology cleanup can proceed.
+- **Requires input:** None remaining for the listed product decisions.
 
 ## Medium-priority engineering and UX actions
 
@@ -129,18 +130,20 @@ This document is the detailed release review behind the summary in [Action-Track
 ### P2-M03: Complete frontend accessibility and responsive polish
 
 - **Severity:** Medium
-- **Evidence:** `src/components/retailer/OpportunitiesExplorer.tsx` contains controls needing labels/state semantics; `src/components/quotes/QuoteComparison.tsx` needs sortable-column announcements; `src/components/layout/LandingPartners.tsx` and `src/components/layout/SiteFooter.tsx` use narrow-screen minimum widths; detail pages have weak loading/error states.
-- **Corrective action:** Add associated labels, `aria-pressed`/`aria-sort` semantics, stable loading shells, retry and permission-denied states, branded error handling, and narrow viewport layout checks.
-- **Can complete:** Yes.
-- **Requires input:** Brand review for any functional colour changes.
+- **Status:** Source polish complete 2026-09-18; real-device confirmation remains open.
+- **Evidence:** Opportunity filters have labels, fieldset, and `aria-pressed`; quote comparison has `aria-sort` plus a polite live region; tender detail pages use `PageLoadState` with retry; partner/footer tiles no longer force `min-w-36` on the smallest screens; footer policy links use `min-h-11`.
+- **Corrective action:** Remaining work is device/first-journey QA, not further source labels for the listed surfaces.
+- **Can complete:** Device QA requires a physical or hosted browser pass.
+- **Requires input:** Brand review only if new functional colours are introduced (none in this pass).
 
 ### P2-M04: Decide launch-credit scope and Provider vetting
 
 - **Severity:** Medium
-- **Evidence:** The business plan describes a time/category/region/provider-group launch-credit policy, while the schema uses a flat `launchCreditsLeft`; the business plan also discusses Provider approval while the current flow appears self-service.
-- **Corrective action:** Decide whether the flat launch credit and suspension-only moderation are accepted launch simplifications. Implement dated/scoped grants and approval state if not.
-- **Can complete:** Implementation can follow the decision.
-- **Requires input:** Founder/product owner decision.
+- **Status:** Closed 2026-09-18. Founder accepted the flat `launchCreditsLeft` model and self-serve matching with suspension-only moderation. No dated/scoped grants or Provider approval gate for Year 1.
+- **Evidence:** `docs/Action-Tracker.md` 2026-09-18 decisions.
+- **Corrective action:** None for Year 1.
+- **Can complete:** N/A.
+- **Requires input:** None remaining.
 
 ## Operational actions requiring owner/provider access
 

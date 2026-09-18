@@ -96,7 +96,7 @@ export async function createPayment(params: {
         price_data: {
           currency: 'gbp',
           unit_amount: netPence,
-          product_data: { name: `${params.type === 'RETAILER_UNLOCK' ? 'Tender unlock fee' : params.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : params.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : params.type === 'INDEPENDENT_REVIEW' ? `Enhanced verification — ${INDEPENDENT_REVIEW_TIER_LABELS[params.independentReviewTier!]}` : params.type === 'DIRECT_CONTACT' ? 'Direct contact request fee' : 'Accepted quote release fee'} (excl. VAT)` },
+          product_data: { name: `${params.type === 'RETAILER_UNLOCK' ? 'Tender unlock fee' : params.type === 'SPONSORED_PLACEMENT' ? 'Sponsored placement fee' : params.type === 'MEMBERSHIP_TIER' ? 'Membership tier' : params.type === 'INDEPENDENT_REVIEW' ? `Enhanced verification — ${INDEPENDENT_REVIEW_TIER_LABELS[params.independentReviewTier!]}` : params.type === 'DIRECT_CONTACT' ? 'Direct contact request fee' : params.type === 'PROFESSIONAL_INTEREST' ? 'Professional interest fee' : 'Accepted quote release fee'} (excl. VAT)` },
         },
         quantity: 1,
       },

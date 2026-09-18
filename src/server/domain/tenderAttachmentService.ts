@@ -5,14 +5,17 @@ import { getCompanyMemberIds } from '@/server/domain/tenderService';
 
 type AttachmentActor = { id: string };
 
-/** Returns attachment bytes only for the owning Client or a matched Retailer with a persisted unlock. */
+/** Returns attachment bytes for the owning Client company, or a Provider with a persisted unlock. */
 export async function getTenderAttachmentForDownload(tenderId: string, attachmentId: string, actor: AttachmentActor): Promise<{ id: string; fileName: string; mimeType: string; content: Buffer }> {
   const companyMemberIds = await getCompanyMemberIds(actor.id);
   const attachment = await prisma.tenderAttachment.findFirst({
     where: {
       id: attachmentId,
       tenderId,
-      tender: { clientId: { in: companyMemberIds } },
+      OR: [
+        { tender: { clientId: { in: companyMemberIds } } },
+        { tender: { unlocks: { some: { retailerId: actor.id } } } },
+      ],
     },
     select: { id: true, fileName: true, mimeType: true, content: true },
   });

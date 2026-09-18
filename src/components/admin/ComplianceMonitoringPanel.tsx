@@ -13,6 +13,7 @@ const categoryLabels = {
   CONFIDENTIALITY: 'Confidentiality',
   TENDER_INTEGRITY: 'Tender integrity',
   PLATFORM_BYPASS: 'Platform bypass',
+  PAYMENT_MISUSE: 'Payment misuse',
 } as const;
 
 function formatSnapshot(snapshot: unknown) {
@@ -100,7 +101,7 @@ export function ComplianceMonitoringPanel({ overview }: { overview: ComplianceOv
         <h2 className="mb-4 font-heading text-lg font-bold text-foundation-navy">Flagged activity</h2>
         {overview.flags.length === 0 ? (
           <Card className="py-16 text-center text-sm text-concrete-grey">
-            No tender-process or confidentiality risks were detected in the current window.
+            No tender-process, payment, or confidentiality risks were detected in the current window.
           </Card>
         ) : (
           <div className="flex flex-col gap-4">

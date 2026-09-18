@@ -1,3 +1,45 @@
+### 2026-09-18 - Deployment verification fails closed
+
+- Changed: unauthenticated probes with unexpected HTTP status fail; Resend, audit, Sentry, retention, reversal, and contact-release checks PASS only with the exact staging or production attestation; production workflow requires `PRODUCTION PROVIDER CONTROLS VERIFIED` and rollback redeploys the previous SHA through Render then re-verifies.
+- Affects: `scripts/health-check/verify-deployment.mjs`, `scripts/health-check/verify-deployment-approval.mjs`, `.github/workflows/deploy-production.yml`, `scripts/health-check/validate-workflows.mjs`, `tests/lib/deployment-high-risk-attestation.test.ts`, `docs/PRODUCTION-RELEASE-ACTION-LIST.md`, `docs/health-check/README.md`.
+- Environment: no schema or migration change.
+- Validation: `tests/lib/deployment-high-risk-attestation.test.ts` and `npm run health:validate-workflows`.
+
+### 2026-09-18 - Source accessibility polish for filters, sort, loading, and narrow screens
+
+- Changed: opportunity search/filters now have associated labels and a filter fieldset; quote comparison announces the active sort; Client and Provider tender detail pages use a branded loading and retry shell; footer policy links meet a 44px hit target; landing partner tiles no longer use a fixed minimum width that overflowed narrow screens.
+- Affects: `src/components/retailer/OpportunitiesExplorer.tsx`, `src/components/quotes/QuoteComparison.tsx`, `src/components/ui/PageLoadState.tsx`, `src/app/client/tenders/[id]/page.tsx`, `src/app/retailer/tenders/[id]/page.tsx`, `src/components/layout/LandingPartners.tsx`, `src/components/layout/SiteFooter.tsx`, `tests/lib/quote-comparison-advertising.test.ts`.
+- Environment: no schema or migration change.
+- Validation: `tests/lib/quote-comparison-advertising.test.ts` and type-check.
+
+### 2026-09-18 - Pre-release rendered HTML and operational-log privacy coverage
+
+- Changed: added quote-comparison HTML assertions that Provider contact details are absent until an authorised release payload is supplied, and a sweep that server/API audit metadata and console output do not persist or print email or phone.
+- Affects: `tests/lib/pre-release-rendered-privacy.test.ts`, `tests/lib/pre-release-operational-log-privacy.test.ts`, `docs/Action-Tracker.md`.
+- Environment: no schema or migration change.
+- Validation: both new tests pass.
+
+### 2026-09-18 - Misuse and fraud monitoring flags
+
+- Changed: Super User tender monitoring now flags repeated Client/Provider pairings, unusual failed or reversed payments, repeated tender closures and quote rejections, and excessive sign-in failures, in addition to near-duplicate tenders, confidentiality blocks, and unlock-without-quote harvesting.
+- Affects: `src/server/domain/complianceMonitoringService.ts`, `src/components/admin/ComplianceMonitoringPanel.tsx`, `tests/lib/compliance-monitoring.test.ts`, `docs/Action-Tracker.md`.
+- Environment: no schema or migration change.
+- Validation: `tests/lib/compliance-monitoring.test.ts`.
+
+### 2026-09-18 - Paid Professional Services interest registration
+
+- Changed: Professional Services Providers must pay the Owner-set Professional Services tender release fee before interest is registered. Client contact details after the deadline are released only when that payment is confirmed. Refunds remove the interest row.
+- Affects: Prisma `PaymentType.PROFESSIONAL_INTEREST`, `ProfessionalInterest.paymentId`, `src/server/domain/professionalInterestService.ts`, Stripe webhook and dev confirmation, Provider tender UI, `tests/lib/professional-interest.integration.test.ts`.
+- Environment: additive enum value and optional `paymentId` on `ProfessionalInterest`; no destructive change.
+- Validation: focused professional-interest integration test and type-check.
+
+### 2026-09-18 - Unlocked Provider tender attachment access
+
+- Changed: a Provider with a persisted tender unlock can list attachment metadata on the unlocked tender view and download the files through `/api/tenders/[id]/attachments/[attachmentId]`. Matched Providers without an unlock remain denied. Owning Client company members keep download access. File bytes are not included in the unlocked tender JSON payload.
+- Affects: `src/server/domain/tenderAttachmentService.ts`, `src/server/domain/unlockService.ts`, `tests/lib/tender-attachment-access.integration.test.ts`, `docs/Action-Tracker.md`, `docs/PRODUCTION-RELEASE-ACTION-LIST.md`.
+- Environment: no schema or migration change.
+- Validation: focused attachment access test and type-check.
+
 ### 2026-09-13 - Environmental Secret Resolution For Third-Party Verification URL & Signing Secrets
 
 - Changed: third-party partner portal URLs and verification secrets for Enhanced Verification are now resolved exclusively from environment variables (`VERIFICATION_REGISTRATION_TOKEN_SECRET`, `VERIFICATION_INTEGRATION_SECRET_TRADE_TENDER_VERIFICATION`, `VERIFICATION_OUTBOUND_SECRET_TRADE_TENDER_VERIFICATION`, `VERIFICATION_OUTBOUND_URL_TRADE_TENDER_VERIFICATION`, `ENHANCED_VERIFICATION_PARTNER_URL`, `ENHANCED_VERIFICATION_SHARED_SECRET`), removing third-party secret and URL inputs from the Owner space UI (`SuperUserSettingsPanel.tsx`) and database platform settings.

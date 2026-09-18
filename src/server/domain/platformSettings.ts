@@ -81,6 +81,8 @@ export async function getPaymentFeeGbp(type: PaymentType): Promise<number> {
       ? 'SPONSORED_PLACEMENT_FEE_GBP'
       : type === 'DIRECT_CONTACT'
           ? 'DIRECT_CONTACT_FEE_GBP'
+          : type === 'PROFESSIONAL_INTEREST'
+            ? 'PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP'
           : 'CLIENT_RELEASE_FEE_GBP';
   const value = Number(await getPlatformSetting(key));
   return Number.isInteger(value) && value >= 0 ? value : Number(defaultSettings[key]);

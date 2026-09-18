@@ -164,7 +164,6 @@ export async function getUnlockedTenderForRetailer(retailerId: string, tenderId:
       status: true,
       createdAt: true,
       attachments: {
-        where: { id: { in: [] } },
         select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
       },
       items: {

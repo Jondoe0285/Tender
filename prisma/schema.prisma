@@ -45,6 +45,7 @@ enum PaymentType {
   MEMBERSHIP_TIER
   INDEPENDENT_REVIEW
   DIRECT_CONTACT
+  PROFESSIONAL_INTEREST
 }
 
 enum PaymentStatus {
@@ -816,6 +817,7 @@ model Payment {
   sponsoredPlacement    RetailerSponsoredPlacement?
   retailerMembership    RetailerMembership?
   directContactRequest  DirectContactRequest?
+  professionalInterest  ProfessionalInterest?
   reversals             PaymentReversal[]
   enhancedVerificationInvitations EnhancedVerificationInvitation[] @relation("PaymentEnhancedVerificationInvitations")
   independentReviewEntitlements RetailerProfile[] @relation("IndependentReviewPurchasedPayment")
@@ -871,6 +873,8 @@ model ProfessionalInterest {
   tender      Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
   retailerId  String
   retailer    User     @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  paymentId   String?  @unique
+  payment     Payment? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
   interestedAt DateTime @default(now())
   releasedAt  DateTime?
 

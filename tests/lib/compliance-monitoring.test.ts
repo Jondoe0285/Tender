@@ -3,7 +3,11 @@ import test from 'node:test';
 import {
   flagConfidentialityAttempts,
   flagDuplicateTenders,
+  flagExcessiveAccessFailures,
+  flagRepeatedCancellations,
+  flagRepeatedParties,
   flagUnlockWithoutQuote,
+  flagUnusualPayments,
   sortFlags,
   type ModerationSignal,
   type TenderSignal,
@@ -118,4 +122,48 @@ test('orders flags by severity then recency', () => {
   ]);
 
   assert.deepEqual(ordered.map((flag) => flag.id), ['c', 'b', 'a']);
+});
+
+test('flags the same Client and Provider pairing after repeated interactions', () => {
+  const flags = flagRepeatedParties([
+    { clientId: 'client-1', retailerId: 'retailer-1', clientLabel: 'Northside Civils', retailerLabel: 'Harvester Supplies', interactionCount: 4, lastActivityAt: new Date('2026-08-25T10:00:00.000Z') },
+    { clientId: 'client-2', retailerId: 'retailer-2', clientLabel: 'Occasional Client', retailerLabel: 'Occasional Provider', interactionCount: 1, lastActivityAt: new Date('2026-08-25T10:00:00.000Z') },
+  ]);
+
+  assert.equal(flags.length, 1);
+  assert.equal(flags[0].targetId, 'client-1');
+  assert.equal(flags[0].category, 'TENDER_INTEGRITY');
+});
+
+test('flags unusual failed and reversed payment behaviour', () => {
+  const flags = flagUnusualPayments([
+    { userId: 'user-1', userLabel: 'Failed Payer', failedCount: 4, reversedCount: 0, confirmedCount: 1, lastEventAt: new Date('2026-08-25T10:00:00.000Z') },
+    { userId: 'user-2', userLabel: 'Normal Payer', failedCount: 1, reversedCount: 0, confirmedCount: 3, lastEventAt: new Date('2026-08-25T10:00:00.000Z') },
+    { userId: 'user-3', userLabel: 'Chargeback Payer', failedCount: 0, reversedCount: 2, confirmedCount: 2, lastEventAt: new Date('2026-08-26T10:00:00.000Z') },
+  ]);
+
+  assert.equal(flags.length, 2);
+  assert.deepEqual(new Set(flags.map((flag) => flag.targetId)), new Set(['user-1', 'user-3']));
+  assert.ok(flags.every((flag) => flag.category === 'PAYMENT_MISUSE'));
+});
+
+test('flags repeated tender closures and quote rejections', () => {
+  const flags = flagRepeatedCancellations([
+    { clientId: 'client-1', clientLabel: 'Price Harvester', closedTenderCount: 3, rejectedQuoteCount: 1, lastActivityAt: new Date('2026-08-25T10:00:00.000Z') },
+    { clientId: 'client-2', clientLabel: 'Quiet Client', closedTenderCount: 1, rejectedQuoteCount: 0, lastActivityAt: new Date('2026-08-25T10:00:00.000Z') },
+  ]);
+
+  assert.equal(flags.length, 1);
+  assert.equal(flags[0].targetId, 'client-1');
+});
+
+test('flags excessive sign-in failures and active lockouts', () => {
+  const flags = flagExcessiveAccessFailures([
+    { userId: 'user-1', userLabel: 'Locked Account', failedLoginAttempts: 5, lockedUntil: new Date(Date.now() + 60_000) },
+    { userId: 'user-2', userLabel: 'Normal Account', failedLoginAttempts: 1, lockedUntil: null },
+  ]);
+
+  assert.equal(flags.length, 1);
+  assert.equal(flags[0].targetId, 'user-1');
+  assert.equal(flags[0].severity, 'HIGH');
 });

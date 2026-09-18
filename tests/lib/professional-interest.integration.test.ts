@@ -3,9 +3,10 @@ import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { ForbiddenError } from '../../src/server/auth/session';
 import { prisma } from '../../src/server/data/prisma';
-import { getProfessionalInterestContact, registerProfessionalInterest } from '../../src/server/domain/professionalInterestService';
+import { finalizeProfessionalInterestWithPayment, getProfessionalInterestContact, registerProfessionalInterest } from '../../src/server/domain/professionalInterestService';
+import { confirmPayment } from '../../src/server/payments/paymentService';
 
-test('Professional Services interest is free and releases the tender owner contact only after the deadline', async (context) => {
+test('Professional Services interest requires the designated fee before the tender owner contact is released', async (context) => {
   const suffix = randomUUID();
   let tenderId: string | undefined;
   let ownerId: string | undefined;
@@ -14,6 +15,7 @@ test('Professional Services interest is free and releases the tender owner conta
 
   context.after(async () => {
     if (tenderId) await prisma.professionalInterest.deleteMany({ where: { tenderId } });
+    if (tenderId) await prisma.payment.deleteMany({ where: { tenderId } });
     if (tenderId) await prisma.tenderMatch.deleteMany({ where: { tenderId } });
     if (tenderId) await prisma.tenderItem.deleteMany({ where: { tenderId } });
     if (tenderId) await prisma.tender.deleteMany({ where: { id: tenderId } });
@@ -36,12 +38,18 @@ test('Professional Services interest is free and releases the tender owner conta
   tenderId = tender.id;
   await prisma.tenderMatch.create({ data: { tenderId, retailerId: professionalId } });
 
-  await registerProfessionalInterest(professionalId, tenderId);
-  assert.equal(await prisma.payment.count({ where: { tenderId, userId: professionalId } }), 0);
+  const pending = await registerProfessionalInterest(professionalId, tenderId);
+  assert.equal(pending.status, 'PAYMENT_REQUIRED');
+  assert.ok(pending.paymentId);
+  assert.equal(await prisma.payment.count({ where: { tenderId, userId: professionalId, type: 'PROFESSIONAL_INTEREST', status: 'PENDING' } }), 1);
+  await assert.rejects(() => getProfessionalInterestContact(professionalId, tenderId), (error: unknown) => error instanceof ForbiddenError);
+
+  await confirmPayment(pending.paymentId);
+  await finalizeProfessionalInterestWithPayment(professionalId, pending.paymentId);
   await assert.rejects(() => getProfessionalInterestContact(professionalId, tenderId), (error: unknown) => error instanceof ForbiddenError);
 
   await prisma.tender.update({ where: { id: tenderId }, data: { closingDate: new Date(Date.now() - 1_000) } });
   const contact = await getProfessionalInterestContact(professionalId, tenderId);
   assert.equal(contact.email, owner.email);
-  assert.ok(await prisma.professionalInterest.findFirst({ where: { tenderId, retailerId: professionalId, releasedAt: { not: null } } }));
+  assert.ok(await prisma.professionalInterest.findFirst({ where: { tenderId, retailerId: professionalId, releasedAt: { not: null }, payment: { status: 'CONFIRMED' } } }));
 });

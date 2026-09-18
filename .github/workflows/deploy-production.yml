@@ -18,6 +18,10 @@ on:
         description: 'Must be exactly: DEPLOY APPROVED COMMIT TO PRODUCTION'
         type: string
         required: true
+      provider_controls_attestation:
+        description: 'Must be exactly: PRODUCTION PROVIDER CONTROLS VERIFIED'
+        type: string
+        required: true
 
 concurrency:
   group: deploy-production
@@ -58,7 +62,8 @@ jobs:
             --target production \
             --sha "${{ github.event.inputs.commit_sha }}" \
             --statement "${{ github.event.inputs.production_approval_statement }}" \
-            --staging-report "${{ github.event.inputs.staging_report }}"
+            --staging-report "${{ github.event.inputs.staging_report }}" \
+            --provider-controls-attestation "${{ github.event.inputs.provider_controls_attestation }}"
 
       - name: Verify required checks passed on the commit
         env:
@@ -245,7 +250,8 @@ jobs:
           node scripts/health-check/verify-deployment.mjs \
             --base-url "$PRODUCTION_BASE_URL" \
             --target production \
-            --sha "${{ github.event.inputs.commit_sha }}"
+            --sha "${{ github.event.inputs.commit_sha }}" \
+            --provider-controls-attestation "${{ github.event.inputs.provider_controls_attestation }}"
 
       - name: Upload the deployment record
         if: always()
@@ -313,6 +319,12 @@ jobs:
           curl --fail --silent --show-error --retry 2 --retry-all-errors \
             -X POST "${RENDER_PRODUCTION_DEPLOY_HOOK}&ref=${{ needs.verify-authorisation.outputs.previous_sha }}"
 
+      - name: Label rollback as an owner-operated redeploy
+        run: |
+          {
+            echo "Rollback is not a report-only step. This job rebuilds the previous approved commit and calls the Render production deploy hook, then re-runs verification."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Confirm the rollback restored service
         env:
           PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
@@ -320,7 +332,8 @@ jobs:
           node scripts/health-check/verify-deployment.mjs \
             --base-url "$PRODUCTION_BASE_URL" \
             --target production \
-            --sha "${{ needs.verify-authorisation.outputs.previous_sha }}"
+            --sha "${{ needs.verify-authorisation.outputs.previous_sha }}" \
+            --provider-controls-attestation "${{ github.event.inputs.provider_controls_attestation }}"
 
   report:
     name: Record and email the production result

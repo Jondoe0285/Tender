@@ -268,6 +268,7 @@ Actions -> **Approved Deploy to Staging** -> Run workflow.
 | --- | --- |
 | `commit_sha` | Exact 40-character commit SHA on `main` |
 | `staging_approval_statement` | `DEPLOY APPROVED COMMIT TO STAGING` |
+| `high_risk_attestation` | `HIGH RISK STAGING CONTROLS VERIFIED` |
 
 Verified before anything is deployed: the statement is exact, the SHA is real and present on
 `main`, `main` has not advanced past it, and no confirmed Critical finding is open. It then
@@ -287,6 +288,7 @@ Actions -> **Approved Deploy to Production** -> Run workflow.
 | `commit_sha` | Exact 40-character SHA that passed staging |
 | `staging_report` | Staging record identifier, e.g. `deploy-staging-2026-08-30-09-00-UTC` |
 | `production_approval_statement` | `DEPLOY APPROVED COMMIT TO PRODUCTION` |
+| `provider_controls_attestation` | `PRODUCTION PROVIDER CONTROLS VERIFIED` |
 
 Adds to the staging checks: the staging record must exist, be successful, contain no failing
 check and reference the identical commit; all check runs on the commit must have succeeded; the
@@ -294,15 +296,18 @@ commit must have arrived through a merged pull request; migrations must be backw
 and point-in-time restore retention must be at least seven days. Production secrets are exposed
 only to the `production` environment job.
 
-If post-deployment verification fails, the rollback job redeploys the previous production commit
-and re-verifies. The outcome is always emailed and never concealed.
+If post-deployment verification fails, the rollback job POSTs the production Render deploy hook
+for the previous approved commit and re-verifies with the same provider-controls attestation.
+The outcome is always emailed and never concealed.
 
 ### What verification does and does not prove
 
 The post-deployment checks are read-only. No tender, quote, payment or account is created. Health
 and database connectivity are read from `/api/health`; every portal and business endpoint is
-probed unauthenticated and must refuse. Resend delivery, audit logging and error rates are
-reported as `UNVERIFIED` because they cannot be proven by an external probe.
+probed unauthenticated and must refuse. Resend delivery, audit logging, Sentry, retention,
+payment reversal, and contact-release privacy cannot be proven by an external probe: they PASS
+only when the operator supplies the exact staging or production attestation, otherwise they FAIL.
+`UNVERIFIED` never counts as a successful deployment.
 
 ## Required secrets
 

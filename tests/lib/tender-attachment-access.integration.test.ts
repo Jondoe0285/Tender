@@ -76,18 +76,19 @@ test('only the owning Client or a matched unlocked Retailer can retrieve a tende
   await prisma.unlock.create({ data: { tenderId, retailerId, method: 'PAID' } });
 
   const unlockedTender = await getUnlockedTenderForRetailer(retailerId, tenderId);
-  assert.deepEqual(unlockedTender.attachments, []);
+  assert.equal(unlockedTender.attachments.length, 1);
+  assert.equal(unlockedTender.attachments[0]?.id, attachmentId);
+  assert.equal(unlockedTender.attachments[0]?.fileName, 'site-plan.pdf');
+  assert.equal('content' in unlockedTender.attachments[0]!, false);
 
-  await assert.rejects(
-    () => getTenderAttachmentForDownload(tenderId, attachmentId, { id: retailerId, role: 'USER' }),
-    (error: unknown) => error instanceof ForbiddenError
-  );
+  const retailerAttachment = await getTenderAttachmentForDownload(tenderId, attachmentId, { id: retailerId, role: 'USER' });
+  assert.equal(retailerAttachment.content.toString(), 'test');
   const clientAttachment = await getTenderAttachmentForDownload(tenderId, attachmentId, { id: clientId, role: 'USER' });
   assert.equal(clientAttachment.content.toString(), 'test');
 
   const auditEvents = await prisma.auditLog.findMany({ where: { targetId: attachmentId, action: 'TENDER_ATTACHMENT_DOWNLOADED' } });
-  assert.equal(auditEvents.length, 1);
-  assert.deepEqual(auditEvents.map((event) => event.actorId), [clientId]);
+  assert.equal(auditEvents.length, 2);
+  assert.deepEqual(new Set(auditEvents.map((event) => event.actorId)), new Set([clientId, retailerId]));
 
   await prisma.tenderAttachment.delete({ where: { id: attachmentId } });
   await assert.rejects(

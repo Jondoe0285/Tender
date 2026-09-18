@@ -25,14 +25,14 @@ export function LandingPartners() {
           <h2 id="partner-information" className="mt-2 font-heading text-xl font-bold text-foundation-navy">Affiliated construction support</h2>
           <p className="mt-2 text-sm leading-relaxed text-concrete-grey">Partner information is separate from tender matching, quote ranking, supplier selection, and Contractor decisions.</p>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap lg:justify-end">
+        <div className="grid w-full min-w-0 grid-cols-2 gap-3 sm:flex sm:flex-wrap lg:justify-end">
           {partners.map((partner) => (
             partner.destinationUrl ? (
-              <a key={partner.id} href={partner.destinationUrl} target="_blank" rel="noreferrer" className="flex h-20 min-w-36 items-center justify-center border border-slate-200 bg-white p-3 outline-offset-4 hover:border-steel-blue hover:ring-2 hover:ring-steel-blue/20" aria-label={`Visit ${partner.name}`}>
+              <a key={partner.id} href={partner.destinationUrl} target="_blank" rel="noreferrer" className="flex h-20 w-full min-w-0 items-center justify-center border border-slate-200 bg-white p-3 outline-offset-4 hover:border-steel-blue hover:ring-2 hover:ring-steel-blue/20 sm:w-36" aria-label={`Visit ${partner.name}`}>
                 <Image src={partner.logoPath} alt={partner.name} width={512} height={192} className="max-h-12 w-auto max-w-full object-contain" />
               </a>
             ) : (
-              <div key={partner.id} className="flex h-20 min-w-36 items-center justify-center border border-slate-200 bg-white p-3" aria-label={partner.name}>
+              <div key={partner.id} className="flex h-20 w-full min-w-0 items-center justify-center border border-slate-200 bg-white p-3 sm:w-36">
                 <Image src={partner.logoPath} alt={partner.name} width={512} height={192} className="max-h-12 w-auto max-w-full object-contain" />
               </div>
             )

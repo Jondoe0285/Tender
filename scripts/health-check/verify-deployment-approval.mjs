@@ -18,6 +18,7 @@ import path from 'node:path';
 
 const DEPLOYMENT_DIR = 'docs/health-check/deployments';
 const HIGH_RISK_ATTESTATION = 'HIGH RISK STAGING CONTROLS VERIFIED';
+const PRODUCTION_PROVIDER_ATTESTATION = 'PRODUCTION PROVIDER CONTROLS VERIFIED';
 
 const EXPECTED_STATEMENT = {
   'staging-branch': 'PROMOTE APPROVED COMMIT TO STAGING BRANCH',
@@ -78,6 +79,15 @@ if (target === 'staging') {
     block(`The high-risk staging attestation must be exactly: ${HIGH_RISK_ATTESTATION}`);
   } else {
     pass('High-risk staging controls attestation is present');
+  }
+}
+
+if (target === 'production') {
+  const attestation = (args['provider-controls-attestation'] ?? '').trim();
+  if (attestation !== PRODUCTION_PROVIDER_ATTESTATION) {
+    block(`The production provider-controls attestation must be exactly: ${PRODUCTION_PROVIDER_ATTESTATION}`);
+  } else {
+    pass('Production provider-controls attestation is present');
   }
 }
 

@@ -112,8 +112,18 @@ export function QuoteComparison({
     }
   }
 
+  const sortLabels: Record<SortKey, string> = {
+    priceGbp: 'Price excl. VAT',
+    leadTimeDays: 'Lead time',
+    validityDays: 'Validity',
+    submittedAt: 'Submitted date',
+  };
+
   return (
     <>
+      <p className="sr-only" aria-live="polite">
+        Sorted by {sortLabels[sortKey]}, {sortAscending ? 'ascending' : 'descending'}
+      </p>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-concrete-grey">Compare {quotes.length} formal quote{quotes.length === 1 ? '' : 's'} side by side.</p>
         <p className="text-xs text-concrete-grey">Select a column heading to sort</p>
@@ -206,7 +216,7 @@ function SortableHeader({
       <button
         type="button"
         onClick={() => onSort(sortKey)}
-        aria-label={`Sort by ${label}`}
+        aria-label={`Sort by ${label}${active ? `, currently ${ascending ? 'ascending' : 'descending'}` : ''}`}
         className="rounded px-1 py-1 text-left hover:text-foundation-navy"
       >
         {label} {active ? (ascending ? '↑' : '↓') : '↕'}

@@ -118,7 +118,8 @@ if (productionWorkflow) {
   check(/verify-deployment-approval\.mjs/.test(productionWorkflow), 'deploy-production.yml must verify the approval before deploying.');
   check(/--staging-report/.test(productionWorkflow), 'deploy-production.yml must require a staging record.');
   check(/environment:\s*production/.test(productionWorkflow), 'deploy-production.yml must deploy through the protected production environment.');
-  check(/verify-deployment\.mjs/.test(productionWorkflow), 'deploy-production.yml must verify the deployment afterwards.');
+  check(/PRODUCTION PROVIDER CONTROLS VERIFIED/.test(productionWorkflow), 'deploy-production.yml must require the production provider-controls attestation.');
+  check(/--provider-controls-attestation/.test(productionWorkflow), 'deploy-production.yml must pass the provider-controls attestation to the verifier.');
   check(/rollback/i.test(productionWorkflow), 'deploy-production.yml must define a rollback path.');
   check(!/schedule:/.test(productionWorkflow), 'A deployment workflow must never be scheduled.');
   check(!/\bpush:/.test(productionWorkflow), 'deploy-production.yml must not deploy automatically on push.');

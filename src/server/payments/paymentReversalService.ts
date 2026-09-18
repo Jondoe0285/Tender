@@ -38,6 +38,7 @@ export async function reversePaymentEntitlements(input: ReversalInput): Promise<
       await transaction.unlock.deleteMany({ where: { paymentId: payment.id, method: 'PAID' } });
       await transaction.contactRelease.deleteMany({ where: { authorizingPaymentId: payment.id } });
       await transaction.directContactRequest.updateMany({ where: { paymentId: payment.id, releasedAt: { not: null } }, data: { releasedAt: null } });
+      await transaction.professionalInterest.deleteMany({ where: { paymentId: payment.id } });
       await recordAuditEvent({
         actorId: null,
         action: 'PAYMENT_REVERSED',

@@ -31,18 +31,18 @@ export function SiteFooter() {
         <div className="border-l-0 border-site-white/15 lg:border-l lg:pl-8">
           <p className="text-xs font-semibold uppercase tracking-widest text-safety-amber">Policies</p>
           <div className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 text-xs font-semibold">
-            <Link href="/policies/platform-terms" className="hover:text-sky-blue">Platform terms</Link>
-            <Link href="/policies/contractor-terms" className="hover:text-sky-blue">Contractor terms</Link>
-            <Link href="/policies/provider-terms" className="hover:text-sky-blue">Provider terms</Link>
-            <Link href="/policies/marketplace-disclaimer" className="hover:text-sky-blue">Marketplace disclaimer</Link>
-            <Link href="/policies/privacy" className="hover:text-sky-blue">Privacy</Link>
-            <Link href="/policies/cookies" className="hover:text-sky-blue">Cookies</Link>
-            <Link href="/policies/quote-retention" className="hover:text-sky-blue">Quote retention</Link>
-            <Link href="/policies/payments" className="hover:text-sky-blue">Payments and refunds</Link>
-            <Link href="/policies/contact-release" className="hover:text-sky-blue">Contact release</Link>
-            <Link href="/policies/acceptable-use" className="hover:text-sky-blue">Acceptable use</Link>
-            <Link href="/policies/partners" className="hover:text-sky-blue">Partner links</Link>
-            <Link href="/policies/accessibility" className="hover:text-sky-blue">Accessibility</Link>
+            <Link href="/policies/platform-terms" className="inline-flex min-h-11 items-center hover:text-sky-blue">Platform terms</Link>
+            <Link href="/policies/contractor-terms" className="inline-flex min-h-11 items-center hover:text-sky-blue">Contractor terms</Link>
+            <Link href="/policies/provider-terms" className="inline-flex min-h-11 items-center hover:text-sky-blue">Provider terms</Link>
+            <Link href="/policies/marketplace-disclaimer" className="inline-flex min-h-11 items-center hover:text-sky-blue">Marketplace disclaimer</Link>
+            <Link href="/policies/privacy" className="inline-flex min-h-11 items-center hover:text-sky-blue">Privacy</Link>
+            <Link href="/policies/cookies" className="inline-flex min-h-11 items-center hover:text-sky-blue">Cookies</Link>
+            <Link href="/policies/quote-retention" className="inline-flex min-h-11 items-center hover:text-sky-blue">Quote retention</Link>
+            <Link href="/policies/payments" className="inline-flex min-h-11 items-center hover:text-sky-blue">Payments and refunds</Link>
+            <Link href="/policies/contact-release" className="inline-flex min-h-11 items-center hover:text-sky-blue">Contact release</Link>
+            <Link href="/policies/acceptable-use" className="inline-flex min-h-11 items-center hover:text-sky-blue">Acceptable use</Link>
+            <Link href="/policies/partners" className="inline-flex min-h-11 items-center hover:text-sky-blue">Partner links</Link>
+            <Link href="/policies/accessibility" className="inline-flex min-h-11 items-center hover:text-sky-blue">Accessibility</Link>
           </div>
         </div>
         <div className="border-l-0 border-site-white/15 md:border-l md:pl-8">
@@ -56,7 +56,7 @@ export function SiteFooter() {
                       <Image src={partner.logoPath} alt={partner.name} width={512} height={192} className="h-auto w-full" />
                     </a>
                   ) : (
-                    <div key={partner.id} className="flex min-h-20 items-center bg-white p-3" aria-label={partner.name}>
+                    <div key={partner.id} className="flex min-h-20 min-w-0 items-center bg-white p-3">
                       <Image src={partner.logoPath} alt={partner.name} width={512} height={192} className="h-auto w-full" />
                     </div>
                   )
@@ -70,8 +70,8 @@ export function SiteFooter() {
           <div className="mt-5 border-t border-site-white/15 pt-4">
             <p className="text-xs font-semibold uppercase tracking-widest text-safety-amber">Contact us</p>
             <p className="mt-2 text-xs leading-relaxed text-site-white/70">Support for account access, platform use, payments, and technical issues.</p>
-            {support && <a href={`mailto:${support}`} className="mt-2 inline-block text-xs font-semibold text-site-white underline underline-offset-4 hover:text-sky-blue">Email support</a>}
-            <Link href="/policies/support" className="ml-4 text-xs font-semibold text-site-white underline underline-offset-4 hover:text-sky-blue">Support policy</Link>
+            {support && <a href={`mailto:${support}`} className="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-site-white underline underline-offset-4 hover:text-sky-blue">Email support</a>}
+            <Link href="/policies/support" className="ml-4 inline-flex min-h-11 items-center text-xs font-semibold text-site-white underline underline-offset-4 hover:text-sky-blue">Support policy</Link>
           </div>
         </div>
       </div>

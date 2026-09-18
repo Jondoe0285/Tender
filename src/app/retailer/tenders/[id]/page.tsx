@@ -10,6 +10,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Label, Input, Textarea, FieldGroup } from '@/components/ui/Field';
 import { TenderMessages } from '@/components/quotes/TenderMessages';
 import { extractPostcode } from '@/lib/geography';
+import { PageLoadState } from '@/components/ui/PageLoadState';
 
 type TenderSummary = {
   id: string;
@@ -56,9 +57,12 @@ export default function RetailerTenderDetailPage() {
   const [standardQuoteValidityDays, setStandardQuoteValidityDays] = useState(30);
   const [directContactStatus, setDirectContactStatus] = useState<DirectContactStatus | null>(null);
   const [directContactPaymentId, setDirectContactPaymentId] = useState<string | null>(null);
+  const [professionalInterestFeeGbp, setProfessionalInterestFeeGbp] = useState<number | null>(null);
+  const [professionalInterestPaymentId, setProfessionalInterestPaymentId] = useState<string | null>(null);
+  const [professionalInterestContact, setProfessionalInterestContact] = useState<{ contactName: string; contactPhone: string | null; email: string } | null>(null);
 
   async function load() {
-    const [response, profileResponse, directContactResponse] = await Promise.all([fetch(`/api/tenders/${params.id}`), fetch('/api/retailer/profile'), fetch(`/api/tenders/${params.id}/direct-contact`)]);
+    const [response, profileResponse, directContactResponse, professionalInterestResponse] = await Promise.all([fetch(`/api/tenders/${params.id}`), fetch('/api/retailer/profile'), fetch(`/api/tenders/${params.id}/direct-contact`), fetch(`/api/tenders/${params.id}/professional-interest`)]);
     if (!response.ok) {
       setMessage('Unable to load this tender.');
       return;
@@ -77,6 +81,19 @@ export default function RetailerTenderDetailPage() {
       const status = await directContactResponse.json() as DirectContactStatus;
       setDirectContactStatus(status);
       setDirectContactPaymentId(status.paymentStatus === 'PENDING' ? status.paymentId : null);
+    }
+    if (professionalInterestResponse.ok) {
+      const status = await professionalInterestResponse.json() as {
+        feeGbp?: number;
+        registered?: boolean;
+        paymentId?: string | null;
+        paymentStatus?: string | null;
+        contact?: { contactName: string; contactPhone: string | null; email: string } | null;
+      };
+      if (typeof status.feeGbp === 'number') setProfessionalInterestFeeGbp(status.feeGbp);
+      setInterestRegistered(Boolean(status.registered));
+      setProfessionalInterestPaymentId(status.paymentStatus === 'PENDING' ? status.paymentId ?? null : null);
+      setProfessionalInterestContact(status.contact ?? null);
     }
   }
 
@@ -114,12 +131,41 @@ export default function RetailerTenderDetailPage() {
     setUnlocking(true);
     setMessage(null);
     const response = await fetch(`/api/tenders/${params.id}/professional-interest`, { method: 'POST' });
+    const data = await response.json().catch(() => null) as { status?: string; paymentId?: string; checkoutUrl?: string; error?: string } | null;
     setUnlocking(false);
     if (!response.ok) {
-      setMessage((await response.json().catch(() => null))?.error ?? 'Unable to register your interest.');
+      setMessage(data?.error ?? 'Unable to register your interest.');
       return;
     }
+    if (data?.status === 'REGISTERED') {
+      setInterestRegistered(true);
+      setProfessionalInterestPaymentId(null);
+      return;
+    }
+    if (data?.checkoutUrl) {
+      window.location.href = data.checkoutUrl;
+      return;
+    }
+    if (data?.paymentId) {
+      setProfessionalInterestPaymentId(data.paymentId);
+      setMessage('Payment required. This environment has no Stripe keys configured — use the dev payment simulation below.');
+    }
+  }
+
+  async function handleSimulateProfessionalInterestPayment() {
+    if (!professionalInterestPaymentId) return;
+    setSimulating(true);
+    setMessage(null);
+    const response = await fetch('/api/dev/confirm-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentId: professionalInterestPaymentId }) });
+    const data = await response.json().catch(() => null);
+    setSimulating(false);
+    if (!response.ok) {
+      setMessage(data?.error ?? 'Dev payment simulation failed.');
+      return;
+    }
+    setProfessionalInterestPaymentId(null);
     setInterestRegistered(true);
+    await load();
   }
 
   async function handleDirectContactRequest() {
@@ -224,7 +270,7 @@ export default function RetailerTenderDetailPage() {
   if (!tender) {
     return (
       <AppShell role="retailer" title="Tender">
-        <p className="text-sm text-concrete-grey">{message ?? 'Loading…'}</p>
+        <PageLoadState error={message} onRetry={message ? () => { setMessage(null); void load(); } : undefined} />
       </AppShell>
     );
   }
@@ -272,10 +318,12 @@ export default function RetailerTenderDetailPage() {
               <h2 className="font-heading text-lg font-bold text-foundation-navy">{isProfessionalTender ? 'Professional interest' : 'Commercial fit assessment'}</h2>
               <p className="mt-2 text-sm leading-relaxed text-concrete-grey">
                 {isProfessionalTender
-                  ? 'Register your interest to be considered. No unlock fee or formal quote is required; contact details are released after the tender deadline.'
+                  ? 'Pay the Professional Services fee to register your interest. Client contact details are released after the tender deadline, and only if that fee has been paid.'
                   : 'Unlock to see the full specification, quantity, requirements, and site details needed to prepare a quote. Client contact details remain private until a quote is accepted and the release fee is paid.'}
               </p>
-              {!isProfessionalTender && <p className="mt-3 text-sm font-semibold text-steel-blue">Cost: £{tender.unlockFeeGbp ?? 0} excl. VAT, unless you have a launch credit available.</p>}
+              {isProfessionalTender
+                ? <p className="mt-3 text-sm font-semibold text-steel-blue">Cost: £{professionalInterestFeeGbp ?? tender.unlockFeeGbp ?? 0} excl. VAT.</p>
+                : <p className="mt-3 text-sm font-semibold text-steel-blue">Cost: £{tender.unlockFeeGbp ?? 0} excl. VAT, unless you have a launch credit available.</p>}
               {tender.items.length > 0 && (
                 <div className="mt-4">
                   <h3 className="text-sm font-semibold text-foundation-navy">Items requested</h3>
@@ -292,7 +340,20 @@ export default function RetailerTenderDetailPage() {
               )}
               {message && <p className="mb-4 mt-4 text-sm font-semibold text-attention">{message}</p>}
               {isProfessionalTender ? (
-                interestRegistered ? <p className="mt-4 text-sm font-semibold text-approved">Interest registered. Contact details will be released after the deadline.</p> : <Button onClick={handleRegisterInterest} loading={unlocking} size="lg">Register interest</Button>
+                professionalInterestContact ? (
+                  <div className="mt-4 text-sm text-concrete-grey">
+                    <p className="font-semibold text-approved">Interest paid. Client contact details:</p>
+                    <p className="mt-2 font-semibold text-foundation-navy">{professionalInterestContact.contactName}</p>
+                    <p>{professionalInterestContact.email}</p>
+                    {professionalInterestContact.contactPhone && <p>{professionalInterestContact.contactPhone}</p>}
+                  </div>
+                ) : interestRegistered ? (
+                  <p className="mt-4 text-sm font-semibold text-approved">Interest registered. Contact details will be released after the deadline.</p>
+                ) : professionalInterestPaymentId ? (
+                  <Button className="mt-4" onClick={handleSimulateProfessionalInterestPayment} loading={simulating} size="lg">Pay professional interest fee (dev)</Button>
+                ) : (
+                  <Button onClick={handleRegisterInterest} loading={unlocking} size="lg">{`Register interest — £${professionalInterestFeeGbp ?? tender.unlockFeeGbp ?? 0} excl. VAT`}</Button>
+                )
               ) : pendingPaymentId ? (
                 <Button onClick={handleSimulatePayment} loading={simulating} size="lg">
                   Simulate payment (dev)

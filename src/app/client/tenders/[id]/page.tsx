@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { QuoteComparison } from '@/components/quotes/QuoteComparison';
 import { TenderMessages } from '@/components/quotes/TenderMessages';
 import { REQUIREMENT_OPTIONS } from '@/lib/categories';
+import { PageLoadState } from '@/components/ui/PageLoadState';
 
 type Tender = {
   id: string;
@@ -224,7 +225,7 @@ export default function ClientTenderDetailPage() {
   if (!tender) {
     return (
       <AppShell role="client" title="Tender">
-        <p className="text-sm text-concrete-grey">{loadError ?? 'Loading\u2026'}</p>
+        <PageLoadState error={loadError} onRetry={loadError ? () => { setLoadError(null); void load(); } : undefined} />
       </AppShell>
     );
   }
