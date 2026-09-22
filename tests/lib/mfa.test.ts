@@ -24,6 +24,7 @@ test('MFA enrollment keeps the current session valid until the code is verified'
   assert.match(readFileSync('src/server/auth/auth.ts', 'utf8'), /updateMany\(\{ where: \{ id: user\.id, mfaRecoveryCodesHash: user\.mfaRecoveryCodesHash \}/);
   assert.match(route, /MFA_ENABLED/);
   assert.match(route, /MFA_DISABLED/);
+  assert.match(route, /sessionVersion: \{ increment: 1 \}/);
 });
 
 test('MFA settings load current enabled state before showing setup controls', () => {

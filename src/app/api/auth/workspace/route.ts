@@ -7,6 +7,9 @@ import { workspaceForRole } from '@/lib/navigation';
 // redirects must resolve against the configured public origin instead.
 export async function GET() {
   const user = await getCurrentUser();
+  if (user?.role === 'SUPER_USER' && !user.mfaEnabled) {
+    return NextResponse.redirect(appUrl('/account/security'));
+  }
   const workspace = workspaceForRole(user?.role);
 
   if (!workspace) {

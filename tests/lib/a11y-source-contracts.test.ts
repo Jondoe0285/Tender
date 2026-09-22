@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+
+test('primary journeys keep associated labels, live regions, and 44px footer targets', () => {
+  const opportunities = readFileSync('src/components/retailer/OpportunitiesExplorer.tsx', 'utf8');
+  const comparison = readFileSync('src/components/quotes/QuoteComparison.tsx', 'utf8');
+  const footer = readFileSync('src/components/layout/SiteFooter.tsx', 'utf8');
+  const loadState = readFileSync('src/components/ui/PageLoadState.tsx', 'utf8');
+  const fields = readFileSync('src/components/ui/Field.tsx', 'utf8');
+
+  assert.match(opportunities, /<fieldset/);
+  assert.match(opportunities, /aria-pressed/);
+  assert.match(comparison, /aria-live="polite"/);
+  assert.match(footer, /min-h-11/);
+  assert.match(loadState, /role="status"/);
+  assert.match(fields, /export function Label/);
+});
+
+test('repeatable browser/axe coverage is still required on a real device for first-journey QA', () => {
+  const tracker = readFileSync('docs/Action-Tracker.md', 'utf8');
+  assert.match(tracker, /real-device/);
+});

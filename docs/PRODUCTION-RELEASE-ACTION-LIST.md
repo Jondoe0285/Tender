@@ -26,12 +26,12 @@ This document is the detailed release review behind the summary in [Action-Track
 ### P0-C01: Add executable coverage for payment and privacy-critical workflows
 
 - **Severity:** Critical
-- **Status:** In progress; signed webhook signature rejection, valid completion replay, paid-unlock refund revocation, and duplicate reversal delivery are covered by PostgreSQL-backed regression tests. Contact-release reversal, chargeback, partial-finalisation recovery, and out-of-order delivery coverage remain open.
-- **Evidence:** `src/app/api/webhooks/stripe/route.ts`, `src/server/payments/paymentService.ts`, `src/server/payments/paymentReversalService.ts`, `src/server/domain/unlockService.ts`, `src/server/domain/contactReleaseService.ts`; existing tests do not exercise the real webhook and finalisation paths end to end.
-- **Corrective action:** Add PostgreSQL-backed tests for Stripe signature rejection, duplicate and replayed events, retry after partial finalisation failure, out-of-order success/failure, amount and VAT mismatch, refund/dispute reversal, unlock entitlement, contact-release finalisation, and post-reversal access denial. Add privacy assertions across API responses, emails, exports, rendered output, attachments, logs, and browser state.
-- **Can complete:** Yes, including test fixtures and mocked Stripe test events.
-- **Requires input:** Stripe test-mode webhook delivery and release-owner approval for staging execution.
-- **Acceptance evidence:** The tests fail when signature, amount, idempotency, release, or privacy controls are deliberately broken and pass on the release commit.
+- **Status:** Closed 2026-09-22 for repository coverage. Signed webhook signature rejection, valid completion replay, paid-unlock refund revocation, duplicate reversal, contact-release reversal, chargeback, partial-finalisation recovery, out-of-order delivery, amount/VAT mismatch, Stripe event ledger uniqueness, and privacy assertions are covered by PostgreSQL-backed tests. Live Stripe test-mode evidence remains a Before Production operator step.
+- **Evidence:** `src/app/api/webhooks/stripe/route.ts`, `src/server/payments/stripeEventLedger.ts`, `tests/lib/stripe-event-ledger.integration.test.ts`, `tests/lib/payment-reversal.integration.test.ts`, `tests/lib/payment-reversal-dispute-and-ordering.integration.test.ts`, `tests/lib/pre-release-privacy-invariants.integration.test.ts`.
+- **Corrective action:** Completed in webhook handling, event ledger, and regression tests.
+- **Can complete:** Yes for repository tests.
+- **Requires input:** Stripe test-mode webhook delivery on staging.
+- **Acceptance evidence:** Amount mismatch returns 400 and leaves the payment `PENDING`; duplicate Stripe event IDs insert once; reversal and privacy tests continue to fail if those controls are broken.
 
 ### P0-C02: Make deployment approval fail closed
 
@@ -48,29 +48,32 @@ This document is the detailed release review behind the summary in [Action-Track
 ### P1-H01: Make Stripe event handling durable and out-of-order tolerant
 
 - **Severity:** High
-- **Status:** Open; security review identified a state-machine risk.
-- **Evidence:** `src/app/api/webhooks/stripe/route.ts` and `src/server/payments/paymentReversalService.ts` track a payment's event state but do not provide a complete event ledger and explicit ordering policy for distinct valid events.
-- **Corrective action:** Persist every provider event under a unique event ID, bind events to the expected Stripe payment object, validate currency and charged total, and implement explicit monotonic/idempotent transitions for success, failure, refund, and dispute events.
-- **Can complete:** Yes, with migration and integration tests.
-- **Requires input:** Stripe test-mode replay/refund/dispute evidence.
+- **Status:** Closed 2026-09-22 for repository implementation. `StripeEvent` persists each provider event ID; webhook handling records the ledger row, rejects currency/amount mismatches, and applies monotonic payment transitions.
+- **Evidence:** `prisma/schema.prisma` `StripeEvent`, `prisma/migrations/20260922000000_add_stripe_event_ledger/migration.sql`, `src/server/payments/stripeEventLedger.ts`, `src/app/api/webhooks/stripe/route.ts`, `tests/lib/stripe-event-ledger.integration.test.ts`.
+- **Corrective action:** Completed with migration and integration tests.
+- **Can complete:** Yes.
+- **Requires input:** Stripe test-mode replay/refund/dispute evidence on staging.
+- **Acceptance evidence:** Duplicate event IDs insert once; `CONFIRMED` cannot move to `FAILED`; a charged-total mismatch does not confirm the payment.
 
 ### P1-H02: Revoke existing sessions after password reset
 
 - **Severity:** High
-- **Status:** Implementation complete in this change; regression coverage and staging confirmation remain open.
-- **Evidence:** `src/server/auth/auth.ts`, `src/app/api/auth/reset-password/route.ts`; the eight-hour JWT lifetime does not by itself revoke already issued tokens after a password reset.
-- **Corrective action:** Add a password/session generation value checked on every protected session lookup, or use revocable database sessions. Add tests proving reset invalidates prior sessions while preserving the new login path.
+- **Status:** Closed 2026-09-22 for repository implementation and regression tests. Staging browser confirmation that password reset and MFA changes invalidate prior JWTs remains a Before Production operator step.
+- **Evidence:** `src/server/auth/auth.ts`, `src/app/api/auth/reset-password/route.ts`, `src/app/api/auth/mfa/route.ts`, `tests/lib/session-version-invalidation.integration.test.ts`, `tests/lib/mfa.test.ts`.
+- **Corrective action:** Completed: `sessionVersion` is incremented on password reset and MFA enable/disable, and protected lookups reject a stale JWT.
 - **Can complete:** Yes.
-- **Requires input:** None for implementation; browser/staging confirmation is still required.
+- **Requires input:** Staging confirmation of cookie/JWT invalidation.
+- **Acceptance evidence:** Completing a password reset increments `sessionVersion`; MFA enablement source increments `sessionVersion`.
 
 ### P1-H03: Harden client-IP trust for rate limiting
 
 - **Severity:** High
-- **Status:** Open; implementation relies on forwarding headers and requires deployment verification.
-- **Evidence:** `src/server/http/rateLimit.ts` reads `x-forwarded-for`, `x-real-ip`, or `cf-connecting-ip`; route-level and proxy-spoofing tests are incomplete.
-- **Corrective action:** Use a trusted Render/CDN edge source, configure the proxy to overwrite forwarding headers, and add route tests for login, registration, reset, concurrent requests, `429`, `Retry-After`, and spoofed headers.
+- **Status:** Closed 2026-09-22 for repository implementation. Production uses only `TRUSTED_CLIENT_IP_HEADER` (default `x-real-ip`) and ignores spoofed `X-Forwarded-For`. Route coverage exists for login, register, reset, `429`/`Retry-After`, and spoofed headers.
+- **Evidence:** `src/server/http/rateLimit.ts`, `render.yaml`, `tests/lib/rate-limit-trusted-ip.test.ts`.
+- **Corrective action:** Completed in rate limiter and tests.
 - **Can complete:** Yes for code/tests.
-- **Requires input:** Render/Cloudflare proxy configuration and evidence.
+- **Requires input:** Confirm Render continues to overwrite `x-real-ip` at the edge.
+- **Acceptance evidence:** In production mode, a spoofed `X-Forwarded-For` does not share a rate-limit bucket with the trusted edge IP.
 
 ### P1-H04: Fix unlocked attachment authorization or revise the contract
 
@@ -85,10 +88,12 @@ This document is the detailed release review behind the summary in [Action-Track
 ### P1-H05: Add session, authorization, reversal, retention, and route-level rate-limit tests
 
 - **Severity:** High
-- **Status:** Open; confirmed coverage gap.
-- **Corrective action:** Cover suspension and role changes before JWT expiry, logout/expiry/reset, own-tender denial, IDOR attempts, wrong payment/tender/quote combinations, concurrent acceptance and release, refund/dispute access removal, retention authentication, and route-level rate limits.
+- **Status:** Closed 2026-09-22 for repository coverage. Suspension/role revalidation, password-reset `sessionVersion`, own-tender denial, quote IDOR, retention bearer auth, and trusted-IP rate limits are tested. Staging multi-user browser validation remains operational.
+- **Evidence:** `tests/lib/session-revalidation.test.ts`, `tests/lib/authorization-idor.integration.test.ts`, `tests/lib/rate-limit-trusted-ip.test.ts`, `src/server/domain/tenderService.ts`.
+- **Corrective action:** Completed in domain checks and regression tests.
 - **Can complete:** Yes.
 - **Requires input:** Staging browser validation for cookies, proxy behavior, and multi-user journeys.
+- **Acceptance evidence:** Own-tender unlock throws `ForbiddenError`; a stranger cannot list quotes; retention rejects a missing or wrong bearer secret.
 
 ### P1-H06: Separate sponsored content from quote comparison
 
@@ -102,20 +107,22 @@ This document is the detailed release review behind the summary in [Action-Track
 ### P1-H07: Complete shared brand contrast verification
 
 - **Severity:** High brand compliance
-- **Status:** Token correction complete in this change; full UI-state contrast verification remains open.
-- **Evidence:** `tailwind.config.ts` and `src/app/globals.css` now use the approved Trade Blue, Sky Blue, Steel Grey, and focus tokens.
-- **Corrective action:** Complete a WCAG contrast audit across buttons, fields, status states, focus states, disabled states, and dark/light surfaces.
+- **Status:** Closed 2026-09-22 for source pairings. Field placeholders use `concrete-grey`; focus rings use Trade Blue on site-white. Measured AA ratios for navy, grey, status, and primary-button pairings are asserted in `tests/lib/brand-contrast.test.ts`. Real-device visual QA remains in P2-M01.
+- **Evidence:** `tailwind.config.ts`, `src/app/globals.css`, `src/components/ui/Field.tsx`, `tests/lib/brand-contrast.test.ts`.
+- **Corrective action:** Completed for documented brand pairings.
 - **Can complete:** Yes for implementation.
 - **Requires input:** Brand owner approval for any new functional/status colours.
+- **Acceptance evidence:** Contrast tests fail if navy/grey/status/button pairings drop below WCAG AA.
 
 ### P1-H10: Resolve the role, pricing, and hosting documentation contradictions
 
 - **Severity:** High product/governance blocker
-- **Status:** Decisions recorded 2026-09-18; documentation realignment remains open. Founder confirmed: unified `USER` (Client/Provider via profiles); Owner-set fees with £10 fixed default; Year 1 sponsorship on comparison; flat launch credits; self-serve matching; unlocked-Provider attachment download; 30-day quote retention. Database/hosting description (Neon vs Render PostgreSQL) was not re-opened and remains Neon Lakebase Postgres per `render.yaml`.
-- **Evidence:** `docs/TradeTender-Business-Plan.md`, `docs/Product-Requirements.md`, `docs/Architecture.md`, `docs/Security-Requirements.md`, and `docs/Action-Tracker.md` still mix some retired Contractor/Provider wording and historical fee figures.
-- **Corrective action:** Update routes, labels, tests, security requirements, architecture, tracker, and release materials to match the recorded decisions.
-- **Can complete:** Documentation and remaining terminology cleanup can proceed.
+- **Status:** Closed 2026-09-22. Architecture, product, and security documents now record unified `USER`, Owner-set £10-default fees, flat launch credits, Year 1 sponsorship on comparison, self-serve matching, unlocked-Provider attachment download, 30-day quote retention, and Neon Lakebase Postgres.
+- **Evidence:** `docs/Architecture.md`, `docs/Product-Requirements.md`, `docs/Security-Requirements.md`, `docs/Action-Tracker.md`.
+- **Corrective action:** Completed documentation realignment. Marketplace Contractor/Provider labels remain in journeys and UI paths by design.
+- **Can complete:** Yes.
 - **Requires input:** None remaining for the listed product decisions.
+- **Acceptance evidence:** Governing docs no longer list Render PostgreSQL as the production database and no longer treat Contractor/Provider as authentication roles.
 
 ## Medium-priority engineering and UX actions
 
@@ -130,7 +137,7 @@ This document is the detailed release review behind the summary in [Action-Track
 ### P2-M03: Complete frontend accessibility and responsive polish
 
 - **Severity:** Medium
-- **Status:** Source polish complete 2026-09-18; real-device confirmation remains open.
+- **Status:** Source polish complete 2026-09-18 and contracted in `tests/lib/a11y-source-contracts.test.ts`; real-device confirmation remains open.
 - **Evidence:** Opportunity filters have labels, fieldset, and `aria-pressed`; quote comparison has `aria-sort` plus a polite live region; tender detail pages use `PageLoadState` with retry; partner/footer tiles no longer force `min-w-36` on the smallest screens; footer policy links use `min-h-11`.
 - **Corrective action:** Remaining work is device/first-journey QA, not further source labels for the listed surfaces.
 - **Can complete:** Device QA requires a physical or hosted browser pass.

@@ -202,7 +202,7 @@ describe('enhanced verification invitation service', () => {
   test('invite API route is Owner/Super User resend only and does not return the signed token', () => {
     const route = readFileSync('src/app/api/retailer/independent-review/invite/route.ts', 'utf8');
 
-    assert.match(route, /requireRole\('SUPER_USER'\)/);
+    assert.match(route, /requireFullSuperUser\(\)/);
     assert.match(route, /createEnhancedVerificationInvitation/);
     assert.doesNotMatch(route, /signedToken/);
     assert.doesNotMatch(route, /registrationUrl/);

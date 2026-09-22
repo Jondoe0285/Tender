@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireRole } from '@/server/auth/session';
+import { requireFullSuperUser } from '@/server/auth/session';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { createRateLimitResponse } from '@/server/http/rateLimit';
 import { recordAuditEvent } from '@/server/audit/auditLog';
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   if (originError) return originError;
 
   try {
-    const admin = await requireRole('SUPER_USER');
+    const admin = await requireFullSuperUser();
 
     if (!isEmailConfigured()) {
       return NextResponse.json(

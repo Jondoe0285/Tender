@@ -23,6 +23,8 @@ services:
         value: "20"
       - key: NODE_ENV
         value: production
+      - key: TRUSTED_CLIENT_IP_HEADER
+        value: x-real-ip
       # Production must point at its own database, never the staging instance.
       - key: DATABASE_URL
         sync: false
@@ -85,6 +87,8 @@ services:
         value: "20"
       - key: NODE_ENV
         value: production
+      - key: TRUSTED_CLIENT_IP_HEADER
+        value: x-real-ip
       # Staging must point at its Neon staging database or branch.
       - key: DATABASE_URL
         sync: false
