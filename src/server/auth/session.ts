@@ -4,15 +4,21 @@ import { authOptions } from '@/server/auth/auth';
 import { prisma } from '@/server/data/prisma';
 import { verifyMobileToken } from '@/server/auth/mobileToken';
 
-export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'USER'; roles: SessionUser['role'][]; isOwner: boolean; isAccountant: boolean };
+export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'USER'; roles: SessionUser['role'][]; isOwner: boolean; isAccountant: boolean; mfaEnabled: boolean };
 
-export type CurrentAccount = { id: string; email: string; role: SessionUser['role']; suspended: boolean; isOwner: boolean; isAccountant: boolean; sessionVersion: number; roleMemberships: { role: SessionUser['role'] }[] };
+export type CurrentAccount = { id: string; email: string; role: SessionUser['role']; suspended: boolean; isOwner: boolean; isAccountant: boolean; sessionVersion: number; mfaEnabled: boolean; roleMemberships: { role: SessionUser['role'] }[] };
+
+/** Super User and Owner accounts must complete TOTP MFA before administrative APIs. */
+export function privilegedMfaSatisfied(account: { role: string; isOwner: boolean; mfaEnabled: boolean }): boolean {
+  if (account.role !== 'SUPER_USER' && !account.isOwner) return true;
+  return account.mfaEnabled;
+}
 
 export function resolveCurrentUser(identity: { requestedRole: SessionUser['role'] }, current: CurrentAccount | null): SessionUser | null {
   if (!current || current.suspended) return null;
   const roles = current.roleMemberships.length > 0 ? current.roleMemberships.map((membership) => membership.role) : [current.role];
   if (!roles.includes(identity.requestedRole)) return null;
-  return { id: current.id, email: current.email, role: identity.requestedRole, roles, isOwner: current.isOwner, isAccountant: current.isAccountant };
+  return { id: current.id, email: current.email, role: identity.requestedRole, roles, isOwner: current.isOwner, isAccountant: current.isAccountant, mfaEnabled: current.mfaEnabled };
 }
 
 /** Resolves the authenticated user from the server-side session only — never trust client-supplied identity. */
@@ -37,6 +43,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       isOwner: true,
       isAccountant: true,
       sessionVersion: true,
+      mfaEnabled: true,
       roleMemberships: { select: { role: true } },
     },
   });
@@ -58,6 +65,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     roles,
     isOwner: current.isOwner,
     isAccountant: current.isAccountant,
+    mfaEnabled: current.mfaEnabled,
   };
 }
 
@@ -67,7 +75,7 @@ export async function getCurrentMobileUser(): Promise<SessionUser | null> {
   if (!bearerToken) return null;
   const identity = await verifyMobileToken(bearerToken);
   if (!identity) return null;
-  const current = await prisma.user.findUnique({ where: { id: identity.userId }, select: { id: true, email: true, role: true, suspended: true, isOwner: true, isAccountant: true, sessionVersion: true, roleMemberships: { select: { role: true } } } });
+  const current = await prisma.user.findUnique({ where: { id: identity.userId }, select: { id: true, email: true, role: true, suspended: true, isOwner: true, isAccountant: true, sessionVersion: true, mfaEnabled: true, roleMemberships: { select: { role: true } } } });
   if (!current || current.sessionVersion !== identity.authVersion) return null;
   return resolveCurrentUser({ requestedRole: identity.role }, current);
 }
@@ -111,6 +119,7 @@ export async function requireRole(...roles: SessionUser['role'][]): Promise<Sess
 export async function requireOwner(): Promise<SessionUser> {
   const user = await requireRole('SUPER_USER');
   if (!user.isOwner) throw new ForbiddenError();
+  if (!privilegedMfaSatisfied(user)) throw new ForbiddenError('MFA_SETUP_REQUIRED');
   return user;
 }
 
@@ -118,5 +127,6 @@ export async function requireOwner(): Promise<SessionUser> {
 export async function requireFullSuperUser(): Promise<SessionUser> {
   const user = await requireRole('SUPER_USER');
   if (user.isAccountant) throw new ForbiddenError();
+  if (!privilegedMfaSatisfied(user)) throw new ForbiddenError('MFA_SETUP_REQUIRED');
   return user;
 }

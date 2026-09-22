@@ -11,6 +11,7 @@ function account(overrides: Partial<CurrentAccount> = {}): CurrentAccount {
     isOwner: false,
     isAccountant: false,
     sessionVersion: 1,
+    mfaEnabled: false,
     roleMemberships: [],
     ...overrides,
   };
@@ -18,7 +19,7 @@ function account(overrides: Partial<CurrentAccount> = {}): CurrentAccount {
 
 test('resolves a session when the requested role matches the account role', () => {
   const result = resolveCurrentUser({ requestedRole: 'USER' }, account());
-  assert.deepEqual(result, { id: 'user-1', email: 'user@example.test', role: 'USER', roles: ['USER'], isOwner: false, isAccountant: false });
+  assert.deepEqual(result, { id: 'user-1', email: 'user@example.test', role: 'USER', roles: ['USER'], isOwner: false, isAccountant: false, mfaEnabled: false });
 });
 
 test('rejects a null account (already revoked or never authenticated)', () => {

@@ -1,4 +1,4 @@
-// Single datasource for every environment: PostgreSQL locally and on Render.
+// Single datasource for every environment: PostgreSQL locally and Neon Lakebase Postgres in staging/production.
 generator client {
   provider = "prisma-client-js"
 }
@@ -819,6 +819,7 @@ model Payment {
   directContactRequest  DirectContactRequest?
   professionalInterest  ProfessionalInterest?
   reversals             PaymentReversal[]
+  stripeEvents          StripeEvent[]
   enhancedVerificationInvitations EnhancedVerificationInvitation[] @relation("PaymentEnhancedVerificationInvitations")
   independentReviewEntitlements RetailerProfile[] @relation("IndependentReviewPurchasedPayment")
 
@@ -835,6 +836,22 @@ model PaymentReversal {
   reversedAt      DateTime            @default(now())
 
   @@index([paymentId, reversedAt])
+}
+
+/** Append-only Stripe webhook ledger. Duplicate provider event IDs are rejected by uniqueness. */
+model StripeEvent {
+  id               String   @id @default(cuid())
+  stripeEventId    String   @unique
+  type             String
+  stripeObjectId   String
+  paymentId        String?
+  payment          Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  currency         String?
+  amountTotalPence Int?
+  receivedAt       DateTime @default(now())
+
+  @@index([paymentId, receivedAt])
+  @@index([stripeObjectId])
 }
 
 model ContactRelease {

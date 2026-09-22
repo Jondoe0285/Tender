@@ -7,12 +7,19 @@ export type RateLimitOptions = {
   windowMs: number;
 };
 
-function getClientKey(headers: Headers): string {
-  const cfConnectingIp = headers.get('cf-connecting-ip');
-  if (cfConnectingIp) return cfConnectingIp.trim();
+export function resolveClientIp(headers: Headers): string {
+  const production = process.env.NODE_ENV === 'production';
+  const trustedHeader = (process.env.TRUSTED_CLIENT_IP_HEADER ?? (production ? 'x-real-ip' : '')).trim().toLowerCase();
 
-  const realIp = headers.get('x-real-ip');
-  if (realIp) return realIp.trim();
+  if (production || trustedHeader) {
+    const headerName = trustedHeader || 'x-real-ip';
+    const trusted = headers.get(headerName);
+    if (trusted) {
+      const ip = trusted.split(',')[0]?.trim();
+      if (ip) return ip;
+    }
+    return 'unknown';
+  }
 
   const forwardedFor = headers.get('x-forwarded-for');
   if (forwardedFor) {
@@ -21,6 +28,10 @@ function getClientKey(headers: Headers): string {
   }
 
   return 'unknown';
+}
+
+function getClientKey(headers: Headers): string {
+  return resolveClientIp(headers);
 }
 
 function getIdentifierHash(headers: Headers, scope: string): string {

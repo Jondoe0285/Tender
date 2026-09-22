@@ -8,6 +8,8 @@ declare module 'next-auth' {
       roles: Array<'SUPER_USER' | 'USER'>;
       isOwner: boolean;
       isAccountant: boolean;
+      mfaEnabled?: boolean;
+      sessionVersion?: number;
     } & DefaultSession['user'];
   }
 
@@ -17,6 +19,8 @@ declare module 'next-auth' {
     roles: Array<'SUPER_USER' | 'USER'>;
     isOwner: boolean;
     isAccountant: boolean;
+    mfaEnabled?: boolean;
+    sessionVersion?: number;
   }
 }
 
@@ -27,5 +31,7 @@ declare module 'next-auth/jwt' {
     roles: string[];
     isOwner: boolean;
     isAccountant: boolean;
+    mfaEnabled?: boolean;
+    sessionVersion?: number;
   }
 }

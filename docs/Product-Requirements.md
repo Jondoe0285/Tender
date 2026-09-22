@@ -26,7 +26,7 @@ These requirements translate the approved business plan into an implementation r
 - TypeScript only for application code.
 - Tailwind CSS for styling.
 - Render for hosting.
-- Render PostgreSQL for persistence.
+- Neon Lakebase Postgres for persistence.
 - Stripe for payments.
 - GitHub Actions for CI/CD.
 
@@ -46,6 +46,14 @@ Only these two roles are approved. New roles or unrelated product areas require 
 - **User:** Maintains one business profile, creates and manages their own tenders, and receives profile-matched tender opportunities. A User can unlock and quote for another User's tender, but never their own tender.
 
 The platform must continue to enforce tender ownership, match eligibility, paid unlock entitlement, and contact-release conditions server-side. The former Contractor and Provider role split is retired.
+
+### 3.2.2 Commercial and hosting canon (2026-09-18)
+
+- Default unlock and Accepted Quote Release fees are Owner-set, with a £10 fixed default. Professional Services interest uses the Owner-set Professional Services fee.
+- Launch credits are a flat per-account counter, not dated or scoped grants.
+- Year 1 keeps sponsored placements on the quote-comparison surface. Matching is self-serve with suspension-only moderation.
+- Unlocked Providers may download tender attachments. Formal quotes are retained for 30 days from submission.
+- Persistence is Neon Lakebase Postgres. Render hosts the web service only.
 
 ### 3.3 Active Commercial Model
 

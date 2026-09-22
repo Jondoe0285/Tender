@@ -1,3 +1,10 @@
+### 2026-09-22 - Payment ledger, privileged MFA, trusted IP, and governing-document canon
+
+- Changed: Stripe webhooks now persist an append-only `StripeEvent` ledger, reject charged-total/currency mismatches, and apply monotonic payment transitions. Super User/Owner administrative APIs and `/super-user` require enrolled TOTP MFA (login and MFA enrollment remain available). Production rate limiting keys only from `TRUSTED_CLIENT_IP_HEADER` (`x-real-ip` on Render) and ignores spoofed `X-Forwarded-For`. A User cannot unlock or quote their own tender. Field placeholders and focus rings meet AA contrast. Architecture, product, and security documents now record unified `USER`, Owner-set £10-default fees, and Neon Lakebase Postgres.
+- Affects: `prisma/schema.prisma`, `prisma/migrations/20260922000000_add_stripe_event_ledger/migration.sql`, `src/server/payments/stripeEventLedger.ts`, `src/app/api/webhooks/stripe/route.ts`, `src/server/auth/session.ts`, `src/server/auth/auth.ts`, `src/proxy.ts`, `src/server/http/rateLimit.ts`, `src/server/domain/tenderService.ts`, `src/components/ui/Field.tsx`, `render.yaml`, `docs/Architecture.md`, `docs/Product-Requirements.md`, `docs/Security-Requirements.md`, `docs/Action-Tracker.md`, `docs/PRODUCTION-RELEASE-ACTION-LIST.md`.
+- Environment: additive `StripeEvent` table; set `TRUSTED_CLIENT_IP_HEADER=x-real-ip` on Render (also in `render.yaml`). No destructive schema change.
+- Validation: focused ledger, IDOR, trusted-IP, privileged-MFA, contrast, and source-a11y tests; `npx prisma generate` and `npx prisma migrate deploy`.
+
 ### 2026-09-18 - Deployment verification fails closed
 
 - Changed: unauthenticated probes with unexpected HTTP status fail; Resend, audit, Sentry, retention, reversal, and contact-release checks PASS only with the exact staging or production attestation; production workflow requires `PRODUCTION PROVIDER CONTROLS VERIFIED` and rollback redeploys the previous SHA through Render then re-verifies.

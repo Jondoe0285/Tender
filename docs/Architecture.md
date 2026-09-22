@@ -5,16 +5,24 @@
 
 ## 1. Architecture Intent
 
-Trade Tender is a UK construction tendering platform for three roles: Super User, Contractor, and Provider. The architecture must support structured tender creation, category and geographic matching, quote submission, comparison, payment-gated detail release, and auditable contact release.
+Trade Tender is a UK construction tendering platform for Super User administration and a unified `USER` marketplace account. Client (tender owner) and Provider (quoting supplier) are profiles of that account, not separate authentication roles. The architecture must support structured tender creation, category and geographic matching, quote submission, comparison, payment-gated detail release, and auditable contact release.
 
-This document describes the target production architecture. The existing repository is a Next.js prototype and must not be treated as evidence that production authentication, persistence, payment integration, or security controls are complete.
+This document describes the target production architecture. The existing repository is a Next.js application and must not be treated as evidence that production authentication, persistence, payment integration, or security controls are complete.
+
+### Product canon (recorded 2026-09-18)
+
+- Authentication roles are `SUPER_USER` and `USER`. Marketplace labels Client/Contractor and Provider remain in paths and copy.
+- Default unlock and Accepted Quote Release fees are Owner-set with a £10 fixed default. Launch credits are a flat per-account counter.
+- Year 1 keeps sponsored placements on quote comparison. Matching is self-serve. Unlocked Providers may download tender attachments.
+- Formal quotes are retained for 30 days from submission unless a legal hold applies.
+- Persistence is Neon Lakebase Postgres. Render hosts the application and does not provide the production database.
 
 ## 2. Approved Technology Boundaries
 
 - **Web application:** Next.js with TypeScript.
 - **UI:** Tailwind CSS and reusable accessible components.
 - **Hosting:** Render.
-- **Database:** Render PostgreSQL.
+- **Database:** Neon Lakebase Postgres.
 - **Payments:** Stripe through server-side integrations and verified webhooks.
 - **CI/CD:** GitHub Actions for validation; Render deploys from the connected git branch.
 - **Transactional email:** Approved email provider, such as the service described in the business plan.
@@ -31,7 +39,7 @@ flowchart LR
     Admin[Super User browser] --> Web
     Web --> Auth[Authentication and authorization]
     Web --> Domain[Server workflows]
-    Domain --> SQL[(Render PostgreSQL)]
+    Domain --> SQL[(Neon Lakebase Postgres)]
     Domain --> Files[Private file storage]
     Domain --> Stripe[Stripe]
     Stripe --> Webhook[Verified webhook endpoint]
@@ -150,7 +158,7 @@ Owns quote submission, validation, linked quote identifiers, quote lifecycle, co
 
 ### Payment
 
-Owns server-controlled fee calculation, Stripe checkout creation, webhook verification, payment reconciliation, refunds, waivers, idempotency, and payment state transitions.
+Owns server-controlled fee calculation, Stripe checkout creation, webhook verification, the append-only Stripe event ledger, payment reconciliation, refunds, waivers, idempotency, and monotonic payment state transitions.
 
 ### Contact Release
 
@@ -211,7 +219,7 @@ A redirect or client success message is never sufficient proof of payment. Webho
 
 ## 11. Data Architecture
 
-Render PostgreSQL should contain normalized, access-controlled records for:
+Neon Lakebase Postgres should contain normalized, access-controlled records for:
 
 - Users, roles, sessions, terms acceptance, and account status.
 - Provider capabilities, categories, service areas, accreditations, and preferences.
@@ -248,7 +256,7 @@ Exports require the same authorization and privacy checks as the dashboard. Cont
 ## 15. Deployment Architecture
 
 - GitHub Actions runs type checking, relevant tests, security checks, and a production build.
-- Render hosts the Next.js application with environment-specific configuration.
+- Render hosts the Next.js application with environment-specific configuration. Persistence is Neon Lakebase Postgres (`DATABASE_URL` / `DATABASE_URL_UNPOOLED`), not a Render-managed database.
 - Database migrations run through `prisma migrate deploy` as an approved, ordered deployment step.
 - Secrets are supplied through GitHub Actions secrets or Render environment variables marked as non-syncing.
 - Development, test, staging, and production settings and data remain separated.

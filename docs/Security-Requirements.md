@@ -5,7 +5,7 @@
 
 ## 1. Purpose and Security Boundary
 
-Trade Tender is a connection and tender-management platform for Contractors and Providers. It is not the supplier, contractor, broker, guarantor, payment intermediary, or responsible party for the final Contractor-Provider transaction.
+Trade Tender is a connection and tender-management platform for Users acting as Clients or Providers. It is not the supplier, contractor, broker, guarantor, payment intermediary, or responsible party for the final transaction.
 
 The platform processes account data, tender and quote data, payment state, project information, attachments, and contact-release events. Security controls must protect these assets throughout their lifecycle and must be enforced at trusted server boundaries.
 
@@ -52,9 +52,10 @@ Requirements:
 - **SEC-014:** Session cookies shall use secure, HttpOnly, and appropriate SameSite settings in production.
 - **SEC-015:** Logout and session expiry shall invalidate access to protected resources.
 - **SEC-016:** Authentication failures shall not reveal whether an account exists or disclose sensitive account information.
-- **SEC-017:** Sensitive authentication events shall be rate-limited and monitored.
+- **SEC-017:** Sensitive authentication events shall be rate-limited and monitored. Production rate limits shall key from a trusted edge client-IP header (`TRUSTED_CLIENT_IP_HEADER`, default `x-real-ip`) and shall ignore client-controlled `X-Forwarded-For`.
 - **SEC-018:** Password reset or account recovery flows shall use single-use, expiring tokens and shall not disclose account existence.
 - **SEC-019:** Authentication and authorization failures shall return safe, non-sensitive error responses.
+- **SEC-019A:** Super User and Owner administrative APIs, and the Super User portal, shall require enrolled TOTP MFA. Login and MFA enrollment remain available so a privileged account can complete setup. Marketplace `USER` accounts are not required to enroll.
 
 ## 5. Input Validation and Output Safety
 
@@ -88,8 +89,8 @@ The platform must preserve anonymity and staged disclosure:
 - **SEC-040:** Stripe secret keys and webhook secrets shall exist only in approved secret-management or environment configuration and never in source control or client bundles.
 - **SEC-041:** Payment amounts and eligible payer or resource shall be calculated from server-controlled configuration and current authorization state.
 - **SEC-042:** Stripe webhook signatures shall be verified against the raw request payload before processing.
-- **SEC-043:** Webhook events shall be idempotent using trusted provider event identifiers and appropriate uniqueness constraints.
-- **SEC-044:** Webhook processing shall tolerate retries, out-of-order delivery, duplicate notifications, and transient failures.
+- **SEC-043:** Webhook events shall be idempotent using trusted provider event identifiers and appropriate uniqueness constraints. Each verified Stripe event shall be persisted in an append-only event ledger bound to the Stripe object and optional payment.
+- **SEC-044:** Webhook processing shall tolerate retries, out-of-order delivery, duplicate notifications, and transient failures. Payment status transitions shall be monotonic: `REVERSED` is terminal, `FAILED` cannot overwrite `CONFIRMED`, and a later valid completion may recover `FAILED` to `CONFIRMED`.
 - **SEC-045:** A client redirect or success page shall never be treated as proof of payment.
 - **SEC-046:** The platform shall reconcile release entitlement from verified Stripe state or an approved waiver, not from browser state.
 - **SEC-047:** Payment, unlock, acceptance, refund, waiver, and contact-release transitions shall be atomic and have defined failure behavior.
@@ -103,7 +104,7 @@ The platform must preserve anonymity and staged disclosure:
 
 ## 8. Database and Data Access
 
-- **SEC-060:** PostgreSQL access shall use parameterised queries and least-privilege credentials.
+- **SEC-060:** Neon Lakebase Postgres access shall use parameterised queries and least-privilege credentials.
 - **SEC-061:** Application roles and database permissions shall be separated where practical.
 - **SEC-062:** Schema changes shall use reviewed, versioned, repeatable migrations.
 - **SEC-063:** Migrations shall preserve authorization, uniqueness, referential integrity, payment consistency, and audit requirements.

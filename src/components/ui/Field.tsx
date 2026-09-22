@@ -6,8 +6,8 @@ import type { InputHTMLAttributes, LabelHTMLAttributes, SelectHTMLAttributes, Te
 
 export const fieldControlClasses =
   'w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-foundation-navy shadow-soft ' +
-  'transition-colors placeholder:text-concrete-grey/70 hover:border-steel-blue/50 ' +
-  'focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/40 ' +
+  'transition-colors placeholder:text-concrete-grey hover:border-steel-blue/50 ' +
+  'focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue focus:ring-offset-2 focus:ring-offset-site-white ' +
   'disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-concrete-grey';
 
 export function Label(props: LabelHTMLAttributes<HTMLLabelElement>) {
@@ -43,7 +43,7 @@ export function PasswordInput({ className = '', ...props }: Omit<InputHTMLAttrib
       <button
         type="button"
         onClick={() => setVisible((current) => !current)}
-        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-concrete-grey hover:text-foundation-navy focus:outline-none focus-visible:ring-2 focus-visible:ring-safety-amber"
+        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-concrete-grey hover:text-foundation-navy focus:outline-none focus-visible:ring-2 focus-visible:ring-trade-blue focus-visible:ring-offset-2 focus-visible:ring-offset-site-white"
         aria-label={visible ? 'Hide password' : 'Show password'}
         aria-pressed={visible}
         title={visible ? 'Hide password' : 'Show password'}

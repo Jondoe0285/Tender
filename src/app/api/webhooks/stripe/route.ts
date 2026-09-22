@@ -13,6 +13,7 @@ import { finalizeIndependentReviewWithPayment } from '@/server/domain/independen
 import { finalizeDirectContactWithPayment } from '@/server/domain/directContactService';
 import { finalizeProfessionalInterestWithPayment } from '@/server/domain/professionalInterestService';
 import { reversePaymentEntitlements } from '@/server/payments/paymentReversalService';
+import { canTransitionPayment, recordStripeEvent } from '@/server/payments/stripeEventLedger';
 
 async function getReceiptUrl(stripe: Stripe, session: Stripe.Checkout.Session): Promise<string | null> {
   if (typeof session.payment_intent !== 'string') return null;
@@ -41,6 +42,11 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
+
+  const metadataPaymentId = event.type.startsWith('checkout.session.')
+    ? (event.data.object as Stripe.Checkout.Session).metadata?.paymentId
+    : undefined;
+  await recordStripeEvent(event, metadataPaymentId);
 
   if (event.type === 'charge.refunded') {
     const charge = event.data.object as Stripe.Charge;
@@ -106,6 +112,10 @@ export async function POST(request: Request) {
       }
       const paymentBeforeUpdate = await prisma.payment.findUnique({ where: { id: paymentId } });
       if (!paymentBeforeUpdate) {
+        return NextResponse.json({ received: true });
+      }
+      const nextStatus = confirmed ? 'CONFIRMED' : 'FAILED';
+      if (!canTransitionPayment(paymentBeforeUpdate.status, nextStatus) && paymentBeforeUpdate.status !== nextStatus) {
         return NextResponse.json({ received: true });
       }
       if (confirmed && session.currency && session.currency !== 'gbp') {

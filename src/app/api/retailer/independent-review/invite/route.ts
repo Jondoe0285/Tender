@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireRole } from '@/server/auth/session';
+import { requireFullSuperUser } from '@/server/auth/session';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { createRateLimitResponse } from '@/server/http/rateLimit';
 import { toErrorResponse } from '@/server/http/errors';
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
 
-    const admin = await requireRole('SUPER_USER');
+    const admin = await requireFullSuperUser();
     const body = await request.json().catch(() => null);
     const parsed = inviteSchema.safeParse(body);
 

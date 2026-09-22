@@ -6,6 +6,11 @@ export default withAuth(
   function proxy(request) {
     const role = request.nextauth.token?.role;
     const path = request.nextUrl.pathname;
+    const mfaEnabled = Boolean(request.nextauth.token?.mfaEnabled);
+
+    if ((role === 'SUPER_USER') && !mfaEnabled && path.startsWith('/super-user')) {
+      return NextResponse.redirect(appUrl('/account/security'));
+    }
 
     // The proxied request host is the internal listener, so redirect against the public origin.
     const isClientPath = path.startsWith('/client') || path.startsWith('/contractor') || path.startsWith('/user');

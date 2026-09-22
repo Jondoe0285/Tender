@@ -129,6 +129,9 @@ function companyEligibility(profile: RetailerTenderEligibilityProfile, company: 
 
 /** Rechecks the mutable retailer capability and coverage controls before paid tender activity. */
 export async function assertRetailerEligibleForTender(retailerId: string, tenderId: string): Promise<void> {
+  if (await userOwnsTender(retailerId, tenderId)) {
+    throw new ForbiddenError('A User cannot unlock or quote for their own tender');
+  }
   const [match, profile, membership] = await Promise.all([
     prisma.tenderMatch.findUnique({
       where: { tenderId_retailerId: { tenderId, retailerId } },
