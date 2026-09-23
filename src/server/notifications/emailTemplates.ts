@@ -23,7 +23,7 @@ function layout({ eyebrow, title, intro, body, action }: EmailLayoutInput): stri
     ? `<p style="margin:28px 0 8px"><a href="${escapeAttribute(action.href)}" style="display:inline-block;background:${TRADE_BLUE};color:${WHITE};padding:13px 20px;text-decoration:none;font-family:Montserrat,Arial,sans-serif;font-weight:700;font-size:14px;letter-spacing:0.02em">${escapeHtml(action.label)}</a></p>`
     : '';
   const logoSrc = escapeAttribute(appUrl('/images/brand/Trade_Tender_Candidate_Horizontal_Logo.png'));
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet"></head><body style="margin:0;background:${LIGHT_GREY};font-family:'Source Sans 3',Arial,sans-serif;color:${NAVY}"><div style="max-width:620px;margin:0 auto;padding:32px 16px"><div style="background:${WHITE};border-top:4px solid ${SAFETY_AMBER};box-shadow:0 1px 3px rgba(13,27,42,.08)"><div style="padding:24px 28px 16px;border-bottom:1px solid ${LIGHT_GREY}"><img src="${logoSrc}" alt="Trade Tender" width="196" height="81" style="display:block;width:196px;height:auto;border:0"><p style="margin:12px 0 0;font-family:Montserrat,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${STEEL_BLUE}">Connect. Compare. Construct.</p></div><div style="padding:28px"><p style="margin:0 0 10px;font-family:Montserrat,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${CONCRETE_GREY}">${escapeHtml(eyebrow)}</p><h1 style="margin:0 0 16px;font-family:Montserrat,Arial,sans-serif;font-size:24px;line-height:1.25;font-weight:700;color:${NAVY}">${escapeHtml(title)}</h1><p style="margin:0;font-size:16px;line-height:1.6;color:${NAVY}">${escapeHtml(intro)}</p>${body}${actionMarkup}</div></div><p style="margin:20px 8px 0;font-size:12px;line-height:1.5;color:${CONCRETE_GREY}">The tender platform for construction supply. Trade Tender is a connection and tender-management platform. It is not the supplier, contractor, broker, guarantor, or responsible party for the final Contractor-Provider transaction.</p><p style="margin:10px 8px 0;font-size:11px;line-height:1.5;color:${CONCRETE_GREY}">This is an operational message from Trade Tender. Please do not reply with confidential project, payment, or contact information.</p></div></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet"></head><body style="margin:0;background:${LIGHT_GREY};font-family:'Source Sans 3',Arial,sans-serif;color:${NAVY}"><div style="max-width:620px;margin:0 auto;padding:32px 16px"><div style="background:${WHITE};border-top:4px solid ${TRADE_BLUE};box-shadow:0 1px 3px rgba(13,27,42,.08)"><div style="padding:24px 28px 16px;border-bottom:1px solid ${LIGHT_GREY}"><img src="${logoSrc}" alt="Trade Tender" width="196" height="81" style="display:block;width:196px;height:auto;border:0"><p style="margin:12px 0 0;font-family:Montserrat,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${STEEL_BLUE}">Structured tenders for UK construction supply</p></div><div style="padding:28px"><p style="margin:0 0 10px;font-family:Montserrat,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${CONCRETE_GREY}">${escapeHtml(eyebrow)}</p><h1 style="margin:0 0 16px;font-family:Montserrat,Arial,sans-serif;font-size:24px;line-height:1.25;font-weight:700;color:${NAVY}">${escapeHtml(title)}</h1><p style="margin:0;font-size:16px;line-height:1.6;color:${NAVY}">${escapeHtml(intro)}</p>${body}${actionMarkup}</div></div><p style="margin:20px 8px 0;font-size:12px;line-height:1.5;color:${CONCRETE_GREY}">Structured tenders for UK construction supply. Trade Tender is a connection and tender-management platform. It is not the supplier, contractor, broker, guarantor, or responsible party for the final Contractor-Provider transaction.</p><p style="margin:10px 8px 0;font-size:11px;line-height:1.5;color:${CONCRETE_GREY}">This is an operational message from Trade Tender. Please do not reply with confidential project, payment, or contact information.</p></div></body></html>`;
 }
 
 function detailRows(rows: Array<[string, string]>): string {
@@ -469,6 +469,24 @@ export function paymentReversedTemplate(input: { paymentType: string; reference:
         ['Status', input.reversalType === 'REFUND' ? 'Refunded' : 'Disputed'],
       ]) + note('Any platform access or contact release authorised by this payment has been removed while the payment reversal is processed.'),
       action: { label: 'Review account activity', href: appUrl(input.accountPath) },
+    }),
+  };
+}
+
+export function demoRequestTemplate(input: { name: string; email: string; organisation: string; role: string; message: string }): EmailTemplate {
+  return {
+    subject: `Demo request from ${input.organisation}`,
+    html: layout({
+      eyebrow: 'Demo request',
+      title: 'A director has asked for a Trade Tender walkthrough',
+      intro: 'A public demo request was submitted from the marketing site. Contact details below are supplied by the requester.',
+      body: detailRows([
+        ['Name', input.name],
+        ['Email', input.email],
+        ['Organisation', input.organisation],
+        ['Role', input.role],
+        ['Message', input.message],
+      ]),
     }),
   };
 }

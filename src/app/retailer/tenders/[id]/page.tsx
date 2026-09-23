@@ -11,6 +11,10 @@ import { Label, Input, Textarea, FieldGroup } from '@/components/ui/Field';
 import { TenderMessages } from '@/components/quotes/TenderMessages';
 import { extractPostcode } from '@/lib/geography';
 import { PageLoadState } from '@/components/ui/PageLoadState';
+import { allowTestPayments } from '@/lib/runtime';
+import { isSpecifiedItemService } from '@/lib/categories';
+import { formatSpecPreview, parseSpecJson } from '@/lib/tender-spec';
+import { pricedQuoteLine } from '@/lib/quote-pricing';
 
 type TenderSummary = {
   id: string;
@@ -24,7 +28,7 @@ type TenderSummary = {
   supplyDate?: string | null;
   status: string;
   unlockFeeGbp?: number;
-  items: { id: string; category: string; subcategory: string; item: string | null; quantity: string }[];
+  items: { id: string; category: string; subcategory: string; item: string | null; quantity: string; specJson?: string }[];
 };
 
 type TenderFull = Omit<TenderSummary, 'items'> & {
@@ -35,7 +39,7 @@ type TenderFull = Omit<TenderSummary, 'items'> & {
   description: string;
   attachments: { id: string; fileName: string; mimeType: string; sizeBytes: number }[];
   packages?: { id: string; reference: string; category: string; subcategory: string; item: string | null; quantity: string; description: string; urgency: string; closingDate: string; status: string }[];
-  items: { id: string; category: string; subcategory: string; item: string | null; quantity: string; description: string }[];
+  items: { id: string; category: string; subcategory: string; item: string | null; quantity: string; description: string; specJson?: string }[];
 };
 
 type DirectContactStatus = { active: boolean; available: boolean; feeGbp: number; released: boolean; paymentId: string | null; checkoutUrl: string | null; paymentStatus: string | null };
@@ -52,6 +56,7 @@ export default function RetailerTenderDetailPage() {
   const [submittingQuote, setSubmittingQuote] = useState(false);
   const [interestRegistered, setInterestRegistered] = useState(false);
   const [linePrices, setLinePrices] = useState<Record<string, string>>({});
+  const [lineRates, setLineRates] = useState<Record<string, string>>({});
   const [unavailableItemIds, setUnavailableItemIds] = useState<string[]>([]);
   const [charges, setCharges] = useState<{ id: string; description: string; priceGbp: string }[]>([]);
   const [standardQuoteValidityDays, setStandardQuoteValidityDays] = useState(30);
@@ -60,6 +65,7 @@ export default function RetailerTenderDetailPage() {
   const [professionalInterestFeeGbp, setProfessionalInterestFeeGbp] = useState<number | null>(null);
   const [professionalInterestPaymentId, setProfessionalInterestPaymentId] = useState<string | null>(null);
   const [professionalInterestContact, setProfessionalInterestContact] = useState<{ contactName: string; contactPhone: string | null; email: string } | null>(null);
+  const [professionalInterestAvailable, setProfessionalInterestAvailable] = useState(false);
 
   async function load() {
     const [response, profileResponse, directContactResponse, professionalInterestResponse] = await Promise.all([fetch(`/api/tenders/${params.id}`), fetch('/api/retailer/profile'), fetch(`/api/tenders/${params.id}/direct-contact`), fetch(`/api/tenders/${params.id}/professional-interest`)]);
@@ -84,12 +90,14 @@ export default function RetailerTenderDetailPage() {
     }
     if (professionalInterestResponse.ok) {
       const status = await professionalInterestResponse.json() as {
+        available?: boolean;
         feeGbp?: number;
         registered?: boolean;
         paymentId?: string | null;
         paymentStatus?: string | null;
         contact?: { contactName: string; contactPhone: string | null; email: string } | null;
       };
+      setProfessionalInterestAvailable(Boolean(status.available));
       if (typeof status.feeGbp === 'number') setProfessionalInterestFeeGbp(status.feeGbp);
       setInterestRegistered(Boolean(status.registered));
       setProfessionalInterestPaymentId(status.paymentStatus === 'PENDING' ? status.paymentId ?? null : null);
@@ -123,7 +131,7 @@ export default function RetailerTenderDetailPage() {
         return;
       }
       setPendingPaymentId(data.paymentId);
-      setMessage('Payment required. This environment has no Stripe keys configured — use the dev payment simulation below.');
+      setMessage(allowTestPayments ? 'Payment required. Complete the test payment below.' : 'Payment required. Continue checkout to complete this payment.');
     }
   }
 
@@ -148,7 +156,7 @@ export default function RetailerTenderDetailPage() {
     }
     if (data?.paymentId) {
       setProfessionalInterestPaymentId(data.paymentId);
-      setMessage('Payment required. This environment has no Stripe keys configured — use the dev payment simulation below.');
+      setMessage(allowTestPayments ? 'Payment required. Complete the test payment below.' : 'Payment required. Continue checkout to complete this payment.');
     }
   }
 
@@ -184,7 +192,7 @@ export default function RetailerTenderDetailPage() {
     }
     if (data?.paymentId) {
       setDirectContactPaymentId(data.paymentId);
-      setMessage('Payment required. This environment has no Stripe keys configured — use the dev payment simulation below.');
+      setMessage(allowTestPayments ? 'Payment required. Complete the test payment below.' : 'Payment required. Continue checkout to complete this payment.');
     }
     await load();
   }
@@ -247,11 +255,17 @@ export default function RetailerTenderDetailPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        lineItems: tenderItems.map((item) => ({
-          tenderItemId: item.id,
-          available: !unavailableItemIds.includes(item.id),
-          priceGbp: unavailableItemIds.includes(item.id) ? undefined : form.get(`line-price-${item.id}`),
-        })),
+        lineItems: tenderItems.map((item) => {
+          const unavailable = unavailableItemIds.includes(item.id);
+          const specified = isSpecifiedItemService(item.category);
+          return {
+            tenderItemId: item.id,
+            available: !unavailable,
+            pricingKind: specified ? 'UNIT' : 'LUMP',
+            unitRateGbp: unavailable || !specified ? undefined : form.get(`line-rate-${item.id}`),
+            priceGbp: unavailable || specified ? undefined : form.get(`line-price-${item.id}`),
+          };
+        }),
         charges: charges.map((charge) => ({ description: charge.description, priceGbp: charge.priceGbp })),
         leadTimeDays: form.get('leadTimeDays'),
         deliveryDateConfirmed: form.get('deliveryDateConfirmed') === 'on',
@@ -276,10 +290,15 @@ export default function RetailerTenderDetailPage() {
   }
 
   const full = unlocked ? (tender as TenderFull) : null;
-  const isProfessionalTender = tender.category === 'Professional Services';
-  const itemsTotal = full?.items.reduce((total, item) => (
-    unavailableItemIds.includes(item.id) ? total : total + Number(linePrices[item.id] || 0)
-  ), 0) ?? 0;
+  const isProfessionalTender = professionalInterestAvailable || interestRegistered || Boolean(professionalInterestPaymentId) || Boolean(professionalInterestContact);
+  const itemsTotal = full?.items.reduce((total, item) => {
+    if (unavailableItemIds.includes(item.id)) return total;
+    if (isSpecifiedItemService(item.category)) {
+      const priced = pricedQuoteLine(item, { available: true, unitRateGbp: Number(lineRates[item.id] || 0), pricingKind: 'UNIT' });
+      return total + (priced.line.priceGbp ?? 0);
+    }
+    return total + Number(linePrices[item.id] || 0);
+  }, 0) ?? 0;
   const chargesTotal = charges.reduce((total, charge) => total + Number(charge.priceGbp || 0), 0);
   const quoteTotal = itemsTotal + chargesTotal;
   const deliveryPostcode = full ? extractPostcode(full.location) : null;
@@ -333,6 +352,9 @@ export default function RetailerTenderDetailPage() {
                         <span className="font-semibold text-foundation-navy">{item.item ?? item.subcategory}</span>
                         {item.item && <span className="ml-1 text-xs text-concrete-grey">({item.subcategory})</span>}
                         <span className="block">Quantity: {item.quantity}</span>
+                        {item.specJson && formatSpecPreview(parseSpecJson(item.specJson)) && (
+                          <span className="mt-1 block text-xs text-foundation-navy">{formatSpecPreview(parseSpecJson(item.specJson))}</span>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -349,15 +371,19 @@ export default function RetailerTenderDetailPage() {
                   </div>
                 ) : interestRegistered ? (
                   <p className="mt-4 text-sm font-semibold text-approved">Interest registered. Contact details will be released after the deadline.</p>
+                ) : professionalInterestPaymentId && allowTestPayments ? (
+                  <Button className="mt-4" onClick={handleSimulateProfessionalInterestPayment} loading={simulating} size="lg">Complete test payment</Button>
                 ) : professionalInterestPaymentId ? (
-                  <Button className="mt-4" onClick={handleSimulateProfessionalInterestPayment} loading={simulating} size="lg">Pay professional interest fee (dev)</Button>
+                  <p className="mt-4 text-sm font-semibold text-concrete-grey">Waiting for payment confirmation.</p>
                 ) : (
                   <Button onClick={handleRegisterInterest} loading={unlocking} size="lg">{`Register interest — £${professionalInterestFeeGbp ?? tender.unlockFeeGbp ?? 0} excl. VAT`}</Button>
                 )
-              ) : pendingPaymentId ? (
+              ) : pendingPaymentId && allowTestPayments ? (
                 <Button onClick={handleSimulatePayment} loading={simulating} size="lg">
-                  Simulate payment (dev)
+                  Complete test payment
                 </Button>
+              ) : pendingPaymentId ? (
+                <p className="mt-4 text-sm font-semibold text-concrete-grey">Waiting for payment confirmation.</p>
               ) : (
                 <Button onClick={handleUnlock} loading={unlocking} size="lg">
                   {`Unlock full details — £${tender.unlockFeeGbp ?? 0} excl. VAT`}
@@ -369,8 +395,10 @@ export default function RetailerTenderDetailPage() {
                   <p className="mt-1 text-sm text-concrete-grey">Pay the approved fee to share your Provider contact details with the purchasing Client for this Contractor or Professional Services tender. This does not release the Client&apos;s contact details to you.</p>
                   {directContactStatus.released ? (
                     <p className="mt-3 text-sm font-semibold text-approved">Your contact details have been shared with the Client.</p>
+                  ) : directContactPaymentId && allowTestPayments ? (
+                    <Button className="mt-3" onClick={handleSimulateDirectContactPayment} loading={simulating}>Complete test payment</Button>
                   ) : directContactPaymentId ? (
-                    <Button className="mt-3" onClick={handleSimulateDirectContactPayment} loading={simulating}>Pay direct contact fee (dev)</Button>
+                    <p className="mt-3 text-sm font-semibold text-concrete-grey">Waiting for payment confirmation.</p>
                   ) : (
                     <Button className="mt-3" variant="secondary" onClick={handleDirectContactRequest} loading={unlocking}>Share contact details · £{directContactStatus.feeGbp} excl. VAT</Button>
                   )}
@@ -392,7 +420,7 @@ export default function RetailerTenderDetailPage() {
                 )}
                 <div className="mt-4 flex flex-col gap-4">
                   {full.items.map((item) => (
-                    <TenderItemDetail key={item.id} subcategory={item.subcategory} item={item.item} quantity={item.quantity} description={item.description} />
+                    <TenderItemDetail key={item.id} subcategory={item.subcategory} item={item.item} quantity={item.quantity} description={item.description} specJson={item.specJson} />
                   ))}
                 </div>
                 {full.requirements && (
@@ -434,23 +462,32 @@ export default function RetailerTenderDetailPage() {
                   <form onSubmit={handleSubmitQuote} className="flex flex-col gap-4">
                     <fieldset className="flex flex-col gap-4">
                       <legend className="text-sm font-semibold text-foundation-navy">Quoted tender lines</legend>
-                      {full.items.map((item, index) => (
+                      {full.items.map((item, index) => {
+                        const specified = isSpecifiedItemService(item.category);
+                        const rateId = specified ? `line-rate-${item.id}` : `line-price-${item.id}`;
+                        const priced = specified && !unavailableItemIds.includes(item.id)
+                          ? pricedQuoteLine(item, { available: true, unitRateGbp: Number(lineRates[item.id] || 0), pricingKind: 'UNIT' })
+                          : null;
+                        return (
                         <FieldGroup key={item.id}>
-                          <Label htmlFor={`line-price-${item.id}`}>{`Item ${index + 1}: ${item.item ?? item.subcategory} (excl. VAT)`}</Label>
-                          <p className="text-xs text-concrete-grey">{item.category} / {item.subcategory} / {item.quantity}</p>
+                          <Label htmlFor={rateId}>{`Item ${index + 1}: ${item.item ?? item.subcategory} (excl. VAT)`}</Label>
+                          <p className="text-xs text-concrete-grey">{item.category} / {item.subcategory} / {item.quantity}{item.specJson ? ` · ${formatSpecPreview(parseSpecJson(item.specJson))}` : ''}</p>
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                             <Input
-                              id={`line-price-${item.id}`}
-                              name={`line-price-${item.id}`}
+                              id={rateId}
+                              name={rateId}
                               type="number"
-                              min="1"
-                              step="1"
+                              min="0.01"
+                              step={specified ? '0.01' : '1'}
                               required={!unavailableItemIds.includes(item.id)}
                               disabled={unavailableItemIds.includes(item.id)}
-                              placeholder="Price in GBP excl. VAT"
-                              value={linePrices[item.id] ?? ''}
-                              onChange={(event) => setLinePrices((current) => ({ ...current, [item.id]: event.target.value }))}
+                              placeholder={specified ? 'Unit rate £ excl. VAT' : 'Lump price £ excl. VAT'}
+                              value={specified ? (lineRates[item.id] ?? '') : (linePrices[item.id] ?? '')}
+                              onChange={(event) => specified
+                                ? setLineRates((current) => ({ ...current, [item.id]: event.target.value }))
+                                : setLinePrices((current) => ({ ...current, [item.id]: event.target.value }))}
                             />
+                            {priced?.line.priceGbp != null && <p className="text-sm font-semibold text-foundation-navy">Line total £{priced.line.priceGbp}</p>}
                             <label className="flex shrink-0 items-center gap-2 text-sm font-semibold text-concrete-grey">
                               <input
                                 type="checkbox"
@@ -464,7 +501,8 @@ export default function RetailerTenderDetailPage() {
                             </label>
                           </div>
                         </FieldGroup>
-                      ))}
+                        );
+                      })}
                     </fieldset>
                     <fieldset className="flex flex-col gap-4 border-t border-slate-200 pt-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -563,12 +601,14 @@ function formatFileSize(sizeBytes: number) {
   return sizeBytes < 1024 ? `${sizeBytes} bytes` : `${(sizeBytes / 1024).toFixed(1)} KB`;
 }
 
-function TenderItemDetail({ subcategory, item, quantity, description }: { subcategory: string; item: string | null; quantity: string; description: string }) {
+function TenderItemDetail({ subcategory, item, quantity, description, specJson }: { subcategory: string; item: string | null; quantity: string; description: string; specJson?: string }) {
+  const spec = formatSpecPreview(parseSpecJson(specJson));
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
       <h3 className="font-heading text-base font-bold text-foundation-navy">{item ?? subcategory}</h3>
       {item && <p className="text-xs text-concrete-grey">{subcategory}</p>}
       <p className="mt-1 text-sm text-concrete-grey">Quantity: {quantity}</p>
+      {spec && <p className="mt-1 text-sm text-foundation-navy">{spec}</p>}
       <p className="mt-3 whitespace-pre-line text-sm text-foundation-navy">{description}</p>
     </div>
   );

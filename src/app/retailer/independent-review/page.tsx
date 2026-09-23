@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { INDEPENDENT_REVIEW_TIER_DESCRIPTIONS, INDEPENDENT_REVIEW_TIER_LABELS, INDEPENDENT_REVIEW_TIERS, type IndependentReviewTier } from '@/lib/independentReviewTiers';
+import { allowTestPayments } from '@/lib/runtime';
 
 type Status = 'NOT_PURCHASED' | 'PURCHASED' | 'APPROVED' | 'DECLINED';
 
@@ -58,7 +59,7 @@ export default function IndependentReviewPage() {
     }
     if (data.devMode) {
       setPendingPayment({ paymentId: data.paymentId, totalAmountGbp: data.totalAmountGbp, feeGbp: data.feeGbp ?? data.amountGbp, vatGbp: data.vatGbp });
-      setMessage(`Payment required. This environment has no Stripe keys configured — use the dev payment simulation below.`);
+      setMessage(allowTestPayments ? 'Payment required. Complete the test payment below.' : 'Payment required. Continue checkout to complete this payment.');
     }
   }
 
@@ -144,10 +145,10 @@ export default function IndependentReviewPage() {
           {state?.status === 'DECLINED' && state.note && <p className="mt-4 text-sm text-concrete-grey">Outcome note: {state.note}</p>}
           {state?.status === 'APPROVED' && <p className="mt-4 text-sm text-approved font-semibold">Your business is Enhanced Verified{state.tier ? ` at ${INDEPENDENT_REVIEW_TIER_LABELS[state.tier]}` : ''}.</p>}
 
-          {pendingPayment && (
+          {pendingPayment && allowTestPayments && (
             <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
               <p className="text-sm text-concrete-grey">Total due: £{pendingPayment.totalAmountGbp} incl. VAT (£{pendingPayment.feeGbp} fee plus £{pendingPayment.vatGbp} VAT)</p>
-              <Button className="mt-3" onClick={handleSimulatePayment} loading={simulating}>Pay (dev simulation)</Button>
+              <Button className="mt-3" onClick={handleSimulatePayment} loading={simulating}>Complete test payment</Button>
             </div>
           )}
         </Card>

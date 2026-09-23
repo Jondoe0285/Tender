@@ -1,6 +1,6 @@
-import { ClerkProvider } from '@clerk/nextjs';
 import { Montserrat, Source_Sans_3 } from 'next/font/google';
 import { AuthSessionProvider } from '@/components/providers/AuthSessionProvider';
+import { SkipLink } from '@/components/layout/SkipLink';
 import './globals.css';
 
 const montserrat = Montserrat({
@@ -18,9 +18,9 @@ const sourceSans = Source_Sans_3({
 });
 
 export const metadata = {
-  title: 'Trade Tender | The tender platform for construction supply',
+  title: 'Trade Tender | Structured tenders for UK construction supply',
   description:
-    'Connect. Compare. Construct. Trade Tender connects construction Contractors with Providers through a clear tender and quotation process.',
+    'Specify a construction requirement, compare formal quotes from matched suppliers, and award on the record. Trade Tender is a UK construction procurement workspace.',
 };
 
 export default function RootLayout({
@@ -30,10 +30,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en-GB" className={`${montserrat.variable} ${sourceSans.variable}`}>
-      <body className="min-h-screen bg-site-white font-sans text-foundation-navy antialiased">
-        <ClerkProvider>
-          <AuthSessionProvider>{children}</AuthSessionProvider>
-        </ClerkProvider>
+      <body className="min-h-screen bg-light-grey font-sans text-foundation-navy antialiased">
+        <SkipLink />
+        <AuthSessionProvider>{children}</AuthSessionProvider>
       </body>
     </html>
   );

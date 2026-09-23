@@ -74,10 +74,20 @@ test('company profile updates refresh active tender opportunity matching', () =>
   assert.ok(profileRoute.includes("coverageScope: parsed.data.operatingLocations.includes('United Kingdom') ? 'UK'"));
 });
 
+test('provider matching coverage is edited on the company profile, not a second retailer form', () => {
+  const retailerProfile = readFileSync(path.join(process.cwd(), 'src/app/retailer/profile/page.tsx'), 'utf8');
+  const retailerRoute = readFileSync(path.join(process.cwd(), 'src/app/api/retailer/profile/route.ts'), 'utf8');
+  const navigation = readFileSync(path.join(process.cwd(), 'src/lib/navigation.ts'), 'utf8');
+  assert.match(retailerProfile, /href="\/user\/profile"/);
+  assert.doesNotMatch(retailerProfile, /htmlFor="coverageScope"/);
+  assert.match(retailerRoute, /operatingLocationsFromCoverage/);
+  assert.match(navigation, /href: '\/user\/profile'/);
+});
+
 test('client company profiles and registration include company type options', () => {
   const schema = readFileSync(path.join(process.cwd(), 'prisma/schema.prisma'), 'utf8');
   const clientProfilePage = readFileSync(path.join(process.cwd(), 'src/app/client/profile/page.tsx'), 'utf8');
-  const registerPage = readFileSync(path.join(process.cwd(), 'src/app/register/page.tsx'), 'utf8');
+  const registerPage = readFileSync(path.join(process.cwd(), 'src/app/register/RegisterForm.tsx'), 'utf8');
 
   assert.match(schema, /model ClientCompany\s*\{[\s\S]*companyType\s+CompanyType/);
   assert.match(clientProfilePage, /companyType/);

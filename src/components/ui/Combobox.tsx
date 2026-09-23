@@ -127,8 +127,8 @@ export function Combobox({ id, name, groups, value, onChange, placeholder, disab
                           aria-selected={value === option || flatIndex === activeIndex}
                           onMouseDown={(event) => event.preventDefault()}
                           onClick={() => selectOption(option)}
-                          className={`block w-full px-4 py-2 text-left text-sm hover:bg-safety-amber/10 ${
-                            flatIndex === activeIndex ? 'bg-safety-amber/10' : ''
+                          className={`block w-full px-4 py-2 text-left text-sm hover:bg-trade-blue/10 ${
+                            flatIndex === activeIndex ? 'bg-trade-blue/10' : ''
                           } ${value === option ? 'font-semibold text-foundation-navy' : 'text-foundation-navy/90'}`}
                         >
                           {option}

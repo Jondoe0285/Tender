@@ -16,7 +16,7 @@ export default async function SubmittedQuotesPage() {
   });
 
   return (
-    <AppShell role="retailer" title="Submitted Quotes">
+    <AppShell role="retailer" title="Submitted quotes">
       <div className="mx-auto max-w-4xl">
         <p className="mb-6 max-w-xl text-sm text-concrete-grey">Every quote you&rsquo;ve submitted, and its current status.</p>
         {quotes.length === 0 ? (

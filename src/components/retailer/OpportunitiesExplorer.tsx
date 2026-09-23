@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Field';
 import { CATEGORY_NAMES } from '@/lib/categories';
+import { catalogServiceNames, type CategoryCatalog } from '@/lib/catalog';
 import { TenderOpportunityCard, type OpportunityCardData } from '@/components/retailer/TenderOpportunityCard';
 
 const URGENCY_OPTIONS = ['standard', 'urgent', 'flexible'] as const;
@@ -32,9 +33,16 @@ export function OpportunitiesExplorer({ opportunities }: { opportunities: Opport
   const [urgencies, setUrgencies] = useState<string[]>([]);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [savedSearchName, setSavedSearchName] = useState('');
+  const [serviceNames, setServiceNames] = useState<string[]>(CATEGORY_NAMES);
 
   useEffect(() => {
     setSavedSearches(loadSavedSearches());
+    fetch('/api/categories')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { catalog?: CategoryCatalog } | null) => {
+        if (data?.catalog) setServiceNames(catalogServiceNames(data.catalog));
+      })
+      .catch(() => undefined);
   }, []);
 
   function toggle(list: string[], setList: (value: string[]) => void, value: string) {
@@ -107,7 +115,7 @@ export function OpportunitiesExplorer({ opportunities }: { opportunities: Opport
         <fieldset className="min-w-0">
           <legend className="mb-2 text-sm font-semibold text-foundation-navy">Filters</legend>
           <div className="flex flex-wrap gap-2">
-          {CATEGORY_NAMES.map((category) => (
+          {serviceNames.map((category) => (
             <button
               key={category}
               type="button"
@@ -116,7 +124,7 @@ export function OpportunitiesExplorer({ opportunities }: { opportunities: Opport
               aria-label={`${categories.includes(category) ? 'Remove' : 'Add'} ${category} filter`}
               className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                 categories.includes(category)
-                  ? 'border-safety-amber bg-safety-amber/10 text-foundation-navy'
+                  ? 'border-trade-blue bg-trade-blue/10 text-foundation-navy'
                   : 'border-slate-300 text-concrete-grey hover:border-steel-blue hover:text-foundation-navy'
               }`}
             >

@@ -15,7 +15,7 @@ export default async function ClientBillingPage() {
   });
 
   return (
-    <AppShell role="client" title="Billing">
+    <AppShell role="client" title="Activity and payments">
       <div className="mx-auto max-w-3xl">
         <p className="mb-6 max-w-xl text-sm text-concrete-grey">
           Accepted Quote Release Fees charged when you accept a Provider&rsquo;s quote.

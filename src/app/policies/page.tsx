@@ -31,7 +31,7 @@ export default function PoliciesPage() {
   return (
     <div className="flex min-h-screen flex-col bg-site-white">
       <SiteHeader />
-      <main className="flex-1 px-6 py-14 sm:px-10">
+      <main id="main-content" className="flex-1 px-6 py-14 sm:px-10">
         <section className="mx-auto max-w-6xl">
           <div className="max-w-3xl">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Trade Tender policies</p>

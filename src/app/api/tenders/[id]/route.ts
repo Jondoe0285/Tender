@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser, requireRole } from '@/server/auth/session';
+import { getCurrentUser, requireRole, ForbiddenError, UnauthorizedError } from '@/server/auth/session';
 import { toErrorResponse } from '@/server/http/errors';
 import { getUnlockedTenderForRetailer } from '@/server/domain/unlockService';
-import { getUserTenderServiceCategories, markMatchViewed, userOwnsTender } from '@/server/domain/tenderService';
-import { ForbiddenError, UnauthorizedError } from '@/server/auth/session';
+import { formatRetailerSummaryLocation, getUserTenderServiceProvisions, markMatchViewed, tenderProvisionPackageWhere, updateTender, userOwnsTender } from '@/server/domain/tenderService';
 import { prisma } from '@/server/data/prisma';
-import { formatRetailerSummaryLocation } from '@/server/domain/tenderService';
 import { getTenderUnlockFeeGbp } from '@/server/domain/platformSettings';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { updateTenderSchema } from '@/lib/schemas/tender';
-import { updateTender } from '@/server/domain/tenderService';
+import { assertAnyBuyerDuty } from '@/server/domain/workspacePermissions';
 
 export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -46,14 +44,15 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
     }
 
     // Pre-unlock: approved non-sensitive summary only (SEC-030/031).
-    const serviceCategories = await getUserTenderServiceCategories(user.id);
+    const provisions = await getUserTenderServiceProvisions(user.id);
+    const provisionWhere = tenderProvisionPackageWhere(provisions);
     const [tender, unlockFeeGbp] = await Promise.all([
       prisma.tender.findUniqueOrThrow({
         where: { id: params.id },
         select: {
           id: true, reference: true, category: true, location: true, urgency: true, closingDate: true, status: true,
-          items: { where: { category: { in: serviceCategories } }, orderBy: { createdAt: 'asc' }, select: { id: true, category: true, subcategory: true, item: true, quantity: true } },
-          packages: { where: { category: { in: serviceCategories } }, orderBy: { createdAt: 'asc' }, select: { id: true, reference: true, category: true, subcategory: true, item: true, quantity: true } },
+          items: { where: provisionWhere, orderBy: { createdAt: 'asc' }, select: { id: true, category: true, subcategory: true, item: true, quantity: true, specJson: true } },
+          packages: { where: provisionWhere, orderBy: { createdAt: 'asc' }, select: { id: true, reference: true, category: true, subcategory: true, item: true, quantity: true, specJson: true } },
         },
       }),
         getTenderUnlockFeeGbp(params.id),
@@ -71,6 +70,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
     const user = await requireRole('USER');
+    await assertAnyBuyerDuty(user.id, ['RAISER', 'ESTIMATOR']);
     const parsed = updateTenderSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid tender details', issues: parsed.error.flatten() }, { status: 400 });

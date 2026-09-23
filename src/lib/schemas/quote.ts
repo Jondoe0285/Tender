@@ -1,10 +1,13 @@
 import { z } from 'zod';
+import { QUOTE_PRICING_KINDS } from '@/lib/quote-pricing';
 
-const quoteLineSchema = z.discriminatedUnion('available', [
+const quoteLineSchema = z.union([
   z.object({
     tenderItemId: z.string().trim().min(1),
     available: z.literal(true),
-    priceGbp: z.coerce.number().int().positive().max(10_000_000),
+    pricingKind: z.enum(QUOTE_PRICING_KINDS).optional(),
+    unitRateGbp: z.coerce.number().positive().max(1_000_000).optional(),
+    priceGbp: z.coerce.number().int().positive().max(10_000_000).optional(),
   }),
   z.object({
     tenderItemId: z.string().trim().min(1),
@@ -27,6 +30,12 @@ export const submitQuoteSchema = z.object({
 }).refine((value) => value.lineItems.some((line) => line.available), {
   message: 'Quote at least one tender item',
   path: ['lineItems'],
+}).superRefine((value, context) => {
+  value.lineItems.forEach((line, index) => {
+    if (line.available && line.unitRateGbp == null && line.priceGbp == null) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter a unit rate or a lump price', path: ['lineItems', index, 'unitRateGbp'] });
+    }
+  });
 });
 
 export type SubmitQuoteInput = z.infer<typeof submitQuoteSchema>;

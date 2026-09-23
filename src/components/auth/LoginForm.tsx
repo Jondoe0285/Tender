@@ -71,19 +71,17 @@ export function LoginForm() {
   return (
     <section className="mx-auto max-w-5xl py-10 pb-20 sm:py-16">
       <div className="grid overflow-hidden rounded-card border border-slate-200 bg-white shadow-soft-lg lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="flex min-h-[520px] flex-col justify-between bg-foundation-navy p-8 text-white sm:p-12">
+        <div className="flex min-h-[480px] flex-col justify-between bg-foundation-navy p-8 text-white sm:p-12">
           <div>
-            <div className="inline-block bg-site-white p-3"><TradeTenderLogo /></div>
-            <p className="mt-10 text-xs font-semibold uppercase tracking-[0.2em] text-sky-blue">Secure workspace access</p>
-            <h1 className="mt-4 max-w-sm font-heading text-3xl font-bold leading-tight sm:text-4xl">Connect. Compare. Construct.</h1>
-            <p className="mt-5 max-w-sm text-base leading-relaxed text-white/75">Sign in to manage tenders, compare formal quotes, and keep your construction procurement moving.</p>
+            <TradeTenderLogo variant="dark" />
+            <p className="mt-10 text-xs font-semibold uppercase tracking-[0.2em] text-sky-blue">Workspace access</p>
+            <p className="mt-4 max-w-sm font-heading text-3xl font-bold leading-tight sm:text-4xl">Specify. Compare. Award.</p>
+            <p className="mt-5 max-w-sm text-base leading-relaxed text-white/75">Sign in to raise tenders, quote against a specification, and keep awards on the record.</p>
           </div>
-          <p className="text-sm font-semibold text-safety-amber">Trade Tender</p>
         </div>
 
         <div className="bg-light-grey p-6 sm:p-10">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-steel-blue">Sign in</p>
-          <h2 className="font-heading text-3xl font-bold tracking-tight text-foundation-navy">Sign in to your workspace</h2>
+          <h1 className="font-heading text-3xl font-bold tracking-tight text-foundation-navy">Sign in</h1>
           {searchParams.get('verification') === 'pending' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Check your email and use the verification link to activate your account.</p>}
           {searchParams.get('verification') === 'verified' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your email address is verified. You can now sign in.</p>}
           {searchParams.get('verification') === 'invalid' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">This verification link is invalid or has expired. Register again with the same details to request a new link.</p>}

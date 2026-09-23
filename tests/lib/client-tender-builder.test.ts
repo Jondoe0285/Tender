@@ -45,6 +45,10 @@ test('Contractor tender builder sequences selected service package requirements'
   assert.ok(source.includes('id="description"'));
   assert.ok(source.includes('Detailed provision (optional)'));
   assert.ok(source.includes("provision: 'Material category'"));
+  assert.ok(source.includes("if (isSpecifiedItemService(form.category) && !form.item) next.item = 'Select a specified item.';"));
+  assert.ok(source.includes('GOODS_QUANTITY_UNITS'));
+  assert.ok(source.includes('EWC code'));
+  assert.ok(source.includes('WASTE_QUANTITY_UNITS'));
   assert.ok(!source.includes("if (!form.item) next.item = 'Select an item.';"));
   assert.ok(source.includes('id={`item-${index}-quantity`}'));
   assert.ok(source.includes('id={`item-${index}-description`}'));
@@ -55,7 +59,10 @@ test('Contractor tender builder sequences selected service package requirements'
   assert.ok(source.includes('const [packagesNeedReset, setPackagesNeedReset] = useState(true);'));
   assert.ok(source.includes('if (step === 1 && packagesNeedReset)'));
   assert.ok(source.includes('ReviewSection title="Additional Requirements" onEdit={() => setStep(3)}'));
-  assert.ok(source.includes('ReviewSection title="Attachments" onEdit={() => setStep(4)}'));
+  assert.ok(source.includes('ReviewSection title="Supplier contact"'));
+  assert.ok(source.includes('allowDirectContact'));
+  assert.ok(source.includes('allowProfessionalInterest'));
+  assert.ok(source.includes('Quotes stay the default path'));
   assert.ok(source.includes('function ReviewSection({ title, onEdit, children }'));
   assert.ok(source.includes('const [furthestStep, setFurthestStep] = useState(1);'));
   assert.ok(source.includes('onStepClick={fastTravel}'));

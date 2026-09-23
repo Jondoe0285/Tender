@@ -35,7 +35,7 @@ export function SponsoredPlacementCard({ enabled, active, feeGbp }: SponsoredPla
       window.location.href = data.checkoutUrl;
       return;
     }
-    if (data?.devMode && data.paymentId) {
+    if (data?.devMode && data.paymentId && process.env.NODE_ENV !== 'production') {
       const confirmResponse = await fetch('/api/dev/confirm-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -55,7 +55,7 @@ export function SponsoredPlacementCard({ enabled, active, feeGbp }: SponsoredPla
   }
 
   return (
-    <Card className="mb-6 border-l-4 border-l-safety-amber">
+    <Card className="mb-6 border-l-4 border-l-steel-blue">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">Sponsored placement</p>

@@ -4,20 +4,24 @@ import { randomUUID } from 'node:crypto';
 import { createPayment } from '@/server/payments/paymentService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { ForbiddenError, ValidationError } from '@/server/auth/session';
-import { getClientReleaseFeeGbp } from '@/server/domain/platformSettings';
+import { assertBuyerDuty, assertSecondApprover } from '@/server/domain/workspacePermissions';
+import { getClientReleaseFeeGbp, getPlatformSetting } from '@/server/domain/platformSettings';
+import { PERCENTAGE_RELEASE_SECOND_APPROVER_GBP } from '@/lib/launch-credits';
 import { isQuoteExpired } from '@/server/domain/quoteService';
 import { contactReleaseTemplate, quoteAcceptedTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { getPurchasedRetentionDeadline } from '@/server/domain/retentionService';
 import { consumePaymentWaiver } from '@/server/domain/paymentWaiverService';
 import { syncVerificationExpiry } from '@/server/domain/verificationDocumentService';
+import { userOwnsTender } from '@/server/domain/tenderService';
 
 type AcceptOutcome = { status: 'PAYMENT_REQUIRED' | 'RELEASED_WITH_CREDIT'; paymentId: string; checkoutUrl: string | null; devMode: boolean; feeGbp: number; vatGbp: number; totalAmountGbp: number; creditsLeft?: number };
 
 /** Accepting a quote enters a pending release-fee state — no contact data is exposed yet (SEC-035). */
-export async function acceptQuote(clientId: string, quoteId: string, mobileReturnUrl?: string, declarationAccepted = false): Promise<AcceptOutcome> {
+export async function acceptQuote(clientId: string, quoteId: string, mobileReturnUrl?: string, declarationAccepted = false, secondApproverEmail?: string): Promise<AcceptOutcome> {
   const quote = await prisma.quote.findUnique({ where: { id: quoteId }, include: { tender: true, retailer: { select: { email: true } }, releasePayment: true } });
-  if (!quote || quote.tender.clientId !== clientId) throw new ForbiddenError('Quote not found for this Client');
+  if (!quote || !await userOwnsTender(clientId, quote.tenderId)) throw new ForbiddenError('Quote not found for this Client');
+  await assertBuyerDuty(clientId, 'APPROVER');
   if (quote.status === 'SUBMITTED' || quote.status === 'ACCEPTED') {
     await syncVerificationExpiry(quote.retailerId);
     const retailerProfile = await prisma.retailerProfile.findUnique({ where: { userId: quote.retailerId }, select: { verificationStatus: true, independentReviewStatus: true } });
@@ -62,6 +66,17 @@ export async function acceptQuote(clientId: string, quoteId: string, mobileRetur
   }
 
   const releaseFeeGbp = await getClientReleaseFeeGbp(quote.priceGbp);
+  const releaseFeeMode = await getPlatformSetting('CLIENT_RELEASE_FEE_MODE');
+  if (releaseFeeMode === 'PERCENTAGE' && releaseFeeGbp >= PERCENTAGE_RELEASE_SECOND_APPROVER_GBP) {
+    const secondApproverId = await assertSecondApprover(clientId, secondApproverEmail);
+    await recordAuditEvent({
+      actorId: clientId,
+      action: 'QUOTE_SECOND_APPROVER_CONFIRMED',
+      targetType: 'Quote',
+      targetId: quoteId,
+      metadata: { tenderId: quote.tenderId, secondApproverId, feeGbp: releaseFeeGbp },
+    });
+  }
   const waiverUse = await consumePaymentWaiver({ userId: clientId, feeType: 'CLIENT_RELEASE', quoteId });
   if (waiverUse) {
     await finalizeContactRelease(clientId, quoteId, waiverUse.payment.id);

@@ -10,6 +10,7 @@ import { QuoteComparison } from '@/components/quotes/QuoteComparison';
 import { TenderMessages } from '@/components/quotes/TenderMessages';
 import { REQUIREMENT_OPTIONS } from '@/lib/categories';
 import { PageLoadState } from '@/components/ui/PageLoadState';
+import { allowTestPayments } from '@/lib/runtime';
 
 type Tender = {
   id: string;
@@ -127,13 +128,13 @@ export default function ClientTenderDetailPage() {
     }
   }
 
-  async function handleAccept(quoteId: string, declarationAccepted = false) {
+  async function handleAccept(quoteId: string, declarationAccepted = false, secondApproverEmail?: string) {
     setBusyQuoteId(quoteId);
     setMessage(null);
     const response = await fetch(`/api/quotes/${quoteId}/accept`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ declarationAccepted }),
+      body: JSON.stringify({ declarationAccepted, secondApproverEmail }),
     });
     const data = await response.json();
     setBusyQuoteId(null);
@@ -149,7 +150,7 @@ export default function ClientTenderDetailPage() {
     if (data.devMode) {
       setPendingPayment({ quoteId, paymentId: data.paymentId, checkoutUrl: data.checkoutUrl });
       setMessage(
-        `Quote accepted. Pay £${data.totalAmountGbp} including VAT (£${data.feeGbp} fee plus £${data.vatGbp} VAT) — this environment has no Stripe keys configured, use the dev payment simulation below.`
+        `Quote accepted. Pay £${data.totalAmountGbp} including VAT (£${data.feeGbp} fee plus £${data.vatGbp} VAT)${allowTestPayments ? '. Complete the test payment below.' : '.'}`
       );
       await load();
     }
@@ -234,7 +235,7 @@ export default function ClientTenderDetailPage() {
     <AppShell role="client" title={tender.reference}>
       <section className="mx-auto max-w-2xl">
         <Link href="/client/tenders" className="mb-6 inline-block text-sm font-semibold text-concrete-grey hover:text-foundation-navy">
-          &larr; Back to My Tenders
+          &larr; Back to my tenders
         </Link>
         <h2 className="font-heading text-2xl font-bold tracking-tight text-foundation-navy">{tender.subcategory}</h2>
         <p className="mt-2 max-w-xl text-sm text-concrete-grey">
@@ -246,7 +247,7 @@ export default function ClientTenderDetailPage() {
             {editing ? 'Cancel edit' : 'Edit tender'}
           </Button>
           {(tender.status === 'CLOSED' || new Date(tender.closingDate).getTime() <= Date.now()) && (
-            <Link href={`/user/tenders/new?copyFrom=${encodeURIComponent(tender.id)}`} className="inline-flex h-11 items-center justify-center rounded-lg bg-safety-amber px-5 text-sm font-semibold text-foundation-navy shadow-soft hover:bg-sky-blue hover:shadow-soft-md">
+            <Link href={`/user/tenders/new?copyFrom=${encodeURIComponent(tender.id)}`} className="inline-flex h-11 items-center justify-center rounded-lg bg-trade-blue px-5 text-sm font-semibold text-site-white shadow-soft hover:bg-foundation-navy hover:shadow-soft-md">
               Re-tender
             </Link>
           )}

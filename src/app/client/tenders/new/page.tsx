@@ -9,7 +9,8 @@ import { Card } from '@/components/ui/Card';
 import { Combobox } from '@/components/ui/Combobox';
 import { Stepper, type WizardStep } from '@/components/ui/Stepper';
 import { Label, Input, Select, Textarea, FieldGroup } from '@/components/ui/Field';
-import { REQUIREMENT_OPTIONS, SERVICE_CATALOG, type ServiceName } from '@/lib/categories';
+import { REQUIREMENT_OPTIONS, SERVICE_CATALOG, isSpecifiedItemService, type ServiceName } from '@/lib/categories';
+import { COMMON_EWC_CODES, MATERIAL_PACKS, WASTE_CONTAINERS, specIssues, type TenderLineSpec } from '@/lib/tender-spec';
 import { buildSafeAttachmentName } from '@/lib/attachment-utils';
 import { getModerationMessage, stripDetectedContactDetails } from '@/lib/moderation';
 
@@ -28,9 +29,17 @@ function getServiceSenseCheck(service: string | undefined, quantityValue: string
     return { message: 'Professional services should be described by duration.' };
   }
 
-  if (normalisedService.includes('material') || normalisedService.includes('waste')) {
+  if (normalisedService.includes('waste')) {
+    if (!hasValue) return { quantityError: 'Enter the waste quantity in tonnes.' };
+    if (!/^\d+(?:\.\d+)?$/.test(quantityValue.trim().replace(/,/g, ''))) return { quantityError: 'Quantity must be a number.' };
+    if (quantityUnit !== 'tonnes') return { unitError: 'Waste must be specified in tonnes. Choose skip, grab, or roll-on as the container separately.' };
+    return { message: 'Waste lines need an EWC code, hazardous flag, container, and tonnes.' };
+  }
+
+  if (normalisedService.includes('material')) {
     if (!hasValue) return { quantityError: 'Enter a quantity for this material or waste requirement.' };
-    if (!hasUnit) return { unitError: 'Select a unit for this material or waste requirement.' };
+    if (!/^\d+(?:\.\d+)?$/.test(quantityValue.trim().replace(/,/g, ''))) return { quantityError: 'Quantity must be a number.' };
+    if (!hasUnit || quantityUnit === 'not applicable') return { unitError: 'Select a unit for this material or waste requirement.' };
     return { message: 'Materials and waste services should be specified by quantity and unit.' };
   }
 
@@ -51,7 +60,9 @@ function getServiceSenseCheck(service: string | undefined, quantityValue: string
   return {};
 }
 
-const QUANTITY_UNITS = ['not applicable', 'units', 'tonnes', 'bags', 'pallets', 'm³', 'skips', 'days', 'weeks', 'months'];
+const GOODS_QUANTITY_UNITS = ['units', 'tonnes', 'bags', 'pallets', 'm³'];
+const WASTE_QUANTITY_UNITS = ['tonnes'];
+const QUANTITY_UNITS = ['not applicable', ...GOODS_QUANTITY_UNITS, 'days', 'weeks', 'months'];
 const DURATION_UNITS = ['days', 'weeks', 'months'];
 const SERVICE_MINIMUM_REQUIREMENTS = ['CSCS carded operatives required', 'SSIP membership required', 'CPCS or NPORS plant competence required', 'Trade-specific qualifications required', 'Public liability insurance evidence required', 'Employers liability insurance evidence required', 'RAMS required before works start', 'Permit to work required', 'DBS clearance required', 'Asbestos awareness required', 'Working at height competence required', 'Confined space competence required'];
 const PLANT_HIRE_SUPPORT_OPTIONS = ['Driver/operator required', 'Lift plan required', 'Delivery and collection required', 'Fuel included', 'Lifting accessories required', 'Banksman or slinger/signaller required', 'Ground protection mats required', 'Operator CPCS or NPORS evidence required', 'Thorough examination certificate required', 'Out-of-hours delivery required', 'Road permits or traffic management required', 'Machine insurance evidence required'];
@@ -89,10 +100,13 @@ type FormState = {
   primaryPlantRequirements: string[];
   primaryDriverRequired: boolean;
   primaryLiftPlanRequired: boolean;
+  primarySpec: TenderLineSpec;
   urgency: string;
   closingDate: string;
   supplyDate: string;
   items: TenderItem[];
+  allowDirectContact: boolean;
+  allowProfessionalInterest: boolean;
 };
 
 type TenderItem = {
@@ -116,6 +130,7 @@ type TenderItem = {
   plantRequirements: string[];
   driverRequired: boolean;
   liftPlanRequired: boolean;
+  spec: TenderLineSpec;
 };
 
 const EMPTY_FORM: FormState = {
@@ -143,10 +158,13 @@ const EMPTY_FORM: FormState = {
   primaryPlantRequirements: [],
   primaryDriverRequired: false,
   primaryLiftPlanRequired: false,
+  primarySpec: {},
   urgency: '',
   closingDate: '',
   supplyDate: '',
   items: [],
+  allowDirectContact: false,
+  allowProfessionalInterest: false,
 };
 
 const DRAFT_KEY = 'tradeTender.newTenderDraft.v1';
@@ -163,9 +181,9 @@ function splitQuantity(quantity: string): { quantityValue: string; quantityUnit:
 }
 
 function packageLabels(service: string): { provision: string; detail: string } {
-  if (service === 'Materials') return { provision: 'Material category', detail: 'Material detail (optional)' };
-  if (service === 'Waste') return { provision: 'Waste type', detail: 'Waste detail (optional)' };
-  if (service === 'Plant Hire') return { provision: 'Plant category', detail: 'Plant detail (optional)' };
+  if (service === 'Materials') return { provision: 'Material category', detail: 'Specified material' };
+  if (service === 'Waste') return { provision: 'Waste type', detail: 'Specified waste stream' };
+  if (service === 'Plant Hire') return { provision: 'Plant category', detail: 'Specified plant' };
   if (service === 'Professional Services') return { provision: 'Professional discipline', detail: 'Professional service needed' };
   return { provision: 'Service provision', detail: 'Detailed provision (optional)' };
 }
@@ -232,7 +250,74 @@ function newTenderItem(service: string, id = `${Date.now()}-${Math.random().toSt
     plantRequirements: [],
     driverRequired: false,
     liftPlanRequired: false,
+    spec: {},
   };
+}
+
+function LineSpecFields({
+  service,
+  spec,
+  onChange,
+  idPrefix,
+}: {
+  service: string;
+  spec: TenderLineSpec;
+  onChange: <K extends keyof TenderLineSpec>(key: K, value: TenderLineSpec[K]) => void;
+  idPrefix: string;
+}) {
+  if (service === 'Waste') {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FieldGroup>
+          <Label htmlFor={`${idPrefix}-ewc`}>EWC code</Label>
+          <Select id={`${idPrefix}-ewc`} value={spec.ewcCode ?? ''} onChange={(event) => onChange('ewcCode', event.target.value)}>
+            <option value="" disabled>Select a List of Wastes code</option>
+            {COMMON_EWC_CODES.map((entry) => (
+              <option key={entry.code} value={entry.code}>{entry.code} — {entry.label}</option>
+            ))}
+          </Select>
+        </FieldGroup>
+        <FieldGroup>
+          <Label htmlFor={`${idPrefix}-container`}>Container</Label>
+          <Select id={`${idPrefix}-container`} value={spec.container ?? ''} onChange={(event) => onChange('container', event.target.value as TenderLineSpec['container'])}>
+            <option value="" disabled>Select skip, grab, or roll-on</option>
+            {WASTE_CONTAINERS.map((container) => <option key={container} value={container}>{container}</option>)}
+          </Select>
+        </FieldGroup>
+        <fieldset className="sm:col-span-2">
+          <legend className="text-sm font-semibold text-foundation-navy">Hazardous</legend>
+          <div className="mt-2 flex gap-4">
+            <label className="flex items-center gap-2 text-sm"><input type="radio" name={`${idPrefix}-hazardous`} checked={spec.hazardous === true} onChange={() => onChange('hazardous', true)} className="h-4 w-4 accent-safety-amber" />Hazardous</label>
+            <label className="flex items-center gap-2 text-sm"><input type="radio" name={`${idPrefix}-hazardous`} checked={spec.hazardous === false} onChange={() => onChange('hazardous', false)} className="h-4 w-4 accent-safety-amber" />Non-hazardous</label>
+          </div>
+        </fieldset>
+      </div>
+    );
+  }
+  if (service === 'Materials') {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FieldGroup><Label htmlFor={`${idPrefix}-dimension`}>Dimension / size</Label><Input id={`${idPrefix}-dimension`} value={spec.dimension ?? ''} onChange={(event) => onChange('dimension', event.target.value)} placeholder="e.g. 215 mm or 20 mm" /></FieldGroup>
+        <FieldGroup><Label htmlFor={`${idPrefix}-class`}>Class / grade</Label><Input id={`${idPrefix}-class`} value={spec.materialClass ?? ''} onChange={(event) => onChange('materialClass', event.target.value)} placeholder="e.g. Type 1 or facing" /></FieldGroup>
+        <FieldGroup><Label htmlFor={`${idPrefix}-standard`}>Standard / specification</Label><Input id={`${idPrefix}-standard`} value={spec.standard ?? ''} onChange={(event) => onChange('standard', event.target.value)} placeholder="e.g. BS EN 771-1 or SHW Clause 803" /></FieldGroup>
+        <FieldGroup>
+          <Label htmlFor={`${idPrefix}-pack`}>Pack</Label>
+          <Select id={`${idPrefix}-pack`} value={spec.pack ?? ''} onChange={(event) => onChange('pack', event.target.value as TenderLineSpec['pack'])}>
+            <option value="" disabled>Select pack</option>
+            {MATERIAL_PACKS.map((pack) => <option key={pack} value={pack}>{pack}</option>)}
+          </Select>
+        </FieldGroup>
+      </div>
+    );
+  }
+  if (service === 'Plant Hire') {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FieldGroup><Label htmlFor={`${idPrefix}-capacity`}>Capacity</Label><Input id={`${idPrefix}-capacity`} value={spec.capacity ?? ''} onChange={(event) => onChange('capacity', event.target.value)} placeholder="e.g. 3 tonnes or 22 m" /></FieldGroup>
+      </div>
+    );
+  }
+  return null;
 }
 
 export default function NewTenderPage() {
@@ -408,6 +493,17 @@ function NewTenderForm() {
     }));
   }
 
+  function updatePrimarySpec<K extends keyof TenderLineSpec>(key: K, value: TenderLineSpec[K]) {
+    setForm((current) => ({ ...current, primarySpec: { ...current.primarySpec, [key]: value } }));
+  }
+
+  function updateItemSpec<K extends keyof TenderLineSpec>(index: number, key: K, value: TenderLineSpec[K]) {
+    setForm((prev) => ({
+      ...prev,
+      items: prev.items.map((item, itemIndex) => (itemIndex === index ? { ...item, spec: { ...item.spec, [key]: value } } : item)),
+    }));
+  }
+
   function addAnotherItem() {
     const category = activeCategory || form.selectedServices[0] || '';
     setActivePackageIndex(form.items.length + 1);
@@ -442,6 +538,7 @@ function NewTenderForm() {
 
         if (isContractorService(form.category) || isProfessionalService(form.category) || isPlantHire(form.category)) {
           if (!form.primaryDurationValue.trim()) next.quantityValue = 'Enter the required service period.';
+          else if (!/^\d+(?:\.\d+)?$/.test(form.primaryDurationValue.trim())) next.quantityValue = 'Duration must be a number.';
           if (!form.primaryDurationUnit) next.quantityUnit = 'Select a duration unit.';
           if (!form.primaryScopeSize.trim()) next.scopeSize = 'Describe the size, scope, or output quantity so Providers can price the work.';
           if (!form.primaryWorkingHours.trim()) next.workingHours = 'State permitted working hours or time-of-day restrictions.';
@@ -457,6 +554,15 @@ function NewTenderForm() {
             if (!form.quantityUnit) next.quantityUnit = 'Select a unit or not applicable.';
           }
         }
+        if (isSpecifiedItemService(form.category) && !form.item) next.item = 'Select a specified item.';
+        if (form.category === 'Waste' && form.quantityUnit !== 'tonnes') next.quantityUnit = 'Waste must be specified in tonnes.';
+        specIssues(form.category, {
+          ...form.primarySpec,
+          plantClass: form.primarySpec.plantClass || form.subcategory,
+          period: form.primarySpec.period || (form.primaryDurationValue.trim() ? `${form.primaryDurationValue.trim()} ${form.primaryDurationUnit}` : undefined),
+        }, packageQuantity(form.category, form.quantityValue, form.quantityUnit, form.primaryDurationValue, form.primaryDurationUnit)).forEach((message, issueIndex) => {
+          next[`spec-${issueIndex}`] = message;
+        });
         if (isProfessionalService(form.category) && !form.item) next.item = 'Select the professional service needed.';
         if (isProfessionalService(form.category) && form.item === 'Other' && form.primaryProfessionalServiceOther.trim().length < 5) next.item = 'Describe the other professional service needed.';
         if ((isContractorService(form.category) || isProfessionalService(form.category)) && !form.primaryDeliverables.trim()) next.deliverables = 'State the works, outputs, report, visit, or deliverables required.';
@@ -468,6 +574,7 @@ function NewTenderForm() {
 
         if (item && (isContractorService(item.category) || isProfessionalService(item.category) || isPlantHire(item.category))) {
           if (!item.durationValue.trim()) next[`${prefix}quantity`] = 'Enter the required service period.';
+          else if (!/^\d+(?:\.\d+)?$/.test(item.durationValue.trim())) next[`${prefix}quantity`] = 'Duration must be a number.';
           if (!item.durationUnit) next[`${prefix}unit`] = 'Select a duration unit.';
           if (!item.scopeSize.trim()) next[`${prefix}scopeSize`] = 'Describe the size, scope, or output quantity so Providers can price the work.';
           if (!item.workingHours.trim()) next[`${prefix}workingHours`] = 'State permitted working hours or time-of-day restrictions.';
@@ -482,6 +589,17 @@ function NewTenderForm() {
             if (!item.quantityValue.trim() && item.quantityUnit !== 'not applicable') next[`${prefix}quantity`] = 'Enter a quantity.';
             if (!item.quantityUnit) next[`${prefix}unit`] = 'Select a unit or not applicable.';
           }
+        }
+        if (item && isSpecifiedItemService(item.category) && !item.item) next[`${prefix}item`] = 'Select a specified item.';
+        if (item && item.category === 'Waste' && item.quantityUnit !== 'tonnes') next[`${prefix}unit`] = 'Waste must be specified in tonnes.';
+        if (item) {
+          specIssues(item.category, {
+            ...item.spec,
+            plantClass: item.spec.plantClass || item.subcategory,
+            period: item.spec.period || (item.durationValue.trim() ? `${item.durationValue.trim()} ${item.durationUnit}` : undefined),
+          }, packageQuantity(item.category, item.quantityValue, item.quantityUnit, item.durationValue, item.durationUnit)).forEach((message, issueIndex) => {
+            next[`${prefix}spec-${issueIndex}`] = message;
+          });
         }
         if (item && isProfessionalService(item.category) && !item.item) next[`${prefix}item`] = 'Select the professional service needed.';
         if (item && isProfessionalService(item.category) && item.item === 'Other' && item.professionalServiceOther.trim().length < 5) next[`${prefix}item`] = 'Describe the other professional service needed.';
@@ -512,6 +630,7 @@ function NewTenderForm() {
         item: '',
         quantityValue: '',
         quantityUnit: '',
+        primarySpec: {},
         items: additionalServices.map((service, index) => newTenderItem(service, `${Date.now()}-${index}`)),
       }));
       setPackagesNeedReset(false);
@@ -607,17 +726,29 @@ function NewTenderForm() {
           location: form.location,
           quantity: packageQuantity(form.category, form.quantityValue, form.quantityUnit, form.primaryDurationValue, form.primaryDurationUnit),
           itemDescription: packageSpecification(form.primaryItemDescription, form.category, form.item, form.primaryProfessionalServiceOther, form.primaryDurationValue, form.primaryDurationUnit, form.primaryScopeSize, form.primaryWorkingHours, form.primaryAccessRestrictions, form.primarySiteConstraints, form.primaryDeliverables, form.primaryMinimumRequirements, form.primaryPlantRequirements, form.primaryDriverRequired, form.primaryLiftPlanRequired),
+          spec: {
+            ...form.primarySpec,
+            plantClass: form.primarySpec.plantClass || form.subcategory,
+            period: form.primarySpec.period || (form.primaryDurationValue.trim() ? `${form.primaryDurationValue.trim()} ${form.primaryDurationUnit}` : undefined),
+          },
           urgency: form.urgency,
           closingDate: form.closingDate,
           supplyDate: form.supplyDate || undefined,
           requirements: form.requirements,
           description: form.description,
+          allowDirectContact: form.allowDirectContact,
+          allowProfessionalInterest: form.allowProfessionalInterest,
           items: form.items.map((item) => ({
             category: item.category,
             subcategory: item.subcategory,
             item: packageItem(item.category, item.item, item.professionalServiceOther),
             quantity: packageQuantity(item.category, item.quantityValue, item.quantityUnit, item.durationValue, item.durationUnit),
             description: packageSpecification(item.description, item.category, item.item, item.professionalServiceOther, item.durationValue, item.durationUnit, item.scopeSize, item.workingHours, item.accessRestrictions, item.siteConstraints, item.deliverables, item.minimumRequirements, item.plantRequirements, item.driverRequired, item.liftPlanRequired),
+            spec: {
+              ...item.spec,
+              plantClass: item.spec.plantClass || item.subcategory,
+              period: item.spec.period || (item.durationValue.trim() ? `${item.durationValue.trim()} ${item.durationUnit}` : undefined),
+            },
           })),
           attachments: await prepareAttachments(),
         }),
@@ -652,7 +783,7 @@ function NewTenderForm() {
   }
 
   return (
-    <AppShell role="client" title="Create Tender">
+    <AppShell role="client" title="Create tender">
       <div className="mx-auto max-w-2xl">
         <p className="mb-6 max-w-xl text-sm leading-relaxed text-concrete-grey">
           {copyFrom ? 'Review the copied tender details, set a new quote deadline, and submit it as a new tender.' : 'Complete the project details, then provide requirements for each selected service. Providers only see full details once they unlock your tender.'}
@@ -800,7 +931,8 @@ function NewTenderForm() {
               {errors.item && <p className="text-sm font-semibold text-attention">{errors.item}</p>}
             </FieldGroup>
             {isProfessionalService(form.category) && form.item === 'Other' && <FieldGroup><Label htmlFor="professional-service-other">Other service details</Label><Input id="professional-service-other" value={form.primaryProfessionalServiceOther} onChange={(event) => update('primaryProfessionalServiceOther', event.target.value)} placeholder="Describe the service required" /></FieldGroup>}
-            {(isContractorService(form.category) || isProfessionalService(form.category) || isPlantHire(form.category)) ? <div className="grid gap-4 sm:grid-cols-2"><FieldGroup><Label htmlFor="duration-value">Required service period</Label><Input id="duration-value" placeholder="e.g. 3" value={form.primaryDurationValue} onChange={(event) => update('primaryDurationValue', event.target.value)} />{errors.quantityValue && <p className="text-sm font-semibold text-attention">{errors.quantityValue}</p>}</FieldGroup><FieldGroup><Label htmlFor="duration-unit">Duration unit</Label><Select id="duration-unit" value={form.primaryDurationUnit} onChange={(event) => update('primaryDurationUnit', event.target.value)}>{DURATION_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</Select>{errors.quantityUnit && <p className="text-sm font-semibold text-attention">{errors.quantityUnit}</p>}</FieldGroup></div> : <div className="grid gap-4 sm:grid-cols-2"><FieldGroup><Label htmlFor="quantity-value">Quantity</Label><Input id="quantity-value" placeholder="e.g. 4,000" value={form.quantityValue} onChange={(event) => update('quantityValue', event.target.value)} />{errors.quantityValue && <p className="text-sm font-semibold text-attention">{errors.quantityValue}</p>}</FieldGroup><FieldGroup><Label htmlFor="quantity-unit">Unit</Label><Select id="quantity-unit" value={form.quantityUnit} onChange={(event) => update('quantityUnit', event.target.value)}><option value="" disabled>Select a unit</option>{QUANTITY_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</Select>{errors.quantityUnit && <p className="text-sm font-semibold text-attention">{errors.quantityUnit}</p>}</FieldGroup></div>}
+            <LineSpecFields service={form.category} spec={form.primarySpec} onChange={updatePrimarySpec} idPrefix="primary-spec" />
+            {(isContractorService(form.category) || isProfessionalService(form.category) || isPlantHire(form.category)) ? <div className="grid gap-4 sm:grid-cols-2"><FieldGroup><Label htmlFor="duration-value">Required service period</Label><Input id="duration-value" placeholder="e.g. 3" inputMode="decimal" value={form.primaryDurationValue} onChange={(event) => update('primaryDurationValue', event.target.value)} />{errors.quantityValue && <p className="text-sm font-semibold text-attention">{errors.quantityValue}</p>}</FieldGroup><FieldGroup><Label htmlFor="duration-unit">Duration unit</Label><Select id="duration-unit" value={form.primaryDurationUnit} onChange={(event) => update('primaryDurationUnit', event.target.value)}>{DURATION_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</Select>{errors.quantityUnit && <p className="text-sm font-semibold text-attention">{errors.quantityUnit}</p>}</FieldGroup></div> : <div className="grid gap-4 sm:grid-cols-2"><FieldGroup><Label htmlFor="quantity-value">Quantity</Label><Input id="quantity-value" placeholder="e.g. 4,000" inputMode="decimal" value={form.quantityValue} onChange={(event) => update('quantityValue', event.target.value)} />{errors.quantityValue && <p className="text-sm font-semibold text-attention">{errors.quantityValue}</p>}</FieldGroup><FieldGroup><Label htmlFor="quantity-unit">Unit</Label><Select id="quantity-unit" value={form.quantityUnit} onChange={(event) => update('quantityUnit', event.target.value)}><option value="" disabled>Select a unit</option>{(form.category === 'Waste' ? WASTE_QUANTITY_UNITS : GOODS_QUANTITY_UNITS).map((unit) => <option key={unit} value={unit}>{unit}</option>)}</Select>{errors.quantityUnit && <p className="text-sm font-semibold text-attention">{errors.quantityUnit}</p>}</FieldGroup></div>}
             {(isContractorService(form.category) || isProfessionalService(form.category) || isPlantHire(form.category)) && <div className="grid gap-4 sm:grid-cols-2"><FieldGroup><Label htmlFor="scope-size">Size, scope or output quantity</Label><Input id="scope-size" value={form.primaryScopeSize} onChange={(event) => update('primaryScopeSize', event.target.value)} placeholder="e.g. 120 m drainage run, 3 site visits, weekly retained support" />{errors.scopeSize && <p className="text-sm font-semibold text-attention">{errors.scopeSize}</p>}</FieldGroup><FieldGroup><Label htmlFor="working-hours">Permitted working hours</Label><Input id="working-hours" value={form.primaryWorkingHours} onChange={(event) => update('primaryWorkingHours', event.target.value)} placeholder="e.g. Mon-Fri 08:00-17:00, no weekend work" />{errors.workingHours && <p className="text-sm font-semibold text-attention">{errors.workingHours}</p>}</FieldGroup><FieldGroup><Label htmlFor="access-restrictions">Access restrictions</Label><Textarea id="access-restrictions" rows={3} value={form.primaryAccessRestrictions} onChange={(event) => update('primaryAccessRestrictions', event.target.value)} placeholder="Gate widths, parking, loading area, permits, occupied premises, or not applicable." />{errors.accessRestrictions && <p className="text-sm font-semibold text-attention">{errors.accessRestrictions}</p>}</FieldGroup><FieldGroup><Label htmlFor="site-constraints">Site constraints</Label><Textarea id="site-constraints" rows={3} value={form.primarySiteConstraints} onChange={(event) => update('primarySiteConstraints', event.target.value)} placeholder="Live site, residents nearby, services, asbestos, fragile surfaces, traffic, noise limits, or not applicable." />{errors.siteConstraints && <p className="text-sm font-semibold text-attention">{errors.siteConstraints}</p>}</FieldGroup>{(isContractorService(form.category) || isProfessionalService(form.category)) && <FieldGroup wide><Label htmlFor="deliverables">Works, outputs or deliverables</Label><Textarea id="deliverables" rows={3} value={form.primaryDeliverables} onChange={(event) => update('primaryDeliverables', event.target.value)} placeholder="State what must be priced: works scope, drawings/reports, inspection frequency, attendance, exclusions, handover evidence." />{errors.deliverables && <p className="text-sm font-semibold text-attention">{errors.deliverables}</p>}</FieldGroup>}</div>}
             {(isContractorService(form.category) || isProfessionalService(form.category)) && <fieldset className="rounded-md border border-slate-200 bg-slate-50 p-4"><legend className="px-1 text-sm font-semibold text-foundation-navy">Minimum requirements</legend><div className="mt-2 grid gap-3 sm:grid-cols-2">{SERVICE_MINIMUM_REQUIREMENTS.map((option) => <label key={option} className="flex items-center gap-3 text-sm text-concrete-grey"><input type="checkbox" checked={form.primaryMinimumRequirements.includes(option)} onChange={() => togglePrimaryMinimumRequirement(option)} className="h-4 w-4 accent-safety-amber" />{option}</label>)}</div></fieldset>}
             {isPlantHire(form.category) && <fieldset className="rounded-md border border-slate-200 bg-slate-50 p-4"><legend className="px-1 text-sm font-semibold text-foundation-navy">Plant hire support</legend><div className="mt-2 grid gap-3 sm:grid-cols-2">{PLANT_HIRE_SUPPORT_OPTIONS.map((option) => <label key={option} className="flex items-center gap-3 text-sm text-concrete-grey"><input type="checkbox" checked={form.primaryPlantRequirements.includes(option) || (option === 'Driver/operator required' && form.primaryDriverRequired) || (option === 'Lift plan required' && form.primaryLiftPlanRequired)} onChange={() => { if (option === 'Driver/operator required') update('primaryDriverRequired', !form.primaryDriverRequired); else if (option === 'Lift plan required') update('primaryLiftPlanRequired', !form.primaryLiftPlanRequired); else togglePrimaryPlantRequirement(option); }} className="h-4 w-4 accent-safety-amber" />{option}</label>)}</div></fieldset>}
@@ -857,16 +989,17 @@ function NewTenderForm() {
                           {errors[`item-${index}-item`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-item`]}</p>}
                         </FieldGroup>
                         {isProfessionalService(item.category) && item.item === 'Other' && <FieldGroup><Label htmlFor={`item-${index}-professional-service-other`}>Other service details</Label><Input id={`item-${index}-professional-service-other`} value={item.professionalServiceOther} onChange={(event) => updateItem(index, 'professionalServiceOther', event.target.value)} placeholder="Describe the service required" /></FieldGroup>}
-                        {(isContractorService(item.category) || isProfessionalService(item.category) || isPlantHire(item.category)) ? <><FieldGroup><Label htmlFor={`item-${index}-duration`}>Required service period</Label><Input id={`item-${index}-duration`} value={item.durationValue} placeholder="e.g. 3" onChange={(event) => updateItem(index, 'durationValue', event.target.value)} />{errors[`item-${index}-quantity`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-quantity`]}</p>}</FieldGroup><FieldGroup><Label htmlFor={`item-${index}-duration-unit`}>Duration unit</Label><Select id={`item-${index}-duration-unit`} value={item.durationUnit} onChange={(event) => updateItem(index, 'durationUnit', event.target.value)}>{DURATION_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</Select>{errors[`item-${index}-unit`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-unit`]}</p>}</FieldGroup></> : <><FieldGroup>
+                        <div className="sm:col-span-2"><LineSpecFields service={item.category} spec={item.spec} onChange={(key, value) => updateItemSpec(index, key, value)} idPrefix={`item-${index}-spec`} /></div>
+                        {(isContractorService(item.category) || isProfessionalService(item.category) || isPlantHire(item.category)) ? <><FieldGroup><Label htmlFor={`item-${index}-duration`}>Required service period</Label><Input id={`item-${index}-duration`} value={item.durationValue} placeholder="e.g. 3" inputMode="decimal" onChange={(event) => updateItem(index, 'durationValue', event.target.value)} />{errors[`item-${index}-quantity`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-quantity`]}</p>}</FieldGroup><FieldGroup><Label htmlFor={`item-${index}-duration-unit`}>Duration unit</Label><Select id={`item-${index}-duration-unit`} value={item.durationUnit} onChange={(event) => updateItem(index, 'durationUnit', event.target.value)}>{DURATION_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</Select>{errors[`item-${index}-unit`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-unit`]}</p>}</FieldGroup></> : <><FieldGroup>
                           <Label htmlFor={`item-${index}-quantity`}>Quantity</Label>
-                          <Input id={`item-${index}-quantity`} value={item.quantityValue} placeholder={item.category?.toLowerCase().includes('plant') || item.category?.toLowerCase().includes('professional') ? 'e.g. 7 days' : 'e.g. 20'} onChange={(event) => updateItem(index, 'quantityValue', event.target.value)} />
+                          <Input id={`item-${index}-quantity`} value={item.quantityValue} placeholder="e.g. 20" inputMode="decimal" onChange={(event) => updateItem(index, 'quantityValue', event.target.value)} />
                           {errors[`item-${index}-quantity`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-quantity`]}</p>}
                         </FieldGroup>
                         <FieldGroup>
                           <Label htmlFor={`item-${index}-unit`}>Unit</Label>
                           <Select id={`item-${index}-unit`} value={item.quantityUnit} onChange={(event) => updateItem(index, 'quantityUnit', event.target.value)}>
                             <option value="" disabled>Select a unit</option>
-                            {QUANTITY_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                            {(item.category === 'Waste' ? WASTE_QUANTITY_UNITS : GOODS_QUANTITY_UNITS).map((unit) => <option key={unit} value={unit}>{unit}</option>)}
                           </Select>
                           {errors[`item-${index}-unit`] && <p className="text-xs font-semibold text-attention">{errors[`item-${index}-unit`]}</p>}
                         </FieldGroup></>}
@@ -989,6 +1122,24 @@ function NewTenderForm() {
             </ReviewSection>
             <ReviewSection title="Attachments" onEdit={() => setStep(4)}>
               <ReviewItem label="Files" value={files.length > 0 ? `${files.length} file(s) selected and saved with this tender` : 'None'} />
+            </ReviewSection>
+            <ReviewSection title="Supplier contact" onEdit={() => setStep(3)}>
+              <p className="mb-3 text-sm text-concrete-grey">Quotes stay the default path. Direct contact and professional interest stay off unless you opt in for this tender.</p>
+              {(form.category === 'Contractor Services' || form.category === 'Professional Services' || form.items.some((item) => item.category === 'Contractor Services' || item.category === 'Professional Services')) && (
+                <label className="mt-2 flex items-start gap-3 text-sm text-foundation-navy">
+                  <input type="checkbox" checked={form.allowDirectContact} onChange={(event) => update('allowDirectContact', event.target.checked)} className="mt-1 h-4 w-4 accent-trade-blue" />
+                  Allow matched suppliers to pay to share their contact details with me
+                </label>
+              )}
+              {(form.category === 'Professional Services' || form.items.some((item) => item.category === 'Professional Services')) && (
+                <label className="mt-2 flex items-start gap-3 text-sm text-foundation-navy">
+                  <input type="checkbox" checked={form.allowProfessionalInterest} onChange={(event) => update('allowProfessionalInterest', event.target.checked)} className="mt-1 h-4 w-4 accent-trade-blue" />
+                  Allow professional-interest registrations on this tender
+                </label>
+              )}
+              {!form.allowDirectContact && !form.allowProfessionalInterest && (
+                <p className="mt-2 text-sm font-semibold text-steel-blue">Default: quote, then contact release after you accept.</p>
+              )}
             </ReviewSection>
             {hasDetectedContactDetails && (
               <div className="rounded-lg border border-attention/40 bg-attention/5 p-4">

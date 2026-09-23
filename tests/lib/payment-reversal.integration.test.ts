@@ -199,6 +199,7 @@ test('a signed completion event grants one unlock and replays without duplicate 
       branchIdentifier: suffix,
       primaryUserId: retailerId,
       services: 'Construction Materials',
+      serviceProvisions: JSON.stringify(['Construction Materials::Aggregate']),
       operatingLocations: 'United Kingdom',
       members: { create: { userId: retailerId } },
     },

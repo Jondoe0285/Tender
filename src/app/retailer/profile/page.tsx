@@ -8,11 +8,8 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Input, Label, Textarea, FieldGroup } from '@/components/ui/Field';
-import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
-import { CATEGORIES } from '@/lib/categories';
 import { COMPANY_TYPE_LABELS, COMPANY_TYPES } from '@/lib/companyTypes';
 import { independentReviewTierDescription } from '@/lib/independentReviewTiers';
-import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 
 type TeamMember = {
   id: string;
@@ -211,29 +208,19 @@ export default function RetailerProfilePage() {
               <FieldGroup wide><Label htmlFor="address">Registered or trading address</Label><Textarea id="address" rows={3} value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></FieldGroup>
               <FieldGroup><Label htmlFor="standardQuoteValidityDays">Standard quote validity (days)</Label><Input id="standardQuoteValidityDays" type="number" min="1" max="365" step="1" value={form.standardQuoteValidityDays} onChange={(event) => setForm({ ...form, standardQuoteValidityDays: Number(event.target.value) })} /><p className="mt-1 text-xs text-concrete-grey">Applied automatically to every quote you submit and shown to the purchasing Client.</p></FieldGroup>
               <FieldGroup wide>
-                <Label htmlFor="coverageScope">Operating area</Label>
-                <div className="flex flex-wrap gap-4">
-                  {(['COUNTY', 'REGION', 'UK'] as const).map((scope) => (
-                    <label key={scope} className="flex items-center gap-2 text-sm text-concrete-grey">
-                      <input type="radio" name="coverageScope" checked={form.coverageScope === scope} onChange={() => setForm({ ...form, coverageScope: scope })} className="h-4 w-4 accent-safety-amber" />
-                      {scope === 'COUNTY' ? 'Select counties' : scope === 'REGION' ? 'Select regions' : 'UK-wide (all regions)'}
-                    </label>
-                  ))}
-                </div>
-                <p className="mt-1 text-xs text-concrete-grey">A tender is matched to you only when its postcode falls inside the area you select here.</p>
+                <Label>Matching coverage and services</Label>
+                <p className="text-sm text-concrete-grey">Services, provisions, and operating locations used for tender matching are edited on your <Link href="/user/profile" className="font-semibold text-trade-blue hover:text-foundation-navy">company profile</Link>.</p>
+                <p className="mt-2 text-sm font-semibold text-foundation-navy">{form.coverageScope === 'UK' ? 'UK-wide (all regions)' : form.coverageScope === 'REGION' ? (form.regions.join(', ') || 'Not configured') : (form.counties.join(', ') || 'Not configured')}</p>
+                <p className="mt-1 text-sm text-concrete-grey">{form.categories.join(', ') || 'No supplying services configured'}</p>
               </FieldGroup>
-              {form.coverageScope === 'COUNTY' && (
-                <FieldGroup><Label htmlFor="counties">Operational counties</Label><MultiSelectDropdown options={UK_COUNTIES.map((county) => ({ label: county, value: county }))} selected={form.counties} onChange={(counties) => setForm({ ...form, counties })} placeholder="Select one or more counties" /></FieldGroup>
-              )}
-              {form.coverageScope === 'REGION' && (
-                <FieldGroup><Label htmlFor="regions">Operational regions</Label><MultiSelectDropdown options={UK_REGIONS.map((region) => ({ label: region, value: region }))} selected={form.regions} onChange={(regions) => setForm({ ...form, regions })} placeholder="Select one or more regions" /></FieldGroup>
-              )}
-              <FieldGroup><Label htmlFor="categories">Services provided</Label><MultiSelectDropdown options={Object.keys(CATEGORIES).map((category) => ({ label: category, value: category }))} selected={form.categories} onChange={(categories) => setForm({ ...form, categories })} placeholder="Select service categories" /><p className="mt-1 text-xs font-semibold text-safety-amber">Note: Modifying your services or company type resets your AI verification and enhanced verification statuses due to new legal and compliance requirements for the updated service scope.</p></FieldGroup>
               <FieldGroup><Label htmlFor="masterUserId">Master user</Label><select id="masterUserId" value={form.masterUserId} onChange={(event) => setForm({ ...form, masterUserId: event.target.value })} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm"><option value="">Select a team member</option>{teamMembers.map((member) => <option key={member.userId} value={member.userId}>{member.user.contactName} ({member.user.email})</option>)}</select></FieldGroup>
               <div className="flex items-end gap-3 sm:col-span-2"><Button variant="secondary" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button><Button onClick={saveProfile} loading={saving}>Save profile</Button></div>
             </div>
           ) : (
-            <dl className="mt-6 grid gap-5 sm:grid-cols-2"><ProfileValue label="Company name" value={profile.companyName} /><ProfileValue label="Company number" value={profile.companyNumber ?? 'Not provided'} /><ProfileValue label="Company type" value={COMPANY_TYPE_LABELS[profile.companyType] ?? 'Limited company'} /><ProfileValue label="Address" value={profile.address ?? 'Not provided'} wide /><ProfileValue label="Standard quote validity" value={`${profile.standardQuoteValidityDays} days`} /><ProfileValue label="Operating area" value={profile.coverageScope === 'UK' ? 'UK-wide (all regions)' : profile.coverageScope === 'REGION' ? (profile.regions || 'Not configured') : (profile.counties || 'Not configured')} /><ProfileValue label="Services provided" value={profile.categories || 'Not configured'} /><ProfileValue label="Master user" value={teamMembers.find((member) => member.userId === profile.masterUserId)?.user.email ?? 'Not assigned'} /></dl>
+            <>
+              <dl className="mt-6 grid gap-5 sm:grid-cols-2"><ProfileValue label="Company name" value={profile.companyName} /><ProfileValue label="Company number" value={profile.companyNumber ?? 'Not provided'} /><ProfileValue label="Company type" value={COMPANY_TYPE_LABELS[profile.companyType] ?? 'Limited company'} /><ProfileValue label="Address" value={profile.address ?? 'Not provided'} wide /><ProfileValue label="Standard quote validity" value={`${profile.standardQuoteValidityDays} days`} /><ProfileValue label="Operating area" value={profile.coverageScope === 'UK' ? 'UK-wide (all regions)' : profile.coverageScope === 'REGION' ? (profile.regions || 'Not configured') : (profile.counties || 'Not configured')} /><ProfileValue label="Services provided" value={profile.categories || 'Not configured'} /><ProfileValue label="Master user" value={teamMembers.find((member) => member.userId === profile.masterUserId)?.user.email ?? 'Not assigned'} /></dl>
+              <p className="mt-4 text-sm text-concrete-grey">Edit services, provisions, and operating locations on your <Link href="/user/profile" className="font-semibold text-trade-blue hover:text-foundation-navy">company profile</Link>.</p>
+            </>
           )}
         </Card>
 

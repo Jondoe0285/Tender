@@ -26,10 +26,11 @@ test('direct contact is owner controlled and disabled by default', () => {
   assert.match(settings, /isDirectContactActive/);
 });
 
-test('direct contact is limited to contractor and professional services tenders', () => {
+test('direct contact is limited to contractor and professional services tenders the buyer opted into', () => {
   const service = readFileSync(servicePath, 'utf8');
 
   assert.match(service, /new Set\(\['Contractor Services', 'Professional Services'\]\)/);
+  assert.match(service, /allowDirectContact/);
   assert.match(service, /assertRetailerEligibleForTender/);
   assert.match(service, /assertTenderOpenForActivity/);
   assert.match(service, /DIRECT_CONTACT_RELEASED/);

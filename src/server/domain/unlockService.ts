@@ -3,10 +3,12 @@ import { Prisma } from '@prisma/client';
 import { createPayment } from '@/server/payments/paymentService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { ForbiddenError } from '@/server/auth/session';
-import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getUserTenderServiceCategories } from '@/server/domain/tenderService';
+import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getUserTenderServiceProvisions, tenderProvisionPackageWhere } from '@/server/domain/tenderService';
 import { membershipTiersEnabled } from '@/server/domain/membershipService';
 import { getTenderUnlockFeeGbp } from '@/server/domain/platformSettings';
 import { consumePaymentWaiver } from '@/server/domain/paymentWaiverService';
+import { HARVEST_CAP_MESSAGE, UNLOCK_HARVEST_CAP, UNLOCK_HARVEST_WINDOW_DAYS, harvestUnlockCount } from '@/lib/harvest';
+import { effectiveLaunchCredits } from '@/lib/launch-credits';
 
 type UnlockOutcome =
   | { status: 'ALREADY_UNLOCKED' }
@@ -14,10 +16,28 @@ type UnlockOutcome =
   | { status: 'UNLOCKED_WITHOUT_PAYMENT_REQUIRED' }
   | { status: 'PAYMENT_REQUIRED'; paymentId: string; checkoutUrl: string | null; devMode: boolean };
 
+export async function assertUnlockHarvestCap(retailerId: string) {
+  const since = new Date(Date.now() - UNLOCK_HARVEST_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const unlocks = await prisma.unlock.findMany({
+    where: { retailerId, unlockedAt: { gte: since } },
+    select: { tenderId: true },
+  });
+  const quotes = unlocks.length === 0
+    ? []
+    : await prisma.quote.findMany({
+      where: { retailerId, tenderId: { in: unlocks.map((unlock) => unlock.tenderId) } },
+      select: { tenderId: true },
+    });
+  if (harvestUnlockCount(unlocks, quotes) >= UNLOCK_HARVEST_CAP) {
+    throw new ForbiddenError(HARVEST_CAP_MESSAGE);
+  }
+}
+
 /** Sole entry point for changing tender visibility for a Retailer (SEC-032/033). */
 export async function requestUnlock(retailerId: string, tenderId: string, mobileReturnUrl?: string): Promise<UnlockOutcome> {
   await assertRetailerEligibleForTender(retailerId, tenderId);
   await assertTenderOpenForActivity(tenderId);
+  await assertUnlockHarvestCap(retailerId);
 
   const existing = await prisma.unlock.findUnique({
     where: { tenderId_retailerId: { tenderId, retailerId } },
@@ -58,7 +78,11 @@ export async function requestUnlock(retailerId: string, tenderId: string, mobile
   }
 
   const profile = await prisma.retailerProfile.findUnique({ where: { userId: retailerId } });
-  if (profile && profile.launchCreditsLeft > 0) {
+  const remainingCredits = effectiveLaunchCredits(profile?.launchCreditsLeft ?? 0, profile?.launchCreditsExpireAt);
+  if (profile && profile.launchCreditsLeft > 0 && remainingCredits === 0) {
+    await prisma.retailerProfile.update({ where: { userId: retailerId }, data: { launchCreditsLeft: 0 } });
+  }
+  if (profile && remainingCredits > 0) {
     // Conditional update guards against two concurrent requests spending the same last credit.
     const spent = await prisma.retailerProfile.updateMany({
       where: { userId: retailerId, launchCreditsLeft: { gt: 0 } },
@@ -143,8 +167,9 @@ export async function getUnlockedTenderForRetailer(retailerId: string, tenderId:
     where: { tenderId_retailerId: { tenderId, retailerId } },
   });
   if (!unlock) throw new ForbiddenError('Tender has not been unlocked by this Retailer');
-  const serviceCategories = await getUserTenderServiceCategories(retailerId);
-  if (serviceCategories.length === 0) throw new ForbiddenError('No active company services are configured');
+  const provisions = await getUserTenderServiceProvisions(retailerId);
+  if (provisions.length === 0) throw new ForbiddenError('No active company services are configured');
+  const provisionWhere = tenderProvisionPackageWhere(provisions);
 
   // Client identity (clientId) is withheld even after unlock — anonymity holds until contact release (SEC-034).
   return prisma.tender.findUniqueOrThrow({
@@ -167,12 +192,12 @@ export async function getUnlockedTenderForRetailer(retailerId: string, tenderId:
         select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
       },
       items: {
-        where: { category: { in: serviceCategories } },
-        select: { id: true, category: true, subcategory: true, item: true, quantity: true, description: true },
+        where: provisionWhere,
+        select: { id: true, category: true, subcategory: true, item: true, quantity: true, description: true, specJson: true },
         orderBy: { createdAt: 'asc' },
       },
       packages: {
-        where: { category: { in: serviceCategories } },
+        where: provisionWhere,
         select: {
           id: true,
           reference: true,
@@ -182,6 +207,7 @@ export async function getUnlockedTenderForRetailer(retailerId: string, tenderId:
           item: true,
           quantity: true,
           description: true,
+          specJson: true,
           urgency: true,
           closingDate: true,
           status: true,

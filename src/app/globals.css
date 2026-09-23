@@ -4,12 +4,11 @@
 
 @layer base {
   html {
-    background: #f2f4f7;
+    background: #f7f8fa;
   }
 
   body {
-    background-image: linear-gradient(rgba(14, 28, 46, 0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(14, 28, 46, 0.025) 1px, transparent 1px);
-    background-size: 32px 32px;
+    background: #f7f8fa;
   }
 
   :focus-visible {

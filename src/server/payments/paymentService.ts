@@ -4,6 +4,7 @@ import type { PaymentType } from '@prisma/client';
 import { buildPaymentAmounts, getClientReleaseFeeGbp, getIndependentReviewFeeGbp, getPaymentFeeGbp, getTenderUnlockFeeGbp, getVatPercentage } from '@/server/domain/platformSettings';
 import { appUrl } from '@/server/config/appUrl';
 import { INDEPENDENT_REVIEW_TIER_LABELS, isIndependentReviewTier, type IndependentReviewTier } from '@/lib/independentReviewTiers';
+import { assertBuyerDuty, assertSupplierPaymentPermission } from '@/server/domain/workspacePermissions';
 
 type CreatePaymentResult = {
   paymentId: string;
@@ -44,6 +45,8 @@ export async function createPayment(params: {
   if (params.mobileReturnUrl !== undefined && params.mobileReturnUrl !== MOBILE_PAYMENT_RETURN_URL) {
     throw new Error('Invalid mobile payment return URL');
   }
+  if (params.type === 'CLIENT_RELEASE') await assertBuyerDuty(params.userId, 'APPROVER');
+  else await assertSupplierPaymentPermission(params.userId);
   let netFeeGbp: number;
   if (params.type === 'MEMBERSHIP_TIER') {
     const tier = params.tierId

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createTenderSchema } from '../../src/lib/schemas/tender';
 import { buildRetailerTenderSummary, formatRetailerSummaryLocation, retailerCanMatchTender } from '../../src/server/domain/tenderService';
-import { getBroadLocation, getPostcodeDistrict, retailerCoversTenderLocation } from '../../src/lib/geography';
+import { getBroadLocation, getPostcodeDistrict, operatingLocationsFromCoverage, retailerCoversTenderLocation } from '../../src/lib/geography';
 import { isQuoteRetentionLocked } from '../../src/server/domain/quoteService';
 import { expiredAttachmentPurgeWhere, expiredQuotePurgeWhere, getPurchasedRetentionDeadline, getUnpurchasedQuoteCutoff } from '../../src/server/domain/retentionService';
 import { calculatePercentageFee, calculateVatGbp, buildPaymentAmounts } from '../../src/server/domain/platformSettings';
@@ -11,13 +11,15 @@ import { getFinancialQuarter } from '../../src/server/domain/analyticsService';
 const VALID_TENDER = {
   projectName: 'Warehouse concrete supply',
   category: 'Materials',
-  subcategory: 'Aggregates',
+  subcategory: 'Aggregates, Sand and Stone',
+  item: 'MOT Type 1 sub-base',
   location: 'Leeds LS10 2AB',
   quantity: '20 tonnes',
   itemDescription: 'Aggregate must meet the project specification and include delivery assumptions.',
   urgency: 'standard' as const,
   closingDate: '2099-08-27',
   description: 'Twenty tonnes of aggregate with delivery to the project site.',
+  spec: { dimension: '20 mm', materialClass: 'Type 1', standard: 'SHW Clause 803', pack: 'bulk' as const },
 };
 
 test('removes raw requirement detail from pre-unlock retailer summaries', () => {
@@ -31,9 +33,11 @@ test('reduces precise tender locations to a broad area before unlock', () => {
   assert.equal(getBroadLocation('Bristol BS1 4DJ'), 'Bristol');
 });
 
-test('shows only the postcode district in pre-unlock retailer locations', () => {
+test('shows only the local authority and postcode district in pre-unlock retailer locations', () => {
   assert.equal(getPostcodeDistrict('42 Example Road, Leeds LS10 2AB'), 'LS10');
-  assert.equal(formatRetailerSummaryLocation('42 Example Road, Leeds LS10 2AB'), 'Leeds (LS10)');
+  assert.equal(formatRetailerSummaryLocation('42 Example Road, Leeds LS10 2AB'), 'West Yorkshire (LS10)');
+  assert.equal(formatRetailerSummaryLocation('Plot 12, 42 Example Road, Leeds LS10 2AB'), 'West Yorkshire (LS10)');
+  assert.doesNotMatch(formatRetailerSummaryLocation('Plot 12, 42 Example Road, Leeds LS10 2AB'), /Plot 12/);
 });
 
 test('uses the raw delivery postcode for coverage matching before location is reduced', () => {
@@ -110,19 +114,26 @@ test('matches any UK postcode when a Retailer covers the whole UK', () => {
   assert.equal(retailerCoversTenderLocation(retailer, 'Cardiff CF10 1AA'), true);
 });
 
-test('requires both exact retailer capability and configured coverage before creating tender matches', () => {
+test('requires both provision-level capability and configured coverage before creating tender matches', () => {
+  const bricksPackage = [{ category: 'Materials', subcategory: 'Bricks' }];
+  const insulationPackage = [{ category: 'Materials', subcategory: 'Insulation' }];
+  const wastePackage = [{ category: 'Waste', subcategory: 'Inert waste' }];
   const eligibleRetailer = {
     coverageScope: 'REGION',
     counties: '',
     regions: 'Yorkshire and The Humber',
-    categories: 'Materials, Plant hire',
+    categories: 'Materials, Plant Hire',
+    serviceProvisions: JSON.stringify(['Materials::Bricks']),
   };
 
-  assert.equal(retailerCanMatchTender(eligibleRetailer, 'Leeds LS10 2AB', ['Materials']), true);
-  assert.equal(retailerCanMatchTender(eligibleRetailer, 'Bristol BS1 4DJ', ['Materials']), false);
-  assert.equal(retailerCanMatchTender(eligibleRetailer, 'Leeds LS10 2AB', ['Waste']), false);
-  assert.equal(retailerCanMatchTender({ ...eligibleRetailer, categories: 'Material' }, 'Leeds LS10 2AB', ['Materials']), false);
-  assert.equal(retailerCanMatchTender({ ...eligibleRetailer, categories: '' }, 'Leeds LS10 2AB', ['Materials']), false);
+  assert.equal(retailerCanMatchTender(eligibleRetailer, 'Leeds LS10 2AB', bricksPackage), true);
+  assert.equal(retailerCanMatchTender(eligibleRetailer, 'Bristol BS1 4DJ', bricksPackage), false);
+  assert.equal(retailerCanMatchTender(eligibleRetailer, 'Leeds LS10 2AB', insulationPackage), false);
+  assert.equal(retailerCanMatchTender(eligibleRetailer, 'Leeds LS10 2AB', wastePackage), false);
+  assert.equal(retailerCanMatchTender({ ...eligibleRetailer, categories: 'Material' }, 'Leeds LS10 2AB', bricksPackage), false);
+  assert.equal(retailerCanMatchTender({ ...eligibleRetailer, categories: '' }, 'Leeds LS10 2AB', bricksPackage), false);
+  assert.equal(retailerCanMatchTender({ ...eligibleRetailer, serviceProvisions: JSON.stringify([]) }, 'Leeds LS10 2AB', bricksPackage), false);
+  assert.equal(retailerCanMatchTender({ ...eligibleRetailer, serviceProvisions: '' }, 'Leeds LS10 2AB', bricksPackage), false);
 });
 
 test('does not match when a Retailer has not configured any counties or regions', () => {
@@ -174,6 +185,7 @@ test('accepts Contractor and Professional Services tender provisions', () => {
     ...VALID_TENDER,
     category: 'Contractor Services',
     subcategory: 'Groundworks & Civil Engineering',
+    item: undefined,
   });
   const professionalService = createTenderSchema.safeParse({
     ...VALID_TENDER,
@@ -213,7 +225,8 @@ test('accepts a valid structured construction tender', () => {
   const result = createTenderSchema.safeParse({
     projectName: 'Warehouse concrete supply',
     category: 'Materials',
-    subcategory: 'Aggregates',
+    subcategory: 'Aggregates, Sand and Stone',
+    item: 'MOT Type 1 sub-base',
     location: 'Leeds LS10 2AB',
     quantity: '20 tonnes',
     itemDescription: 'Aggregate must meet the project specification and include delivery assumptions.',
@@ -221,9 +234,32 @@ test('accepts a valid structured construction tender', () => {
     closingDate: '2099-08-27',
     requirements: ['Delivery to site required'],
     description: 'Twenty tonnes of aggregate with delivery to the project site.',
+    spec: { dimension: '20 mm', materialClass: 'Type 1', standard: 'SHW Clause 803', pack: 'bulk' },
   });
 
   assert.equal(result.success, true);
+});
+
+test('rejects materials, waste, and plant packages without a specified item', () => {
+  const result = createTenderSchema.safeParse({
+    ...VALID_TENDER,
+    item: undefined,
+  });
+
+  assert.equal(result.success, false);
+  if (!result.success) assert.equal(result.error.issues.some((issue) => issue.path[0] === 'item'), true);
+});
+
+test('rejects a free-text quantity that is not a catalogue number and unit', () => {
+  assert.equal(createTenderSchema.safeParse({ ...VALID_TENDER, quantity: 'about 20 tonnes' }).success, false);
+  assert.equal(createTenderSchema.safeParse({ ...VALID_TENDER, quantity: 'not applicable' }).success, false);
+  assert.equal(createTenderSchema.safeParse({ ...VALID_TENDER, quantity: '4,000 tonnes' }).success, true);
+});
+
+test('writes registration coverage onto the company locations matching reads', () => {
+  assert.equal(operatingLocationsFromCoverage({ coverageScope: 'UK' }), 'United Kingdom');
+  assert.equal(operatingLocationsFromCoverage({ coverageScope: 'REGION', regions: ['Yorkshire and The Humber'] }), 'Yorkshire and The Humber');
+  assert.equal(operatingLocationsFromCoverage({ coverageScope: 'COUNTY', counties: ['West Yorkshire', 'Greater Manchester'] }), 'West Yorkshire,Greater Manchester');
 });
 
 test('rejects a tender without specification notes', () => {
@@ -281,6 +317,7 @@ test('accepts selectable quote requirements', () => {
     closingDate: '2099-08-27',
     requirements: ['Driver or operator required', 'Timed delivery required', 'Site induction required'],
     description: 'An operated mini excavator is required for a groundworks package.',
+    spec: { plantClass: 'Excavators', capacity: '3 tonnes', period: '2 weeks' },
   });
 
   assert.equal(result.success, true);
@@ -316,4 +353,19 @@ test('rejects a closing date in the past', () => {
   });
 
   assert.equal(result.success, false);
+});
+
+test('direct contact and professional interest stay off unless the buyer opts in', () => {
+  const result = createTenderSchema.safeParse(VALID_TENDER);
+  assert.equal(result.success, true);
+  if (result.success) {
+    assert.equal(result.data.allowDirectContact, undefined);
+    assert.equal(result.data.allowProfessionalInterest, undefined);
+  }
+  const optedIn = createTenderSchema.safeParse({ ...VALID_TENDER, allowDirectContact: true, allowProfessionalInterest: true });
+  assert.equal(optedIn.success, true);
+  if (optedIn.success) {
+    assert.equal(optedIn.data.allowDirectContact, true);
+    assert.equal(optedIn.data.allowProfessionalInterest, true);
+  }
 });
