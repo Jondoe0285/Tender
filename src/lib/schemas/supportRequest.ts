@@ -26,8 +26,8 @@ export function containsProhibitedSupportContent(value: unknown): boolean {
 export const supportRequestSchema = z.object({
   type: z.enum(['SUPPORT', 'CHANGE', 'PAYMENT', 'DATA_PRIVACY']),
   dataSubjectRight: z.enum(dataSubjectRights).optional(),
-  title: z.string().trim().min(5).max(120),
-  description: z.string().trim().min(20).max(2_000),
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().min(1).max(2_000),
 }).superRefine((value, context) => {
   if (value.type === 'DATA_PRIVACY' && !value.dataSubjectRight) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['dataSubjectRight'], message: 'Select a data protection right' });
@@ -42,8 +42,8 @@ export const supportRequestSchema = z.object({
 
 export const supportRequestReviewSchema = z.object({
   action: z.enum(['triage', 'request-info', 'approve', 'reject', 'resolve']),
-  note: z.string().trim().min(5).max(1_000),
+  note: z.string().trim().min(1).max(1_000),
   triageCategory: z.enum(['ACCESS', 'ACCOUNT', 'PAYMENT', 'TECHNICAL', 'PRIVACY', 'COMPLAINT', 'CHANGE']).optional(),
   escalationLevel: z.enum(['NONE', 'STANDARD', 'URGENT', 'OWNER']).optional(),
-  resolutionEvidence: z.string().trim().min(5).max(2_000).optional(),
+  resolutionEvidence: z.string().trim().min(1).max(2_000).optional(),
 });

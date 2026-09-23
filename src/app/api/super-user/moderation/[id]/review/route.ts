@@ -9,7 +9,7 @@ import { getSupportRecipientEmail } from '@/server/domain/platformSettings';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { contentReviewOutcomeTemplate } from '@/server/notifications/emailTemplates';
 
-const reviewSchema = z.object({ note: z.string().trim().min(3).max(500), outcome: z.enum(['RELEASED_SAFE', 'HOLD_CONFIRMED']) });
+const reviewSchema = z.object({ note: z.string().trim().min(1).max(500), outcome: z.enum(['RELEASED_SAFE', 'HOLD_CONFIRMED']) });
 
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;

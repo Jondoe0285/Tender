@@ -5,7 +5,8 @@ import { containsProhibitedSupportContent, supportRequestReviewSchema, supportRe
 
 test('validates bounded support request input', () => {
   assert.equal(supportRequestSchema.safeParse({ type: 'CHANGE', title: 'Add a request workflow', description: 'Please add an approved workflow for controlled support and change requests.' }).success, true);
-  assert.equal(supportRequestSchema.safeParse({ type: 'CHANGE', title: 'No', description: 'Too short' }).success, false);
+  assert.equal(supportRequestSchema.safeParse({ type: 'CHANGE', title: 'Help', description: 'Login issue' }).success, true);
+  assert.equal(supportRequestSchema.safeParse({ type: 'CHANGE', title: 'Help', description: '' }).success, false);
 });
 
 test('validates data-subject rights and rejects obvious sensitive support content', () => {
@@ -18,7 +19,8 @@ test('validates data-subject rights and rejects obvious sensitive support conten
 
 test('requires a valid reviewed action and records Owner-only change approval', () => {
   assert.equal(supportRequestReviewSchema.safeParse({ action: 'approve', note: 'Approved for planned implementation.' }).success, true);
-  assert.equal(supportRequestReviewSchema.safeParse({ action: 'approve', note: 'No' }).success, false);
+  assert.equal(supportRequestReviewSchema.safeParse({ action: 'approve', note: 'OK' }).success, true);
+  assert.equal(supportRequestReviewSchema.safeParse({ action: 'approve', note: '' }).success, false);
   const service = readFileSync('src/server/domain/supportRequestService.ts', 'utf8');
   assert.match(service, /request\.type !== 'CHANGE' \|\| !reviewer\.isOwner/);
   assert.match(service, /Only an Owner can resolve a data protection request/);

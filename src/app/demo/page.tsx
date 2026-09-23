@@ -51,7 +51,7 @@ export default function DemoPage() {
               <FieldGroup><Label htmlFor="email">Work email</Label><Input id="email" name="email" type="email" required /></FieldGroup>
               <FieldGroup><Label htmlFor="organisation">Organisation</Label><Input id="organisation" name="organisation" required minLength={2} /></FieldGroup>
               <FieldGroup><Label htmlFor="role">Your role</Label><Input id="role" name="role" required placeholder="Buyer, supplier, QS, director" /></FieldGroup>
-              <FieldGroup><Label htmlFor="message">What you need to see</Label><Textarea id="message" name="message" rows={5} required minLength={20} /></FieldGroup>
+              <FieldGroup><Label htmlFor="message">What you need to see</Label><Textarea id="message" name="message" rows={5} required /></FieldGroup>
               {status && <p className="text-sm font-semibold text-foundation-navy" role="status">{status}</p>}
               <Button type="submit" loading={submitting}>Send demo request</Button>
             </form>

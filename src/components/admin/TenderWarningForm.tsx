@@ -26,7 +26,7 @@ export function TenderWarningForm({ tenderId }: { tenderId: string }) {
   return <form onSubmit={issueWarning} className="space-y-4">
     {message && <p role="status" className="rounded-md border border-steel-blue/20 bg-steel-blue/5 px-3 py-2 text-sm text-steel-blue">{message}</p>}
     <div><Label htmlFor="warning-reason">Reason</Label><Input id="warning-reason" required minLength={3} maxLength={160} value={reason} onChange={(event) => setReason(event.target.value)} /></div>
-    <div><Label htmlFor="warning-note">Review note</Label><Textarea id="warning-note" required minLength={3} maxLength={1000} rows={5} value={note} onChange={(event) => setNote(event.target.value)} /></div>
+    <div><Label htmlFor="warning-note">Review note</Label><Textarea id="warning-note" required maxLength={1000} rows={5} value={note} onChange={(event) => setNote(event.target.value)} /></div>
     <Button type="submit" variant="danger" loading={saving}>Issue warning</Button>
   </form>;
 }

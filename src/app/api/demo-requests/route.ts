@@ -12,7 +12,7 @@ const demoRequestSchema = z.object({
   email: z.string().trim().email().max(190),
   organisation: z.string().trim().min(2).max(160),
   role: z.string().trim().min(2).max(80),
-  message: z.string().trim().min(20).max(2000),
+  message: z.string().trim().min(1).max(2000),
 });
 
 export async function POST(request: Request) {

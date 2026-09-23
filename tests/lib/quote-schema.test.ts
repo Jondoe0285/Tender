@@ -54,11 +54,23 @@ test('rejects a quote without commercial delivery information', () => {
     lineItems: [{ tenderItemId: 'tender-item-1', available: true, priceGbp: 2450 }],
     leadTimeDays: 14,
     deliveryDateConfirmed: true,
-    deliveryInfo: 'No',
+    deliveryInfo: '',
     validityDays: 30,
   });
 
   assert.equal(result.success, false);
+});
+
+test('accepts short delivery information without a minimum character count', () => {
+  const result = submitQuoteSchema.safeParse({
+    lineItems: [{ tenderItemId: 'tender-item-1', available: true, priceGbp: 2450 }],
+    leadTimeDays: 14,
+    deliveryDateConfirmed: true,
+    deliveryInfo: 'FOC',
+    validityDays: 30,
+  });
+
+  assert.equal(result.success, true);
 });
 
 test('rejects a quote line without a price', () => {
