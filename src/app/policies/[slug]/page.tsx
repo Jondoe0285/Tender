@@ -46,7 +46,7 @@ const policies = [
       },
       {
         heading: 'Contact release process',
-        content: 'A Contractor may release contact details only after the required payment and release conditions are met, and only for the relevant quote or tender workflow. The release is time-limited to the specific business event and is recorded in an audit log. The platform does not release contact details before the approved trigger condition is satisfied.',
+        content: 'Contact details are released only after the required payment and release conditions are met, and only for the relevant quote or tender workflow. For Materials, Waste, and Plant Hire, release follows quote acceptance and the Client release fee. For Contractor Services and Professional Services, the supplier pays a fixed release fee at unlock and then receives the customer’s contact details to arrange a site visit and prepare a quote. The release is recorded in an audit log.',
       },
       {
         heading: 'Disputes and moderation',
@@ -65,7 +65,7 @@ const policies = [
       },
       {
         heading: 'Tender unlock and access',
-        content: 'A Provider may unlock a tender only if the relevant payment or waiver workflow is valid and the platform permits the action. Access to a tender is limited to the approved platform workflow and protected by server-side authorization.',
+        content: 'A Provider may unlock a tender only if the relevant payment or waiver workflow is valid and the platform permits the action. Access to a tender is limited to the approved platform workflow and protected by server-side authorization. Contractor Services and Professional Services unlocks that confirm the fixed release fee also release customer contact details for site visits and quoting.',
       },
       {
         heading: 'Verification and representation',
@@ -218,7 +218,7 @@ const policies = [
       },
       {
         heading: 'Approved trigger conditions',
-        content: 'A contact release may occur only after the relevant payment or waiver condition is verified and the associated quote or tender workflow is in the authorized state. Where the Owner activates direct contact requests, a Contractor Services or Professional Services Provider may pay the approved direct-contact fee to share only their own Provider contact details with the purchasing Client. This does not release the Client contact details to the Provider. The platform enforces every release server-side and prevents browser-controlled release attempts.',
+        content: 'A contact release may occur only after the relevant payment or waiver condition is verified and the associated quote or tender workflow is in the authorized state. For Contractor Services and Professional Services, confirmation of the supplier’s fixed unlock/release fee releases both parties’ contact details so a site visit and quote can be arranged. For Materials, Waste, and Plant Hire, release follows Client quote acceptance and the Client release fee. Where the Owner activates direct contact requests, a Contractor Services or Professional Services Provider may pay the approved direct-contact fee to share only their own Provider contact details with the purchasing Client. The platform enforces every release server-side and prevents browser-controlled release attempts.',
       },
       {
         heading: 'Audit and revocation',

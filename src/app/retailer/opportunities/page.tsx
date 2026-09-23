@@ -42,7 +42,7 @@ export default async function NewOpportunitiesPage() {
       const categoryMatch = tender.categoryMatch;
       const locationMatch = tender.locationMatch;
       const strongMatch = categoryMatch && locationMatch;
-      const unlockFeeGbp = hasCredits ? 0 : await getTenderUnlockFeeGbp(tender.id);
+      const unlockFeeGbp = hasCredits ? 0 : await getTenderUnlockFeeGbp(tender.id, tender.packageCategories);
 
       return {
         tenderId: tender.id,

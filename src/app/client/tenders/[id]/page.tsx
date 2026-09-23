@@ -72,6 +72,7 @@ export default function ClientTenderDetailPage() {
   const [pendingPayment, setPendingPayment] = useState<{ quoteId: string; paymentId: string; checkoutUrl: string | null } | null>(null);
   const [contacts, setContacts] = useState<Record<string, Contact>>({});
   const [professionalInterests, setProfessionalInterests] = useState<Array<{ id: string; contact: Contact }>>([]);
+  const [releasedProviders, setReleasedProviders] = useState<Array<{ id: string; contact: Contact }>>([]);
   const [directContacts, setDirectContacts] = useState<DirectContact[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -94,7 +95,9 @@ export default function ClientTenderDetailPage() {
       });
     }
     if (tenderResponse.ok) {
-      setTender((await tenderResponse.json()).tender);
+      const tenderPayload = await tenderResponse.json() as { tender: Tender; releasedProviders?: Array<{ id: string; contact: Contact }> };
+      setTender(tenderPayload.tender);
+      setReleasedProviders(tenderPayload.releasedProviders ?? []);
       setLoadError(null);
     } else if (!tender) {
       const data = await tenderResponse.json().catch(() => null);
@@ -360,6 +363,21 @@ export default function ClientTenderDetailPage() {
             )}
           </Card>
         )}
+        {releasedProviders.length > 0 && (
+          <Card className="mt-5">
+            <h3 className="font-heading text-lg font-bold text-foundation-navy">Released supplier contacts</h3>
+            <p className="mt-1 text-sm text-concrete-grey">These contractors or professionals paid the fixed release fee so they can arrange a site visit and quote.</p>
+            <ul className="mt-3 flex flex-col gap-3">
+              {releasedProviders.map((release) => (
+                <li key={release.id} className="border-l-4 border-steel-blue/40 pl-4 text-sm text-concrete-grey">
+                  <p className="font-semibold text-foundation-navy">{release.contact.contactName}</p>
+                  <p>{release.contact.email}</p>
+                  {release.contact.contactPhone && <p>{release.contact.contactPhone}</p>}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
         {professionalInterests.length > 0 && (
           <Card className="mt-5">
             <h3 className="font-heading text-lg font-bold text-foundation-navy">Professional interests</h3>
@@ -413,8 +431,7 @@ export default function ClientTenderDetailPage() {
         ) : (
           <>
             <p className="mb-4 text-sm text-concrete-grey">
-              Compare the commercial details first. Accepting a quote releases contact details for that Provider quote only;
-              the release fee is based on the full submitted quote value, not selected quote lines.
+              Compare the commercial details first. For materials, waste, and plant, accepting a quote and paying the release fee shares contact details for that quote. Contractors and professionals who already paid the unlock fee can contact you for a site visit before they quote.
             </p>
             <QuoteComparison
               quotes={quotes}

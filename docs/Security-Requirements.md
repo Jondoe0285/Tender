@@ -55,7 +55,7 @@ Requirements:
 - **SEC-017:** Sensitive authentication events shall be rate-limited and monitored. Production rate limits shall key from a trusted edge client-IP header (`TRUSTED_CLIENT_IP_HEADER`, default `x-real-ip`) and shall ignore client-controlled `X-Forwarded-For`.
 - **SEC-018:** Password reset or account recovery flows shall use single-use, expiring tokens and shall not disclose account existence.
 - **SEC-019:** Authentication and authorization failures shall return safe, non-sensitive error responses.
-- **SEC-019A:** Super User and Owner administrative APIs, and the Super User portal, shall require enrolled TOTP MFA. Login and MFA enrollment remain available so a privileged account can complete setup. Marketplace `USER` accounts are not required to enroll.
+- **SEC-019A:** Owner administrative APIs and the Owner console shall require enrolled TOTP MFA. Login and MFA enrollment remain available so an Owner can complete setup. Super User and marketplace `USER` accounts are not required to enroll.
 
 ## 5. Input Validation and Output Safety
 
@@ -77,9 +77,9 @@ The platform must preserve anonymity and staged disclosure:
 - **SEC-031:** Before Provider unlock, hide Contractor identity, contact details, the full postcode and address, other precise site information, full specification, attachments, and direct communication details.
 - **SEC-032:** Full tender details shall be returned only after a server-confirmed launch-credit entitlement or verified £10 unlock payment.
 - **SEC-033:** A Provider shall only access details for tenders they are matched to and have legitimately unlocked. A legitimate tender unlock may reveal every package within that same tender but shall not reveal a different tender.
-- **SEC-034:** Contractor and Provider identities shall remain anonymous to one another until the Contractor release condition is met.
-- **SEC-035:** Contact details shall be released only to the authorised Contractor and Provider after confirmed £10 Contractor Accepted Quote Release Fee payment or an explicitly approved waiver.
-- **SEC-035A:** For an eligible Professional Services interest, contact details may be released only to the matched interested User and tender owner after the server confirms the tender deadline has passed; the interest and release event shall be auditable.
+- **SEC-034:** Contractor and Provider identities shall remain anonymous to one another until an authorised release condition is met. For Materials, Waste, and Plant Hire, that condition is the Client accept-and-release payment. For Contractor Services and Professional Services, that condition is the supplier’s confirmed fixed unlock/release fee, which discloses contact details so the supplier can arrange a site visit and prepare a quote.
+- **SEC-035:** Contact details shall be released only to the authorised parties after a confirmed payment or approved waiver. Materials, Waste, and Plant Hire remain on the Client Accepted Quote Release Fee. Contractor Services and Professional Services use the configured fixed supplier release fee at unlock.
+- **SEC-035A:** For an eligible Professional Services interest on a tender that still has that opt-in, contact details may be released only to the matched interested User and tender owner after the server confirms the tender deadline has passed; the interest and release event shall be auditable. New tenders use the unlock-time site-visit release in SEC-034 instead.
 - **SEC-036:** Failed, cancelled, duplicate, replayed, refunded where release is revoked, or ambiguous payment events shall not release protected details.
 - **SEC-037:** Restricted details shall not leak through API responses, server-rendered pages, client bundles, browser storage, notification previews, email summaries, analytics, exports, logs, error pages, metadata, or attachments.
 - **SEC-038:** The server shall re-check release state on every request for protected tender, quote, attachment, or contact data.

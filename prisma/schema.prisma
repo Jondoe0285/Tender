@@ -954,13 +954,16 @@ model StripeEvent {
 model ContactRelease {
   id                  String   @id @default(cuid())
   tenderId            String
-  quoteId             String   @unique
-  quote               Quote    @relation(fields: [quoteId], references: [id])
+  quoteId             String?  @unique
+  quote               Quote?   @relation(fields: [quoteId], references: [id])
   clientId            String
   retailerId          String
   releasedAt          DateTime @default(now())
-  authorizingPaymentId String
-  authorizingPayment  Payment  @relation(fields: [authorizingPaymentId], references: [id])
+  authorizingPaymentId String?
+  authorizingPayment  Payment? @relation(fields: [authorizingPaymentId], references: [id])
+
+  @@unique([tenderId, retailerId])
+  @@index([tenderId, clientId])
 }
 
 model ContactReleaseAuditEvent {
@@ -968,12 +971,12 @@ model ContactReleaseAuditEvent {
   contactReleaseId     String   @unique
   actorId              String
   tenderId             String
-  quoteId              String   @unique
+  quoteId              String?  @unique
   clientId             String
   retailerId           String
   releasedDataCategory String
   releasedAt           DateTime
-  authorizingPaymentId String
+  authorizingPaymentId String?
   correlationId        String   @unique
   createdAt            DateTime @default(now())
 

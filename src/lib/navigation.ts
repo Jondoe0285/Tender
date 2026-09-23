@@ -73,7 +73,7 @@ export const SUPER_USER_NAV: NavGroup[] = [
       { label: 'Partners', href: '/super-user/partners' },
       { label: 'Accountants', href: '/super-user/accountants' },
       { label: 'Accounting', href: '/super-user/accounting' },
-      { label: 'Security', href: '/account/security' },
+      { label: 'Security', href: '/account/security', ownerOnly: true },
     ],
   },
   {

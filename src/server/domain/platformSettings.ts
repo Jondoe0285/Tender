@@ -193,7 +193,7 @@ async function getConfiguredFeeGbp(key: keyof typeof defaultSettings): Promise<n
   return Number.isFinite(value) && value >= 0 ? value : Number(defaultSettings[key]);
 }
 
-export async function getTenderUnlockFeeGbp(tenderId: string): Promise<number> {
+export async function getTenderUnlockFeeGbp(tenderId: string, matchingCategories?: readonly string[]): Promise<number> {
   const fixedUnlockFeeGbp = await getPaymentFeeGbp('RETAILER_UNLOCK');
   if (fixedUnlockFeeGbp <= 0) return 0;
 
@@ -205,11 +205,15 @@ export async function getTenderUnlockFeeGbp(tenderId: string): Promise<number> {
       packages: { select: { category: true, subcategory: true, item: true, description: true, quantity: true } },
     },
   });
-  const serviceFeeKey = tenderUsesFixedServiceRelease([
-    tender.category,
-    ...tender.items.map((item) => item.category),
-    ...tender.packages.map((pkg) => pkg.category),
-  ]);
+  const serviceFeeKey = tenderUsesFixedServiceRelease(
+    matchingCategories && matchingCategories.length > 0
+      ? matchingCategories
+      : [
+        tender.category,
+        ...tender.items.map((item) => item.category),
+        ...tender.packages.map((pkg) => pkg.category),
+      ],
+  );
   if (serviceFeeKey) return getConfiguredFeeGbp(serviceFeeKey);
 
   const mode = await getPlatformSetting('RETAILER_UNLOCK_FEE_MODE');

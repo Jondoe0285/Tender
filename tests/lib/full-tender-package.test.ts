@@ -16,13 +16,15 @@ const eligibleRetailer = {
   serviceProvisions: JSON.stringify(['Waste::Hazardous waste', 'Materials::Reinforcement']),
 };
 
-test('catalogue includes merchant, plant, scaffolding, and training families', () => {
+test('catalogue includes merchant, plant, scaffolding, roofing, and training families', () => {
   assert.ok(SERVICE_CATALOG.Materials.Reinforcement.includes('Cut and bent rebar'));
   assert.ok(SERVICE_CATALOG.Materials['Electrical Supplies'].includes('SWA cable'));
   assert.ok(SERVICE_CATALOG.Materials['Mechanical and Plumbing Supplies'].includes('Copper pipe'));
+  assert.ok(SERVICE_CATALOG.Materials['Roofing Materials'].includes('Roof tiles'));
   assert.ok(SERVICE_CATALOG['Plant Hire'].Compressors.includes('Portable diesel compressors'));
   assert.ok(SERVICE_CATALOG['Plant Hire']['Temporary site establishment'].includes('Hoarding panels and gates'));
   assert.ok(SERVICE_CATALOG['Contractor Services']['Scaffolding and access'].includes('Independent scaffolding'));
+  assert.ok(SERVICE_CATALOG['Contractor Services']['Roofing & Cladding'].includes('Roofing, roof maintenance, cladding and rainwater systems'));
   assert.ok(SERVICE_CATALOG['Professional Services']['Training Providers'].includes('SMSTS'));
   assert.ok(SERVICE_CATALOG.Waste['Skip and container hire'].includes('8 yard skip'));
 });
@@ -65,6 +67,22 @@ test('unlock credentials require WCL for waste and PLI for plant', () => {
     [{ documentType: 'PROFESSIONAL_INDEMNITY_INSURANCE', verified: true, expiryDate: new Date('2020-01-01') }],
     'unlock',
   ), ['PROFESSIONAL_INDEMNITY_INSURANCE']);
+});
+
+test('a scaffolding company does not match a roofing-only package', () => {
+  const scaffolder = {
+    coverageScope: 'COUNTY' as const,
+    counties: 'West Yorkshire',
+    regions: '',
+    categories: 'Contractor Services',
+    serviceProvisions: JSON.stringify(['Contractor Services::Scaffolding and access']),
+  };
+  assert.equal(retailerCanMatchTender(scaffolder, 'Leeds LS10 2AB', [{ category: 'Contractor Services', subcategory: 'Scaffolding and access' }]), true);
+  assert.equal(retailerCanMatchTender(scaffolder, 'Leeds LS10 2AB', [{ category: 'Contractor Services', subcategory: 'Roofing & Cladding' }]), false);
+  assert.equal(retailerCanMatchTender(scaffolder, 'Leeds LS10 2AB', [
+    { category: 'Contractor Services', subcategory: 'Scaffolding and access' },
+    { category: 'Contractor Services', subcategory: 'Roofing & Cladding' },
+  ]), true);
 });
 
 test('lane compliance is gated by selected supply lane', () => {

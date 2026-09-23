@@ -12,7 +12,7 @@ import { TenderMessages } from '@/components/quotes/TenderMessages';
 import { extractPostcode } from '@/lib/geography';
 import { PageLoadState } from '@/components/ui/PageLoadState';
 import { allowTestPayments } from '@/lib/runtime';
-import { isSpecifiedItemService } from '@/lib/categories';
+import { isSpecifiedItemService, isSiteVisitService } from '@/lib/categories';
 import { formatSpecPreview, parseSpecJson } from '@/lib/tender-spec';
 import { pricedQuoteLine } from '@/lib/quote-pricing';
 
@@ -43,6 +43,7 @@ type TenderFull = Omit<TenderSummary, 'items'> & {
 };
 
 type DirectContactStatus = { active: boolean; available: boolean; feeGbp: number; released: boolean; paymentId: string | null; checkoutUrl: string | null; paymentStatus: string | null };
+type ReleasedContact = { contactName: string; contactPhone: string | null; email: string };
 
 export default function RetailerTenderDetailPage() {
   const params = useParams<{ id: string }>();
@@ -66,6 +67,7 @@ export default function RetailerTenderDetailPage() {
   const [professionalInterestPaymentId, setProfessionalInterestPaymentId] = useState<string | null>(null);
   const [professionalInterestContact, setProfessionalInterestContact] = useState<{ contactName: string; contactPhone: string | null; email: string } | null>(null);
   const [professionalInterestAvailable, setProfessionalInterestAvailable] = useState(false);
+  const [buyerContact, setBuyerContact] = useState<ReleasedContact | null>(null);
 
   async function load() {
     const [response, profileResponse, directContactResponse, professionalInterestResponse] = await Promise.all([fetch(`/api/tenders/${params.id}`), fetch('/api/retailer/profile'), fetch(`/api/tenders/${params.id}/direct-contact`), fetch(`/api/tenders/${params.id}/professional-interest`)]);
@@ -77,9 +79,10 @@ export default function RetailerTenderDetailPage() {
       const profile = await profileResponse.json() as { standardQuoteValidityDays?: number };
       setStandardQuoteValidityDays(profile.standardQuoteValidityDays ?? 30);
     }
-    const data = await response.json();
+    const data = await response.json() as { tender: TenderSummary | TenderFull; unlocked: boolean; buyerContact?: ReleasedContact | null };
     setTender(data.tender);
     setUnlocked(data.unlocked);
+    setBuyerContact(data.buyerContact ?? null);
     setLinePrices({});
     setUnavailableItemIds([]);
     setCharges([]);
@@ -291,6 +294,7 @@ export default function RetailerTenderDetailPage() {
 
   const full = unlocked ? (tender as TenderFull) : null;
   const isProfessionalTender = professionalInterestAvailable || interestRegistered || Boolean(professionalInterestPaymentId) || Boolean(professionalInterestContact);
+  const siteVisitUnlock = (tender.packageCategories ?? [tender.category]).some((category) => isSiteVisitService(category));
   const itemsTotal = full?.items.reduce((total, item) => {
     if (unavailableItemIds.includes(item.id)) return total;
     if (isSpecifiedItemService(item.category)) {
@@ -334,11 +338,13 @@ export default function RetailerTenderDetailPage() {
 
           {!unlocked && (
             <Card>
-              <h2 className="font-heading text-lg font-bold text-foundation-navy">{isProfessionalTender ? 'Professional interest' : 'Commercial fit assessment'}</h2>
+              <h2 className="font-heading text-lg font-bold text-foundation-navy">{isProfessionalTender ? 'Professional interest' : siteVisitUnlock ? 'Site visit and quote' : 'Commercial fit assessment'}</h2>
               <p className="mt-2 text-sm leading-relaxed text-concrete-grey">
                 {isProfessionalTender
                   ? 'Pay the Professional Services fee to register your interest. Client contact details are released after the tender deadline, and only if that fee has been paid.'
-                  : 'Unlock to see the full specification, quantity, requirements, and site details needed to prepare a quote. Client contact details remain private until a quote is accepted and the release fee is paid.'}
+                  : siteVisitUnlock
+                    ? 'Pay the fixed release fee to unlock the specification and the customer’s contact details so you can arrange a site visit and prepare a quote.'
+                    : 'Unlock to see the full specification, quantity, requirements, and site details needed to prepare a quote. Client contact details remain private until a quote is accepted and the release fee is paid.'}
               </p>
               {isProfessionalTender
                 ? <p className="mt-3 text-sm font-semibold text-steel-blue">Cost: £{professionalInterestFeeGbp ?? tender.unlockFeeGbp ?? 0} excl. VAT.</p>
@@ -386,7 +392,9 @@ export default function RetailerTenderDetailPage() {
                 <p className="mt-4 text-sm font-semibold text-concrete-grey">Waiting for payment confirmation.</p>
               ) : (
                 <Button onClick={handleUnlock} loading={unlocking} size="lg">
-                  {`Unlock full details — £${tender.unlockFeeGbp ?? 0} excl. VAT`}
+                  {siteVisitUnlock
+                    ? `Pay release fee — £${tender.unlockFeeGbp ?? 0} excl. VAT`
+                    : `Unlock full details — £${tender.unlockFeeGbp ?? 0} excl. VAT`}
                 </Button>
               )}
               {directContactStatus?.active && directContactStatus.available && (
@@ -409,6 +417,15 @@ export default function RetailerTenderDetailPage() {
 
           {full && !isProfessionalTender && (
             <>
+              {buyerContact && (
+                <Card className="mb-6">
+                  <h2 className="font-heading text-lg font-bold text-foundation-navy">Customer contact</h2>
+                  <p className="mt-2 text-sm text-concrete-grey">Use these details to arrange a site visit and prepare your quote.</p>
+                  <p className="mt-3 font-semibold text-foundation-navy">{buyerContact.contactName}</p>
+                  <p className="text-sm text-concrete-grey">{buyerContact.email}</p>
+                  {buyerContact.contactPhone && <p className="text-sm text-concrete-grey">{buyerContact.contactPhone}</p>}
+                </Card>
+              )}
               <Card className="mb-6">
                 <h2 className="font-heading text-lg font-bold text-foundation-navy">Tender requirements</h2>
                 {(full.packages && full.packages.length > 0) && (

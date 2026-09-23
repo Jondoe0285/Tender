@@ -160,6 +160,18 @@ export function tenderProvisionPackageWhere(provisions: string[]): { id: { in: s
   };
 }
 
+/** Categories this supplier is matched to on a tender. Used for unlock fee and site-visit contact release. */
+export async function retailerMatchedCategories(retailerId: string, tenderId: string): Promise<string[]> {
+  const provisions = await getUserTenderServiceProvisions(retailerId);
+  if (provisions.length === 0) return [];
+  const provisionWhere = tenderProvisionPackageWhere(provisions);
+  const [items, packages] = await Promise.all([
+    prisma.tenderItem.findMany({ where: { tenderId, ...provisionWhere }, select: { category: true } }),
+    prisma.tenderPackage.findMany({ where: { tenderId, ...provisionWhere }, select: { category: true } }),
+  ]);
+  return [...new Set((items.length > 0 ? items : packages).map((entry) => entry.category))];
+}
+
 export async function userOwnsTender(userId: string, tenderId: string): Promise<boolean> {
   const memberIds = await getCompanyMemberIds(userId);
   return Boolean(await prisma.tender.findFirst({ where: { id: tenderId, clientId: { in: memberIds } }, select: { id: true } }));
@@ -419,27 +431,7 @@ export async function createTender(clientId: string, input: CreateTenderInput) {
       metadata: { matchedRetailerCount: uniqueRetailerIds.length, matchedItemCount: itemMatches.length },
     });
 
-    await Promise.allSettled(
-      tenderItems.flatMap((item) => matchedRetailers
-        .filter((retailer) => retailer.user.clientCompanyMembership && matchingItemsForRetailer(companyEligibility(retailer, retailer.user.clientCompanyMembership.company), [item]).length > 0)
-        .map(async (retailer) => {
-        const result = await sendTenderOpportunityEmail(retailer.user.email, {
-            id: tender.id,
-            reference: tender.reference,
-            category: `${item.category} / ${item.subcategory}`,
-            locationArea: formatRetailerSummaryLocation(tender.location),
-            closingDate: tender.closingDate,
-            requirementSummary: [item.item, item.quantity].filter(Boolean).join(' · '),
-          });
-        await recordAuditEvent({
-          actorId: null,
-          action: result.sent ? 'TENDER_NOTIFICATION_SENT' : 'TENDER_NOTIFICATION_SKIPPED',
-          targetType: 'Tender',
-          targetId: tender.id,
-          metadata: { retailerId: retailer.userId, tenderItemId: item.id, reason: result.sent ? undefined : result.reason },
-        });
-      }))
-    );
+    void notifyMatchedRetailers(tender, tenderItems, matchedRetailers);
   }
 
   await notifyTenderOwnerOfHighRisk(tender.id);
@@ -639,9 +631,57 @@ export async function matchRetailerToOpenTenders(retailerId: string) {
   }
 }
 
+type MatchedOpportunityRetailer = RetailerTenderEligibilityProfile & {
+  userId: string;
+  user: { email: string; clientCompanyMembership: { company: CompanyMatchFields } | null };
+};
+
+async function notifyMatchedRetailers(
+  tender: { id: string; reference: string; location: string; closingDate: Date },
+  tenderItems: Array<{ id: string; category: string; subcategory: string; item: string | null; quantity: string }>,
+  matchedRetailers: MatchedOpportunityRetailer[],
+) {
+  const notified = new Set<string>();
+  await Promise.allSettled(matchedRetailers.map(async (retailer) => {
+    if (notified.has(retailer.userId) || !retailer.user.clientCompanyMembership) return;
+    notified.add(retailer.userId);
+    const eligibility = companyEligibility(retailer, retailer.user.clientCompanyMembership.company);
+    const matchingItem = tenderItems.find((item) => matchingItemsForRetailer(eligibility, [item]).length > 0) ?? tenderItems[0];
+    if (!matchingItem) return;
+    const result = await sendTenderOpportunityEmail(retailer.user.email, {
+      id: tender.id,
+      reference: tender.reference,
+      category: `${matchingItem.category} / ${matchingItem.subcategory}`,
+      locationArea: formatRetailerSummaryLocation(tender.location),
+      closingDate: tender.closingDate,
+      requirementSummary: [matchingItem.item, matchingItem.quantity].filter(Boolean).join(' · '),
+    });
+    await recordAuditEvent({
+      actorId: null,
+      action: result.sent ? 'TENDER_NOTIFICATION_SENT' : 'TENDER_NOTIFICATION_SKIPPED',
+      targetType: 'Tender',
+      targetId: tender.id,
+      metadata: { retailerId: retailer.userId, tenderItemId: matchingItem.id, reason: result.sent ? undefined : result.reason },
+    });
+  }));
+}
+
 /** Own tenders only — the repository call itself enforces ownership via the where clause. */
 export function listTendersForClient(clientId: string) {
-  return getCompanyMemberIds(clientId).then((memberIds) => prisma.tender.findMany({ where: { clientId: { in: memberIds } }, orderBy: { createdAt: 'desc' } }));
+  return getCompanyMemberIds(clientId).then((memberIds) => prisma.tender.findMany({
+    where: { clientId: { in: memberIds } },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      reference: true,
+      status: true,
+      closingDate: true,
+      location: true,
+      category: true,
+      subcategory: true,
+      createdAt: true,
+    },
+  }));
 }
 
 export function buildRetailerTenderSummary(requirements: string | null | undefined): string[] {

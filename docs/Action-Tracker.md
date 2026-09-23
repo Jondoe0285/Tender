@@ -6,7 +6,7 @@ It is intentionally stored in the repository so it travels with the code across 
 
 ## Outstanding Actions
 
-The ambition is **enterprise-ready**: a specified package workspace that a Tier 1 contractor can trust for closed regional procurement, then national use. Bar is 70. Last honest score on staging `5120c73` was **56/100**. Live rail remains 12. Production remains **BLOCKED**.
+The ambition is **enterprise-ready**: a specified package workspace that a Tier 1 contractor can trust for closed regional procurement, then national use. Bar is 70. Last honest score on staging `d0699a4` was **59/100**. Live rail remains 12. Production remains **BLOCKED**.
 
 Work top to bottom — live-rail config first, then remaining operational evidence. Specify → Compare → Award was re-walked on localhost (23 September 2026). Localhost axe WCAG 2 A/AA was clean on the public first-journey pages and the signed-in dashboard. Real-device confirmation is still outstanding.
 
@@ -44,7 +44,7 @@ Actions below include the 2026-09-22 enterprise due-diligence recommendations. E
 
 ### Data, Product, and Marketplace
 
-- [ ] Run a closed regional beachhead (one geography, limited trades, invited demand) and instrument match → unlock → quote → accept → release before any national acquisition spend. Conversion funnel exists in Super User code. Owner MFA is required for Super User and Owner; the ops board flags a missing or placeholder `PLATFORM_OWNER_EMAIL` and Owners with MFA off. Outstanding: set a real `PLATFORM_OWNER_EMAIL` on each environment and complete Owner MFA enrollment.
+- [ ] Run a closed regional beachhead (one geography, limited trades, invited demand) and instrument match → unlock → quote → accept → release before any national acquisition spend. Conversion funnel exists in Super User code. Owner MFA is required for Owner accounts only; Super User and marketplace accounts do not enroll. The ops board flags a missing or placeholder `PLATFORM_OWNER_EMAIL` and Owners with MFA off. Outstanding: set a real `PLATFORM_OWNER_EMAIL` on each environment and complete Owner MFA enrollment.
 - [ ] Before enterprise sales, move sponsored placements off the quote-comparison surface. Year 1 launch keeps sponsorship on comparison (founder decision 2026-09-18); this is not a Year 1 reopen.
 
 ### Operations and Recovery

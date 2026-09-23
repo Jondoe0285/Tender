@@ -11,7 +11,8 @@ export default async function OwnerConsolePage() {
   const user = await getCurrentUser();
   if (!user || user.role !== 'SUPER_USER') redirect('/login');
   if (user.isAccountant) redirect('/super-user/accounting');
-  if (!user.isOwner) redirect('/login');
+  if (!user.isOwner) redirect('/super-user');
+  if (!user.mfaEnabled) redirect('/account/security');
 
   const superUsers = await prisma.user.findMany({
     where: { role: 'SUPER_USER' },

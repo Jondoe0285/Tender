@@ -6,9 +6,10 @@ export default withAuth(
   function proxy(request) {
     const role = request.nextauth.token?.role;
     const path = request.nextUrl.pathname;
+    const isOwner = Boolean(request.nextauth.token?.isOwner);
     const mfaEnabled = Boolean(request.nextauth.token?.mfaEnabled);
 
-    if ((role === 'SUPER_USER') && !mfaEnabled && path.startsWith('/super-user')) {
+    if (isOwner && !mfaEnabled && path.startsWith('/super-user/owner')) {
       return NextResponse.redirect(appUrl('/account/security'));
     }
 

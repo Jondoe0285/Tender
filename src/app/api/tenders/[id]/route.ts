@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser, requireRole, ForbiddenError, UnauthorizedError } from '@/server/auth/session';
 import { toErrorResponse } from '@/server/http/errors';
 import { getUnlockedTenderForRetailer } from '@/server/domain/unlockService';
-import { formatRetailerSummaryLocation, getUserTenderServiceProvisions, markMatchViewed, tenderProvisionPackageWhere, updateTender, userOwnsTender } from '@/server/domain/tenderService';
+import { formatRetailerSummaryLocation, getUserTenderServiceProvisions, markMatchViewed, retailerMatchedCategories, tenderProvisionPackageWhere, updateTender, userOwnsTender } from '@/server/domain/tenderService';
 import { prisma } from '@/server/data/prisma';
 import { getTenderUnlockFeeGbp } from '@/server/domain/platformSettings';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { updateTenderSchema } from '@/lib/schemas/tender';
 import { assertAnyBuyerDuty } from '@/server/domain/workspacePermissions';
+import { getReleasedBuyerContact, listReleasedProviderContacts, releaseSiteVisitContact } from '@/server/domain/contactReleaseService';
 
 export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -26,7 +27,8 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
       },
     }) : null;
     if (ownedTender) {
-      return NextResponse.json({ tender: ownedTender, unlocked: true });
+      const releasedProviders = await listReleasedProviderContacts(user.id, params.id);
+      return NextResponse.json({ tender: ownedTender, unlocked: true, releasedProviders });
     }
 
     const match = await prisma.tenderMatch.findUnique({
@@ -41,13 +43,18 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
     });
 
     if (unlock) {
-      const tender = await getUnlockedTenderForRetailer(user.id, params.id);
-      return NextResponse.json({ tender, unlocked: true });
+      await releaseSiteVisitContact(user.id, params.id, unlock.paymentId).catch(() => undefined);
+      const [tender, buyerContact] = await Promise.all([
+        getUnlockedTenderForRetailer(user.id, params.id),
+        getReleasedBuyerContact(user.id, params.id),
+      ]);
+      return NextResponse.json({ tender, unlocked: true, buyerContact });
     }
 
     // Pre-unlock: approved non-sensitive summary only (SEC-030/031).
     const provisions = await getUserTenderServiceProvisions(user.id);
     const provisionWhere = tenderProvisionPackageWhere(provisions);
+    const matchingCategories = await retailerMatchedCategories(user.id, params.id);
     const [tender, unlockFeeGbp] = await Promise.all([
       prisma.tender.findUniqueOrThrow({
         where: { id: params.id },
@@ -57,7 +64,7 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
           packages: { where: provisionWhere, orderBy: { createdAt: 'asc' }, select: { id: true, reference: true, category: true, subcategory: true, item: true, quantity: true, specJson: true } },
         },
       }),
-        getTenderUnlockFeeGbp(params.id),
+        getTenderUnlockFeeGbp(params.id, matchingCategories),
     ]);
     const packageCategories = [...new Set((tender.packages ?? []).map((pkg) => pkg.category))];
     return NextResponse.json({ tender: { ...tender, category: packageCategories[0] ?? tender.category, packageCategories, packageCount: packageCategories.length, location: formatRetailerSummaryLocation(tender.location), unlockFeeGbp }, unlocked: false });

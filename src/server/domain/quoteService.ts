@@ -9,7 +9,7 @@ import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
 import { independentReviewExpired } from '@/server/domain/independentReviewService';
 import { getClientReleaseFeeGbp, getPlatformSetting } from '@/server/domain/platformSettings';
-import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getTenderReviewSnapshot, getUserTenderServiceCategories, userOwnsTender } from '@/server/domain/tenderService';
+import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getTenderReviewSnapshot, getUserTenderServiceProvisions, tenderProvisionPackageWhere, userOwnsTender } from '@/server/domain/tenderService';
 import { syncVerificationExpiryForUserIds } from '@/server/domain/verificationDocumentService';
 import { VERIFICATION_DOCUMENT_TYPES } from '@/lib/verification-documents';
 import { pricedQuoteLine } from '@/lib/quote-pricing';
@@ -63,12 +63,13 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
     ...input.charges.map((charge, index) => ({ name: `quote item ${index + 1} description`, value: charge.description })),
   ], { type: 'QUOTE_SUBMISSION', tender: tenderReviewSnapshot, quote: input });
 
-  const serviceCategories = await getUserTenderServiceCategories(retailerId);
+  const provisions = await getUserTenderServiceProvisions(retailerId);
+  const provisionWhere = tenderProvisionPackageWhere(provisions);
   const tender = await prisma.tender.findUniqueOrThrow({
     where: { id: tenderId },
     include: {
       client: { select: { email: true } },
-      items: { where: { category: { in: serviceCategories } }, select: { id: true, category: true, quantity: true } },
+      items: { where: provisionWhere, select: { id: true, category: true, quantity: true } },
       packages: { select: { specHash: true }, orderBy: { packageIndex: 'asc' } },
     },
   });

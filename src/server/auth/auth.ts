@@ -20,8 +20,7 @@ export async function authenticateCredentials(credentials: Record<string, unknow
     if (updated.failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) await prisma.user.update({ where: { id: user.id }, data: { loginLockedUntil: new Date(Date.now() + LOGIN_LOCKOUT_MS) } });
     return null;
   }
-  const privileged = user.role === 'SUPER_USER' || user.isOwner;
-  if (privileged && user.mfaEnabled) {
+  if (user.isOwner && user.mfaEnabled) {
     const mfaCode = typeof credentials?.mfaCode === 'string' ? credentials.mfaCode.trim() : '';
     let verified = false;
     if (mfaCode && user.mfaSecretEncrypted) verified = await verifyMfaCode(decryptMfaSecret(user.mfaSecretEncrypted), mfaCode).catch(() => false);

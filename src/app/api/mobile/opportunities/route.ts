@@ -26,7 +26,7 @@ export async function GET() {
         closingDate: tender.closingDate,
         requirements: tender.requirements,
         isNew: !viewedAt,
-        unlockFeeGbp: effectiveLaunchCredits(profile?.launchCreditsLeft ?? 0, profile?.launchCreditsExpireAt) > 0 ? 0 : await getTenderUnlockFeeGbp(tender.id),
+        unlockFeeGbp: effectiveLaunchCredits(profile?.launchCreditsLeft ?? 0, profile?.launchCreditsExpireAt) > 0 ? 0 : await getTenderUnlockFeeGbp(tender.id, tender.packageCategories),
       })));
     return NextResponse.json({
       opportunities,

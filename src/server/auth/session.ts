@@ -8,9 +8,9 @@ export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'USE
 
 export type CurrentAccount = { id: string; email: string; role: SessionUser['role']; suspended: boolean; isOwner: boolean; isAccountant: boolean; sessionVersion: number; mfaEnabled: boolean; roleMemberships: { role: SessionUser['role'] }[] };
 
-/** Super User and Owner accounts must complete TOTP MFA before administrative APIs. */
+/** Owner accounts must complete TOTP MFA before Owner APIs. Super User and USER do not. */
 export function privilegedMfaSatisfied(account: { role: string; isOwner: boolean; mfaEnabled: boolean }): boolean {
-  if (account.role !== 'SUPER_USER' && !account.isOwner) return true;
+  if (!account.isOwner) return true;
   return account.mfaEnabled;
 }
 
@@ -115,18 +115,23 @@ export async function requireRole(...roles: SessionUser['role'][]): Promise<Sess
   return user;
 }
 
-/** Owner-gated actions require Super User plus the Owner flag. Fails closed. */
-export async function requireOwner(): Promise<SessionUser> {
+/** Owner identity without MFA — enrollment stays available so an Owner can complete setup. */
+export async function requireOwnerAccount(): Promise<SessionUser> {
   const user = await requireRole('SUPER_USER');
   if (!user.isOwner) throw new ForbiddenError();
+  return user;
+}
+
+/** Owner-gated actions require Super User plus the Owner flag and enrolled MFA. Fails closed. */
+export async function requireOwner(): Promise<SessionUser> {
+  const user = await requireOwnerAccount();
   if (!privilegedMfaSatisfied(user)) throw new ForbiddenError('MFA_SETUP_REQUIRED');
   return user;
 }
 
-/** Full Super User access excludes restricted Accountant sub-accounts. Fails closed. */
+/** Full Super User access excludes restricted Accountant sub-accounts. MFA is Owner-only. */
 export async function requireFullSuperUser(): Promise<SessionUser> {
   const user = await requireRole('SUPER_USER');
   if (user.isAccountant) throw new ForbiddenError();
-  if (!privilegedMfaSatisfied(user)) throw new ForbiddenError('MFA_SETUP_REQUIRED');
   return user;
 }

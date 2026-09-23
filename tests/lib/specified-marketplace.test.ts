@@ -39,7 +39,7 @@ test('waste lines require EWC, hazardous flag, container, and tonnes', () => {
 });
 
 test('materials and plant specs are typed, not essays', () => {
-  assert.ok(specIssues('Materials', {}, '20 tonnes').length > 0);
+  assert.deepEqual(specIssues('Materials', {}, '20 tonnes'), []);
   assert.deepEqual(specIssues('Materials', { dimension: '20 mm', materialClass: 'Type 1', standard: 'SHW Clause 803', pack: 'bulk' }, '20 tonnes'), []);
   assert.deepEqual(specIssues('Plant Hire', { plantClass: 'Excavators', capacity: '3 tonnes', period: '2 weeks' }, '2 weeks'), []);
   assert.equal(formatSpecPreview({ ewcCode: '17 05 04', hazardous: false, container: 'skip' }).includes('EWC'), true);

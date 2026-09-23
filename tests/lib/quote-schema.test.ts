@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { submitQuoteSchema } from '../../src/lib/schemas/quote';
 
@@ -108,4 +109,11 @@ test('requires a retailer delivery-date confirmation', () => {
   });
 
   assert.equal(result.success, false);
+});
+
+test('quote submit prices only packages that match the company provisions', () => {
+  const source = readFileSync('src/server/domain/quoteService.ts', 'utf8');
+  assert.match(source, /getUserTenderServiceProvisions/);
+  assert.match(source, /tenderProvisionPackageWhere/);
+  assert.doesNotMatch(source, /getUserTenderServiceCategories/);
 });

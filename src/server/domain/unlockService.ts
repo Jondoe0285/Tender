@@ -3,13 +3,14 @@ import { Prisma } from '@prisma/client';
 import { createPayment } from '@/server/payments/paymentService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { ForbiddenError } from '@/server/auth/session';
-import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getUserTenderServiceProvisions, tenderProvisionPackageWhere } from '@/server/domain/tenderService';
+import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getUserTenderServiceProvisions, retailerMatchedCategories, tenderProvisionPackageWhere } from '@/server/domain/tenderService';
 import { membershipTiersEnabled } from '@/server/domain/membershipService';
 import { getTenderUnlockFeeGbp } from '@/server/domain/platformSettings';
 import { consumePaymentWaiver } from '@/server/domain/paymentWaiverService';
 import { HARVEST_CAP_MESSAGE, UNLOCK_HARVEST_CAP, UNLOCK_HARVEST_WINDOW_DAYS, harvestUnlockCount } from '@/lib/harvest';
 import { effectiveLaunchCredits } from '@/lib/launch-credits';
 import { credentialsMessage, missingCredentials } from '@/lib/package-credentials';
+import { releaseSiteVisitContact } from '@/server/domain/contactReleaseService';
 
 type UnlockOutcome =
   | { status: 'ALREADY_UNLOCKED' }
@@ -52,6 +53,10 @@ export async function assertUnlockHarvestCap(retailerId: string) {
   }
 }
 
+async function releaseSiteVisitContactAfterUnlock(retailerId: string, tenderId: string, paymentId?: string | null) {
+  await releaseSiteVisitContact(retailerId, tenderId, paymentId ?? null).catch(() => undefined);
+}
+
 /** Sole entry point for changing tender visibility for a Retailer (SEC-032/033). */
 export async function requestUnlock(retailerId: string, tenderId: string, mobileReturnUrl?: string): Promise<UnlockOutcome> {
   await assertRetailerEligibleForTender(retailerId, tenderId);
@@ -62,9 +67,13 @@ export async function requestUnlock(retailerId: string, tenderId: string, mobile
   const existing = await prisma.unlock.findUnique({
     where: { tenderId_retailerId: { tenderId, retailerId } },
   });
-  if (existing) return { status: 'ALREADY_UNLOCKED' };
+  if (existing) {
+    await releaseSiteVisitContactAfterUnlock(retailerId, tenderId, existing.paymentId);
+    return { status: 'ALREADY_UNLOCKED' };
+  }
 
-  const unlockFeeGbp = await getTenderUnlockFeeGbp(tenderId);
+  const matchingCategories = await retailerMatchedCategories(retailerId, tenderId);
+  const unlockFeeGbp = await getTenderUnlockFeeGbp(tenderId, matchingCategories);
   if (unlockFeeGbp <= 0) {
     await prisma.unlock.create({ data: { tenderId, retailerId, method: 'WAIVED' } });
     await recordAuditEvent({
@@ -74,6 +83,7 @@ export async function requestUnlock(retailerId: string, tenderId: string, mobile
       targetId: tenderId,
       metadata: { method: 'WAIVED', feeGbp: 0 },
     });
+    await releaseSiteVisitContactAfterUnlock(retailerId, tenderId);
     return { status: 'UNLOCKED_WITHOUT_PAYMENT_REQUIRED' };
   }
 
@@ -83,6 +93,7 @@ export async function requestUnlock(retailerId: string, tenderId: string, mobile
       await prisma.unlock.create({ data: { tenderId, retailerId, method: 'WAIVED', paymentId: waiverUse.payment.id } });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        await releaseSiteVisitContactAfterUnlock(retailerId, tenderId, waiverUse.payment.id);
         return { status: 'ALREADY_UNLOCKED' };
       }
       throw error;
@@ -94,6 +105,7 @@ export async function requestUnlock(retailerId: string, tenderId: string, mobile
       targetId: tenderId,
       metadata: { method: 'WAIVED', paymentId: waiverUse.payment.id, paymentWaiverId: waiverUse.waiver.id },
     });
+    await releaseSiteVisitContactAfterUnlock(retailerId, tenderId, waiverUse.payment.id);
     return { status: 'UNLOCKED_WITHOUT_PAYMENT_REQUIRED' };
   }
 
@@ -117,6 +129,7 @@ export async function requestUnlock(retailerId: string, tenderId: string, mobile
         targetId: tenderId,
         metadata: { method: 'CREDIT' },
       });
+      await releaseSiteVisitContactAfterUnlock(retailerId, tenderId);
       return { status: 'UNLOCKED_WITH_CREDIT' };
     }
   }
@@ -135,6 +148,7 @@ export async function requestUnlock(retailerId: string, tenderId: string, mobile
       if (monthlyUnlockCount < membership.tier.freeTenderOpportunitiesPerMonth) {
         await prisma.unlock.create({ data: { tenderId, retailerId, method: 'CREDIT' } });
         await recordAuditEvent({ actorId: retailerId, action: 'TENDER_UNLOCKED', targetType: 'Tender', targetId: tenderId, metadata: { method: 'MEMBERSHIP', tierId: membership.tierId, monthlyAllowance: membership.tier.freeTenderOpportunitiesPerMonth } });
+        await releaseSiteVisitContactAfterUnlock(retailerId, tenderId);
         return { status: 'UNLOCKED_WITH_CREDIT' };
       }
       const payment = await createPayment({ type: 'RETAILER_UNLOCK', userId: retailerId, tenderId, mobileReturnUrl, discountPercentage: membership.tier.additionalCreditDiscountPercentage });
@@ -157,7 +171,10 @@ export async function finalizeUnlockWithPayment(retailerId: string, tenderId: st
   }
 
   const existingUnlock = await prisma.unlock.findUnique({ where: { tenderId_retailerId: { tenderId, retailerId } } });
-  if (existingUnlock) return existingUnlock;
+  if (existingUnlock) {
+    await releaseSiteVisitContactAfterUnlock(retailerId, tenderId, paymentId);
+    return existingUnlock;
+  }
 
   let unlock;
   try {
@@ -165,7 +182,10 @@ export async function finalizeUnlockWithPayment(retailerId: string, tenderId: st
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       const concurrentUnlock = await prisma.unlock.findUnique({ where: { tenderId_retailerId: { tenderId, retailerId } } });
-      if (concurrentUnlock) return concurrentUnlock;
+      if (concurrentUnlock) {
+        await releaseSiteVisitContactAfterUnlock(retailerId, tenderId, paymentId);
+        return concurrentUnlock;
+      }
     }
     throw error;
   }
@@ -177,6 +197,7 @@ export async function finalizeUnlockWithPayment(retailerId: string, tenderId: st
     targetId: tenderId,
     metadata: { method: 'PAID', paymentId },
   });
+  await releaseSiteVisitContactAfterUnlock(retailerId, tenderId, paymentId);
 
   return unlock;
 }
@@ -191,7 +212,7 @@ export async function getUnlockedTenderForRetailer(retailerId: string, tenderId:
   if (provisions.length === 0) throw new ForbiddenError('No active company services are configured');
   const provisionWhere = tenderProvisionPackageWhere(provisions);
 
-  // Client identity (clientId) is withheld even after unlock — anonymity holds until contact release (SEC-034).
+  // Client identity is withheld on this object. Site-visit contact is a separate authorised payload (SEC-034).
   return prisma.tender.findUniqueOrThrow({
     where: { id: tenderId },
     select: {

@@ -35,7 +35,7 @@ export function TenderMessages({ tenderId, quoteId, role, tenderClosed = false }
       setUnavailableReason(tenderClosed ? 'CLOSED' : 'NO_RELEASE');
       setMessage(tenderClosed
         ? 'This tender is closed. Questions are no longer available.'
-        : 'Questions open after a quote is accepted and contact details are released.');
+        : 'Questions open after contact details are released.');
       setLoading(false);
       return;
     }
@@ -45,7 +45,7 @@ export function TenderMessages({ tenderId, quoteId, role, tenderClosed = false }
     if (data.unavailableReason === 'CLOSED') {
       setMessage('This tender is closed. Questions are no longer available.');
     } else if (data.unavailableReason === 'NO_RELEASE') {
-      setMessage('Questions open after a quote is accepted and contact details are released.');
+      setMessage('Questions open after contact details are released.');
     }
     setLoading(false);
   }

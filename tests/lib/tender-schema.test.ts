@@ -201,13 +201,17 @@ test('accepts Contractor and Professional Services tender provisions', () => {
     category: 'Contractor Services',
     subcategory: 'Groundworks & Civil Engineering',
     item: undefined,
-    quantity: '120 m²',
+    quantity: 'not applicable',
+    itemDescription: '',
+    description: '',
   });
   const professionalService = createTenderSchema.safeParse({
     ...VALID_TENDER,
     category: 'Professional Services',
     subcategory: 'Health, Safety & CDM Consultancy',
     item: 'Retained health and safety consultancy',
+    quantity: 'not applicable',
+    itemDescription: '',
   });
 
   assert.equal(contractorService.success, true);
@@ -278,7 +282,7 @@ test('writes registration coverage onto the company locations matching reads', (
   assert.equal(operatingLocationsFromCoverage({ coverageScope: 'COUNTY', counties: ['West Yorkshire', 'Greater Manchester'] }), 'West Yorkshire,Greater Manchester');
 });
 
-test('rejects a tender without specification notes', () => {
+test('accepts a tender without optional specification notes', () => {
   const result = createTenderSchema.safeParse({
     projectName: 'Ready mix concrete delivery',
     category: 'Materials',
@@ -286,21 +290,14 @@ test('rejects a tender without specification notes', () => {
     item: 'Ready-mix concrete',
     location: 'Leeds LS10 2AB',
     quantity: '10 m³',
-    itemDescription: 'Concrete supply specification must include mix design and delivery assumptions.',
+    itemDescription: '',
     urgency: 'standard',
     closingDate: '2099-08-27',
-    itemDescription: '',
     description: '',
-    items: [{
-      category: 'Plant Hire',
-      subcategory: 'Excavators',
-      item: 'Mini excavators approx. 1.5-3 tonnes',
-      quantity: '1 unit',
-      description: '',
-    }],
+    spec: { dimension: 'C30', materialClass: 'GEN3', standard: 'BS 8500', pack: 'bulk' },
   });
 
-  assert.equal(result.success, false);
+  assert.equal(result.success, true);
 });
 
 test('rejects a supply date in the past', () => {

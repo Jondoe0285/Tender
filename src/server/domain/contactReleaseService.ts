@@ -13,13 +13,22 @@ import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { getPurchasedRetentionDeadline } from '@/server/domain/retentionService';
 import { consumePaymentWaiver } from '@/server/domain/paymentWaiverService';
 import { syncVerificationExpiry } from '@/server/domain/verificationDocumentService';
-import { userOwnsTender } from '@/server/domain/tenderService';
+import { userOwnsTender, retailerMatchedCategories } from '@/server/domain/tenderService';
 import { issuedTenderSpecHash, STALE_QUOTE_REVISION_MESSAGE } from '@/lib/package-spec';
 import { isValidPurchaseOrderNumber } from '@/lib/enterprise-controls';
 import { assertReleaseSpendCap } from '@/server/domain/purchaseControl';
 import { buyingTenderPath, supplyingTenderPath } from '@/lib/workspace-paths';
+import { tenderUsesFixedServiceRelease } from '@/server/domain/platformSettings';
 
 type AcceptOutcome = { status: 'PAYMENT_REQUIRED' | 'RELEASED_WITH_CREDIT'; paymentId: string; checkoutUrl: string | null; devMode: boolean; feeGbp: number; vatGbp: number; totalAmountGbp: number; creditsLeft?: number };
+
+const authorisedReleaseWhere = {
+  OR: [{ authorizingPaymentId: null }, { authorizingPayment: { status: 'CONFIRMED' as const } }],
+};
+
+function counterpartyContactSelect() {
+  return { contactName: true, contactPhone: true, email: true } as const;
+}
 
 /** Accepting a quote enters a pending release-fee state — no contact data is exposed yet (SEC-035). */
 export async function acceptQuote(clientId: string, quoteId: string, mobileReturnUrl?: string, declarationAccepted = false, secondApproverEmail?: string, purchaseOrderNumber?: string): Promise<AcceptOutcome> {
@@ -210,8 +219,15 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
       });
       if (!payment) throw new ForbiddenError('Payment is not a confirmed release payment for this Client');
 
-      const existing = await transaction.contactRelease.findUnique({ where: { quoteId } });
-      if (existing) return existing;
+      const existing = await transaction.contactRelease.findFirst({
+        where: { OR: [{ quoteId }, { tenderId: quote.tenderId, retailerId: quote.retailerId }] },
+      });
+      if (existing) {
+        if (!existing.quoteId) {
+          return transaction.contactRelease.update({ where: { id: existing.id }, data: { quoteId } });
+        }
+        return existing;
+      }
 
       const createdRelease = await transaction.contactRelease.create({
         data: {
@@ -257,9 +273,11 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
       return createdRelease;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (error) {
-    // The quoteId unique constraint rejects a concurrent duplicate finalisation; return the row it created.
+    // Unique constraints reject a concurrent duplicate finalisation; return the row it created.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      const concurrent = await prisma.contactRelease.findUnique({ where: { quoteId } });
+      const concurrent = await prisma.contactRelease.findFirst({
+        where: { OR: [{ quoteId }, { tenderId: quote.tenderId, retailerId: quote.retailerId }] },
+      });
       if (concurrent) return concurrent;
     }
     throw error;
@@ -296,18 +314,178 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
 
 /** Returns the counterparty's contact details only if a release event authorises this requester. */
 export async function getReleasedContact(userId: string, quoteId: string) {
+  const quote = await prisma.quote.findUnique({
+    where: { id: quoteId },
+    select: { tenderId: true, retailerId: true, tender: { select: { clientId: true } } },
+  });
   const release = await prisma.contactRelease.findFirst({
-    where: { quoteId, authorizingPayment: { status: 'CONFIRMED' } },
+    where: {
+      AND: [
+        authorisedReleaseWhere,
+        quote
+          ? { OR: [{ quoteId }, { tenderId: quote.tenderId, retailerId: quote.retailerId }] }
+          : { quoteId },
+      ],
+    },
   });
   if (!release || (release.clientId !== userId && release.retailerId !== userId)) {
     throw new ForbiddenError('Contact details have not been released to this user');
   }
 
   const counterpartyId = release.clientId === userId ? release.retailerId : release.clientId;
-  const counterparty = await prisma.user.findUniqueOrThrow({
+  return prisma.user.findUniqueOrThrow({
     where: { id: counterpartyId },
-    select: { contactName: true, contactPhone: true, email: true },
+    select: counterpartyContactSelect(),
   });
+}
 
-  return counterparty;
+export type ReleasedContact = { contactName: string; contactPhone: string | null; email: string };
+
+/** After a contractor or professional pays the fixed unlock fee, both parties get contact details for a site visit and quote. */
+export async function releaseSiteVisitContact(retailerId: string, tenderId: string, authorizingPaymentId: string | null) {
+  const categories = await retailerMatchedCategories(retailerId, tenderId);
+  if (!tenderUsesFixedServiceRelease(categories)) return null;
+
+  const tender = await prisma.tender.findUnique({
+    where: { id: tenderId },
+    select: { id: true, reference: true, clientId: true },
+  });
+  if (!tender) throw new ForbiddenError('Tender not found');
+
+  if (authorizingPaymentId) {
+    const payment = await prisma.payment.findFirst({
+      where: { id: authorizingPaymentId, userId: retailerId, tenderId, type: 'RETAILER_UNLOCK', status: 'CONFIRMED' },
+      select: { id: true },
+    });
+    if (!payment) throw new ForbiddenError('Payment is not a confirmed unlock payment for this Provider');
+  }
+
+  const existing = await prisma.contactRelease.findFirst({
+    where: { tenderId, retailerId },
+  });
+  if (existing) return existing;
+
+  let release;
+  try {
+    const releasedAt = new Date();
+    const correlationId = randomUUID();
+    release = await prisma.$transaction(async (transaction) => {
+      if (authorizingPaymentId) {
+        const payment = await transaction.payment.findFirst({
+          where: { id: authorizingPaymentId, userId: retailerId, tenderId, type: 'RETAILER_UNLOCK', status: 'CONFIRMED' },
+          select: { id: true },
+        });
+        if (!payment) throw new ForbiddenError('Payment is not a confirmed unlock payment for this Provider');
+      }
+      const duplicate = await transaction.contactRelease.findFirst({
+        where: { tenderId, retailerId },
+      });
+      if (duplicate) return duplicate;
+      const createdRelease = await transaction.contactRelease.create({
+        data: {
+          tenderId,
+          clientId: tender.clientId,
+          retailerId,
+          releasedAt,
+          authorizingPaymentId,
+        },
+      });
+      await transaction.contactReleaseAuditEvent.create({
+        data: {
+          contactReleaseId: createdRelease.id,
+          actorId: retailerId,
+          tenderId,
+          clientId: tender.clientId,
+          retailerId,
+          releasedDataCategory: 'CONTACT_DETAILS',
+          releasedAt,
+          authorizingPaymentId,
+          correlationId,
+        },
+      });
+      await transaction.auditLog.create({
+        data: {
+          actorId: retailerId,
+          action: 'CONTACT_RELEASED',
+          targetType: 'Tender',
+          targetId: tenderId,
+          metadata: JSON.stringify({
+            tenderId,
+            clientId: tender.clientId,
+            retailerId,
+            releasedDataCategory: 'CONTACT_DETAILS',
+            releasedAt: releasedAt.toISOString(),
+            authorizingPaymentId,
+            correlationId,
+            reason: 'SITE_VISIT_UNLOCK',
+          }),
+        },
+      });
+      return createdRelease;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const concurrent = await prisma.contactRelease.findFirst({ where: { tenderId, retailerId } });
+      if (concurrent) return concurrent;
+    }
+    throw error;
+  }
+
+  const parties = await prisma.user.findMany({
+    where: { id: { in: [tender.clientId, retailerId] } },
+    select: { id: true, email: true },
+  });
+  await Promise.allSettled(
+    parties.map(async (party) => {
+      const recipientRole = party.id === tender.clientId ? 'CONTRACTOR' : 'PROVIDER';
+      const result = await sendTransactionalEmail(
+        party.email,
+        contactReleaseTemplate({
+          tenderReference: tender.reference,
+          recipientRole,
+          workspacePath: recipientRole === 'CONTRACTOR' ? buyingTenderPath(tenderId) : supplyingTenderPath(tenderId),
+          reason: 'SITE_VISIT',
+        })
+      ).catch(() => ({ sent: false as const }));
+      await recordAuditEvent({
+        actorId: null,
+        action: result.sent ? 'CONTACT_RELEASE_NOTIFICATION_SENT' : 'CONTACT_RELEASE_NOTIFICATION_FAILED',
+        targetType: 'Tender',
+        targetId: tenderId,
+        metadata: { recipientRole, reason: 'SITE_VISIT_UNLOCK' },
+      });
+    })
+  );
+
+  return release;
+}
+
+export async function getReleasedBuyerContact(retailerId: string, tenderId: string): Promise<ReleasedContact | null> {
+  const release = await prisma.contactRelease.findFirst({
+    where: { tenderId, retailerId, ...authorisedReleaseWhere },
+  });
+  if (!release) return null;
+  return prisma.user.findUniqueOrThrow({
+    where: { id: release.clientId },
+    select: counterpartyContactSelect(),
+  });
+}
+
+export async function listReleasedProviderContacts(viewerId: string, tenderId: string): Promise<Array<{ id: string; contact: ReleasedContact }>> {
+  if (!await userOwnsTender(viewerId, tenderId)) return [];
+  const releases = await prisma.contactRelease.findMany({
+    where: { tenderId, ...authorisedReleaseWhere },
+    select: { id: true, retailerId: true },
+  });
+  if (releases.length === 0) return [];
+  const providers = await prisma.user.findMany({
+    where: { id: { in: releases.map((release) => release.retailerId) } },
+    select: { id: true, ...counterpartyContactSelect() },
+  });
+  const byId = new Map(providers.map((provider) => [provider.id, provider]));
+  return releases.flatMap((release) => {
+    const provider = byId.get(release.retailerId);
+    if (!provider) return [];
+    return [{ id: release.id, contact: { contactName: provider.contactName, contactPhone: provider.contactPhone, email: provider.email } }];
+  });
 }

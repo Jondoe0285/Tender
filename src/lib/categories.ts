@@ -176,6 +176,15 @@ export function isContractorService(service: string | undefined): boolean {
   return String(service ?? '').trim().toLowerCase().includes('contractor');
 }
 
+export function isProfessionalService(service: string | undefined): boolean {
+  return String(service ?? '').trim().toLowerCase().includes('professional');
+}
+
+/** Contractor and professional packages: the supplier pays a fixed fee and gets buyer contact for a site visit and quote. */
+export function isSiteVisitService(service: string | undefined): boolean {
+  return isContractorService(service) || isProfessionalService(service);
+}
+
 const GOODS_QUANTITY_PATTERN = /^\d+(?:\.\d+)? (?:units?|tonnes|bags|pallets|m³|skips?)$/;
 const WASTE_TONNES_PATTERN = /^\d+(?:\.\d+)? tonnes$/;
 const DURATION_QUANTITY_PATTERN = /^\d+(?:\.\d+)? (?:days|weeks|months)$/;

@@ -196,16 +196,19 @@ export function quoteAcceptedTemplate(input: { quoteReference: string; tenderRef
   };
 }
 
-export function contactReleaseTemplate(input: { quoteReference: string; tenderReference: string; recipientRole: 'CONTRACTOR' | 'PROVIDER'; workspacePath: string }): EmailTemplate {
+export function contactReleaseTemplate(input: { quoteReference?: string; tenderReference: string; recipientRole: 'CONTRACTOR' | 'PROVIDER'; workspacePath: string; reason?: 'SITE_VISIT' }): EmailTemplate {
+  const siteVisit = input.reason === 'SITE_VISIT';
   return {
     subject: `Contact details released: ${input.tenderReference}`,
     html: layout({
       eyebrow: 'Contact release',
-      title: 'Contact details are now available',
-      intro: `The approved contact-release condition for ${input.tenderReference} has been confirmed. You can now view the authorised contact details in your workspace.`,
+      title: siteVisit ? 'Contact details are available for a site visit' : 'Contact details are now available',
+      intro: siteVisit
+        ? `The fixed release fee for ${input.tenderReference} has been confirmed. Use the authorised contact details in your workspace to arrange a site visit and prepare a quote.`
+        : `The approved contact-release condition for ${input.tenderReference} has been confirmed. You can now view the authorised contact details in your workspace.`,
       body: detailRows([
         ['Tender', input.tenderReference],
-        ['Quote', input.quoteReference],
+        ...(input.quoteReference ? [['Quote', input.quoteReference] as [string, string]] : []),
         ['Recipient', input.recipientRole === 'CONTRACTOR' ? 'Contractor' : 'Provider'],
         ['Release status', 'Confirmed'],
       ]) + note('Trade Tender connects the parties. The final transaction, fulfilment, payment arrangements, and disputes are handled directly between Contractor and Provider.'),

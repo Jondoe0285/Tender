@@ -111,16 +111,7 @@ export function specIssues(service: string | undefined, spec: TenderLineSpec | u
     if (!WASTE_TONNES_PATTERN.test(quantityValue)) issues.push('Waste quantity must be a number of tonnes');
   }
 
-  if (kind === 'materials') {
-    if (trimmed(spec?.dimension).length < 1) issues.push('Enter a dimension or size (for example 215 mm or 20 mm)');
-    if (trimmed(spec?.materialClass).length < 1) issues.push('Enter the material class or grade');
-    if (trimmed(spec?.standard).length < 1) issues.push('Enter the standard or specification (for example BS EN or SHW)');
-    if (!spec?.pack || !MATERIAL_PACKS.includes(spec.pack)) issues.push('Select a pack type');
-  }
-
   if (kind === 'plant') {
-    if (trimmed(spec?.plantClass).length < 1) issues.push('Enter the plant class');
-    if (trimmed(spec?.capacity).length < 1) issues.push('Enter plant capacity (for example 3 tonnes or 22 m)');
     if (trimmed(spec?.period).length < 1 && !/^\d+(?:\.\d+)? (?:days|weeks|months)$/.test(quantityValue)) {
       issues.push('Enter the hire period');
     }

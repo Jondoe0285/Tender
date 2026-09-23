@@ -20,12 +20,20 @@ async function resolveThread(tenderId: string, actor: MessageActor, quoteId?: st
       const accepted = await prisma.quote.findFirst({ where: { tenderId, status: 'ACCEPTED' }, select: { id: true, retailerId: true } });
       resolvedQuoteId = accepted?.id;
     }
-    if (!resolvedQuoteId) {
-      return { unavailableReason: (closed ? 'CLOSED' : 'NO_RELEASE') as MessageUnavailableReason };
+    if (resolvedQuoteId) {
+      const quote = await prisma.quote.findUnique({ where: { id: resolvedQuoteId }, select: { retailerId: true, tenderId: true } });
+      if (!quote || quote.tenderId !== tenderId) throw new ForbiddenError('Message thread not available');
+      retailerId = quote.retailerId;
+    } else {
+      const releases = await prisma.contactRelease.findMany({
+        where: { tenderId, clientId: tender.clientId },
+        select: { retailerId: true },
+      });
+      if (releases.length !== 1) {
+        return { unavailableReason: (closed ? 'CLOSED' : 'NO_RELEASE') as MessageUnavailableReason };
+      }
+      retailerId = releases[0]!.retailerId;
     }
-    const quote = await prisma.quote.findUnique({ where: { id: resolvedQuoteId }, select: { retailerId: true, tenderId: true } });
-    if (!quote || quote.tenderId !== tenderId) throw new ForbiddenError('Message thread not available');
-    retailerId = quote.retailerId;
   } else {
     retailerId = actor.id;
   }
@@ -70,7 +78,7 @@ export async function sendTenderMessage(tenderId: string, actor: MessageActor, b
   if ('unavailableReason' in thread) {
     throw new ForbiddenError(thread.unavailableReason === 'CLOSED'
       ? 'This tender is closed. Questions are no longer available.'
-      : 'Questions open after a quote is accepted and contact details are released.');
+      : 'Questions open after contact details are released.');
   }
   const tenderReviewSnapshot = await getTenderReviewSnapshot(tenderId);
   await enforceContentModeration(actor.id, 'TENDER_MESSAGE', [{ name: 'message', value: normalizedBody }], { type: 'TENDER_MESSAGE', tender: tenderReviewSnapshot, message: normalizedBody });

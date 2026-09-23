@@ -2,6 +2,7 @@ import { prisma } from '@/server/data/prisma';
 import { getStripeClient, isStripeConfigured } from '@/server/payments/stripeClient';
 import type { PaymentType } from '@prisma/client';
 import { buildPaymentAmounts, getClientReleaseFeeGbp, getIndependentReviewFeeGbp, getPaymentFeeGbp, getTenderUnlockFeeGbp, getVatPercentage } from '@/server/domain/platformSettings';
+import { retailerMatchedCategories } from '@/server/domain/tenderService';
 import { appUrl } from '@/server/config/appUrl';
 import { INDEPENDENT_REVIEW_TIER_LABELS, isIndependentReviewTier, type IndependentReviewTier } from '@/lib/independentReviewTiers';
 import { assertBuyerDuty, assertSupplierPaymentPermission } from '@/server/domain/workspacePermissions';
@@ -61,7 +62,7 @@ export async function createPayment(params: {
     netFeeGbp = params.type === 'CLIENT_RELEASE' && params.quotePriceGbp !== undefined
       ? await getClientReleaseFeeGbp(params.quotePriceGbp)
       : params.type === 'RETAILER_UNLOCK' && params.tenderId
-        ? await getTenderUnlockFeeGbp(params.tenderId)
+        ? await getTenderUnlockFeeGbp(params.tenderId, await retailerMatchedCategories(params.userId, params.tenderId))
         : await getPaymentFeeGbp(params.type);
     if (params.type === 'RETAILER_UNLOCK' && params.discountPercentage !== undefined) {
       netFeeGbp = applyPaymentDiscount(netFeeGbp, params.discountPercentage);
