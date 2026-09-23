@@ -7,12 +7,14 @@ import type { SubmitQuoteInput } from '@/lib/schemas/quote';
 import { quoteReceivedTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { enforceContentModeration } from '@/server/moderation/contentModeration';
-import { sponsoredPlacementEnabled } from '@/server/domain/sponsoredPlacementService';
-import { getClientReleaseFeeGbp } from '@/server/domain/platformSettings';
 import { independentReviewExpired } from '@/server/domain/independentReviewService';
-import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getTenderReviewSnapshot, getUserTenderServiceCategories, userOwnsTender } from '@/server/domain/tenderService';
+import { getClientReleaseFeeGbp, getPlatformSetting } from '@/server/domain/platformSettings';
+import { assertRetailerEligibleForTender, assertTenderOpenForActivity, getTenderReviewSnapshot, getUserTenderServiceProvisions, tenderProvisionPackageWhere, userOwnsTender } from '@/server/domain/tenderService';
 import { syncVerificationExpiryForUserIds } from '@/server/domain/verificationDocumentService';
 import { VERIFICATION_DOCUMENT_TYPES } from '@/lib/verification-documents';
+import { pricedQuoteLine } from '@/lib/quote-pricing';
+import { PERCENTAGE_RELEASE_SECOND_APPROVER_GBP } from '@/lib/launch-credits';
+import { issuedTenderSpecHash } from '@/lib/package-spec';
 
 export function isQuoteRetentionLocked(retentionLockedUntil: Date | null | undefined, now = new Date()): boolean {
   return retentionLockedUntil !== null && retentionLockedUntil !== undefined && retentionLockedUntil > now;
@@ -61,11 +63,17 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
     ...input.charges.map((charge, index) => ({ name: `quote item ${index + 1} description`, value: charge.description })),
   ], { type: 'QUOTE_SUBMISSION', tender: tenderReviewSnapshot, quote: input });
 
-  const serviceCategories = await getUserTenderServiceCategories(retailerId);
+  const provisions = await getUserTenderServiceProvisions(retailerId);
+  const provisionWhere = tenderProvisionPackageWhere(provisions);
   const tender = await prisma.tender.findUniqueOrThrow({
     where: { id: tenderId },
-    include: { client: { select: { email: true } }, items: { where: { category: { in: serviceCategories } }, select: { id: true } } },
+    include: {
+      client: { select: { email: true } },
+      items: { where: provisionWhere, select: { id: true, category: true, quantity: true } },
+      packages: { select: { specHash: true }, orderBy: { packageIndex: 'asc' } },
+    },
   });
+  const packageSpecHash = issuedTenderSpecHash(tender.packages.map((pkg) => pkg.specHash).filter(Boolean));
   const providerProfile = await prisma.retailerProfile.findUnique({ where: { userId: retailerId }, select: { standardQuoteValidityDays: true } });
   const validityDays = providerProfile?.standardQuoteValidityDays ?? 30;
   if (tender.supplyDate && !input.deliveryDateConfirmed) {
@@ -80,7 +88,22 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
   ) {
     throw new ValidationError('Provide a price or mark each tender item unavailable');
   }
-  const priceGbp = input.lineItems.reduce((total, line) => total + (line.available ? line.priceGbp : 0), 0)
+  const pricedLines = input.lineItems.map((line) => {
+    const item = tender.items.find((tenderItem) => tenderItem.id === line.tenderItemId);
+    if (!item) throw new ValidationError('Provide a price or mark each tender item unavailable');
+    const priced = pricedQuoteLine(item, line);
+    if (priced.error) throw new ValidationError(priced.error);
+    return {
+      tenderItemId: line.tenderItemId,
+      available: priced.line.available,
+      priceGbp: priced.line.priceGbp,
+      unitRateGbp: priced.line.unitRateGbp,
+      quantityValue: priced.line.quantityValue,
+      unit: priced.line.unit,
+      pricingKind: priced.line.pricingKind,
+    };
+  });
+  const priceGbp = pricedLines.reduce((total, line) => total + (line.available ? (line.priceGbp ?? 0) : 0), 0)
     + input.charges.reduce((total, charge) => total + charge.priceGbp, 0);
   const existingQuoteCount = await prisma.quote.count({ where: { tenderId } });
   const quoteData = {
@@ -92,7 +115,8 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
       deliveryInfo: input.deliveryInfo,
       validityDays,
       status: 'SUBMITTED' as const,
-      lines: { create: input.lineItems },
+      packageSpecHash,
+      lines: { create: pricedLines },
       charges: { create: input.charges },
   };
 
@@ -125,7 +149,7 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
       category: tender.category,
       priceGbp: quote.priceGbp,
       leadTimeDays: quote.leadTimeDays,
-      reviewPath: `/client/tenders/${tender.id}`,
+      reviewPath: `/user/tenders/${tender.id}`,
     })
   ).catch((error: unknown) => ({ sent: false as const, reason: error instanceof Error ? error.message : 'Email delivery failed' }));
   await recordAuditEvent({
@@ -155,10 +179,15 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
       deliveryDateConfirmed: true,
       deliveryInfo: true,
       validityDays: true,
+      packageSpecHash: true,
       lines: {
         select: {
           tenderItemId: true,
           priceGbp: true,
+          unitRateGbp: true,
+          quantityValue: true,
+          unit: true,
+          pricingKind: true,
           available: true,
           tenderItem: { select: { category: true, subcategory: true, item: true, quantity: true } },
         },
@@ -166,16 +195,12 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
       charges: { select: { id: true, description: true, priceGbp: true } },
       status: true,
       submittedAt: true,
+      award: { select: { id: true, awardedAt: true, packageSpecHash: true } },
     },
     orderBy: { submittedAt: 'asc' },
   });
   await syncVerificationExpiryForUserIds(quotes.map((quote) => quote.retailerId));
-  const sponsoredRetailerIds = await sponsoredPlacementEnabled()
-    ? new Set((await prisma.retailerSponsoredPlacement.findMany({
-        where: { active: true, expiresAt: { gt: new Date() }, retailerId: { in: quotes.map((quote) => quote.retailerId) } },
-        select: { retailerId: true },
-      })).map((placement) => placement.retailerId))
-    : new Set<string>();
+  const [releaseFeeMode] = await Promise.all([getPlatformSetting('CLIENT_RELEASE_FEE_MODE')]);
   const verificationProfiles = await prisma.retailerProfile.findMany({
     where: { userId: { in: quotes.map((quote) => quote.retailerId) } },
     select: { id: true, userId: true, isSoleTrader: true, verificationStatus: true, independentReviewStatus: true, independentReviewTier: true, independentReviewDecidedAt: true },
@@ -202,12 +227,12 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
         status: quote.status,
         expired: true,
         expiryMessage: QUOTE_EXPIRED_MESSAGE,
-        sponsoredPlacementActive: sponsoredRetailerIds.has(retailerId),
         providerIsSoleTrader: soleTraderByRetailerId.get(retailerId) ?? false,
         providerVerificationStatus: verificationByRetailerId.get(retailerId) ?? 'UNVERIFIED',
         verifiedDocumentLabels: verifiedDocumentsByRetailerId.get(retailerId) ?? [],
         independentlyVerified: independentTierByRetailerId.has(retailerId),
         independentReviewTier: independentTierByRetailerId.get(retailerId) ?? null,
+        award: quote.award,
       };
     }
 
@@ -215,9 +240,10 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
       ...quote,
       expiresAt: getQuoteExpiresAt(quote.submittedAt, quote.validityDays),
       expired: false,
-      sponsoredPlacementActive: sponsoredRetailerIds.has(retailerId),
       providerIsSoleTrader: soleTraderByRetailerId.get(retailerId) ?? false,
       releaseFeeGbp: await getClientReleaseFeeGbp(quote.priceGbp),
+      releaseFeeMode,
+      requiresSecondApprover: releaseFeeMode === 'PERCENTAGE' && (await getClientReleaseFeeGbp(quote.priceGbp)) >= PERCENTAGE_RELEASE_SECOND_APPROVER_GBP,
       providerVerificationStatus: verificationByRetailerId.get(retailerId) ?? 'UNVERIFIED',
       verifiedDocumentLabels: verifiedDocumentsByRetailerId.get(retailerId) ?? [],
       independentlyVerified: independentTierByRetailerId.has(retailerId),

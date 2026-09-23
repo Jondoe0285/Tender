@@ -18,7 +18,7 @@ test('footer fetches active, ordered affiliated partners from a server-only disp
   assert.match(apiSource, /expiresAt: \{ gt: new Date\(\) \}/);
   assert.match(apiSource, /orderBy: \[\{ sortOrder: 'asc' \}, \{ name: 'asc' \}\]/);
   assert.match(apiSource, /select: \{ id: true, name: true, logoPath: true, destinationUrl: true \}/);
-  assert.match(source, /Affiliated partner information is separate from tender matching, quote ranking, supplier selection, and Contractor decisions/);
+  assert.match(source, /Affiliated partner information is separate from tender matching, quote ranking, supplier selection, and Buyer decisions/);
   assert.match(source, /partner\.destinationUrl \?/);
   assert.doesNotMatch(source, /sinclairsafetysolutions\.co\.uk|smartworkscivils\.com/);
 });
@@ -27,6 +27,6 @@ test('landing partner information uses the same display-only partner endpoint', 
   const source = readFileSync(landingPartnersPath, 'utf8');
 
   assert.match(source, /fetch\('\/api\/partners\/footer'\)/);
-  assert.match(source, /Partner information is separate from tender matching, quote ranking, supplier selection, and Contractor decisions/);
+  assert.match(source, /Partner information is separate from tender matching, quote ranking, supplier selection, and Buyer decisions/);
   assert.doesNotMatch(source, /from '@\/server\/data\/prisma'/);
 });

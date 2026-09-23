@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { getCurrentUser } from '@/server/auth/session';
 import { listMatchedSummariesForRetailer } from '@/server/domain/tenderService';
 import { prisma } from '@/server/data/prisma';
@@ -7,6 +8,7 @@ import { estimateDistanceMiles } from '@/lib/geography';
 import { getTenderUnlockFeeGbp } from '@/server/domain/platformSettings';
 import { OpportunitiesExplorer } from '@/components/retailer/OpportunitiesExplorer';
 import type { OpportunityCardData } from '@/components/retailer/TenderOpportunityCard';
+import { effectiveLaunchCredits } from '@/lib/launch-credits';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,11 +28,12 @@ export default async function NewOpportunitiesPage() {
         counties: true,
         regions: true,
         launchCreditsLeft: true,
+        launchCreditsExpireAt: true,
       },
     }),
   ]);
   const unlockedIds = new Set(unlocks.map((u) => u.tenderId));
-  const hasCredits = (profile?.launchCreditsLeft ?? 0) > 0;
+  const hasCredits = effectiveLaunchCredits(profile?.launchCreditsLeft ?? 0, profile?.launchCreditsExpireAt) > 0;
   const coverageAreas = profile?.coverageAreas ?? '';
 
   const opportunities: OpportunityCardData[] = (await Promise.all(matches
@@ -39,7 +42,7 @@ export default async function NewOpportunitiesPage() {
       const categoryMatch = tender.categoryMatch;
       const locationMatch = tender.locationMatch;
       const strongMatch = categoryMatch && locationMatch;
-      const unlockFeeGbp = hasCredits ? 0 : await getTenderUnlockFeeGbp(tender.id);
+      const unlockFeeGbp = hasCredits ? 0 : await getTenderUnlockFeeGbp(tender.id, tender.packageCategories);
 
       return {
         tenderId: tender.id,
@@ -66,12 +69,9 @@ export default async function NewOpportunitiesPage() {
     });
 
   return (
-    <AppShell role="retailer" title="New Opportunities">
-      <div className="mx-auto max-w-4xl">
-        <p className="mb-6 max-w-xl text-sm text-concrete-grey">
-          Tenders matched to your categories and coverage areas that remain available to unlock.
-          Filter and save searches to quickly spot the opportunities worth unlocking.
-        </p>
+    <AppShell role="retailer" title="Opportunities">
+      <div className="mx-auto max-w-6xl">
+        <PageHeader description="Matched packages still available to unlock. Filter by lane and coverage, then unlock to quote against the frozen specification." />
         <OpportunitiesExplorer opportunities={opportunities} />
       </div>
     </AppShell>

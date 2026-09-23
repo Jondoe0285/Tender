@@ -8,12 +8,14 @@ export function AccountControls() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  if (status === 'loading') return null;
+  if (status === 'loading') {
+    return <div className="h-12 w-36" aria-hidden="true" />;
+  }
 
   if (!session?.user) {
     return (
-      <LinkButton href="/login" variant="secondary" size="md" className="h-9 px-4 text-sm">
-        Sign in
+      <LinkButton href="/register" variant="secondary" size="lg">
+        Create account
       </LinkButton>
     );
   }
@@ -21,12 +23,9 @@ export function AccountControls() {
   return (
     <Button
       type="button"
-      variant="ghost"
-      size="md"
-      className="h-9 px-4 text-sm"
+      variant="secondary"
+      size="lg"
       onClick={() => {
-        // Falls back to a hard navigation if the sign-out request itself fails, so the user is
-        // never left on a protected page believing sign-out silently did nothing.
         signOut({ callbackUrl: '/' }).catch(() => {
           router.replace('/');
         });

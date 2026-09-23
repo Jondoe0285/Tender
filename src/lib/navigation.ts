@@ -8,27 +8,42 @@ export function workspaceForRole(role: string | undefined): string | null {
   return null;
 }
 
-/** User navigation combines tender ownership and matched opportunity workflows. */
+/** User navigation groups buying and supplying on one account. */
 export const USER_NAV: NavGroup[] = [
   { label: null, items: [{ label: 'Dashboard', href: '/user' }] },
   {
-    label: 'Tendering',
+    label: 'Buying',
     items: [
-      { label: 'Create Tender', href: '/user/tenders/new' },
-      { label: 'My Tenders', href: '/user/tenders' },
-      { label: 'Tender Opportunities', href: '/user/opportunities' },
-      { label: 'Submitted Quotes', href: '/user/quotes' },
+      { label: 'Create tender', href: '/user/tenders/new' },
+      { label: 'My tenders', href: '/user/tenders' },
+      { label: 'Awarded', href: '/user/awarded' },
+    ],
+  },
+  {
+    label: 'Supplying',
+    items: [
+      { label: 'Opportunities', href: '/user/opportunities' },
+      { label: 'Submitted quotes', href: '/user/quotes' },
     ],
   },
   {
     label: 'Account',
     items: [
-      { label: 'Activity History', href: '/user/billing' },
+      { label: 'Activity and payments', href: '/user/billing' },
       { label: 'Profile', href: '/user/profile' },
-      { label: 'Support requests', href: '/user/support' },
+      { label: 'Support', href: '/user/support' },
     ],
   },
 ];
+
+export function userNavForCapabilities(canRaiseTender: boolean): NavGroup[] {
+  return USER_NAV
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.href !== '/user/tenders/new' || canRaiseTender),
+    }))
+    .filter((group) => group.items.length > 0);
+}
 
 /** Super User nav: oversee marketplace participants, payments, and configuration. */
 export const SUPER_USER_NAV: NavGroup[] = [
@@ -36,38 +51,38 @@ export const SUPER_USER_NAV: NavGroup[] = [
   {
     label: 'Marketplace',
     items: [
-      { label: 'Tender Management', href: '/super-user/tenders' },
-      { label: 'User Management', href: '/super-user/retailers' },
-      { label: 'Payment Monitoring', href: '/super-user/payments' },
+      { label: 'Tenders', href: '/super-user/tenders' },
+      { label: 'Users', href: '/super-user/retailers' },
+      { label: 'Payments', href: '/super-user/payments' },
     ],
   },
   {
     label: 'Insights',
     items: [
-      { label: 'Tender Monitoring', href: '/super-user/compliance' },
-      { label: 'Activity Log', href: '/super-user/activity-log' },
+      { label: 'Monitoring', href: '/super-user/compliance' },
+      { label: 'Activity log', href: '/super-user/activity-log' },
       { label: 'Analytics', href: '/super-user/analytics' },
-      { label: 'Pricing Intelligence', href: '/super-user/pricing-intelligence' },
-      { label: 'Support requests', href: '/super-user/support' },
+      { label: 'Pricing intelligence', href: '/super-user/pricing-intelligence' },
+      { label: 'Support', href: '/super-user/support' },
     ],
   },
   {
     label: 'Configuration',
     items: [
       { label: 'Categories', href: '/super-user/categories' },
-      { label: 'Partner Management', href: '/super-user/partners' },
-      { label: 'Accountant Management', href: '/super-user/accountants' },
-      { label: 'Accounting Space', href: '/super-user/accounting' },
-      { label: 'Security', href: '/account/security' },
+      { label: 'Partners', href: '/super-user/partners' },
+      { label: 'Accountants', href: '/super-user/accountants' },
+      { label: 'Accounting', href: '/super-user/accounting' },
+      { label: 'Security', href: '/account/security', ownerOnly: true },
     ],
   },
   {
     label: 'Owner',
-    items: [{ label: 'Owner Console', href: '/super-user/owner', ownerOnly: true }],
+    items: [{ label: 'Owner console', href: '/super-user/owner', ownerOnly: true }],
   },
 ];
 
-/** Accountant nav: restricted to the Accounting Space only \u2014 no marketplace or configuration access. */
+/** Accountant nav: restricted to the Accounting Space only. */
 export const ACCOUNTANT_NAV: NavGroup[] = [
-  { label: null, items: [{ label: 'Accounting Space', href: '/super-user/accounting' }] },
+  { label: null, items: [{ label: 'Accounting', href: '/super-user/accounting' }] },
 ];

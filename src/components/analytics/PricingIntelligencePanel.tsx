@@ -118,9 +118,9 @@ export function PricingIntelligencePanel({ rows: initialRows, masterReductionPer
               {rows.map((row) => (
                 <tr key={row.id}>
                   <td className="py-4 pr-4"><p className="font-semibold text-foundation-navy">{row.service} / {row.category}</p><p className="text-xs text-concrete-grey">{row.item ?? 'Category baseline'} · {row.sampleSize} live sample{row.sampleSize === 1 ? '' : 's'}</p></td>
-                  <td className="py-4 pr-4 text-concrete-grey">{row.standardUnitSize === 1 ? row.standardUnit : `${row.standardUnitSize} ${row.standardUnit}`}</td>
-                  <td className="py-4 pr-4 text-concrete-grey">{money.format(row.baselineGbp)}</td>
-                  <td className="py-4 pr-4 text-concrete-grey">{row.observedUnitPriceGbp === null ? 'No live data' : money.format(row.observedUnitPriceGbp)}</td>
+                  <td className="py-4 pr-4 text-concrete-grey">{row.standardUnit ? (row.standardUnitSize === 1 ? row.standardUnit : `${row.standardUnitSize} ${row.standardUnit}`) : 'No published unit'}</td>
+                  <td className="py-4 pr-4 text-concrete-grey">{row.standardUnit ? money.format(row.baselineGbp) : 'Hidden until a unit is published'}</td>
+                  <td className="py-4 pr-4 text-concrete-grey">{row.observedUnitPriceGbp === null ? 'No live data' : row.standardUnit ? money.format(row.observedUnitPriceGbp) : 'Hidden until a unit is published'}</td>
                   <td className="py-4 pr-4"><StatusBadge status={row.sampleSize === 0 ? 'neutral' : Math.abs(row.variancePercent) <= 10 ? 'approved' : 'pending'}>{row.sampleSize === 0 ? 'Awaiting data' : `${row.variancePercent > 0 ? '+' : ''}${row.variancePercent.toFixed(2)}% ${row.variancePercent > 0 ? 'higher' : row.variancePercent < 0 ? 'lower' : 'aligned'}`}</StatusBadge></td>
                   <td className="py-4 pr-4 text-concrete-grey">{row.automaticOffsetPercent.toFixed(2)}%</td>
                   <td className="py-4 pr-4 text-concrete-grey">{money.format(row.adjustedEstimateGbp)}</td>

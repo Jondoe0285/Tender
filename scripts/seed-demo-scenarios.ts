@@ -1,19 +1,29 @@
 import { PrismaClient, Role } from '@prisma/client';
 import { hash } from 'bcryptjs';
-import { buildQuoteReference } from '../src/lib/identifiers';
+import { buildClientTradeTenderId, buildQuoteReference } from '../src/lib/identifiers';
 import { createTender } from '../src/server/domain/tenderService';
+import { coverageFieldsFromOperatingLocations, normaliseOperatingLocations } from '../src/lib/geography';
+import { splitContactName } from '../src/lib/person-name';
+import { issuedTenderSpecHash } from '../src/lib/package-spec';
 
 const prisma = new PrismaClient();
 const DEFAULT_PASSWORD = 'TradeTenderDev!2026';
 
+function sandboxPassword(): string {
+  return process.env.SANDBOX_USER_PASSWORD?.trim() || DEFAULT_PASSWORD;
+}
+
 async function ensureClient() {
-  const passwordHash = await hash(process.env.SANDBOX_USER_PASSWORD?.trim() || DEFAULT_PASSWORD, 12);
+  const passwordHash = await hash(sandboxPassword(), 12);
+  const names = splitContactName('Demo Client');
   const client = await prisma.user.upsert({
     where: { email: 'client@example.test' },
     update: {
       passwordHash,
       role: Role.USER,
-      contactName: 'Demo Client',
+      firstName: names.firstName,
+      lastName: names.lastName,
+      contactName: `${names.firstName} ${names.lastName}`,
       contactPhone: '07123456789',
       emailVerifiedAt: new Date(),
       termsAcceptedAt: new Date(),
@@ -22,17 +32,25 @@ async function ensureClient() {
       email: 'client@example.test',
       passwordHash,
       role: Role.USER,
-      contactName: 'Demo Client',
+      firstName: names.firstName,
+      lastName: names.lastName,
+      contactName: `${names.firstName} ${names.lastName}`,
       contactPhone: '07123456789',
       emailVerifiedAt: new Date(),
       termsAcceptedAt: new Date(),
     },
   });
 
-  await prisma.clientCompany.upsert({
+  const coverage = coverageFieldsFromOperatingLocations(normaliseOperatingLocations(['Birmingham', 'Cardiff', 'Manchester', 'Liverpool']));
+  const company = await prisma.clientCompany.upsert({
     where: { primaryUserId: client.id },
-    update: { companyName: 'Demo Construction Client Ltd', services: 'Materials,Waste,Plant Hire', operatingLocations: 'Birmingham,Cardiff,Manchester,Liverpool' },
-    create: { companyName: 'Demo Construction Client Ltd', primaryUserId: client.id, services: 'Materials,Waste,Plant Hire', operatingLocations: 'Birmingham,Cardiff,Manchester,Liverpool' },
+    update: { companyName: 'Demo Construction Client Ltd', services: 'Materials,Waste,Plant Hire', operatingLocations: coverage.operatingLocations },
+    create: { companyName: 'Demo Construction Client Ltd', primaryUserId: client.id, services: 'Materials,Waste,Plant Hire', operatingLocations: coverage.operatingLocations, tradeTenderId: buildClientTradeTenderId() },
+  });
+  await prisma.clientCompanyMember.upsert({
+    where: { companyId_userId: { companyId: company.id, userId: client.id } },
+    update: {},
+    create: { companyId: company.id, userId: client.id },
   });
 
   return client;
@@ -47,13 +65,16 @@ async function ensureRetailerScenario(input: {
   independentReviewStatus?: 'NOT_PURCHASED' | 'PURCHASED' | 'APPROVED' | 'DECLINED';
   independentReviewTier?: 'BRONZE' | 'SILVER' | 'GOLD' | null;
 }) {
-  const passwordHash = await hash(process.env.SANDBOX_USER_PASSWORD?.trim() || DEFAULT_PASSWORD, 12);
+  const passwordHash = await hash(sandboxPassword(), 12);
+  const names = splitContactName(input.companyName, input.companyName);
   const user = await prisma.user.upsert({
     where: { email: input.email },
     update: {
       passwordHash,
       role: Role.USER,
-      contactName: input.companyName,
+      firstName: names.firstName,
+      lastName: names.lastName,
+      contactName: `${names.firstName} ${names.lastName}`,
       contactPhone: '07000000000',
       emailVerifiedAt: new Date(),
       termsAcceptedAt: new Date(),
@@ -62,17 +83,20 @@ async function ensureRetailerScenario(input: {
       email: input.email,
       passwordHash,
       role: Role.USER,
-      contactName: input.companyName,
+      firstName: names.firstName,
+      lastName: names.lastName,
+      contactName: `${names.firstName} ${names.lastName}`,
       contactPhone: '07000000000',
       emailVerifiedAt: new Date(),
       termsAcceptedAt: new Date(),
     },
   });
 
+  const coverage = coverageFieldsFromOperatingLocations(normaliseOperatingLocations(input.operatingLocations.split(',')));
   const company = await prisma.clientCompany.upsert({
     where: { primaryUserId: user.id },
-    update: { companyName: input.companyName, services: input.services, operatingLocations: input.operatingLocations },
-    create: { companyName: input.companyName, primaryUserId: user.id, services: input.services, operatingLocations: input.operatingLocations },
+    update: { companyName: input.companyName, services: input.services, operatingLocations: coverage.operatingLocations },
+    create: { companyName: input.companyName, primaryUserId: user.id, services: input.services, operatingLocations: coverage.operatingLocations, tradeTenderId: buildClientTradeTenderId() },
   });
 
   await prisma.clientCompanyMember.upsert({
@@ -87,7 +111,9 @@ async function ensureRetailerScenario(input: {
       companyName: input.companyName,
       categories: input.services,
       coverageAreas: input.operatingLocations,
-      coverageScope: 'UK',
+      coverageScope: coverage.coverageScope,
+      counties: coverage.counties,
+      regions: coverage.regions,
       verificationStatus: input.verificationStatus ?? 'UNVERIFIED',
       independentReviewStatus: input.independentReviewStatus ?? 'NOT_PURCHASED',
       independentReviewTier: input.independentReviewTier ?? null,
@@ -98,7 +124,9 @@ async function ensureRetailerScenario(input: {
       companyName: input.companyName,
       categories: input.services,
       coverageAreas: input.operatingLocations,
-      coverageScope: 'UK',
+      coverageScope: coverage.coverageScope,
+      counties: coverage.counties,
+      regions: coverage.regions,
       verificationStatus: input.verificationStatus ?? 'UNVERIFIED',
       independentReviewStatus: input.independentReviewStatus ?? 'NOT_PURCHASED',
       independentReviewTier: input.independentReviewTier ?? null,
@@ -169,6 +197,19 @@ async function createQuoteRecord({ tenderId, retailerId, priceGbp, status, decla
 
   if (status === 'ACCEPTED') {
     await prisma.quote.update({ where: { id: quote.id }, data: { retentionLockedUntil: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) } });
+    const packages = await prisma.tenderPackage.findMany({ where: { tenderId }, select: { specHash: true } });
+    await prisma.award.upsert({
+      where: { quoteId: quote.id },
+      create: {
+        projectId: tender.projectId,
+        tenderId,
+        quoteId: quote.id,
+        packageSpecHash: issuedTenderSpecHash(packages.map((pkg) => pkg.specHash).filter(Boolean)),
+        awardedById: tender.clientId,
+        purchaseOrderNumber: 'LEGACY',
+      },
+      update: {},
+    });
   }
 
   await prisma.unlock.upsert({
@@ -201,7 +242,7 @@ async function main() {
     if (retailer.verificationStatus === 'VERIFIED' || retailer.verificationStatus === 'PENDING' || retailer.verificationStatus === 'REJECTED' || retailer.verificationStatus === 'EXPIRED') {
       await addDemoVerificationDocument(profile.id, 'PUBLIC_LIABILITY_INSURANCE', retailer.verificationStatus === 'EXPIRED' ? -7 : 365, retailer.verificationStatus === 'VERIFIED');
       if (retailer.verificationStatus === 'VERIFIED') {
-        await prisma.retailerProfile.update({ where: { id: profile.id }, data: { verificationStatus: 'VERIFIED', verificationNote: 'AI assessment accepted for demo scenario.' } });
+        await prisma.retailerProfile.update({ where: { id: profile.id }, data: { verificationStatus: 'VERIFIED', verificationNote: 'Automated assessment accepted for demo scenario.' } });
       }
       if (retailer.verificationStatus === 'PENDING') {
         await prisma.retailerProfile.update({ where: { id: profile.id }, data: { verificationStatus: 'PENDING', verificationRequestedAt: new Date() } });
@@ -286,17 +327,17 @@ async function main() {
   ];
 
   console.log('Demo scenario seed created successfully.');
-  console.log('Example login credentials:');
-  console.log('- client@example.test / TradeTenderDev!2026');
-  console.log('- demo-verified-ai@example.test / TradeTenderDev!2026');
-  console.log('- demo-unverified@example.test / TradeTenderDev!2026');
-  console.log('- demo-pending@example.test / TradeTenderDev!2026');
-  console.log('- demo-independent@example.test / TradeTenderDev!2026');
-  console.log('- demo-rejected@example.test / TradeTenderDev!2026');
+  console.log('Example accounts use SANDBOX_USER_PASSWORD (or the local seed default).');
+  console.log('- client@example.test');
+  console.log('- demo-verified-ai@example.test');
+  console.log('- demo-unverified@example.test');
+  console.log('- demo-pending@example.test');
+  console.log('- demo-independent@example.test');
+  console.log('- demo-rejected@example.test');
   console.log('');
   for (const line of matchLog) console.log(line);
   console.log('');
-  console.log('Scenarios covered: verified provider, AI-verified with declaration, pending review, expired verification, independent review badge, rejected quote, and unmatched tender.');
+  console.log('Scenarios covered: verified provider, automated verification with declaration, pending review, expired verification, independent review badge, rejected quote, and unmatched tender.');
 }
 
 main()

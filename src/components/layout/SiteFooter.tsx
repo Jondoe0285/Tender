@@ -14,68 +14,77 @@ export function SiteFooter() {
 
   useEffect(() => {
     fetch('/api/partners/footer')
-      .then((response) => response.ok ? response.json() : null)
+      .then((response) => (response.ok ? response.json() : null))
       .then((data: { partners?: FooterPartner[] } | null) => setPartners(data?.partners ?? []))
       .catch(() => setPartners([]));
   }, []);
+
   return (
-    <footer className="mt-auto border-t-4 border-safety-amber bg-foundation-navy px-6 py-10 text-sm text-site-white/75 sm:px-10">
-      <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.2fr_1fr_1fr]">
-        <div>
-          <div className="w-56 bg-site-white p-2"><TradeTenderLogo variant="dark" /></div>
-          <p className="mt-5 max-w-xl leading-relaxed">
-            Trade Tender is a connection and tender-management platform. We do not supply, contract,
-            broker, or guarantee the final agreement between Contractors and Providers.
+    <footer className="mt-auto border-t border-slate-200 bg-foundation-navy px-6 py-10 text-sm text-site-white/75 sm:px-10">
+      <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-4">
+        <div className="lg:col-span-1">
+          <TradeTenderLogo variant="dark" />
+          <p className="mt-5 max-w-sm leading-relaxed">
+            Tenders and quotes for UK construction. Trade Tender connects Buyers and Suppliers. It is not a party to the final contract.
           </p>
         </div>
-        <div className="border-l-0 border-site-white/15 lg:border-l lg:pl-8">
-          <p className="text-xs font-semibold uppercase tracking-widest text-safety-amber">Policies</p>
-          <div className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 text-xs font-semibold">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-site-white">Product</p>
+          <div className="mt-4 flex flex-col gap-3 text-xs font-semibold">
+            <Link href="/#how-it-works" className="inline-flex min-h-11 items-center hover:text-sky-blue">How it works</Link>
+            <Link href="/security" className="inline-flex min-h-11 items-center hover:text-sky-blue">Security</Link>
+            <Link href="/demo" className="inline-flex min-h-11 items-center hover:text-sky-blue">Request a demo</Link>
+            <Link href="/#buying" className="inline-flex min-h-11 items-center hover:text-sky-blue">Buyers</Link>
+            <Link href="/#supplying" className="inline-flex min-h-11 items-center hover:text-sky-blue">Suppliers</Link>
+            <Link href="/login" className="inline-flex min-h-11 items-center hover:text-sky-blue">Sign in</Link>
+            <Link href="/register" className="inline-flex min-h-11 items-center hover:text-sky-blue">Create account</Link>
+          </div>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-site-white">Legal</p>
+          <div className="mt-4 grid grid-cols-1 gap-3 text-xs font-semibold">
+            <Link href="/policies" className="inline-flex min-h-11 items-center hover:text-sky-blue">All policies</Link>
             <Link href="/policies/platform-terms" className="inline-flex min-h-11 items-center hover:text-sky-blue">Platform terms</Link>
-            <Link href="/policies/contractor-terms" className="inline-flex min-h-11 items-center hover:text-sky-blue">Contractor terms</Link>
-            <Link href="/policies/provider-terms" className="inline-flex min-h-11 items-center hover:text-sky-blue">Provider terms</Link>
-            <Link href="/policies/marketplace-disclaimer" className="inline-flex min-h-11 items-center hover:text-sky-blue">Marketplace disclaimer</Link>
             <Link href="/policies/privacy" className="inline-flex min-h-11 items-center hover:text-sky-blue">Privacy</Link>
-            <Link href="/policies/cookies" className="inline-flex min-h-11 items-center hover:text-sky-blue">Cookies</Link>
-            <Link href="/policies/quote-retention" className="inline-flex min-h-11 items-center hover:text-sky-blue">Quote retention</Link>
-            <Link href="/policies/payments" className="inline-flex min-h-11 items-center hover:text-sky-blue">Payments and refunds</Link>
-            <Link href="/policies/contact-release" className="inline-flex min-h-11 items-center hover:text-sky-blue">Contact release</Link>
-            <Link href="/policies/acceptable-use" className="inline-flex min-h-11 items-center hover:text-sky-blue">Acceptable use</Link>
-            <Link href="/policies/partners" className="inline-flex min-h-11 items-center hover:text-sky-blue">Partner links</Link>
+            <Link href="/policies/payments" className="inline-flex min-h-11 items-center hover:text-sky-blue">Payments</Link>
             <Link href="/policies/accessibility" className="inline-flex min-h-11 items-center hover:text-sky-blue">Accessibility</Link>
           </div>
         </div>
-        <div className="border-l-0 border-site-white/15 md:border-l md:pl-8">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-site-white">Support</p>
+          <p className="mt-4 text-xs leading-relaxed text-site-white/70">Account access, payments, and technical issues.</p>
+          <div className="mt-4 flex flex-col gap-1 text-xs font-semibold">
+          {support && (
+            <a href={`mailto:${support}`} className="inline-flex min-h-11 items-center text-site-white underline underline-offset-4 hover:text-sky-blue">
+              Email support
+            </a>
+          )}
+          <Link href="/policies/support" className="inline-flex min-h-11 items-center text-site-white underline underline-offset-4 hover:text-sky-blue">
+            Support policy
+          </Link>
+          </div>
           {partners.length > 0 && (
-            <>
-              <p className="text-xs font-semibold uppercase tracking-widest text-safety-amber">Affiliated partners</p>
-              <div className="mt-4 grid max-w-md grid-cols-2 gap-3">
-                {partners.map((partner) => (
+            <div className="mt-6">
+              <p className="text-xs font-semibold uppercase tracking-widest text-site-white">Affiliated partners</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {partners.map((partner) =>
                   partner.destinationUrl ? (
-                    <a key={partner.id} href={partner.destinationUrl} target="_blank" rel="noreferrer" className="flex min-h-20 items-center bg-white p-3 outline-offset-4 hover:ring-2 hover:ring-sky-blue" aria-label={`Visit ${partner.name}`}>
+                    <a key={partner.id} href={partner.destinationUrl} target="_blank" rel="noreferrer" className="flex min-h-16 items-center border border-white/15 bg-white/5 p-2" aria-label={`Visit ${partner.name}`}>
                       <Image src={partner.logoPath} alt={partner.name} width={512} height={192} className="h-auto w-full" />
                     </a>
                   ) : (
-                    <div key={partner.id} className="flex min-h-20 min-w-0 items-center bg-white p-3">
+                    <div key={partner.id} className="flex min-h-16 items-center border border-white/15 bg-white/5 p-2">
                       <Image src={partner.logoPath} alt={partner.name} width={512} height={192} className="h-auto w-full" />
                     </div>
                   )
-                ))}
+                )}
               </div>
-              <p className="mt-4 max-w-md text-xs leading-relaxed text-site-white/60">
-                Affiliated partner information is separate from tender matching, quote ranking, supplier selection, and Contractor decisions.
-              </p>
-            </>
+              <p className="mt-3 text-xs leading-relaxed text-site-white/60">Affiliated partner information is separate from tender matching, quote ranking, supplier selection, and Buyer decisions.</p>
+            </div>
           )}
-          <div className="mt-5 border-t border-site-white/15 pt-4">
-            <p className="text-xs font-semibold uppercase tracking-widest text-safety-amber">Contact us</p>
-            <p className="mt-2 text-xs leading-relaxed text-site-white/70">Support for account access, platform use, payments, and technical issues.</p>
-            {support && <a href={`mailto:${support}`} className="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-site-white underline underline-offset-4 hover:text-sky-blue">Email support</a>}
-            <Link href="/policies/support" className="ml-4 inline-flex min-h-11 items-center text-xs font-semibold text-site-white underline underline-offset-4 hover:text-sky-blue">Support policy</Link>
-          </div>
         </div>
       </div>
-      <p className="mx-auto mt-8 max-w-6xl border-t border-site-white/15 pt-5 text-xs text-site-white/50">&copy; {new Date().getFullYear()} Trade Tender. UK construction tendering.</p>
+      <p className="mx-auto mt-8 max-w-6xl border-t border-site-white/15 pt-5 text-xs text-site-white/50">&copy; 2026 Trade Tender.</p>
     </footer>
   );
 }

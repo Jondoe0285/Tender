@@ -96,15 +96,19 @@ export function locationHasPostcode(location: string): boolean {
   return extractPostcode(location) !== null;
 }
 
-/** Returns a broad town/area label suitable for pre-unlock opportunity views. */
-export function getBroadLocation(location: string): string {
-  const normalized = location.trim();
-  const knownTown = Object.keys(TOWN_COORDINATES).find((town) => normalized.toLowerCase().includes(town));
-  if (knownTown) return knownTown.replace(/\b\w/g, (letter) => letter.toUpperCase());
+/** Pre-unlock location is local authority plus postcode district only — never plot, street, or site name. */
+export function formatRetailerSummaryLocation(location: string): string {
+  const postcodeDistrict = getPostcodeDistrict(location);
+  const authority = getCountyForPostcode(location) ?? getRegionForPostcode(location);
+  if (postcodeDistrict && authority) return `${authority} (${postcodeDistrict})`;
+  if (postcodeDistrict) return postcodeDistrict;
+  if (authority) return authority;
+  return 'Location area available after unlock';
+}
 
-  const withoutPostcode = normalized.replace(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/gi, '').trim();
-  const area = withoutPostcode.split(',')[0]?.trim();
-  return area || 'Location area available after unlock';
+/** Returns a broad area label suitable for pre-unlock opportunity views. */
+export function getBroadLocation(location: string): string {
+  return formatRetailerSummaryLocation(location);
 }
 
 /** Finds the first known town name contained within free-text location/coverage strings. */
@@ -371,6 +375,22 @@ export function getRegionForPostcode(location: string): string | null {
 
 export type RetailerCoverageScope = 'COUNTY' | 'REGION' | 'UK';
 
+/** Canonical company coverage string written at register and read at match time. */
+export function operatingLocationsFromCoverage(input: {
+  coverageScope?: RetailerCoverageScope;
+  counties?: readonly string[];
+  regions?: readonly string[];
+}): string {
+  if (input.coverageScope === 'UK') return 'United Kingdom';
+  if (input.coverageScope === 'REGION') {
+    return (input.regions ?? []).map((value) => value.trim()).filter(Boolean).join(',');
+  }
+  if (input.coverageScope === 'COUNTY') {
+    return (input.counties ?? []).map((value) => value.trim()).filter(Boolean).join(',');
+  }
+  return '';
+}
+
 /**
  * Determines whether a tender location falls inside a Retailer's selected operating area.
  * COUNTY and REGION scopes match only against the Retailer's selected counties or regions;
@@ -384,22 +404,66 @@ export function retailerCoversTenderLocation(
   if (retailer.coverageScope === 'UK') return true;
 
   const normalizedLocation = tenderLocation.trim().toLowerCase();
+  const selectedCounties = retailer.counties.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+  const selectedRegions = retailer.regions.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+  const county = getCountyForPostcode(tenderLocation);
+  const region = getRegionForPostcode(tenderLocation);
+  const countyHit = selectedCounties.length > 0 && (
+    Boolean(county && selectedCounties.includes(county.toLowerCase()))
+    || selectedCounties.some((selected) => normalizedLocation.includes(selected))
+  );
+  const regionHit = selectedRegions.length > 0 && (
+    Boolean(region && selectedRegions.includes(region.toLowerCase()))
+    || selectedRegions.some((selected) => normalizedLocation.includes(selected))
+  );
 
-  if (retailer.coverageScope === 'REGION') {
-    const region = getRegionForPostcode(tenderLocation);
-    const selectedRegions = retailer.regions.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
-    if (region && selectedRegions.includes(region.toLowerCase())) return true;
-    if (selectedRegions.some((selected) => normalizedLocation.includes(selected))) return true;
-    return false;
+  if (retailer.coverageScope === 'REGION' && selectedCounties.length === 0) return regionHit;
+  if (retailer.coverageScope === 'COUNTY' && selectedRegions.length === 0) return countyHit;
+  if (selectedCounties.length === 0 && selectedRegions.length === 0) return false;
+  return countyHit || regionHit;
+}
+
+const COMPANY_OPERATING_LOCATION_LIST = Array.from(new Set(['United Kingdom', ...UK_COUNTIES, ...UK_REGIONS]));
+export const COMPANY_OPERATING_LOCATIONS = COMPANY_OPERATING_LOCATION_LIST as [string, ...string[]];
+const OPERATING_LOCATION_SET = new Set<string>(COMPANY_OPERATING_LOCATION_LIST);
+
+function canonicalOperatingLocation(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (OPERATING_LOCATION_SET.has(trimmed)) return trimmed;
+  const town = TOWN_LOCATION_MAP[trimmed.toLowerCase()];
+  if (!town) return null;
+  if (OPERATING_LOCATION_SET.has(town.county)) return town.county;
+  if (OPERATING_LOCATION_SET.has(town.region)) return town.region;
+  return null;
+}
+
+/** Maps stored towns or mixed labels onto the county/region enum used by company profiles. */
+export function normaliseOperatingLocations(values: readonly string[]): string[] {
+  const resolved: string[] = [];
+  for (const value of values) {
+    const location = canonicalOperatingLocation(value);
+    if (location && !resolved.includes(location)) resolved.push(location);
   }
+  return resolved;
+}
 
-  if (retailer.coverageScope === 'COUNTY') {
-    const county = getCountyForPostcode(tenderLocation);
-    const selectedCounties = retailer.counties.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
-    if (county && selectedCounties.includes(county.toLowerCase())) return true;
-    if (selectedCounties.some((selected) => normalizedLocation.includes(selected))) return true;
-    return false;
-  }
-
-  return false;
+export function coverageFieldsFromOperatingLocations(values: readonly string[]): {
+  operatingLocations: string;
+  coverageScope: RetailerCoverageScope;
+  counties: string;
+  regions: string;
+} {
+  const locations = normaliseOperatingLocations(values);
+  return {
+    operatingLocations: locations.join(','),
+    coverageScope: locations.includes('United Kingdom')
+      ? 'UK'
+      : locations.some((location) => (UK_REGIONS as readonly string[]).includes(location))
+        && !locations.some((location) => (UK_COUNTIES as readonly string[]).includes(location) && !(UK_REGIONS as readonly string[]).includes(location))
+        ? 'REGION'
+        : 'COUNTY',
+    counties: locations.filter((location) => (UK_COUNTIES as readonly string[]).includes(location)).join(','),
+    regions: locations.filter((location) => (UK_REGIONS as readonly string[]).includes(location)).join(','),
+  };
 }

@@ -46,7 +46,7 @@ const policies = [
       },
       {
         heading: 'Contact release process',
-        content: 'A Contractor may release contact details only after the required payment and release conditions are met, and only for the relevant quote or tender workflow. The release is time-limited to the specific business event and is recorded in an audit log. The platform does not release contact details before the approved trigger condition is satisfied.',
+        content: 'Contact details are released only after the required payment and release conditions are met, and only for the relevant quote or tender workflow. For Materials, Waste, and Plant Hire, release follows quote acceptance and the Client release fee. For Contractor Services and Professional Services, the supplier pays a fixed release fee at unlock and then receives the customer’s contact details to arrange a site visit and prepare a quote. The release is recorded in an audit log.',
       },
       {
         heading: 'Disputes and moderation',
@@ -65,7 +65,7 @@ const policies = [
       },
       {
         heading: 'Tender unlock and access',
-        content: 'A Provider may unlock a tender only if the relevant payment or waiver workflow is valid and the platform permits the action. Access to a tender is limited to the approved platform workflow and protected by server-side authorization.',
+        content: 'A Provider may unlock a tender only if the relevant payment or waiver workflow is valid and the platform permits the action. Access to a tender is limited to the approved platform workflow and protected by server-side authorization. Contractor Services and Professional Services unlocks that confirm the fixed release fee also release customer contact details for site visits and quoting.',
       },
       {
         heading: 'Verification and representation',
@@ -107,7 +107,7 @@ const policies = [
       },
       {
         heading: 'Verification levels',
-        content: 'The platform defines six verification statuses for documentation and assessment purposes:\n\n1. Unverified: No approved verification evidence is recorded on the platform (Banner label: Unverified).\n2. Sole trader AI Verified: Automated evidence assessment confirmed self-employment credentials (HMRC UTR confirmation, SA302 tax calculation, VAT registration certificate, CIS registration proof, insurance, bank statement, invoices, quotations/contracts, trade body membership, or trading activity evidence) (Banner label: Verified).\n3. Incorporated AI Verified: Automated evidence assessment confirmed legal entity standing, mandatory Certificate of Incorporation (required for Limited Company, LLP, and PLC company types), and required service evidence (Banner label: Verified).\n4. Enhanced Bronze Verification: Health & Safety professional reviewed legal requirements such as permits, insurances, and competent advice (Banner label: Bronze).\n5. Enhanced Silver Verification: Health & Safety professional reviewed Bronze criteria plus evidence of industry-specific employee and managerial training (Banner label: Silver).\n6. Enhanced Gold Verification: Health & Safety professional reviewed Bronze and Silver criteria plus either a comprehensive management system or validated SSIP membership (Banner label: Gold).\n\nNote: Enhanced Verification is a single professional assessment purchase. Individual tiers (Bronze, Silver, Gold) cannot be purchased separately; they are the assessed outcome awarded by the Health & Safety auditor.',
+        content: 'The platform defines six verification statuses for documentation and assessment purposes:\n\n1. Unverified: No approved verification evidence is recorded on the platform (Banner label: Unverified).\n2. Sole trader automated assessment: Automated evidence assessment confirmed self-employment credentials (HMRC UTR confirmation, SA302 tax calculation, VAT registration certificate, CIS registration proof, insurance, bank statement, invoices, quotations/contracts, trade body membership, or trading activity evidence) (Banner label: Verified).\n3. Incorporated automated assessment: Automated evidence assessment confirmed legal entity standing, mandatory Certificate of Incorporation (required for Limited Company, LLP, and PLC company types), and required service evidence (Banner label: Verified).\n4. Enhanced Bronze Verification: Health & Safety professional reviewed legal requirements such as permits, insurances, and competent advice (Banner label: Bronze).\n5. Enhanced Silver Verification: Health & Safety professional reviewed Bronze criteria plus evidence of industry-specific employee and managerial training (Banner label: Silver).\n6. Enhanced Gold Verification: Health & Safety professional reviewed Bronze and Silver criteria plus either a comprehensive management system or validated SSIP membership (Banner label: Gold).\n\nNote: Enhanced Verification is a single professional assessment purchase. Individual tiers (Bronze, Silver, Gold) cannot be purchased separately; they are the assessed outcome awarded by the Health & Safety auditor.',
       },
       {
         heading: 'Evidence and review process',
@@ -115,7 +115,7 @@ const policies = [
       },
       {
         heading: 'Sole trader status',
-        content: 'A Provider may declare that they operate as a sole trader by selecting Sole Trader as their company type. Sole trader Providers can become Sole trader AI Verified by uploading self-employment evidence. Quotes from sole traders who have not yet completed verification display a Sole Trader flag (Banner label: Sole Trader) with explanatory text so Contractors can complete appropriate identity, insurance, competence, and commercial due diligence before appointment.',
+        content: 'A Provider may declare that they operate as a sole trader by selecting Sole Trader as their company type. Sole trader Providers can complete sole trader automated assessment by uploading self-employment evidence. Quotes from sole traders who have not yet completed verification display a Sole Trader flag (Banner label: Sole Trader) with explanatory text so Contractors can complete appropriate identity, insurance, competence, and commercial due diligence before appointment.',
       },
       {
         heading: 'User due diligence',
@@ -218,7 +218,7 @@ const policies = [
       },
       {
         heading: 'Approved trigger conditions',
-        content: 'A contact release may occur only after the relevant payment or waiver condition is verified and the associated quote or tender workflow is in the authorized state. Where the Owner activates direct contact requests, a Contractor Services or Professional Services Provider may pay the approved direct-contact fee to share only their own Provider contact details with the purchasing Client. This does not release the Client contact details to the Provider. The platform enforces every release server-side and prevents browser-controlled release attempts.',
+        content: 'A contact release may occur only after the relevant payment or waiver condition is verified and the associated quote or tender workflow is in the authorized state. For Contractor Services and Professional Services, confirmation of the supplier’s fixed unlock/release fee releases both parties’ contact details so a site visit and quote can be arranged. For Materials, Waste, and Plant Hire, release follows Client quote acceptance and the Client release fee. Where the Owner activates direct contact requests, a Contractor Services or Professional Services Provider may pay the approved direct-contact fee to share only their own Provider contact details with the purchasing Client. The platform enforces every release server-side and prevents browser-controlled release attempts.',
       },
       {
         heading: 'Audit and revocation',
@@ -316,21 +316,21 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
   return (
     <div className="flex min-h-screen flex-col bg-site-white">
       <SiteHeader />
-      <main className="flex-1 px-6 py-14 sm:px-10">
+      <main id="main-content" className="flex-1 px-6 py-14 sm:px-10">
         <section className="mx-auto max-w-4xl">
           <Link href="/policies" className="inline-flex items-center text-sm font-semibold text-steel-blue underline underline-offset-4 hover:text-foundation-navy">
             ← Back to policy index
           </Link>
           <div className="mt-6">
             <p className="text-xs font-semibold uppercase tracking-widest text-steel-blue">Trade Tender policy</p>
-            <h1 className="mt-3 font-heading text-3xl font-bold text-foundation-navy sm:text-4xl">{policy.title}</h1>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foundation-navy">{policy.title}</h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-concrete-grey">{policy.summary}</p>
           </div>
 
           <div className="mt-8 space-y-5">
             {policy.sections.map((section) => (
-              <section key={`${policy.id}-${section.heading}`} className="rounded-xl border border-slate-200 bg-white p-5 shadow-soft">
-                <h2 className="font-heading text-lg font-bold text-foundation-navy">{section.heading}</h2>
+              <section key={`${policy.id}-${section.heading}`} className="rounded-md border border-slate-200 bg-white p-5">
+                <h2 className="text-base font-semibold tracking-tight text-foundation-navy">{section.heading}</h2>
                 <p className="mt-3 text-sm leading-relaxed text-concrete-grey">{section.content}</p>
               </section>
             ))}

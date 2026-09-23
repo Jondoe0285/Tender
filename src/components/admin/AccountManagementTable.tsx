@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { maskEmail } from '@/lib/enterprise-controls';
 
 export type AccountRow = {
   id: string;
@@ -138,7 +139,7 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER'; 
               type="checkbox"
               checked={openTenderRequestsOnly}
               onChange={(event) => setOpenTenderRequestsOnly(event.target.checked)}
-              className="h-4 w-4 accent-safety-amber"
+              className="h-4 w-4 accent-trade-blue"
             />
             Show Providers with open tender requests only
           </label>
@@ -152,7 +153,7 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER'; 
                 required
                 value={form.contactName}
                 onChange={(event) => setForm((current) => ({ ...current, contactName: event.target.value }))}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
               />
             </label>
             <label className="text-sm text-concrete-grey md:col-span-1">
@@ -162,7 +163,7 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER'; 
                 type="email"
                 value={form.email}
                 onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
               />
             </label>
             <label className="text-sm text-concrete-grey md:col-span-1">
@@ -172,7 +173,7 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER'; 
                 type="text"
                 value={form.password}
                 onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
               />
             </label>
             <label className="text-sm text-concrete-grey md:col-span-1">
@@ -180,7 +181,7 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER'; 
               <input
                 value={form.contactPhone}
                 onChange={(event) => setForm((current) => ({ ...current, contactPhone: event.target.value }))}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
               />
             </label>
 
@@ -191,7 +192,7 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER'; 
                     required
                     value={form.companyName}
                     onChange={(event) => setForm((current) => ({ ...current, companyName: event.target.value }))}
-                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
                   />
                 </label>
                 <label className="text-sm text-concrete-grey md:col-span-1">
@@ -200,7 +201,7 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER'; 
                     value={form.categories}
                     onChange={(event) => setForm((current) => ({ ...current, categories: event.target.value }))}
                     placeholder="Concrete, Waste"
-                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
                   />
                 </label>
                 <label className="text-sm text-concrete-grey md:col-span-2">
@@ -209,7 +210,7 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER'; 
                     value={form.coverageAreas}
                     onChange={(event) => setForm((current) => ({ ...current, coverageAreas: event.target.value }))}
                     placeholder="Leeds, Manchester, Birmingham"
-                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
                   />
                 </label>
               </>
@@ -218,7 +219,7 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER'; 
               <button
                 type="submit"
                 disabled={isBusy === 'create'}
-                className="inline-flex items-center rounded-md bg-safety-amber px-4 py-2 text-sm font-semibold text-foundation-navy shadow-soft transition hover:bg-safety-amber/90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center rounded-md bg-trade-blue px-4 py-2 text-sm font-semibold text-site-white transition hover:bg-trade-blue/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isBusy === 'create' ? 'Creating...' : 'Create account'}
               </button>
@@ -240,8 +241,8 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER'; 
                   {account.companyName ?? account.contactName}
                 </h3>
                 <p className="mt-1 text-sm text-concrete-grey">
-                  {account.email}
-                  {account.categories ? ` &middot; ${account.categories}` : ''}
+                  {maskEmail(account.email)}
+                  {account.categories ? ` · ${account.categories}` : ''}
                 </p>
                 <p className="mt-1 text-sm text-concrete-grey">
                   {account.tenders ?? 0} tender(s) raised &middot; {account.unlocks ?? 0} unlock(s) &middot; {account.quotes ?? 0} quote(s)

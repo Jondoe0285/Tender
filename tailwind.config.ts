@@ -25,7 +25,7 @@ const config: Config = {
         pending: '#8A4B00',
       },
       fontFamily: {
-        heading: ['var(--font-montserrat)', 'Arial', 'sans-serif'],
+        heading: ['var(--font-source-sans)', 'Arial', 'sans-serif'],
         sans: ['var(--font-source-sans)', 'Arial', 'sans-serif'],
       },
       boxShadow: {

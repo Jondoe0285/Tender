@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser, requireRole } from '@/server/auth/session';
+import { getCurrentUser, requireRole, ForbiddenError, UnauthorizedError } from '@/server/auth/session';
 import { toErrorResponse } from '@/server/http/errors';
 import { getUnlockedTenderForRetailer } from '@/server/domain/unlockService';
-import { getUserTenderServiceCategories, markMatchViewed, userOwnsTender } from '@/server/domain/tenderService';
-import { ForbiddenError, UnauthorizedError } from '@/server/auth/session';
+import { formatRetailerSummaryLocation, getUserTenderServiceProvisions, markMatchViewed, retailerMatchedCategories, tenderProvisionPackageWhere, updateTender, userOwnsTender } from '@/server/domain/tenderService';
 import { prisma } from '@/server/data/prisma';
-import { formatRetailerSummaryLocation } from '@/server/domain/tenderService';
 import { getTenderUnlockFeeGbp } from '@/server/domain/platformSettings';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { updateTenderSchema } from '@/lib/schemas/tender';
-import { updateTender } from '@/server/domain/tenderService';
+import { assertAnyBuyerDuty } from '@/server/domain/workspacePermissions';
+import { getReleasedBuyerContact, listReleasedProviderContacts, releaseSiteVisitContact } from '@/server/domain/contactReleaseService';
 
 export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -22,11 +21,14 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
       where: { id: params.id },
       include: {
         items: { orderBy: { createdAt: 'asc' } },
-        attachments: { select: { id: true, fileName: true, mimeType: true, sizeBytes: true } },
+        attachments: { select: { id: true, fileName: true, mimeType: true, sizeBytes: true, kind: true, version: true } },
+        packages: { select: { id: true, reference: true, revision: true, specHash: true, issuedAt: true, packageIndex: true }, orderBy: { packageIndex: 'asc' } },
+        awards: { select: { id: true, awardedAt: true, quoteId: true, packageSpecHash: true }, orderBy: { awardedAt: 'desc' } },
       },
     }) : null;
     if (ownedTender) {
-      return NextResponse.json({ tender: ownedTender, unlocked: true });
+      const releasedProviders = await listReleasedProviderContacts(user.id, params.id);
+      return NextResponse.json({ tender: ownedTender, unlocked: true, releasedProviders });
     }
 
     const match = await prisma.tenderMatch.findUnique({
@@ -41,22 +43,28 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
     });
 
     if (unlock) {
-      const tender = await getUnlockedTenderForRetailer(user.id, params.id);
-      return NextResponse.json({ tender, unlocked: true });
+      await releaseSiteVisitContact(user.id, params.id, unlock.paymentId).catch(() => undefined);
+      const [tender, buyerContact] = await Promise.all([
+        getUnlockedTenderForRetailer(user.id, params.id),
+        getReleasedBuyerContact(user.id, params.id),
+      ]);
+      return NextResponse.json({ tender, unlocked: true, buyerContact });
     }
 
     // Pre-unlock: approved non-sensitive summary only (SEC-030/031).
-    const serviceCategories = await getUserTenderServiceCategories(user.id);
+    const provisions = await getUserTenderServiceProvisions(user.id);
+    const provisionWhere = tenderProvisionPackageWhere(provisions);
+    const matchingCategories = await retailerMatchedCategories(user.id, params.id);
     const [tender, unlockFeeGbp] = await Promise.all([
       prisma.tender.findUniqueOrThrow({
         where: { id: params.id },
         select: {
           id: true, reference: true, category: true, location: true, urgency: true, closingDate: true, status: true,
-          items: { where: { category: { in: serviceCategories } }, orderBy: { createdAt: 'asc' }, select: { id: true, category: true, subcategory: true, item: true, quantity: true } },
-          packages: { where: { category: { in: serviceCategories } }, orderBy: { createdAt: 'asc' }, select: { id: true, reference: true, category: true, subcategory: true, item: true, quantity: true } },
+          items: { where: provisionWhere, orderBy: { createdAt: 'asc' }, select: { id: true, category: true, subcategory: true, item: true, quantity: true, specJson: true } },
+          packages: { where: provisionWhere, orderBy: { createdAt: 'asc' }, select: { id: true, reference: true, category: true, subcategory: true, item: true, quantity: true, specJson: true } },
         },
       }),
-        getTenderUnlockFeeGbp(params.id),
+        getTenderUnlockFeeGbp(params.id, matchingCategories),
     ]);
     const packageCategories = [...new Set((tender.packages ?? []).map((pkg) => pkg.category))];
     return NextResponse.json({ tender: { ...tender, category: packageCategories[0] ?? tender.category, packageCategories, packageCount: packageCategories.length, location: formatRetailerSummaryLocation(tender.location), unlockFeeGbp }, unlocked: false });
@@ -71,6 +79,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
     const user = await requireRole('USER');
+    await assertAnyBuyerDuty(user.id, ['RAISER', 'ESTIMATOR']);
     const parsed = updateTenderSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid tender details', issues: parsed.error.flatten() }, { status: 400 });

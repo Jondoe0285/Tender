@@ -5,12 +5,15 @@ import { rejectCrossOrigin } from '@/server/http/origin';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { getAdminSettings, assertIndependentReviewFeeOrder } from '@/server/domain/platformSettings';
 import { requireFullSuperUser, requireOwner } from '@/server/auth/session';
+import { isFourEyesSettingKey } from '@/lib/enterprise-controls';
+import { proposeFeeChange } from '@/server/domain/controlChangeService';
 import { ensureDefaultMembershipTiers } from '@/server/domain/membershipService';
+import { toErrorResponse } from '@/server/http/errors';
 
 const settingSchema = z.object({
-  action: z.enum(['fee', 'tier', 'subscription', 'support-recipient', 'verification-document']),
+  action: z.enum(['fee', 'tier', 'subscription', 'support-recipient', 'verification-document', 'public-launch']),
   id: z.string().optional(),
-  key: z.enum(['RETAILER_UNLOCK_FEE_GBP', 'RETAILER_UNLOCK_FEE_MODE', 'RETAILER_UNLOCK_PERCENTAGE_LOW', 'RETAILER_UNLOCK_PERCENTAGE_HIGH', 'RETAILER_UNLOCK_PERCENTAGE_TOP', 'CONTRACTOR_SERVICE_UNLOCK_FEE_GBP', 'PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP', 'CLIENT_RELEASE_FEE_GBP', 'CLIENT_RELEASE_FEE_MODE', 'CLIENT_RELEASE_PERCENTAGE_LOW', 'CLIENT_RELEASE_PERCENTAGE_HIGH', 'CLIENT_RELEASE_PERCENTAGE_TOP', 'QUOTE_ESTIMATE_OFFSET_PERCENTAGE', 'QUOTE_ESTIMATE_MASTER_REDUCTION_PERCENTAGE', 'VAT_PERCENTAGE', 'SPONSORED_PLACEMENT_ACTIVE', 'SPONSORED_PLACEMENT_FEE_GBP', 'MEMBERSHIP_TIERS_ACTIVE', 'RETAILER_LAUNCH_CREDITS_DEFAULT', 'ADSPACE_ACTIVE', 'INDEPENDENT_REVIEW_ACTIVE', 'INDEPENDENT_REVIEW_FEE_BRONZE_GBP', 'INDEPENDENT_REVIEW_FEE_SILVER_GBP', 'INDEPENDENT_REVIEW_FEE_GOLD_GBP', 'DIRECT_CONTACT_ACTIVE', 'DIRECT_CONTACT_FEE_GBP', 'HUMAN_REVIEW_ACTIVE']).optional(),
+  key: z.enum(['RETAILER_UNLOCK_FEE_GBP', 'RETAILER_UNLOCK_FEE_MODE', 'RETAILER_UNLOCK_PERCENTAGE_LOW', 'RETAILER_UNLOCK_PERCENTAGE_HIGH', 'RETAILER_UNLOCK_PERCENTAGE_TOP', 'CONTRACTOR_SERVICE_UNLOCK_FEE_GBP', 'PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP', 'CLIENT_RELEASE_FEE_GBP', 'CLIENT_RELEASE_FEE_MODE', 'CLIENT_RELEASE_PERCENTAGE_LOW', 'CLIENT_RELEASE_PERCENTAGE_HIGH', 'CLIENT_RELEASE_PERCENTAGE_TOP', 'QUOTE_ESTIMATE_OFFSET_PERCENTAGE', 'QUOTE_ESTIMATE_MASTER_REDUCTION_PERCENTAGE', 'VAT_PERCENTAGE', 'SPONSORED_PLACEMENT_ACTIVE', 'SPONSORED_PLACEMENT_FEE_GBP', 'MEMBERSHIP_TIERS_ACTIVE', 'RETAILER_LAUNCH_CREDITS_DEFAULT', 'ADSPACE_ACTIVE', 'INDEPENDENT_REVIEW_ACTIVE', 'INDEPENDENT_REVIEW_FEE_BRONZE_GBP', 'INDEPENDENT_REVIEW_FEE_SILVER_GBP', 'INDEPENDENT_REVIEW_FEE_GOLD_GBP', 'DIRECT_CONTACT_ACTIVE', 'DIRECT_CONTACT_FEE_GBP', 'HUMAN_REVIEW_ACTIVE', 'SIGN_IN_ACTIVE']).optional(),
   value: z.union([z.number(), z.enum(['FIXED', 'PERCENTAGE']), z.boolean()]).optional(),
   name: z.string().trim().min(2).max(80).optional(),
   description: z.string().trim().max(500).optional(),
@@ -21,6 +24,7 @@ const settingSchema = z.object({
   active: z.boolean().optional(),
   supportRecipientEmail: z.string().trim().toLowerCase().email().max(254).nullable().optional(),
   requirements: z.record(z.string(), z.boolean()).optional(),
+  publicLaunchAt: z.string().nullable().optional(),
 });
 
 export async function GET() {
@@ -63,11 +67,24 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ status: 'updated' });
   }
 
+  if (input.action === 'public-launch') {
+    if (input.publicLaunchAt === undefined) return NextResponse.json({ error: 'A launch date is required' }, { status: 400 });
+    let stored = '';
+    if (input.publicLaunchAt !== null && input.publicLaunchAt.trim() !== '') {
+      const parsed = Date.parse(input.publicLaunchAt);
+      if (!Number.isFinite(parsed)) return NextResponse.json({ error: 'Enter a valid launch date and time' }, { status: 400 });
+      stored = new Date(parsed).toISOString();
+    }
+    await prisma.platformSetting.upsert({ where: { key: 'PUBLIC_LAUNCH_AT' }, update: { value: stored }, create: { key: 'PUBLIC_LAUNCH_AT', value: stored } });
+    await recordAuditEvent({ actorId: admin.id, action: 'PUBLIC_LAUNCH_AT_UPDATED', targetType: 'PlatformSetting', targetId: 'PUBLIC_LAUNCH_AT', metadata: { publicLaunchAt: stored || null } });
+    return NextResponse.json({ status: 'updated', publicLaunchAt: stored || null });
+  }
+
   if (input.action === 'fee') {
     if (!input.key || input.value === undefined) return NextResponse.json({ error: 'Fee key and value are required' }, { status: 400 });
     if (['RETAILER_UNLOCK_FEE_MODE', 'CLIENT_RELEASE_FEE_MODE'].includes(input.key) && typeof input.value !== 'string') return NextResponse.json({ error: 'A fee mode is required' }, { status: 400 });
-    if (['SPONSORED_PLACEMENT_ACTIVE', 'MEMBERSHIP_TIERS_ACTIVE', 'ADSPACE_ACTIVE', 'INDEPENDENT_REVIEW_ACTIVE', 'DIRECT_CONTACT_ACTIVE', 'HUMAN_REVIEW_ACTIVE'].includes(input.key) && typeof input.value !== 'boolean') return NextResponse.json({ error: 'An active flag is required' }, { status: 400 });
-    if (!['RETAILER_UNLOCK_FEE_MODE', 'CLIENT_RELEASE_FEE_MODE', 'SPONSORED_PLACEMENT_ACTIVE', 'MEMBERSHIP_TIERS_ACTIVE', 'ADSPACE_ACTIVE', 'INDEPENDENT_REVIEW_ACTIVE', 'DIRECT_CONTACT_ACTIVE', 'HUMAN_REVIEW_ACTIVE'].includes(input.key) && typeof input.value !== 'number') return NextResponse.json({ error: 'A numeric fee value is required' }, { status: 400 });
+    if (['SPONSORED_PLACEMENT_ACTIVE', 'MEMBERSHIP_TIERS_ACTIVE', 'ADSPACE_ACTIVE', 'INDEPENDENT_REVIEW_ACTIVE', 'DIRECT_CONTACT_ACTIVE', 'HUMAN_REVIEW_ACTIVE', 'SIGN_IN_ACTIVE'].includes(input.key) && typeof input.value !== 'boolean') return NextResponse.json({ error: 'An active flag is required' }, { status: 400 });
+    if (!['RETAILER_UNLOCK_FEE_MODE', 'CLIENT_RELEASE_FEE_MODE', 'SPONSORED_PLACEMENT_ACTIVE', 'MEMBERSHIP_TIERS_ACTIVE', 'ADSPACE_ACTIVE', 'INDEPENDENT_REVIEW_ACTIVE', 'DIRECT_CONTACT_ACTIVE', 'HUMAN_REVIEW_ACTIVE', 'SIGN_IN_ACTIVE'].includes(input.key) && typeof input.value !== 'number') return NextResponse.json({ error: 'A numeric fee value is required' }, { status: 400 });
     if (input.key === 'QUOTE_ESTIMATE_OFFSET_PERCENTAGE' && typeof input.value === 'number' && (input.value < -100 || input.value > 100 || Math.round(input.value * 100) !== input.value * 100)) return NextResponse.json({ error: 'Offset percentage must be between -100 and 100 with up to two decimal places' }, { status: 400 });
     if (typeof input.value === 'number' && input.key !== 'QUOTE_ESTIMATE_OFFSET_PERCENTAGE' && input.value < 0) return NextResponse.json({ error: 'Fee values cannot be negative' }, { status: 400 });
     if (typeof input.value === 'number' && input.key.startsWith('INDEPENDENT_REVIEW_FEE_') && input.value > 1_000_000) return NextResponse.json({ error: 'Enhanced verification fees cannot exceed £1,000,000' }, { status: 400 });
@@ -76,6 +93,15 @@ export async function PATCH(request: Request) {
       if (orderError) return NextResponse.json({ error: orderError }, { status: 400 });
     }
     if ((input.key.includes('PERCENTAGE') || input.key === 'VAT_PERCENTAGE') && input.key !== 'QUOTE_ESTIMATE_OFFSET_PERCENTAGE' && typeof input.value === 'number' && (input.value > 100 || Math.round(input.value * 100) !== input.value * 100)) return NextResponse.json({ error: 'Percentage must be between 0 and 100 with up to two decimal places' }, { status: 400 });
+    if (isFourEyesSettingKey(input.key)) {
+      if (typeof input.value === 'boolean') return NextResponse.json({ error: 'A fee mode or VAT value is required' }, { status: 400 });
+      try {
+        const change = await proposeFeeChange(admin.id, input.key, input.value);
+        return NextResponse.json({ status: 'pending', changeId: change.id });
+      } catch (error) {
+        return toErrorResponse(error);
+      }
+    }
     await prisma.platformSetting.upsert({ where: { key: input.key }, update: { value: String(input.value) }, create: { key: input.key, value: String(input.value) } });
     await recordAuditEvent({ actorId: admin.id, action: 'PLATFORM_FEE_UPDATED', targetType: 'PlatformSetting', targetId: input.key, metadata: { value: input.value } });
     return NextResponse.json({ status: 'updated' });

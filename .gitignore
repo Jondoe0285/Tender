@@ -52,3 +52,6 @@ prisma/health-check*.db
 
 # Stress-test reports are generated evidence and should not be committed.
 stress-test-results/
+
+# Local private attachment object store (not committed).
+data/attachments/

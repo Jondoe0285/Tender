@@ -51,6 +51,10 @@ test('provider profile and verification pages support the sole trader evidence f
   assert.doesNotMatch(profilePage, /Sole trader profiles cannot be AI verified/);
   assert.match(verificationPage, /soleTraderEvidence/);
   assert.doesNotMatch(verificationPage, /Sole traders cannot be AI verified/);
+  assert.match(verificationPage, /accept="application\/pdf,\.pdf"/);
+  assert.doesNotMatch(verificationPage, /\.jpg/);
+  assert.match(verificationPage, /There is no human review of this upload path/);
+  assert.doesNotMatch(verificationPage, /flagged this for human review/);
 });
 
 test('verification policy and quote comparison document all 6 verification levels and use approved banner labels', () => {
@@ -58,8 +62,8 @@ test('verification policy and quote comparison document all 6 verification level
   const quoteComparison = readFileSync('src/components/quotes/QuoteComparison.tsx', 'utf8');
 
   // Documentation levels
-  assert.match(policyPage, /Sole trader AI Verified/);
-  assert.match(policyPage, /Incorporated AI Verified/);
+  assert.match(policyPage, /Sole trader automated assessment/);
+  assert.match(policyPage, /Incorporated automated assessment/);
   assert.match(policyPage, /Enhanced Bronze Verification/);
   assert.match(policyPage, /Enhanced Silver Verification/);
   assert.match(policyPage, /Enhanced Gold Verification/);

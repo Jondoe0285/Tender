@@ -1,56 +1,68 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
 import { LinkButton } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Card } from '@/components/ui/Card';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { DataCell, DataRow, DataTable } from '@/components/ui/DataTable';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { getCurrentUser } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
 import { getCompanyMemberIds } from '@/server/domain/tenderService';
+import { hydrateEnterpriseRecords } from '@/server/domain/enterpriseRecordRepair';
+import { getBuyerCapabilities } from '@/server/domain/workspacePermissions';
+import { buyingTenderNewPath, buyingTenderPath } from '@/lib/workspace-paths';
 
 export default async function MyTendersPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== 'USER') redirect('/login');
 
   const memberIds = await getCompanyMemberIds(user.id);
-  const tenders = await prisma.tender.findMany({
-    where: { clientId: { in: memberIds } },
-    orderBy: { createdAt: 'desc' },
-    include: { _count: { select: { quotes: true } } },
-  });
+  await hydrateEnterpriseRecords(memberIds);
+  const [tenders, capabilities] = await Promise.all([
+    prisma.tender.findMany({
+      where: { clientId: { in: memberIds } },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: { select: { quotes: true, awards: true, packages: true } },
+        project: { select: { name: true } },
+      },
+    }),
+    getBuyerCapabilities(user.id),
+  ]);
 
   return (
-    <AppShell role="client" title="My Tenders">
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <p className="max-w-xl text-sm text-concrete-grey">Every tender raised for your company, in one place.</p>
-          <LinkButton href="/client/tenders/new">Create Tender</LinkButton>
-        </div>
+    <AppShell role="client" title="My tenders">
+      <div className="mx-auto max-w-6xl">
+        <PageHeader
+          description="Every package issued for your company, with quote and award counts."
+          actions={capabilities.canRaiseTender ? <LinkButton href={buyingTenderNewPath()}>Create tender</LinkButton> : undefined}
+        />
         {tenders.length === 0 ? (
-          <Card className="py-16 text-center">
-            <p className="text-sm text-concrete-grey">No tenders have been raised for this account.</p>
-            <LinkButton href="/client/tenders/new" className="mx-auto mt-5">Raise your first tender</LinkButton>
-          </Card>
+          <EmptyState
+            title="No tenders yet"
+            body={capabilities.canRaiseTender ? 'Raise a specified package to start receiving comparable quotes. The first tender is the fastest way to see matching suppliers.' : 'No packages have been issued yet. A Buyer or QS / estimator on this organisation can raise a tender.'}
+            action={capabilities.canRaiseTender ? <LinkButton href={buyingTenderNewPath()}>Raise your first tender</LinkButton> : undefined}
+          />
         ) : (
-          <div className="flex flex-col gap-4">
+          <DataTable headers={['Reference', 'Project', 'Package', 'Closes', 'Quotes', 'Status']}>
             {tenders.map((tender) => (
-              <a key={tender.id} href={`/client/tenders/${tender.id}`} className="block">
-                <Card interactive className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-steel-blue">
-                      {tender.category} &middot; {tender.reference}
-                    </p>
-                    <h3 className="font-heading text-lg font-bold text-foundation-navy">{tender.subcategory}</h3>
-                    <p className="mt-1 text-sm text-concrete-grey">
-                      Closes {tender.closingDate.toLocaleDateString('en-GB')}
-                    </p>
-                  </div>
-                  <StatusBadge status={tender._count.quotes > 0 ? 'approved' : 'pending'}>
-                    {tender._count.quotes > 0 ? `${tender._count.quotes} quote(s) received` : 'Awaiting quotes'}
+              <DataRow key={tender.id}>
+                <DataCell strong numeric>
+                  <Link href={buyingTenderPath(tender.id)} className="hover:text-trade-blue">{tender.reference}</Link>
+                </DataCell>
+                <DataCell>{tender.project?.name ?? tender.subcategory}</DataCell>
+                <DataCell strong>{tender.subcategory}</DataCell>
+                <DataCell numeric>{tender.closingDate.toLocaleDateString('en-GB')}</DataCell>
+                <DataCell numeric strong>{tender._count.quotes}</DataCell>
+                <DataCell>
+                  <StatusBadge status={tender._count.awards > 0 ? 'approved' : tender._count.quotes > 0 ? 'pending' : 'neutral'}>
+                    {tender._count.awards > 0 ? 'Awarded' : tender._count.quotes === 1 ? '1 quote' : tender._count.quotes > 1 ? `${tender._count.quotes} quotes` : 'Awaiting quotes'}
                   </StatusBadge>
-                </Card>
-              </a>
+                </DataCell>
+              </DataRow>
             ))}
-          </div>
+          </DataTable>
         )}
       </div>
     </AppShell>

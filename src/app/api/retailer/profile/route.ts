@@ -4,6 +4,7 @@ import { isSameOriginRequest } from '@/server/http/origin';
 import { prisma } from '@/server/data/prisma';
 import { z } from 'zod';
 import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
+import { operatingLocationsFromCoverage } from '@/lib/geography';
 import { isVerificationEligible } from '@/lib/categories';
 import { markUploadedDocumentsVerified, syncVerificationExpiry } from '@/server/domain/verificationDocumentService';
 import { INDEPENDENT_REVIEW_RESET_DATA } from '@/server/domain/independentReviewService';
@@ -82,6 +83,21 @@ export async function PUT(req: NextRequest) {
         masterUserId: parsed.masterUserId || null,
       },
     });
+
+    const membership = await prisma.clientCompanyMember.findUnique({ where: { userId: user.id }, select: { companyId: true } });
+    if (membership) {
+      await prisma.clientCompany.update({
+        where: { id: membership.companyId },
+        data: {
+          services: parsed.categories,
+          operatingLocations: operatingLocationsFromCoverage({
+            coverageScope: parsed.coverageScope,
+            counties: parsed.counties.split(',').map((value) => value.trim()).filter(Boolean),
+            regions: parsed.regions.split(',').map((value) => value.trim()).filter(Boolean),
+          }),
+        },
+      });
+    }
 
     if (resetVerification) {
       await markUploadedDocumentsVerified(profile.id, parsed.categories, false, isSoleTrader);

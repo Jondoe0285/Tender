@@ -5,13 +5,16 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input, Label, Select, Textarea } from '@/components/ui/Field';
 import { SERVICE_NAMES } from '@/lib/categories';
+import { isPreLaunchActive, toDatetimeLocalInput, datetimeLocalToIso, formatLaunchDate } from '@/lib/public-launch';
 import { VERIFICATION_DOCUMENT_TYPES } from '@/lib/verification-documents';
 
 export type AdminSettings = {
-  fees: { retailerUnlockGbp: number; retailerUnlockMode: string; retailerUnlockPercentageLow: number; retailerUnlockPercentageHigh: number; retailerUnlockPercentageTop: number; contractorServiceUnlockGbp: number; professionalServiceUnlockGbp: number; clientReleaseGbp: number; clientReleaseMode: string; clientReleasePercentageLow: number; clientReleasePercentageHigh: number; clientReleasePercentageTop: number; quoteEstimateOffsetPercentage: number; quoteEstimateMasterReductionPercentage: number; vatPercentage: number; sponsoredPlacementActive: boolean; sponsoredPlacementFeeGbp: number; membershipTiersActive: boolean; retailerLaunchCreditsDefault: number; adspaceActive: boolean; independentReviewActive: boolean; independentReviewFeeBronzeGbp: number; independentReviewFeeSilverGbp: number; independentReviewFeeGoldGbp: number; directContactActive: boolean; directContactFeeGbp: number; humanReviewActive: boolean; verificationDocumentRequirements: Array<[string, boolean]> };
+  fees: { retailerUnlockGbp: number; retailerUnlockMode: string; retailerUnlockPercentageLow: number; retailerUnlockPercentageHigh: number; retailerUnlockPercentageTop: number; contractorServiceUnlockGbp: number; professionalServiceUnlockGbp: number; clientReleaseGbp: number; clientReleaseMode: string; clientReleasePercentageLow: number; clientReleasePercentageHigh: number; clientReleasePercentageTop: number; quoteEstimateOffsetPercentage: number; quoteEstimateMasterReductionPercentage: number; vatPercentage: number; sponsoredPlacementActive: boolean; sponsoredPlacementFeeGbp: number; membershipTiersActive: boolean; retailerLaunchCreditsDefault: number; adspaceActive: boolean; independentReviewActive: boolean; independentReviewFeeBronzeGbp: number; independentReviewFeeSilverGbp: number; independentReviewFeeGoldGbp: number; directContactActive: boolean; directContactFeeGbp: number; humanReviewActive: boolean; signInActive: boolean; verificationDocumentRequirements: Array<[string, boolean]> };
+  publicLaunchAt?: string | null;
   supportRecipientEmail?: string | null;
   tiers: Array<{ id: string; name: string; description: string; monthlyPriceGbp: number; freeTenderOpportunitiesPerMonth: number; additionalCreditDiscountPercentage: number; active: boolean }>;
   subscriptions: Array<{ id: string; name: string; description: string; annualPriceGbp: number; active: boolean }>;
+  pendingControlChanges?: Array<{ id: string; kind: string; settingKey: string | null; proposedValue: string; proposedById: string; proposedByName: string; createdAt: string }>;
 };
 
 type MembershipTier = AdminSettings['tiers'][number];
@@ -19,11 +22,14 @@ type SubscriptionPlan = AdminSettings['subscriptions'][number];
 
 type PlanType = 'tier' | 'subscription';
 
-export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSettings: AdminSettings; isOwner: boolean }) {
+export function SuperUserSettingsPanel({ initialSettings, isOwner, currentUserId }: { initialSettings: AdminSettings; isOwner: boolean; currentUserId?: string }) {
   const [settings, setSettings] = useState(initialSettings);
   const [fees, setFees] = useState(settings.fees);
   const [verificationRequirements, setVerificationRequirements] = useState<Record<string, boolean>>(Object.fromEntries(settings.fees.verificationDocumentRequirements));
   const [supportRecipientEmail, setSupportRecipientEmail] = useState(settings.supportRecipientEmail ?? '');
+  const [publicLaunchAt, setPublicLaunchAt] = useState(settings.publicLaunchAt ?? null);
+  const [launchLocal, setLaunchLocal] = useState(settings.publicLaunchAt ? toDatetimeLocalInput(settings.publicLaunchAt) : '');
+  const [pendingChanges, setPendingChanges] = useState(initialSettings.pendingControlChanges ?? []);
   const [form, setForm] = useState({ name: '', description: '', monthlyPriceGbp: '', freeTenderOpportunitiesPerMonth: '', additionalCreditDiscountPercentage: '' });
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -36,13 +42,48 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSe
     return data;
   }
 
-  async function saveFee(key: 'RETAILER_UNLOCK_FEE_GBP' | 'RETAILER_UNLOCK_FEE_MODE' | 'RETAILER_UNLOCK_PERCENTAGE_LOW' | 'RETAILER_UNLOCK_PERCENTAGE_HIGH' | 'RETAILER_UNLOCK_PERCENTAGE_TOP' | 'CONTRACTOR_SERVICE_UNLOCK_FEE_GBP' | 'PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP' | 'CLIENT_RELEASE_FEE_GBP' | 'CLIENT_RELEASE_FEE_MODE' | 'CLIENT_RELEASE_PERCENTAGE_LOW' | 'CLIENT_RELEASE_PERCENTAGE_HIGH' | 'CLIENT_RELEASE_PERCENTAGE_TOP' | 'QUOTE_ESTIMATE_OFFSET_PERCENTAGE' | 'QUOTE_ESTIMATE_MASTER_REDUCTION_PERCENTAGE' | 'VAT_PERCENTAGE' | 'SPONSORED_PLACEMENT_ACTIVE' | 'SPONSORED_PLACEMENT_FEE_GBP' | 'MEMBERSHIP_TIERS_ACTIVE' | 'RETAILER_LAUNCH_CREDITS_DEFAULT' | 'ADSPACE_ACTIVE' | 'INDEPENDENT_REVIEW_FEE_BRONZE_GBP' | 'INDEPENDENT_REVIEW_FEE_SILVER_GBP' | 'INDEPENDENT_REVIEW_FEE_GOLD_GBP' | 'DIRECT_CONTACT_ACTIVE' | 'DIRECT_CONTACT_FEE_GBP', value: number | string | boolean) {
+  async function saveFee(key: 'RETAILER_UNLOCK_FEE_GBP' | 'RETAILER_UNLOCK_FEE_MODE' | 'RETAILER_UNLOCK_PERCENTAGE_LOW' | 'RETAILER_UNLOCK_PERCENTAGE_HIGH' | 'RETAILER_UNLOCK_PERCENTAGE_TOP' | 'CONTRACTOR_SERVICE_UNLOCK_FEE_GBP' | 'PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP' | 'CLIENT_RELEASE_FEE_GBP' | 'CLIENT_RELEASE_FEE_MODE' | 'CLIENT_RELEASE_PERCENTAGE_LOW' | 'CLIENT_RELEASE_PERCENTAGE_HIGH' | 'CLIENT_RELEASE_PERCENTAGE_TOP' | 'QUOTE_ESTIMATE_OFFSET_PERCENTAGE' | 'QUOTE_ESTIMATE_MASTER_REDUCTION_PERCENTAGE' | 'VAT_PERCENTAGE' | 'SPONSORED_PLACEMENT_ACTIVE' | 'SPONSORED_PLACEMENT_FEE_GBP' | 'MEMBERSHIP_TIERS_ACTIVE' | 'RETAILER_LAUNCH_CREDITS_DEFAULT' | 'ADSPACE_ACTIVE' | 'INDEPENDENT_REVIEW_FEE_BRONZE_GBP' | 'INDEPENDENT_REVIEW_FEE_SILVER_GBP' | 'INDEPENDENT_REVIEW_FEE_GOLD_GBP' | 'DIRECT_CONTACT_ACTIVE' | 'DIRECT_CONTACT_FEE_GBP' | 'SIGN_IN_ACTIVE', value: number | string | boolean) {
     setSaving(true);
     setMessage(null);
     try {
-      await request('/api/super-user/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'fee', key, value }) });
-      setMessage('Fee updated. New payments will use this amount.');
+      const data = await request('/api/super-user/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'fee', key, value }) });
+      if (data.status === 'pending') {
+        setMessage('Proposed. A second Owner must confirm VAT, fee-mode, or waiver changes before they take effect.');
+        const next = await request('/api/super-user/settings', { method: 'GET' });
+        setPendingChanges(next.pendingControlChanges ?? []);
+        setFees(next.fees);
+      } else if (key === 'SIGN_IN_ACTIVE') {
+        setMessage(value ? 'Sign in is open.' : 'Sign in is closed. Registration remains open. Owner accounts can still sign in.');
+      } else {
+        setMessage('Fee updated. New payments will use this amount.');
+      }
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to save fee'); }
+    setSaving(false);
+  }
+
+  async function resolveChange(id: string, action: 'confirm' | 'reject') {
+    setSaving(true);
+    setMessage(null);
+    try {
+      await request(`/api/super-user/control-changes/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
+      const next = await request('/api/super-user/settings', { method: 'GET' });
+      setFees(next.fees);
+      setPendingChanges(next.pendingControlChanges ?? []);
+      setMessage(action === 'confirm' ? 'Change confirmed and applied.' : 'Change rejected.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to resolve change'); }
+    setSaving(false);
+  }
+
+  async function savePublicLaunchAt(nextIso: string | null) {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const data = await request('/api/super-user/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'public-launch', publicLaunchAt: nextIso }) });
+      const stored = (data.publicLaunchAt as string | null) ?? null;
+      setPublicLaunchAt(stored);
+      setLaunchLocal(stored ? toDatetimeLocalInput(stored) : '');
+      setMessage(isPreLaunchActive(stored) ? 'Pre-launch page is showing until that date and time.' : 'Live landing page is showing.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to save launch date'); }
     setSaving(false);
   }
 
@@ -120,6 +161,95 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSe
       {locked && <p role="status" className="rounded-lg border border-safety-amber/40 bg-safety-amber/10 px-4 py-3 text-sm font-semibold text-foundation-navy">Fees, affiliated partner links, membership tiers, and subscriptions are Owner-controlled. Ask an Owner to make changes here.</p>}
       {message && <p role="status" className="rounded-lg border border-steel-blue/20 bg-steel-blue/5 px-4 py-3 text-sm font-semibold text-steel-blue">{message}</p>}
       <section>
+        <h2 className="mb-4 font-heading text-lg font-bold text-foundation-navy">Public launch</h2>
+        <Card>
+          <Label htmlFor="public-launch-at">Launch date and time</Label>
+          <p className="mt-1 max-w-3xl text-sm text-concrete-grey">
+            Until this date and time, visitors see the pre-launch page with a countdown and Register now. At that moment the live landing page takes over. Leave this empty, or choose Go live now, to show the live landing immediately. Owner sign-in stays at /login.
+          </p>
+          <p className="mt-2 text-sm font-semibold text-foundation-navy">
+            {isPreLaunchActive(publicLaunchAt) ? `Pre-launch page is showing until ${formatLaunchDate(publicLaunchAt ?? '')}.` : 'Live landing page is showing.'}
+          </p>
+          <div className="mt-4 flex max-w-xl flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <Input
+                id="public-launch-at"
+                type="datetime-local"
+                step="60"
+                value={launchLocal}
+                disabled={locked}
+                onChange={(event) => setLaunchLocal(event.target.value)}
+              />
+            </div>
+            <Button
+              disabled={locked}
+              loading={saving}
+              onClick={() => {
+                const iso = datetimeLocalToIso(launchLocal);
+                if (launchLocal && !iso) {
+                  setMessage('Enter a valid launch date and time.');
+                  return;
+                }
+                void savePublicLaunchAt(iso);
+              }}
+            >
+              Save launch date
+            </Button>
+            <Button variant="secondary" disabled={locked} loading={saving} onClick={() => void savePublicLaunchAt(null)}>
+              Go live now
+            </Button>
+          </div>
+        </Card>
+      </section>
+      <section>
+        <h2 className="mb-4 font-heading text-lg font-bold text-foundation-navy">Sign in access</h2>
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <Label>Marketplace sign in</Label>
+              <p className="mt-1 max-w-3xl text-sm text-concrete-grey">
+                Close sign in when you want people to register but not enter the workspace yet. Registration and email verification stay open. Owner accounts can always sign in so this cannot lock you out. People already signed in stay in until they sign out.
+              </p>
+              <p className="mt-2 text-sm font-semibold text-foundation-navy">{fees.signInActive ? 'Sign in is open.' : 'Sign in is closed.'}</p>
+            </div>
+            <Button
+              variant={fees.signInActive ? 'danger' : 'secondary'}
+              disabled={locked}
+              onClick={() => {
+                const active = !fees.signInActive;
+                setFees({ ...fees, signInActive: active });
+                void saveFee('SIGN_IN_ACTIVE', active);
+              }}
+              loading={saving}
+            >
+              {fees.signInActive ? 'Close sign in' : 'Open sign in'}
+            </Button>
+          </div>
+        </Card>
+      </section>
+      {pendingChanges.length > 0 && (
+        <section>
+          <h2 className="mb-4 font-heading text-lg font-bold text-foundation-navy">Pending four-eyes changes</h2>
+          <p className="mb-4 max-w-3xl text-sm text-concrete-grey">VAT, fee mode, and waivers need a second Owner. The proposer cannot confirm their own change.</p>
+          <div className="space-y-3">
+            {pendingChanges.map((change) => (
+              <Card key={change.id}>
+                <p className="font-semibold text-foundation-navy">{change.kind === 'FEE' ? change.settingKey : change.kind.replace(/_/g, ' ')}</p>
+                <p className="mt-1 text-sm text-concrete-grey">Proposed value: {change.proposedValue} · {change.proposedByName} · {new Date(change.createdAt).toLocaleString('en-GB')}</p>
+                {isOwner && currentUserId !== change.proposedById ? (
+                  <div className="mt-3 flex gap-2">
+                    <Button onClick={() => void resolveChange(change.id, 'confirm')} loading={saving}>Confirm</Button>
+                    <Button variant="secondary" onClick={() => void resolveChange(change.id, 'reject')} loading={saving}>Reject</Button>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm font-semibold text-safety-amber">Waiting for a different Owner to confirm.</p>
+                )}
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+      <section>
         <h2 className="mb-4 font-heading text-lg font-bold text-foundation-navy">Fees</h2>
         <div className="grid gap-5 sm:grid-cols-2">
           <Card><FieldEditor label="Provider fixed tender unlock fee (excl. VAT)" value={fees.retailerUnlockGbp} onChange={(value) => setFees({ ...fees, retailerUnlockGbp: value })} onSave={() => saveFee('RETAILER_UNLOCK_FEE_GBP', fees.retailerUnlockGbp)} saving={saving} disabled={locked} /><div className="mt-4"><Label>Tender unlock pricing mode</Label><Select className="mt-2" value={fees.retailerUnlockMode} disabled={locked} onChange={(event) => { const value = event.target.value; setFees({ ...fees, retailerUnlockMode: value }); void saveFee('RETAILER_UNLOCK_FEE_MODE', value); }}><option value="FIXED">Fixed fee</option><option value="PERCENTAGE">Dynamic staged percentage of internal estimate</option></Select></div>{fees.retailerUnlockMode === 'PERCENTAGE' && <div className="mt-4 grid gap-3 sm:grid-cols-2"><FieldEditor label="First £10,000 (%)" value={fees.retailerUnlockPercentageLow} onChange={(value) => setFees({ ...fees, retailerUnlockPercentageLow: value })} onSave={() => saveFee('RETAILER_UNLOCK_PERCENTAGE_LOW', fees.retailerUnlockPercentageLow)} saving={saving} step="0.01" disabled={locked} /><FieldEditor label="£10,000.01 to £100,000 (%)" value={fees.retailerUnlockPercentageHigh} onChange={(value) => setFees({ ...fees, retailerUnlockPercentageHigh: value })} onSave={() => saveFee('RETAILER_UNLOCK_PERCENTAGE_HIGH', fees.retailerUnlockPercentageHigh)} saving={saving} step="0.01" disabled={locked} /><FieldEditor label="Over £100,000 (%)" value={fees.retailerUnlockPercentageTop} onChange={(value) => setFees({ ...fees, retailerUnlockPercentageTop: value })} onSave={() => saveFee('RETAILER_UNLOCK_PERCENTAGE_TOP', fees.retailerUnlockPercentageTop)} saving={saving} step="0.01" disabled={locked} /></div>}<p className="mt-3 text-sm text-concrete-grey">Dynamic tender unlock pricing uses the internal estimate and the same staged bands as accepted quote release pricing.</p></Card>
@@ -127,7 +257,7 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSe
           <Card><FieldEditor label="Professional Services fixed tender release fee (excl. VAT)" value={fees.professionalServiceUnlockGbp} onChange={(value) => setFees({ ...fees, professionalServiceUnlockGbp: value })} onSave={() => saveFee('PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP', fees.professionalServiceUnlockGbp)} saving={saving} disabled={locked} /><p className="mt-3 text-sm text-concrete-grey">Charged when a Professional Services Provider registers interest. Also used for any Professional Services tender unlock, independent of estimated tender value and dynamic pricing mode.</p></Card>
           <Card><FieldEditor label="Contractor fixed release fee (excl. VAT)" value={fees.clientReleaseGbp} onChange={(value) => setFees({ ...fees, clientReleaseGbp: value })} onSave={() => saveFee('CLIENT_RELEASE_FEE_GBP', fees.clientReleaseGbp)} saving={saving} disabled={locked} /><div className="mt-4"><Label>Contractor release fee mode</Label><Select className="mt-2" value={fees.clientReleaseMode} disabled={locked} onChange={(event) => { const value = event.target.value; setFees({ ...fees, clientReleaseMode: value }); void saveFee('CLIENT_RELEASE_FEE_MODE', value); }}><option value="FIXED">Fixed fee</option><option value="PERCENTAGE">Percentage of accepted quote</option></Select></div>{fees.clientReleaseMode === 'PERCENTAGE' && <div className="mt-4 grid gap-3 sm:grid-cols-2"><FieldEditor label="First £10,000 (%)" value={fees.clientReleasePercentageLow} onChange={(value) => setFees({ ...fees, clientReleasePercentageLow: value })} onSave={() => saveFee('CLIENT_RELEASE_PERCENTAGE_LOW', fees.clientReleasePercentageLow)} saving={saving} step="0.01" disabled={locked} /><FieldEditor label="£10,000.01 to £100,000 (%)" value={fees.clientReleasePercentageHigh} onChange={(value) => setFees({ ...fees, clientReleasePercentageHigh: value })} onSave={() => saveFee('CLIENT_RELEASE_PERCENTAGE_HIGH', fees.clientReleasePercentageHigh)} saving={saving} step="0.01" disabled={locked} /><FieldEditor label="Over £100,000 (%)" value={fees.clientReleasePercentageTop} onChange={(value) => setFees({ ...fees, clientReleasePercentageTop: value })} onSave={() => saveFee('CLIENT_RELEASE_PERCENTAGE_TOP', fees.clientReleasePercentageTop)} saving={saving} step="0.01" disabled={locked} /></div>}</Card>
           <Card><FieldEditor label="Master estimate reduction (%)" value={fees.quoteEstimateMasterReductionPercentage} onChange={(value) => setFees({ ...fees, quoteEstimateMasterReductionPercentage: value })} onSave={() => saveFee('QUOTE_ESTIMATE_MASTER_REDUCTION_PERCENTAGE', fees.quoteEstimateMasterReductionPercentage)} saving={saving} step="0.01" disabled={locked} /><p className="mt-3 text-sm text-concrete-grey">Applied only to the tender release fee basis after item-level estimate offsets. A 5% reduction means a £100,000 estimated tender is charged as if the fee basis were £95,000.</p></Card>
-          <Card><FieldEditor label="VAT percentage" value={fees.vatPercentage} onChange={(value) => setFees({ ...fees, vatPercentage: value })} onSave={() => saveFee('VAT_PERCENTAGE', fees.vatPercentage)} saving={saving} step="0.01" disabled={locked} /><p className="mt-3 text-sm text-concrete-grey">Applied to new Trade Tender payments. Existing payment VAT remains unchanged.</p></Card>
+          <Card><FieldEditor label="VAT percentage" value={fees.vatPercentage} onChange={(value) => setFees({ ...fees, vatPercentage: value })} onSave={() => saveFee('VAT_PERCENTAGE', fees.vatPercentage)} saving={saving} step="0.01" disabled={locked} /><p className="mt-3 text-sm text-concrete-grey">Applied to new Trade Tender payments after a second Owner confirms. Existing payment VAT remains unchanged.</p></Card>
           <Card><FieldEditor label="Default launch credits for new Providers" value={fees.retailerLaunchCreditsDefault} onChange={(value) => setFees({ ...fees, retailerLaunchCreditsDefault: value })} onSave={() => saveFee('RETAILER_LAUNCH_CREDITS_DEFAULT', fees.retailerLaunchCreditsDefault)} saving={saving} disabled={locked} /><p className="mt-3 text-sm text-concrete-grey">Applied when a new Provider profile is created. Existing balances are unchanged.</p></Card>
           <Card><div className="flex flex-wrap items-center justify-between gap-3"><div><Label>Sponsored placement</Label><p className="mt-1 text-sm text-concrete-grey">Displayed separately from quote ranking.</p></div><Button variant={fees.sponsoredPlacementActive ? 'danger' : 'secondary'} disabled={locked} onClick={() => { const active = !fees.sponsoredPlacementActive; setFees({ ...fees, sponsoredPlacementActive: active }); void saveFee('SPONSORED_PLACEMENT_ACTIVE', active); }} loading={saving}>{fees.sponsoredPlacementActive ? 'Deactivate' : 'Activate'}</Button></div><div className="mt-4"><FieldEditor label="Sponsored placement fee (excl. VAT)" value={fees.sponsoredPlacementFeeGbp} onChange={(value) => setFees({ ...fees, sponsoredPlacementFeeGbp: value })} onSave={() => saveFee('SPONSORED_PLACEMENT_FEE_GBP', fees.sponsoredPlacementFeeGbp)} saving={saving} disabled={locked} /></div></Card>
           <Card><div className="flex flex-wrap items-center justify-between gap-3"><div><Label>Affiliated partner links</Label><p className="mt-1 text-sm text-concrete-grey">Display approved affiliated partner information on the platform with proper governance and separation from tender decisions.</p></div><Button variant={fees.adspaceActive ? 'danger' : 'secondary'} disabled={locked} onClick={() => { const active = !fees.adspaceActive; setFees({ ...fees, adspaceActive: active }); void saveFee('ADSPACE_ACTIVE', active); }} loading={saving}>{fees.adspaceActive ? 'Deactivate' : 'Activate'}</Button></div></Card>
@@ -144,7 +274,7 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner }: { initialSe
         <div className="grid gap-5 sm:grid-cols-2">
           {SERVICE_NAMES.map((service) => {
             const documents = VERIFICATION_DOCUMENT_TYPES.filter((document) => document.appliesTo === 'all' || document.appliesTo.includes(service));
-            return <Card key={service}><h3 className="font-heading text-base font-bold text-foundation-navy">{service}</h3><div className="mt-3 space-y-3">{documents.map((document) => { const key = `${service}:${document.type}`; const required = verificationRequirements[key] === true; return <label key={key} className="flex items-start gap-3 text-sm text-concrete-grey"><input type="checkbox" checked={required} disabled={locked || saving} onChange={(event) => { const next = { ...verificationRequirements, [key]: event.target.checked }; void saveVerificationRequirements(next); }} className="mt-1 h-4 w-4 accent-safety-amber" /><span><span className="font-semibold text-foundation-navy">{document.label}</span><span className="block text-xs">{required ? 'Required for this service' : 'Optional for this service'}</span></span></label>; })}</div></Card>;
+            return <Card key={service}><h3 className="font-heading text-base font-bold text-foundation-navy">{service}</h3><div className="mt-3 space-y-3">{documents.map((document) => { const key = `${service}:${document.type}`; const required = verificationRequirements[key] === true; return <label key={key} className="flex items-start gap-3 text-sm text-concrete-grey"><input type="checkbox" checked={required} disabled={locked || saving} onChange={(event) => { const next = { ...verificationRequirements, [key]: event.target.checked }; void saveVerificationRequirements(next); }} className="mt-1 h-4 w-4 accent-trade-blue" /><span><span className="font-semibold text-foundation-navy">{document.label}</span><span className="block text-xs">{required ? 'Required for this service' : 'Optional for this service'}</span></span></label>; })}</div></Card>;
           })}
         </div>
       </section>

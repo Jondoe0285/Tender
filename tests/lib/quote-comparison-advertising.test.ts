@@ -7,6 +7,7 @@ test('quote comparison excludes sponsored content from the decision surface', ()
 
   assert.doesNotMatch(source, /sponsoredQuotes/);
   assert.doesNotMatch(source, /Sponsored Retailer placement/);
+  assert.doesNotMatch(source, /sponsoredPlacementActive/);
 });
 
 test('quote sorting and filter toggles expose accessible state for assistive technology', () => {
@@ -22,12 +23,12 @@ test('quote sorting and filter toggles expose accessible state for assistive tec
   assert.match(opportunitiesExplorer, /aria-label=.*urgency filter/);
 });
 
-test('quote comparison documents sole trader status and allows sole traders to become AI verified', () => {
+test('quote comparison documents sole trader status and automated assessment', () => {
   const quoteComparison = readFileSync('src/components/quotes/QuoteComparison.tsx', 'utf8');
 
   assert.match(quoteComparison, /Sole Trader/);
   assert.match(quoteComparison, /sole trader/i);
-  assert.match(quoteComparison, /Sole trader AI Verified/);
+  assert.match(quoteComparison, /Sole trader automated assessment/);
   assert.match(quoteComparison, /providerIsSoleTrader/);
 });
 

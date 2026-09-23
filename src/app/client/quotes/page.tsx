@@ -28,7 +28,7 @@ export default async function QuotesReceivedPage() {
         ) : (
           <div className="flex flex-col gap-4">
             {quotes.map((quote) => (
-              <a key={quote.id} href={`/client/tenders/${quote.tender.id}`} className="block">
+              <a key={quote.id} href={`/user/tenders/${quote.tender.id}`} className="block">
                 <Card interactive className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-steel-blue">

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { independentReviewTierDescription } from '@/lib/independentReviewTiers';
+import { allowTestPayments } from '@/lib/runtime';
 
 type QuoteCommon = {
   id: string;
@@ -14,12 +15,12 @@ type QuoteCommon = {
   status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
   submittedAt: string;
   expiresAt: string;
-  sponsoredPlacementActive?: boolean;
   providerIsSoleTrader: boolean;
   providerVerificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
   verifiedDocumentLabels: string[];
   independentlyVerified: boolean;
   independentReviewTier: 'BRONZE' | 'SILVER' | 'GOLD' | null;
+  award?: { id: string; awardedAt: string; packageSpecHash: string } | null;
 };
 
 type ActiveQuote = QuoteCommon & {
@@ -28,9 +29,11 @@ type ActiveQuote = QuoteCommon & {
   leadTimeDays: number;
   deliveryDateConfirmed: boolean;
   deliveryInfo: string;
-  lines: { tenderItemId: string; priceGbp: number | null; available: boolean; tenderItem: { category: string; subcategory: string; item: string | null; quantity: string } }[];
+  lines: { tenderItemId: string; priceGbp: number | null; available: boolean; unitRateGbp?: number | null; quantityValue?: number | null; unit?: string | null; pricingKind?: string | null; tenderItem: { category: string; subcategory: string; item: string | null; quantity: string } }[];
   charges: { id: string; description: string; priceGbp: number }[];
   releaseFeeGbp: number;
+  releaseFeeMode?: string;
+  requiresSecondApprover?: boolean;
 };
 
 type ExpiredQuote = QuoteCommon & {
@@ -48,13 +51,13 @@ function ProviderVerificationBadge({ status, verifiedDocumentLabels, independent
     return <span title={`${docLabel} — ${independentReviewTierDescription(tier)} Sinclair Safety Solutions Ltd completed this professional review through the HSQE Consult Hub platform. This does not replace your own due diligence before any formal agreement.`}><StatusBadge status="approved">{bannerLabel}</StatusBadge></span>;
   }
   if (status === 'VERIFIED') {
-    const docLabel = soleTrader ? 'Sole trader AI Verified' : 'Incorporated AI Verified';
+    const docLabel = soleTrader ? 'Sole trader automated assessment' : 'Incorporated automated assessment';
     const evidenceLabel = soleTrader ? 'self-employment' : 'legal-compliance & incorporation';
-    const title = verifiedDocumentLabels.length > 0 ? `${docLabel} — Automated ${evidenceLabel} evidence reviewed: ${verifiedDocumentLabels.join(', ')}. AI may make mistakes; complete your own due diligence.` : `${docLabel} — Automated ${evidenceLabel} assessment passed. AI may make mistakes; complete your own due diligence.`;
+    const title = verifiedDocumentLabels.length > 0 ? `${docLabel} — Automated ${evidenceLabel} evidence reviewed: ${verifiedDocumentLabels.join(', ')}. Complete your own due diligence.` : `${docLabel} — Automated ${evidenceLabel} assessment passed. Complete your own due diligence.`;
     return <span title={title}><StatusBadge status="approved">Verified</StatusBadge></span>;
   }
   if (soleTrader) {
-    return <span title="Sole Trader (Unverified) — This Provider declared sole-trader status and has not yet completed AI verification. Complete your own identity, insurance, competence, and commercial checks before appointing them."><StatusBadge status="neutral">Sole Trader</StatusBadge></span>;
+    return <span title="Sole Trader (Unverified) — This Provider declared sole-trader status and has not yet completed automated assessment. Complete your own identity, insurance, competence, and commercial checks before appointing them."><StatusBadge status="neutral">Sole Trader</StatusBadge></span>;
   }
   if (status === 'PENDING') return <StatusBadge status="pending">Verification pending</StatusBadge>;
   if (status === 'EXPIRED') return <span title="This Provider's verification lapsed because a document expired."><StatusBadge status="attention">Verification expired</StatusBadge></span>;
@@ -69,7 +72,8 @@ type QuoteComparisonProps = {
   pendingPayment: { quoteId: string; paymentId: string } | null;
   pendingCheckoutUrl?: string | null;
   busyQuoteId: string | null;
-  onAccept: (quoteId: string, declarationAccepted?: boolean) => void;
+  canAward?: boolean;
+  onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string, purchaseOrderNumber?: string) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
 };
@@ -80,6 +84,7 @@ export function QuoteComparison({
   pendingPayment,
   pendingCheckoutUrl,
   busyQuoteId,
+  canAward = true,
   onAccept,
   onSimulateReleasePayment,
   onLoadContact,
@@ -119,31 +124,39 @@ export function QuoteComparison({
     submittedAt: 'Submitted date',
   };
 
+  const awarded = quotes.find((quote) => quote.award)?.award;
+
   return (
     <>
       <p className="sr-only" aria-live="polite">
-        Sorted by {sortLabels[sortKey]}, {sortAscending ? 'ascending' : 'descending'}
+        Sorted by {sortLabels[sortKey]} ({sortAscending ? 'ascending' : 'descending'})
       </p>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-concrete-grey">Compare {quotes.length} formal quote{quotes.length === 1 ? '' : 's'} side by side.</p>
+        <p className="text-sm text-concrete-grey">Compare {quotes.length === 1 ? '1 formal quote' : `${quotes.length} formal quotes`} side by side.</p>
         <p className="text-xs text-concrete-grey">Select a column heading to sort</p>
       </div>
+      {awarded && (
+        <div className="mb-5 rounded-lg border border-approved/40 bg-approved/5 px-4 py-3">
+          <p className="text-sm font-semibold text-foundation-navy">Award recorded</p>
+          <p className="mt-1 text-xs text-concrete-grey">This package was awarded on {new Date(awarded.awardedAt).toLocaleDateString('en-GB')} against the issued specification hash.</p>
+        </div>
+      )}
 
-      <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Verification key</p>
+      <details className="mb-5 rounded-md border border-slate-200 bg-white px-4 py-3">
+        <summary className="cursor-pointer text-sm font-semibold text-foundation-navy">Verification key</summary>
         <div className="mt-3 grid gap-3 text-sm md:grid-cols-3 lg:grid-cols-6">
           <div><StatusBadge status="neutral">Unverified</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Unverified</p><p className="mt-1 text-xs text-concrete-grey">No approved verification evidence recorded on the platform.</p></div>
           <div><StatusBadge status="neutral">Sole Trader</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Sole Trader (Unverified)</p><p className="mt-1 text-xs text-concrete-grey">Declared sole trader status; complete suitable due diligence before appointment.</p></div>
-          <div><StatusBadge status="approved">Verified</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Sole trader AI Verified / Incorporated AI Verified</p><p className="mt-1 text-xs text-concrete-grey">Passed automated self-employment or incorporation &amp; legal-compliance checks.</p></div>
+          <div><StatusBadge status="approved">Verified</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Sole trader automated assessment / Incorporated automated assessment</p><p className="mt-1 text-xs text-concrete-grey">Passed automated self-employment or incorporation &amp; legal-compliance checks.</p></div>
           <div><StatusBadge status="approved">Bronze</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Enhanced Bronze Verification</p><p className="mt-1 text-xs text-concrete-grey">Health &amp; Safety legal requirements, permits, insurances, and competent advice reviewed.</p></div>
           <div><StatusBadge status="approved">Silver</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Enhanced Silver Verification</p><p className="mt-1 text-xs text-concrete-grey">Bronze criteria plus employee &amp; managerial safety training evidence reviewed.</p></div>
           <div><StatusBadge status="approved">Gold</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Enhanced Gold Verification</p><p className="mt-1 text-xs text-concrete-grey">Bronze &amp; Silver criteria plus comprehensive management system or SSIP membership reviewed.</p></div>
         </div>
         <p className="mt-3 text-xs text-concrete-grey">These statuses do not replace your own suitable due diligence before entering a formal agreement.</p>
         <Link href="/policies/verification-policy" className="mt-2 inline-block text-xs font-semibold text-steel-blue hover:text-foundation-navy">Read the detailed verification policy</Link>
-      </div>
+      </details>
 
-      <div className="hidden overflow-x-auto rounded-card border border-slate-200 bg-white shadow-soft lg:block">
+      <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white lg:block">
         <table className="w-full min-w-[900px] border-collapse text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-concrete-grey">
             <tr>
@@ -166,6 +179,7 @@ export function QuoteComparison({
                 contact={contacts[quote.id]}
                 isPendingPayment={pendingPayment?.quoteId === quote.id}
                 busy={busyQuoteId === quote.id}
+                canAward={canAward}
                 onAccept={onAccept}
                 onSimulateReleasePayment={onSimulateReleasePayment}
                 pendingCheckoutUrl={pendingCheckoutUrl}
@@ -186,6 +200,7 @@ export function QuoteComparison({
             contact={contacts[quote.id]}
             isPendingPayment={pendingPayment?.quoteId === quote.id}
             busy={busyQuoteId === quote.id}
+            canAward={canAward}
             onAccept={onAccept}
             onSimulateReleasePayment={onSimulateReleasePayment}
             pendingCheckoutUrl={pendingCheckoutUrl}
@@ -232,6 +247,7 @@ function QuoteRow({
   contact,
   isPendingPayment,
   busy,
+  canAward,
   onAccept,
   onSimulateReleasePayment,
   onLoadContact,
@@ -247,7 +263,7 @@ function QuoteRow({
         <div className="mt-2"><ProviderVerificationBadge status={quote.providerVerificationStatus} verifiedDocumentLabels={quote.verifiedDocumentLabels} independentlyVerified={quote.independentlyVerified} independentReviewTier={quote.independentReviewTier} soleTrader={quote.providerIsSoleTrader} /></div>
       </td>
       <td className="px-5 py-5">
-        <p className="font-heading text-xl font-bold text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
+        <p className="text-lg font-semibold tabular-nums tracking-tight text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
         {quote.status === 'SUBMITTED' && quote.priceGbp === bestPrice && <StatusBadge status="approved">Best price</StatusBadge>}
       </td>
       <td className="px-5 py-5">
@@ -265,6 +281,7 @@ function QuoteRow({
           contact={contact}
           isPendingPayment={isPendingPayment}
           busy={busy}
+          canAward={canAward}
           onAccept={onAccept}
           onSimulateReleasePayment={onSimulateReleasePayment}
           onLoadContact={onLoadContact}
@@ -282,6 +299,7 @@ function QuoteCard({
   contact,
   isPendingPayment,
   busy,
+  canAward,
   onAccept,
   onSimulateReleasePayment,
   onLoadContact,
@@ -294,7 +312,7 @@ function QuoteCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">{quote.reference}</p>
-          <p className="mt-1 font-heading text-2xl font-bold text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums tracking-tight text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
           <div className="mt-2"><ProviderVerificationBadge status={quote.providerVerificationStatus} verifiedDocumentLabels={quote.verifiedDocumentLabels} independentlyVerified={quote.independentlyVerified} independentReviewTier={quote.independentReviewTier} soleTrader={quote.providerIsSoleTrader} /></div>
         </div>
         <StatusBadge status={quote.status === 'ACCEPTED' ? 'approved' : 'neutral'}>{quote.status}</StatusBadge>
@@ -313,6 +331,7 @@ function QuoteCard({
           contact={contact}
           isPendingPayment={isPendingPayment}
           busy={busy}
+          canAward={canAward}
           onAccept={onAccept}
           onSimulateReleasePayment={onSimulateReleasePayment}
           onLoadContact={onLoadContact}
@@ -330,7 +349,8 @@ type QuoteRowProps = {
   contact?: Contact;
   isPendingPayment: boolean;
   busy: boolean;
-  onAccept: (quoteId: string, declarationAccepted?: boolean) => void;
+  canAward: boolean;
+  onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string, purchaseOrderNumber?: string) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
   pendingCheckoutUrl?: string | null;
@@ -349,7 +369,11 @@ function QuoteBreakdown({ quote }: { quote: ActiveQuote }) {
           <li key={quoteLine.tenderItemId} className="flex items-start justify-between gap-3">
             <span>{quoteLine.tenderItem.item ?? quoteLine.tenderItem.subcategory} ({quoteLine.tenderItem.quantity})</span>
             <span className={`shrink-0 font-semibold ${quoteLine.available ? '' : 'text-attention'}`}>
-              {quoteLine.available ? `£${quoteLine.priceGbp}` : 'Cannot supply'}
+              {quoteLine.available
+                ? quoteLine.unitRateGbp != null
+                  ? `£${quoteLine.unitRateGbp}/${quoteLine.unit ?? 'unit'} · £${quoteLine.priceGbp}`
+                  : `£${quoteLine.priceGbp}`
+                : 'Cannot supply'}
             </span>
           </li>
         ))}
@@ -409,6 +433,7 @@ function DecisionActions({
   contact,
   isPendingPayment,
   busy,
+  canAward,
   onAccept,
   onSimulateReleasePayment,
   onLoadContact,
@@ -418,31 +443,66 @@ function DecisionActions({
   contact?: Contact;
   isPendingPayment: boolean;
   busy: boolean;
-  onAccept: (quoteId: string, declarationAccepted?: boolean) => void;
+  canAward: boolean;
+  onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string, purchaseOrderNumber?: string) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
   pendingCheckoutUrl?: string | null;
 }) {
   const [showDeclaration, setShowDeclaration] = useState(false);
   const [declarationChecked, setDeclarationChecked] = useState(false);
+  const [secondApproverEmail, setSecondApproverEmail] = useState('');
+  const [purchaseOrderNumber, setPurchaseOrderNumber] = useState('');
 
   if (quote.status === 'SUBMITTED') {
+    if (!canAward) {
+      return <p className="text-sm text-foundation-navy">A Buyer on this organisation must accept this quote.</p>;
+    }
     const requiresDeclaration = quote.providerVerificationStatus === 'VERIFIED' || quote.independentlyVerified;
+    const feeLabel = quote.releaseFeeMode === 'PERCENTAGE'
+      ? `Calculated platform charge: £${quote.releaseFeeGbp} excl. VAT (${quote.releaseFeeMode.toLowerCase()} of quote)`
+      : `Calculated platform charge: £${quote.releaseFeeGbp} excl. VAT (fixed)`;
+    const accept = (declarationAccepted?: boolean) => onAccept(quote.id, declarationAccepted, quote.requiresSecondApprover ? secondApproverEmail : undefined, purchaseOrderNumber);
     return (
       <>
-        <Button onClick={() => requiresDeclaration ? setShowDeclaration(true) : onAccept(quote.id)} loading={busy}>Accept full quote · £{quote.releaseFeeGbp} excl. VAT release fee</Button>
+        <p className="mb-2 text-xs font-semibold text-foundation-navy">{feeLabel}</p>
+        <label className="mb-2 block text-xs font-semibold text-foundation-navy">
+          Purchase order number
+          <input
+            type="text"
+            value={purchaseOrderNumber}
+            onChange={(event) => setPurchaseOrderNumber(event.target.value)}
+            className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+            placeholder="PO-2026-00412"
+            maxLength={40}
+            required
+          />
+        </label>
+        {quote.requiresSecondApprover && (
+          <label className="mb-2 block text-xs font-semibold text-foundation-navy">
+            Second Approver email
+            <input
+              type="email"
+              value={secondApproverEmail}
+              onChange={(event) => setSecondApproverEmail(event.target.value)}
+              className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+              placeholder="approver@company.example"
+            />
+          </label>
+        )}
+        <Button onClick={() => requiresDeclaration ? setShowDeclaration(true) : accept()} loading={busy} disabled={Boolean(!purchaseOrderNumber.trim() || (quote.requiresSecondApprover && !secondApproverEmail.trim()))}>Accept full quote · £{quote.releaseFeeGbp} excl. VAT</Button>
         {showDeclaration && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-foundation-navy/50 p-4">
             <Card className="max-w-lg">
-              <h3 className="font-heading text-lg font-bold text-foundation-navy">Before you proceed</h3>
+              <h3 className="text-base font-semibold tracking-tight text-foundation-navy">Before you proceed</h3>
             <p className="mt-3 text-sm text-concrete-grey">Trade Tender&rsquo;s automated review assesses legal-compliance evidence only and may make mistakes. You retain full responsibility for suitable independent due diligence before entering any formal agreement, and Trade Tender accepts no liability for the Provider&rsquo;s work, conduct, or the outcome of your engagement with them.</p>
               <label className="mt-4 flex items-start gap-3 text-sm text-foundation-navy">
-                <input type="checkbox" checked={declarationChecked} onChange={(event) => setDeclarationChecked(event.target.checked)} className="mt-1 h-4 w-4 accent-safety-amber" />
+                <input type="checkbox" checked={declarationChecked} onChange={(event) => setDeclarationChecked(event.target.checked)} className="mt-1 h-4 w-4 accent-trade-blue" />
                 I have read and accept this declaration.
               </label>
               <div className="mt-5 flex justify-end gap-3">
                 <Button variant="secondary" onClick={() => { setShowDeclaration(false); setDeclarationChecked(false); }}>Cancel</Button>
-                <Button disabled={!declarationChecked} loading={busy} onClick={() => { setShowDeclaration(false); onAccept(quote.id, true); }}>Accept &amp; proceed</Button>
+                <Button disabled={!declarationChecked} loading={busy} onClick={() => { setShowDeclaration(false); accept(true); }}>Accept &amp; proceed</Button>
               </div>
             </Card>
           </div>
@@ -451,10 +511,16 @@ function DecisionActions({
     );
   }
   if (quote.status === 'ACCEPTED' && isPendingPayment) {
-    if (pendingCheckoutUrl) {
-      return <a href={pendingCheckoutUrl} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-safety-amber px-5 text-sm font-semibold text-foundation-navy shadow-soft hover:bg-sky-blue">Continue payment</a>;
+    if (!canAward) {
+      return <p className="text-sm text-foundation-navy">Waiting for a Buyer to complete the release payment.</p>;
     }
-    return <Button onClick={onSimulateReleasePayment} loading={busy}>Pay release fee (dev)</Button>;
+    if (pendingCheckoutUrl) {
+      return <a href={pendingCheckoutUrl} className="inline-flex min-h-11 items-center justify-center rounded-md bg-trade-blue px-5 text-sm font-semibold text-site-white hover:bg-trade-blue/90">Continue payment</a>;
+    }
+    if (allowTestPayments) {
+      return <Button onClick={onSimulateReleasePayment} loading={busy}>Complete test payment</Button>;
+    }
+    return <p className="text-sm font-semibold text-concrete-grey">Waiting for payment confirmation.</p>;
   }
   if (quote.status === 'ACCEPTED' && !contact) {
     return <Button variant="secondary" onClick={() => onLoadContact(quote.id)}>View released contact</Button>;

@@ -31,10 +31,10 @@ test('Professional Services interest requires the designated fee before the tend
   ]);
   ownerId = owner.id;
   professionalId = professional.id;
-  const company = await prisma.clientCompany.create({ data: { companyName: `Professional Test ${suffix}`, branchIdentifier: suffix, primaryUserId: professionalId, services: 'Professional Services', operatingLocations: 'United Kingdom', members: { create: { userId: professionalId } } } });
+  const company = await prisma.clientCompany.create({ data: { companyName: `Professional Test ${suffix}`, branchIdentifier: suffix, primaryUserId: professionalId, services: 'Professional Services', serviceProvisions: JSON.stringify(['Professional Services::Safety, Compliance & Consultancy']), operatingLocations: 'United Kingdom', members: { create: { userId: professionalId } } } });
   companyId = company.id;
   await prisma.retailerProfile.create({ data: { userId: professionalId, companyName: company.companyName, categories: 'Professional Services', coverageAreas: '', coverageScope: 'UK', counties: '', regions: '' } });
-  const tender = await prisma.tender.create({ data: { reference: `PRO-${suffix}`, clientId: ownerId, category: 'Professional Services', subcategory: 'Safety, Compliance & Consultancy', location: 'Leeds LS10 2AB', quantity: '5 days', urgency: 'standard', closingDate: new Date(Date.now() + 86_400_000), requirements: '', description: 'Professional services interest test', items: { create: { category: 'Professional Services', subcategory: 'Safety, Compliance & Consultancy', quantity: '5 days', description: 'Professional services requirement' } } } });
+  const tender = await prisma.tender.create({ data: { reference: `PRO-${suffix}`, clientId: ownerId, category: 'Professional Services', subcategory: 'Safety, Compliance & Consultancy', location: 'Leeds LS10 2AB', quantity: '5 days', urgency: 'standard', closingDate: new Date(Date.now() + 86_400_000), requirements: '', description: 'Professional services interest test', allowProfessionalInterest: true, items: { create: { category: 'Professional Services', subcategory: 'Safety, Compliance & Consultancy', quantity: '5 days', description: 'Professional services requirement' } } } });
   tenderId = tender.id;
   await prisma.tenderMatch.create({ data: { tenderId, retailerId: professionalId } });
 

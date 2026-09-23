@@ -20,7 +20,7 @@ export default async function ClientManagementPage() {
 
   return (
     <AppShell role="super-user" title="Contractor Management">
-      <p className="mb-6 max-w-xl text-sm text-concrete-grey">Registered Contractor accounts and their tender activity.</p>
+      <p className="mb-6 max-w-xl text-sm text-concrete-grey">Registered Contractor accounts and their tender activity. Emails are masked here; open the user profile for the case file.</p>
       <AccountManagementTable
         role="USER"
         isOwner={user.isOwner}

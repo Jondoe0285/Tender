@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 import { issueMobileToken, verifyMobileToken } from '../../src/server/auth/mobileToken';
 
@@ -47,4 +49,10 @@ test('requires a configured mobile token secret', async () => {
   } finally {
     process.env.MOBILE_AUTH_SECRET = previousSecret;
   }
+});
+
+test('mobile login issues tokens for USER accounts only', () => {
+  const source = readFileSync(path.join(process.cwd(), 'src/app/api/mobile/auth/login/route.ts'), 'utf8');
+  assert.match(source, /role !== 'USER'/);
+  assert.doesNotMatch(source, /SUPER_USER/);
 });

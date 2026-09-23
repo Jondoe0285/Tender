@@ -11,9 +11,9 @@ const DIRECT_CONTACT_CATEGORIES = new Set(['Contractor Services', 'Professional 
 export async function directContactAvailableForTender(tenderId: string): Promise<boolean> {
   const tender = await prisma.tender.findUnique({
     where: { id: tenderId },
-    select: { category: true, items: { select: { category: true } }, packages: { select: { category: true } } },
+    select: { allowDirectContact: true, category: true, items: { select: { category: true } }, packages: { select: { category: true } } },
   });
-  if (!tender) return false;
+  if (!tender?.allowDirectContact) return false;
   return [tender.category, ...tender.items.map((item) => item.category), ...tender.packages.map((pkg) => pkg.category)].some((category) => DIRECT_CONTACT_CATEGORIES.has(category));
 }
 
@@ -29,7 +29,7 @@ export async function getDirectContactStatus(userId: string, tenderId: string) {
 
 export async function requestDirectContact(userId: string, tenderId: string) {
   if (!await isDirectContactActive()) throw new ForbiddenError('Direct contact requests are not active');
-  if (!await directContactAvailableForTender(tenderId)) throw new ForbiddenError('Direct contact is only available for Contractor Services and Professional Services tenders');
+  if (!await directContactAvailableForTender(tenderId)) throw new ForbiddenError('Direct contact is not enabled for this tender');
   await assertRetailerEligibleForTender(userId, tenderId);
   await assertTenderOpenForActivity(tenderId);
 

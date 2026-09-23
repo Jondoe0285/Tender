@@ -10,12 +10,19 @@ export async function POST(request: Request) {
   if (limited) return limited;
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
-  const user = await authenticateCredentials(body as Record<string, unknown>);
+  let user;
+  try {
+    user = await authenticateCredentials(body as Record<string, unknown>);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('LOGIN_DISABLED')) return NextResponse.json({ error: 'Sign in is currently closed.' }, { status: 403 });
+    throw error;
+  }
   if (!user) return NextResponse.json({ error: 'Incorrect email or password.' }, { status: 401 });
   const role = user.role;
-  if (role !== 'USER' && role !== 'SUPER_USER') return NextResponse.json({ error: 'Mobile access is unavailable.' }, { status: 403 });
+  if (role !== 'USER') return NextResponse.json({ error: 'Mobile access is unavailable.' }, { status: 403 });
   try {
-    const accessToken = await issueMobileToken({ userId: user.id, role: role as 'USER' | 'SUPER_USER', authVersion: user.sessionVersion });
+    const accessToken = await issueMobileToken({ userId: user.id, role: 'USER', authVersion: user.sessionVersion });
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     await recordAuditEvent({ actorId: user.id, action: 'USER_LOGIN', targetType: 'User', targetId: user.id, metadata: { channel: 'mobile' } });
     return NextResponse.json({ accessToken, expiresIn: 28800, user: { email: user.email, role: user.role, roles: user.roles } });

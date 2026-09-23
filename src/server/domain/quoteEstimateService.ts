@@ -1,5 +1,6 @@
 import { prisma } from '@/server/data/prisma';
 import { SERVICE_CATALOG } from '@/lib/categories';
+import { cloneCatalog, type CategoryCatalog } from '@/lib/catalog';
 
 export type TenderEstimateInput = {
   category?: string | null;
@@ -52,6 +53,9 @@ export const INITIAL_CATEGORY_UNIT_ESTIMATES_GBP: Record<string, number> = {
   'Materials > Roofing Materials': 4.5,
   'Materials > Plastering and Drylining': 15,
   'Materials > Drainage, Civils and Groundworks': 32,
+  'Materials > Reinforcement': 780,
+  'Materials > Electrical Supplies': 185,
+  'Materials > Mechanical and Plumbing Supplies': 95,
   'Waste > Inert waste': 240,
   'Waste > Excavation waste': 325,
   'Waste > Aggregates for recycling': 210,
@@ -68,6 +72,7 @@ export const INITIAL_CATEGORY_UNIT_ESTIMATES_GBP: Record<string, number> = {
   'Waste > Welfare and site waste': 220,
   'Waste > Hazardous waste': 650,
   'Waste > Electrical and mechanical waste': 280,
+  'Waste > Skip and container hire': 275,
   'Plant Hire > Excavators': 625,
   'Plant Hire > Dumpers': 350,
   'Plant Hire > Cranes and lifting plant': 1850,
@@ -84,6 +89,8 @@ export const INITIAL_CATEGORY_UNIT_ESTIMATES_GBP: Record<string, number> = {
   'Plant Hire > Traffic management and site safety': 95,
   'Plant Hire > Welfare and temporary accommodation': 260,
   'Plant Hire > Transport, haulage and logistics': 700,
+  'Plant Hire > Compressors': 155,
+  'Plant Hire > Temporary site establishment': 240,
   'Contractor Services > Groundworks & Civil Engineering': 1950,
   'Contractor Services > Demolition & Enabling Works': 2250,
   'Contractor Services > General Building & Construction': 2100,
@@ -97,6 +104,8 @@ export const INITIAL_CATEGORY_UNIT_ESTIMATES_GBP: Record<string, number> = {
   'Contractor Services > Facilities, Maintenance & Cleaning': 950,
   'Contractor Services > Transport, Haulage & Logistics': 1200,
   'Contractor Services > Specialist Construction Services': 2350,
+  'Contractor Services > Scaffolding and access': 1650,
+  'Contractor Services > Temporary works and hoarding': 1450,
   'Contractor Services > Labour & Workforce Supply': 850,
   'Professional Services > Health, Safety & CDM Consultancy': 950,
   'Professional Services > Fire Safety Consultancy': 1100,
@@ -106,6 +115,7 @@ export const INITIAL_CATEGORY_UNIT_ESTIMATES_GBP: Record<string, number> = {
   'Professional Services > Project Management & Programme Support': 1300,
   'Professional Services > Environmental & Specialist Consultancy': 1250,
   'Professional Services > Legal, Contract & Claims Support': 1600,
+  'Professional Services > Training Providers': 450,
 };
 
 type PricingCatalogueRow = {
@@ -183,7 +193,7 @@ export function standardUnitForPurchase(service: string, category: string, item:
   if (text.includes('concrete') || text.includes('screed')) return { standardUnit: 'm3', standardUnitSize: 1 };
   if (text.includes('aggregate') || text.includes('sand') || text.includes('stone') || text.includes('spoil')) return { standardUnit: 'tonne', standardUnitSize: 1 };
   if (text.includes('timber') || text.includes('sheet') || text.includes('insulation') || text.includes('plasterboard')) return { standardUnit: 'units', standardUnitSize: 1 };
-  if (service === 'Waste') return { standardUnit: 'skip', standardUnitSize: 1 };
+  if (service === 'Waste') return { standardUnit: 'tonne', standardUnitSize: 1 };
   if (service === 'Plant Hire') return { standardUnit: 'week', standardUnitSize: 1 };
   if (service === 'Contractor Services' || service === 'Professional Services') return { standardUnit: 'week', standardUnitSize: 1 };
   return { standardUnit: 'unit', standardUnitSize: 1 };
@@ -201,8 +211,8 @@ export function estimatedUnitPriceForPurchase(service: string, category: string,
   return roundCurrency(Math.max(25, base * itemMultiplier));
 }
 
-export function buildPricingCatalogue(): PricingCatalogueRow[] {
-  return Object.entries(SERVICE_CATALOG).flatMap(([service, categories]) => Object.entries(categories).flatMap(([category, items]) => {
+export function buildPricingCatalogue(catalog: CategoryCatalog = cloneCatalog(SERVICE_CATALOG)): PricingCatalogueRow[] {
+  return Object.entries(catalog).flatMap(([service, categories]) => Object.entries(categories).flatMap(([category, items]) => {
     const itemRows = (items as readonly string[]).map((item) => {
       const unit = standardUnitForPurchase(service, category, item);
       return { key: buildEstimateBaselineKey(service, category, item), service, category, item, ...unit, estimatedUnitPriceGbp: estimatedUnitPriceForPurchase(service, category, item) };

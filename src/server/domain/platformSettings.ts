@@ -1,10 +1,11 @@
 import type { PaymentType } from '@prisma/client';
 import { prisma } from '@/server/data/prisma';
-import { CLIENT_RELEASE_FEE_GBP, RETAILER_UNLOCK_FEE_GBP } from '@/lib/categories';
-import { SERVICE_NAMES } from '@/lib/categories';
+import { listPendingControlChanges } from '@/server/domain/controlChangeService';
+import { CLIENT_RELEASE_FEE_GBP, RETAILER_UNLOCK_FEE_GBP, SERVICE_NAMES } from '@/lib/categories';
 import { type IndependentReviewTier } from '@/lib/independentReviewTiers';
 import { VERIFICATION_DOCUMENT_TYPES, type VerificationDocumentType } from '@/lib/verification-documents';
 import { applyMasterEstimateReduction, estimateTenderQuoteValue, getReviewedQuoteEstimateBaselines } from '@/server/domain/quoteEstimateService';
+import { parsePublicLaunchAt } from '@/lib/public-launch';
 
 const defaultSettings: Record<string, string> = {
   RETAILER_UNLOCK_FEE_GBP: String(RETAILER_UNLOCK_FEE_GBP),
@@ -34,6 +35,8 @@ const defaultSettings: Record<string, string> = {
   DIRECT_CONTACT_ACTIVE: 'false',
   DIRECT_CONTACT_FEE_GBP: '25',
   HUMAN_REVIEW_ACTIVE: 'true',
+  SIGN_IN_ACTIVE: 'true',
+  PUBLIC_LAUNCH_AT: '',
   VERIFICATION_DOCUMENT_REQUIREMENTS: '{}',
   RETAILER_ANALYTICS_SECTION_TRENDS: 'true',
   RETAILER_ANALYTICS_SECTION_CATEGORY: 'true',
@@ -62,7 +65,30 @@ export async function getRetailerAnalyticsSectionSettings(): Promise<Record<Reta
   ) as Record<RetailerAnalyticsSectionKey, boolean>;
 }
 
+const YEAR1_FIXED_FEE_KEYS = ['CLIENT_RELEASE_FEE_MODE', 'RETAILER_UNLOCK_FEE_MODE'] as const;
+let year1FeeDefaultsEnsured = false;
+
+async function ensureYear1FixedFeeModes(): Promise<void> {
+  if (year1FeeDefaultsEnsured) return;
+  year1FeeDefaultsEnsured = true;
+  const confirmed = await prisma.controlChange.findMany({
+    where: { settingKey: { in: [...YEAR1_FIXED_FEE_KEYS] }, status: 'CONFIRMED' },
+    select: { settingKey: true },
+  });
+  const confirmedKeys = new Set(confirmed.map((change) => change.settingKey));
+  for (const key of YEAR1_FIXED_FEE_KEYS) {
+    if (confirmedKeys.has(key)) continue;
+    const current = await prisma.platformSetting.findUnique({ where: { key } });
+    if (current?.value === 'PERCENTAGE') {
+      await prisma.platformSetting.update({ where: { key }, data: { value: 'FIXED' } });
+    }
+  }
+}
+
 export async function getPlatformSetting(key: string): Promise<string | null> {
+  if (YEAR1_FIXED_FEE_KEYS.includes(key as (typeof YEAR1_FIXED_FEE_KEYS)[number])) {
+    await ensureYear1FixedFeeModes();
+  }
   const setting = await prisma.platformSetting.findUnique({ where: { key } });
   return setting?.value ?? defaultSettings[key] ?? null;
 }
@@ -170,7 +196,7 @@ async function getConfiguredFeeGbp(key: keyof typeof defaultSettings): Promise<n
   return Number.isFinite(value) && value >= 0 ? value : Number(defaultSettings[key]);
 }
 
-export async function getTenderUnlockFeeGbp(tenderId: string): Promise<number> {
+export async function getTenderUnlockFeeGbp(tenderId: string, matchingCategories?: readonly string[]): Promise<number> {
   const fixedUnlockFeeGbp = await getPaymentFeeGbp('RETAILER_UNLOCK');
   if (fixedUnlockFeeGbp <= 0) return 0;
 
@@ -182,11 +208,15 @@ export async function getTenderUnlockFeeGbp(tenderId: string): Promise<number> {
       packages: { select: { category: true, subcategory: true, item: true, description: true, quantity: true } },
     },
   });
-  const serviceFeeKey = tenderUsesFixedServiceRelease([
-    tender.category,
-    ...tender.items.map((item) => item.category),
-    ...tender.packages.map((pkg) => pkg.category),
-  ]);
+  const serviceFeeKey = tenderUsesFixedServiceRelease(
+    matchingCategories && matchingCategories.length > 0
+      ? matchingCategories
+      : [
+        tender.category,
+        ...tender.items.map((item) => item.category),
+        ...tender.packages.map((pkg) => pkg.category),
+      ],
+  );
   if (serviceFeeKey) return getConfiguredFeeGbp(serviceFeeKey);
 
   const mode = await getPlatformSetting('RETAILER_UNLOCK_FEE_MODE');
@@ -286,6 +316,17 @@ export async function isHumanReviewActive(): Promise<boolean> {
   return await getPlatformSetting('HUMAN_REVIEW_ACTIVE') !== 'false';
 }
 
+/** Owner-controlled: registration stays open. Non-Owner sign-in is blocked when this is false. */
+export async function isSignInActive(): Promise<boolean> {
+  return await getPlatformSetting('SIGN_IN_ACTIVE') !== 'false';
+}
+
+export async function getPublicLaunchAt(): Promise<string | null> {
+  const value = await getPlatformSetting('PUBLIC_LAUNCH_AT');
+  const trimmed = value?.trim() ?? '';
+  return parsePublicLaunchAt(trimmed) ? trimmed : null;
+}
+
 export type VerificationDocumentRequirementKey = `${string}:${VerificationDocumentType}`;
 
 export function verificationDocumentRequirementKey(service: string, documentType: VerificationDocumentType): VerificationDocumentRequirementKey {
@@ -313,12 +354,13 @@ export async function getVerificationDocumentRequirements(): Promise<Record<stri
 }
 
 export async function getAdminSettings(includeSupportRecipient = false) {
-  const [settings, tiers, subscriptions, categoryDefinitions, verificationDocumentRequirements] = await Promise.all([
+  const [settings, tiers, subscriptions, categoryDefinitions, verificationDocumentRequirements, pendingControlChanges] = await Promise.all([
     prisma.platformSetting.findMany({ orderBy: { key: 'asc' } }),
     prisma.membershipTier.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.subscriptionPlan.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.categoryDefinition.findMany({ orderBy: [{ service: 'asc' }, { name: 'asc' }] }),
     getVerificationDocumentRequirements(),
+    listPendingControlChanges(),
   ]);
   return {
     fees: {
@@ -349,8 +391,10 @@ export async function getAdminSettings(includeSupportRecipient = false) {
       directContactActive: (settings.find((setting) => setting.key === 'DIRECT_CONTACT_ACTIVE')?.value ?? defaultSettings.DIRECT_CONTACT_ACTIVE) === 'true',
       directContactFeeGbp: Number(settings.find((setting) => setting.key === 'DIRECT_CONTACT_FEE_GBP')?.value ?? defaultSettings.DIRECT_CONTACT_FEE_GBP),
       humanReviewActive: (settings.find((setting) => setting.key === 'HUMAN_REVIEW_ACTIVE')?.value ?? defaultSettings.HUMAN_REVIEW_ACTIVE) === 'true',
+      signInActive: (settings.find((setting) => setting.key === 'SIGN_IN_ACTIVE')?.value ?? defaultSettings.SIGN_IN_ACTIVE) !== 'false',
       verificationDocumentRequirements: Object.entries(verificationDocumentRequirements),
     },
+    publicLaunchAt: parsePublicLaunchAt(settings.find((setting) => setting.key === 'PUBLIC_LAUNCH_AT')?.value)?.toISOString() ?? null,
     tiers,
     subscriptions,
     categoryDefinitions: categoryDefinitions.map((category) => ({ ...category, items: JSON.parse(category.itemsJson) as string[] })),
@@ -358,5 +402,14 @@ export async function getAdminSettings(includeSupportRecipient = false) {
       RETAILER_ANALYTICS_SECTION_KEYS.map((key) => [key, (settings.find((setting) => setting.key === key)?.value ?? defaultSettings[key]) === 'true'])
     ) as Record<RetailerAnalyticsSectionKey, boolean>,
     ...(includeSupportRecipient ? { supportRecipientEmail: settings.find((setting) => setting.key === 'SUPPORT_RECIPIENT_EMAIL')?.value ?? null } : {}),
+    pendingControlChanges: pendingControlChanges.map((change) => ({
+      id: change.id,
+      kind: change.kind,
+      settingKey: change.settingKey,
+      proposedValue: change.proposedValue,
+      proposedById: change.proposedById,
+      proposedByName: change.proposedBy.contactName,
+      createdAt: change.createdAt.toISOString(),
+    })),
   };
 }

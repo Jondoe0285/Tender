@@ -38,6 +38,7 @@ test('only the owning Client or a matched unlocked Retailer can retrieve a tende
       branchIdentifier: suffix,
       primaryUserId: retailer.id,
       services: 'Materials',
+      serviceProvisions: JSON.stringify(['Materials::Bricks']),
       operatingLocations: 'United Kingdom',
       members: { create: { userId: retailer.id } },
     },

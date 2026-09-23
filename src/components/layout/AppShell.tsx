@@ -7,25 +7,19 @@ import { useSession } from 'next-auth/react';
 import { AccountControls } from '@/components/layout/AccountControls';
 import { TradeTenderLogo } from '@/components/layout/TradeTenderLogo';
 import { SiteFooter } from '@/components/layout/SiteFooter';
-import { USER_NAV, SUPER_USER_NAV, ACCOUNTANT_NAV, type NavGroup } from '@/lib/navigation';
+import { SUPER_USER_NAV, ACCOUNTANT_NAV, userNavForCapabilities, type NavGroup } from '@/lib/navigation';
 
 type Role = 'client' | 'retailer' | 'super-user';
 
-const navByRole: Record<Role, NavGroup[]> = {
-  client: USER_NAV,
-  retailer: USER_NAV,
-  'super-user': SUPER_USER_NAV,
-};
-
 const roleLabels: Record<Role, string> = {
-  client: 'User space',
-  retailer: 'User space',
-  'super-user': 'Super User space',
+  client: 'Workspace',
+  retailer: 'Workspace',
+  'super-user': 'Platform ops',
 };
 
 const workspaceOptions: Record<string, { label: string; path: string }> = {
-  USER: { label: 'User workspace', path: '/user' },
-  SUPER_USER: { label: 'Super User workspace', path: '/super-user' },
+  USER: { label: 'Workspace', path: '/user' },
+  SUPER_USER: { label: 'Platform ops', path: '/super-user' },
 };
 
 /** Finds the most specific nav item for the current path, so parent and child routes don't both light up. */
@@ -42,11 +36,11 @@ function findActiveHref(pathname: string | null, groups: NavGroup[]): string | n
 
 function SidebarNav({ groups, activeHref, unreadOpportunityCount, onNavigate }: { groups: NavGroup[]; activeHref: string | null; unreadOpportunityCount: number; onNavigate?: () => void }) {
   return (
-    <nav aria-label="Primary" className="flex flex-col gap-6 px-4 py-6">
+    <nav aria-label="Primary" className="flex flex-col gap-5 px-3 py-4">
       {groups.map((group, index) => (
-        <div key={group.label ?? `group-${index}`} className="flex flex-col gap-1">
+        <div key={group.label ?? `group-${index}`} className="flex flex-col gap-0.5">
           {group.label && (
-            <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-widest text-site-white/45">{group.label}</p>
+            <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-site-white">{group.label}</p>
           )}
           {group.items.map((item) => {
             const active = item.href === activeHref;
@@ -57,15 +51,15 @@ function SidebarNav({ groups, activeHref, unreadOpportunityCount, onNavigate }: 
                 href={item.href}
                 onClick={onNavigate}
                 aria-current={active ? 'page' : undefined}
-                className={`flex items-center justify-between gap-3 rounded-md px-3 py-2.5 text-sm font-semibold transition-colors ${
+                className={`flex items-center justify-between gap-3 rounded-md border-l-2 px-3 py-2 text-[13px] font-medium transition-colors ${
                   active
-                    ? 'bg-safety-amber text-foundation-navy'
-                    : 'text-site-white/80 hover:bg-white/10 hover:text-site-white'
+                    ? 'border-sky-blue bg-white/10 text-site-white'
+                    : 'border-transparent text-site-white/75 hover:bg-white/10 hover:text-site-white'
                 }`}
               >
                 <span>{item.label}</span>
                 {showUnreadBadge && (
-                  <span className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-xs font-bold ${active ? 'bg-foundation-navy text-site-white' : 'bg-safety-amber text-foundation-navy'}`} aria-label={`${unreadOpportunityCount} unread tender opportunities`}>
+                  <span className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-xs font-bold ${active ? 'bg-trade-blue text-site-white' : 'bg-white/15 text-site-white'}`} aria-label={`${unreadOpportunityCount} unread tender opportunities`}>
                     {unreadOpportunityCount > 99 ? '99+' : unreadOpportunityCount}
                   </span>
                 )}
@@ -84,11 +78,13 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
   const { data: session, update } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [unreadOpportunityCount, setUnreadOpportunityCount] = useState(0);
+  const [canRaiseTender, setCanRaiseTender] = useState(true);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const isOwner = Boolean(session?.user?.isOwner);
   const isAccountant = Boolean(session?.user?.isAccountant);
-  const baseGroups = role === 'super-user' && isAccountant ? ACCOUNTANT_NAV : navByRole[role];
+  const workspaceNav = userNavForCapabilities(canRaiseTender);
+  const baseGroups = role === 'super-user' && isAccountant ? ACCOUNTANT_NAV : role === 'super-user' ? SUPER_USER_NAV : workspaceNav;
   const groups = baseGroups
     .map((group) => ({ ...group, items: group.items.filter((item) => !item.ownerOnly || isOwner) }))
     .filter((group) => group.items.length > 0);
@@ -101,6 +97,12 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
       .then((response) => response.ok ? response.json() : null)
       .then((data: { count?: number } | null) => setUnreadOpportunityCount(data?.count ?? 0))
       .catch(() => setUnreadOpportunityCount(0));
+    fetch('/api/user/capabilities')
+      .then((response) => response.ok ? response.json() : null)
+      .then((data: { canRaiseTender?: boolean } | null) => {
+        if (typeof data?.canRaiseTender === 'boolean') setCanRaiseTender(data.canRaiseTender);
+      })
+      .catch(() => setCanRaiseTender(true));
   }, [role, session?.user?.role]);
 
   async function switchWorkspace(event: React.ChangeEvent<HTMLSelectElement>) {
@@ -161,11 +163,11 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
   }, [pathname, session?.user?.id]);
 
   return (
-    <div className="flex min-h-screen bg-site-white">
+    <div className="flex min-h-screen bg-light-grey">
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 flex-shrink-0 bg-foundation-navy md:flex md:flex-col">
-        <Link href="/" className="mx-4 mt-4 block bg-site-white p-2" aria-label="Trade Tender home">
-          <TradeTenderLogo />
+      <aside className="hidden w-60 flex-shrink-0 bg-foundation-navy md:flex md:flex-col">
+        <Link href="/" className="mx-3 mt-4 block border-b border-white/10 px-2 pb-4" aria-label="Trade Tender home">
+          <TradeTenderLogo variant="dark" />
         </Link>
         <SidebarNav groups={groups} activeHref={activeHref} unreadOpportunityCount={unreadOpportunityCount} />
       </aside>
@@ -186,17 +188,17 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
             aria-modal="true"
             aria-label="Navigation menu"
             tabIndex={-1}
-            className="relative flex h-full w-72 flex-col bg-foundation-navy shadow-soft-lg"
+            className="relative flex h-full w-60 flex-col bg-foundation-navy"
           >
             <div className="flex items-center justify-between px-6 py-5">
-              <Link href="/" className="block w-52 bg-site-white p-2" aria-label="Trade Tender home">
-                <TradeTenderLogo />
+              <Link href="/" className="block" aria-label="Trade Tender home">
+                <TradeTenderLogo variant="dark" />
               </Link>
               <button
                 type="button"
                 aria-label="Close navigation"
                 onClick={() => setMobileOpen(false)}
-                className="rounded-md p-2 text-site-white/80 hover:bg-white/10"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-md text-site-white/80 hover:bg-white/10"
               >
                 &#10005;
               </button>
@@ -207,8 +209,8 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
       )}
 
       <div className="flex min-h-screen flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur sm:px-8">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 sm:px-8">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
               aria-label="Open navigation"
@@ -216,13 +218,13 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
               aria-controls="mobile-navigation-drawer"
               ref={menuButtonRef}
               onClick={() => setMobileOpen(true)}
-              className="rounded-md p-2 text-foundation-navy hover:bg-foundation-navy/5 md:hidden"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-md text-foundation-navy hover:bg-slate-100 md:hidden"
             >
               &#9776;
             </button>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-concrete-grey">{roleLabels[role]}</p>
-              <h1 className="font-heading text-lg font-bold text-foundation-navy">{title}</h1>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-concrete-grey">{roleLabels[role]}</p>
+              <h1 className="truncate text-base font-semibold tracking-tight text-foundation-navy">{title}</h1>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -232,7 +234,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
                 <select
                   value={role === 'super-user' ? 'SUPER_USER' : 'USER'}
                   onChange={switchWorkspace}
-                  className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-foundation-navy shadow-soft focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                  className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
                 >
                   {availableWorkspaces.map((workspaceRole) => (
                     <option key={workspaceRole} value={workspaceRole}>
@@ -245,7 +247,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
             <AccountControls />
           </div>
         </header>
-        <main className="flex-1 px-6 py-8 sm:px-8">{children}</main>
+        <main id="main-content" className="flex-1 px-5 py-5 sm:px-8">{children}</main>
         <SiteFooter />
       </div>
     </div>

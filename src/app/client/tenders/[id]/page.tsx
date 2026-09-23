@@ -8,8 +8,10 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { QuoteComparison } from '@/components/quotes/QuoteComparison';
 import { TenderMessages } from '@/components/quotes/TenderMessages';
+import { buyingTendersPath } from '@/lib/workspace-paths';
 import { REQUIREMENT_OPTIONS } from '@/lib/categories';
 import { PageLoadState } from '@/components/ui/PageLoadState';
+import { allowTestPayments } from '@/lib/runtime';
 
 type Tender = {
   id: string;
@@ -24,7 +26,9 @@ type Tender = {
   requirements: string;
   description: string;
   items: { id: string; category: string; subcategory: string; item: string | null; quantity: string; description: string }[];
-  attachments: { id: string; fileName: string; mimeType: string; sizeBytes: number }[];
+  attachments: { id: string; fileName: string; mimeType: string; sizeBytes: number; kind?: string; version?: number }[];
+  packages?: { id: string; reference: string; revision: number; specHash: string; issuedAt: string | null }[];
+  awards?: { id: string; awardedAt: string; quoteId: string; packageSpecHash: string }[];
 };
 
 type QuoteCommon = {
@@ -40,6 +44,7 @@ type QuoteCommon = {
   verifiedDocumentLabels: string[];
   independentlyVerified: boolean;
   independentReviewTier: 'BRONZE' | 'SILVER' | 'GOLD' | null;
+  award?: { id: string; awardedAt: string; packageSpecHash: string } | null;
 };
 
 type Quote = QuoteCommon & ({
@@ -67,19 +72,32 @@ export default function ClientTenderDetailPage() {
   const [pendingPayment, setPendingPayment] = useState<{ quoteId: string; paymentId: string; checkoutUrl: string | null } | null>(null);
   const [contacts, setContacts] = useState<Record<string, Contact>>({});
   const [professionalInterests, setProfessionalInterests] = useState<Array<{ id: string; contact: Contact }>>([]);
+  const [releasedProviders, setReleasedProviders] = useState<Array<{ id: string; contact: Contact }>>([]);
   const [directContacts, setDirectContacts] = useState<DirectContact[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [capabilities, setCapabilities] = useState({ canRaiseTender: true, canEstimate: true, canAward: true });
 
   async function load() {
-    const [tenderResponse, quotesResponse] = await Promise.all([
+    const [tenderResponse, quotesResponse, capabilitiesResponse] = await Promise.all([
       fetch(`/api/tenders/${params.id}`),
       fetch(`/api/tenders/${params.id}/quotes`),
+      fetch('/api/user/capabilities'),
     ]);
+    if (capabilitiesResponse.ok) {
+      const nextCapabilities = await capabilitiesResponse.json() as { canRaiseTender?: boolean; canEstimate?: boolean; canAward?: boolean };
+      setCapabilities({
+        canRaiseTender: nextCapabilities.canRaiseTender !== false,
+        canEstimate: nextCapabilities.canEstimate !== false,
+        canAward: nextCapabilities.canAward !== false,
+      });
+    }
     if (tenderResponse.ok) {
-      setTender((await tenderResponse.json()).tender);
+      const tenderPayload = await tenderResponse.json() as { tender: Tender; releasedProviders?: Array<{ id: string; contact: Contact }> };
+      setTender(tenderPayload.tender);
+      setReleasedProviders(tenderPayload.releasedProviders ?? []);
       setLoadError(null);
     } else if (!tender) {
       const data = await tenderResponse.json().catch(() => null);
@@ -127,13 +145,13 @@ export default function ClientTenderDetailPage() {
     }
   }
 
-  async function handleAccept(quoteId: string, declarationAccepted = false) {
+  async function handleAccept(quoteId: string, declarationAccepted = false, secondApproverEmail?: string, purchaseOrderNumber?: string) {
     setBusyQuoteId(quoteId);
     setMessage(null);
     const response = await fetch(`/api/quotes/${quoteId}/accept`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ declarationAccepted }),
+      body: JSON.stringify({ declarationAccepted, secondApproverEmail, purchaseOrderNumber }),
     });
     const data = await response.json();
     setBusyQuoteId(null);
@@ -149,7 +167,7 @@ export default function ClientTenderDetailPage() {
     if (data.devMode) {
       setPendingPayment({ quoteId, paymentId: data.paymentId, checkoutUrl: data.checkoutUrl });
       setMessage(
-        `Quote accepted. Pay £${data.totalAmountGbp} including VAT (£${data.feeGbp} fee plus £${data.vatGbp} VAT) — this environment has no Stripe keys configured, use the dev payment simulation below.`
+        `Quote accepted. Pay £${data.totalAmountGbp} including VAT (£${data.feeGbp} fee plus £${data.vatGbp} VAT)${allowTestPayments ? '. Complete the test payment below.' : '.'}`
       );
       await load();
     }
@@ -218,7 +236,7 @@ export default function ClientTenderDetailPage() {
       return;
     }
     setEditing(false);
-    setMessage('Tender updated. Matched Providers have been notified; existing Provider access remains available.');
+    setMessage('Package revision issued. Matched suppliers have been notified. Quotes bound to the previous specification cannot be awarded.');
     await load();
   }
 
@@ -232,30 +250,35 @@ export default function ClientTenderDetailPage() {
 
   return (
     <AppShell role="client" title={tender.reference}>
-      <section className="mx-auto max-w-2xl">
-        <Link href="/client/tenders" className="mb-6 inline-block text-sm font-semibold text-concrete-grey hover:text-foundation-navy">
-          &larr; Back to My Tenders
+      <section className="mx-auto max-w-6xl">
+        <Link href={buyingTendersPath()} className="mb-5 inline-block text-sm font-semibold text-concrete-grey hover:text-foundation-navy">
+          &larr; Back to my tenders
         </Link>
-        <h2 className="font-heading text-2xl font-bold tracking-tight text-foundation-navy">{tender.subcategory}</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-foundation-navy">{tender.subcategory}</h2>
         <p className="mt-2 max-w-xl text-sm text-concrete-grey">
           {tender.category} &middot; {tender.location} &middot; Closes{' '}
           {new Date(tender.closingDate).toLocaleDateString('en-GB')}
         </p>
+        {tender.packages?.[0] && (
+          <p className="mt-2 text-sm text-steel-blue">Issued revision {tender.packages[0].revision}{tender.awards?.[0] ? ' · Award on record' : ''}</p>
+        )}
         <div className="mt-5 flex flex-wrap gap-3">
-          <Button variant="secondary" onClick={() => setEditing((current) => !current)}>
-            {editing ? 'Cancel edit' : 'Edit tender'}
-          </Button>
-          {(tender.status === 'CLOSED' || new Date(tender.closingDate).getTime() <= Date.now()) && (
-            <Link href={`/user/tenders/new?copyFrom=${encodeURIComponent(tender.id)}`} className="inline-flex h-11 items-center justify-center rounded-lg bg-safety-amber px-5 text-sm font-semibold text-foundation-navy shadow-soft hover:bg-sky-blue hover:shadow-soft-md">
+          {capabilities.canEstimate ? (
+            <Button variant="secondary" onClick={() => setEditing((current) => !current)}>
+              {editing ? 'Cancel edit' : 'Edit tender'}
+            </Button>
+          ) : null}
+          {capabilities.canRaiseTender && (tender.status === 'CLOSED' || new Date(tender.closingDate).getTime() <= Date.now()) && (
+            <Link href={`/user/tenders/new?copyFrom=${encodeURIComponent(tender.id)}`} className="inline-flex h-11 items-center justify-center rounded-md bg-trade-blue px-5 text-sm font-semibold text-site-white hover:bg-trade-blue/90">
               Re-tender
             </Link>
           )}
         </div>
-        {editing ? (
+        {editing && capabilities.canEstimate ? (
           <Card className="mt-5">
             <form onSubmit={handleTenderUpdate} className="flex flex-col gap-5">
-              <h3 className="font-heading text-lg font-bold text-foundation-navy">Edit tender</h3>
-              <p className="text-sm text-concrete-grey">The tender reference stays the same. Existing Provider access remains active after this update.</p>
+              <h3 className="text-base font-semibold tracking-tight text-foundation-navy">Edit tender</h3>
+              <p className="text-sm text-concrete-grey">The tender reference stays the same. Editing issues a new package revision. Existing quotes stay on the previous hash and cannot be awarded until the supplier requotes.</p>
               <label className="flex flex-col gap-1.5 text-sm font-semibold text-foundation-navy">
                 Jobsite or delivery postcode
                 <input name="location" required defaultValue={tender.location} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" />
@@ -282,7 +305,7 @@ export default function ClientTenderDetailPage() {
                 <legend className="text-sm font-semibold text-foundation-navy">Site, delivery and supporting requirements</legend>
                 {REQUIREMENT_OPTIONS.map((requirement) => (
                   <label key={requirement} className="flex items-center gap-3 text-sm text-concrete-grey">
-                    <input name="requirements" type="checkbox" value={requirement} defaultChecked={tender.requirements.split(',').includes(requirement)} className="h-4 w-4 accent-safety-amber" />
+                    <input name="requirements" type="checkbox" value={requirement} defaultChecked={tender.requirements.split(',').includes(requirement)} className="h-4 w-4 accent-trade-blue" />
                     {requirement}
                   </label>
                 ))}
@@ -340,6 +363,21 @@ export default function ClientTenderDetailPage() {
             )}
           </Card>
         )}
+        {releasedProviders.length > 0 && (
+          <Card className="mt-5">
+            <h3 className="font-heading text-lg font-bold text-foundation-navy">Released supplier contacts</h3>
+            <p className="mt-1 text-sm text-concrete-grey">These contractors or professionals paid the fixed release fee so they can arrange a site visit and quote.</p>
+            <ul className="mt-3 flex flex-col gap-3">
+              {releasedProviders.map((release) => (
+                <li key={release.id} className="border-l-4 border-steel-blue/40 pl-4 text-sm text-concrete-grey">
+                  <p className="font-semibold text-foundation-navy">{release.contact.contactName}</p>
+                  <p>{release.contact.email}</p>
+                  {release.contact.contactPhone && <p>{release.contact.contactPhone}</p>}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
         {professionalInterests.length > 0 && (
           <Card className="mt-5">
             <h3 className="font-heading text-lg font-bold text-foundation-navy">Professional interests</h3>
@@ -379,7 +417,7 @@ export default function ClientTenderDetailPage() {
           {quotes.length > 0 && (
             <a
               href={`/api/tenders/${params.id}/quotes/pdf`}
-              className="inline-flex min-h-11 items-center rounded-lg border border-steel-blue/40 bg-white px-4 text-sm font-semibold text-steel-blue shadow-soft hover:border-steel-blue hover:bg-steel-blue/5"
+              className="inline-flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-foundation-navy hover:bg-slate-50"
             >
               Download PDF
             </a>
@@ -393,8 +431,7 @@ export default function ClientTenderDetailPage() {
         ) : (
           <>
             <p className="mb-4 text-sm text-concrete-grey">
-              Compare the commercial details first. Accepting a quote releases contact details for that Provider quote only;
-              the release fee is based on the full submitted quote value, not selected quote lines.
+              Compare the commercial details first. Acceptance applies to the full submitted quote value, not selected quote lines. For materials, waste, and plant, accepting a quote and paying the release fee shares contact details for that quote. Contractors and professionals who already paid the unlock fee can contact you for a site visit before they quote.
             </p>
             <QuoteComparison
               quotes={quotes}
@@ -402,17 +439,22 @@ export default function ClientTenderDetailPage() {
               pendingPayment={pendingPayment}
               pendingCheckoutUrl={pendingPayment?.checkoutUrl}
               busyQuoteId={busyQuoteId}
+              canAward={capabilities.canAward}
               onAccept={handleAccept}
               onSimulateReleasePayment={handleSimulateReleasePayment}
               onLoadContact={loadContact}
             />
           </>
         )}
-        {quotes.filter((quote) => !quote.expired).map((quote) => (
-          <div key={quote.id} className="mt-6">
-            <TenderMessages tenderId={params.id} quoteId={quote.id} role="client" />
-          </div>
-        ))}
+        {(() => {
+          const threadQuote = quotes.find((quote) => quote.status === 'ACCEPTED') ?? quotes.find((quote) => !quote.expired) ?? quotes[0];
+          const tenderClosed = tender.status === 'CLOSED' || new Date(tender.closingDate).getTime() <= Date.now();
+          return (
+            <div className="mt-6">
+              <TenderMessages tenderId={params.id} quoteId={threadQuote?.id} role="client" tenderClosed={tenderClosed} />
+            </div>
+          );
+        })()}
       </section>
     </AppShell>
   );

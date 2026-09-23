@@ -31,11 +31,11 @@ export default function PoliciesPage() {
   return (
     <div className="flex min-h-screen flex-col bg-site-white">
       <SiteHeader />
-      <main className="flex-1 px-6 py-14 sm:px-10">
+      <main id="main-content" className="flex-1 px-6 py-14 sm:px-10">
         <section className="mx-auto max-w-6xl">
           <div className="max-w-3xl">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Trade Tender policies</p>
-            <h1 className="mt-3 font-heading text-3xl font-bold text-foundation-navy sm:text-4xl">Policy documents and operating rules</h1>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foundation-navy">Policy documents and operating rules</h1>
             <p className="mt-4 text-sm leading-relaxed text-concrete-grey">
               These policies explain how the platform operates, how user data is handled, how payments are processed, how contract release is controlled, and how reviews and disputes are managed.
             </p>
@@ -43,11 +43,11 @@ export default function PoliciesPage() {
 
           <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {policies.map((policy) => (
-              <article key={policy.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-soft">
+              <article key={policy.id} className="rounded-md border border-slate-200 bg-white p-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">
                   {policy.id === 'privacy' || policy.id === 'platform-terms' ? 'Required reading' : 'Operational policy'}
                 </p>
-                <h2 className="mt-3 font-heading text-xl font-bold text-foundation-navy">{policy.title}</h2>
+                <h2 className="mt-3 text-base font-semibold tracking-tight text-foundation-navy">{policy.title}</h2>
                 <p className="mt-3 text-sm leading-relaxed text-concrete-grey">{policy.summary}</p>
                 {policy.version && <p className="mt-4 text-xs font-semibold uppercase tracking-[0.08em] text-concrete-grey">Version {policy.version}</p>}
                 <Link href={`/policies/${policy.id}`} className="mt-4 inline-flex text-sm font-semibold text-steel-blue underline underline-offset-4 hover:text-foundation-navy">

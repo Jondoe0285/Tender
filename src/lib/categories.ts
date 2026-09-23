@@ -9,6 +9,9 @@ export const SERVICE_CATALOG = {
     'Roofing Materials': ['Roof tiles', 'Slate roofing', 'Roof battens', 'Roofing membranes', 'Breather felt', 'Lead flashing', 'Fascia and soffit boards', 'Guttering and rainwater systems'],
     'Plastering and Drylining': ['Plasterboard sheets', 'Moisture-resistant plasterboard', 'Fire-resistant plasterboard', 'Acoustic plasterboard', 'Multi-finish plaster', 'Bonding plaster', 'Jointing compound', 'Plaster beads, trims and tapes'],
     'Drainage, Civils and Groundworks': ['Underground drainage pipe', 'Drainage fittings and bends', 'Inspection chambers', 'Manhole covers and frames', 'Land drainage pipe', 'Geotextile membranes', 'Ducting', 'Kerbs, edging and channels'],
+    Reinforcement: ['Mesh reinforcement A142', 'Mesh reinforcement A193', 'Mesh reinforcement A252', 'Cut and bent rebar', 'Straight bar', 'Tying wire', 'Spacer blocks', 'Reinforcement accessories'],
+    'Electrical Supplies': ['SWA cable', 'Twin and earth cable', 'Cable tray and containment', 'Distribution boards', 'MCBs and RCBOs', 'Consumer units', 'Lighting fittings', 'Emergency lighting', 'Socket outlets', 'Conduit and fittings'],
+    'Mechanical and Plumbing Supplies': ['Copper pipe', 'MDPE pipe', 'Push-fit fittings', 'Valves and isolation', 'Radiators', 'Boilers', 'Sanitaryware', 'Soil and vent pipe', 'Insulation for pipework', 'Mechanical fixings'],
   },
   Waste: {
     'Inert waste': ['Concrete, bricks, blocks, tiles, ceramics, rubble and hardcore'],
@@ -27,6 +30,7 @@ export const SERVICE_CATALOG = {
     'Welfare and site waste': ['Canteen waste', 'Office waste', 'Sweepings', 'General refuse'],
     'Hazardous waste': ['Asbestos-containing materials', 'Contaminated soil', 'Paints', 'Solvents', 'Adhesives', 'Sealants', 'Oils', 'Aerosols', 'Treated timber', 'Chemical containers'],
     'Electrical and mechanical waste': ['Cable', 'Containment', 'Pipework', 'Ductwork', 'Lighting', 'Small plant components', 'WEEE items'],
+    'Skip and container hire': ['4 yard skip', '6 yard skip', '8 yard skip', '12 yard skip', '16 yard skip', 'RoRo containers', 'Grab lorry hire', 'Compactor skips'],
   },
   'Plant Hire': {
     Excavators: ['Micro excavators approx. 0.8-1.5 tonnes', 'Mini excavators approx. 1.5-3 tonnes', 'Midi excavators approx. 5-9 tonnes', '360 excavators below 10 tonnes', '360 excavators above 10 tonnes', 'Long-reach excavators', 'Demolition excavators'],
@@ -45,6 +49,8 @@ export const SERVICE_CATALOG = {
     'Traffic management and site safety': ['Barriers', 'Fencing', 'Trench covers', 'Road plates', 'Cones', 'Signs', 'Temporary walkways', 'Edge protection', 'Fall-arrest systems', 'Site security equipment'],
     'Welfare and temporary accommodation': ['Site cabins', 'Drying rooms', 'Toilets', 'Welfare units', 'Storage containers', 'Temporary offices', 'Canteen units'],
     'Transport, haulage and logistics': ['Plant trailers', 'Low loaders', 'HIAB vehicles', 'Abnormal load transport', 'Loader/securer services', 'Lifting supervisors', 'Slinger/signallers', 'Plant marshals'],
+    Compressors: ['Portable diesel compressors', 'Electric compressors', 'Silenced compressors', 'Compressor hoses and fittings', 'Air tools packages'],
+    'Temporary site establishment': ['Hoarding panels and gates', 'Heras fencing', 'Temporary pedestrian barriers', 'CCTV tower units', 'Independent scaffolding', 'Scaffold towers', 'Edge protection packages', 'Temporary site compound packages'],
   },
   'Contractor Services': {
     'Groundworks & Civil Engineering': ['Groundworks, drainage, roads, utilities, concrete and civils activities'],
@@ -59,7 +65,9 @@ export const SERVICE_CATALOG = {
     'External Works & Landscaping': ['Fencing, surfacing, landscaping, grounds works and external finishing'],
     'Facilities, Maintenance & Cleaning': ['Planned and reactive maintenance, cleaning and property support services'],
     'Transport, Haulage & Logistics': ['Haulage, specialist transport, courier and delivery support'],
-    'Specialist Construction Services': ['Scaffolding, drilling, cutting, welding, temporary works and specialist access'],
+    'Specialist Construction Services': ['Drilling, cutting, welding, temporary works and specialist access'],
+    'Scaffolding and access': ['Independent scaffolding', 'Birdcage scaffolding', 'Scaffold towers', 'Scaffold design and TG20', 'Handover and inspection', 'Edge protection and fans'],
+    'Temporary works and hoarding': ['Hoarding installation', 'Temporary fencing', 'Site compound establishment', 'Temporary works coordination'],
     'Labour & Workforce Supply': ['General labour, skilled trades, plant operators, supervisors and site management'],
   },
   'Professional Services': {
@@ -71,6 +79,7 @@ export const SERVICE_CATALOG = {
     'Project Management & Programme Support': ['Project management support', 'Programme planning', 'Contract administration', 'Client representative services', 'Pre-construction coordination', 'Site meeting attendance', 'Risk register facilitation', 'Progress reporting', 'Other'],
     'Environmental & Specialist Consultancy': ['Asbestos survey coordination', 'Ecology survey', 'Noise or dust assessment', 'Waste management plan', 'Sustainability or BREEAM support', 'Occupational health support', 'Contaminated land assessment', 'Environmental management plan', 'Other'],
     'Legal, Contract & Claims Support': ['Contract review support', 'Claims preparation support', 'Delay analysis support', 'Adjudication support', 'Expert witness support', 'Insurance claim technical support', 'Other'],
+    'Training Providers': ['CSCS card training', 'SSSTS', 'SMSTS', 'First aid at work', 'Asbestos awareness', 'Working at height', 'Abrasive wheels', 'Plant operator CPCS or NPORS', 'Toolbox talk packages', 'Other'],
   },
 } as const;
 
@@ -111,7 +120,7 @@ export function isValidSubcategory(service: string, category: string, item?: str
     const normalised = normaliseService(service);
     if (!normalised) return false;
     const legacyLabels: Record<ServiceName, string[]> = {
-      Materials: ['Bricks and blocks', 'Aggregates', 'Timber', 'Insulation', 'Roofing materials', 'Plumbing and drainage materials', 'Electrical supplies', 'Other materials'],
+      Materials: ['Bricks and blocks', 'Aggregates', 'Timber', 'Insulation', 'Roofing materials', 'Plumbing and drainage materials', 'Electrical supplies', 'Electrical Supplies', 'Other materials'],
       Waste: ['Skip hire', 'Muck away', 'Waste collection', 'Recycling and disposal', 'Other waste services'],
       'Plant Hire': ['Excavators', 'Dumpers', 'Access and scaffolding', 'Welfare units', 'Generators and power', 'Other plant hire'],
       'Contractor Services': [],
@@ -152,6 +161,44 @@ export const REQUIREMENT_OPTIONS = [
 ] as const;
 export const RETAILER_UNLOCK_FEE_GBP = 10;
 export const CLIENT_RELEASE_FEE_GBP = 10;
+
+export function isSpecifiedItemService(service: string | undefined): boolean {
+  const value = String(service ?? '').trim().toLowerCase();
+  return value === 'materials' || value === 'waste' || value === 'plant hire';
+}
+
+export function isGoodsQuantityService(service: string | undefined): boolean {
+  const value = String(service ?? '').trim().toLowerCase();
+  return value === 'materials' || value === 'waste';
+}
+
+export function isContractorService(service: string | undefined): boolean {
+  return String(service ?? '').trim().toLowerCase().includes('contractor');
+}
+
+export function isProfessionalService(service: string | undefined): boolean {
+  return String(service ?? '').trim().toLowerCase().includes('professional');
+}
+
+/** Contractor and professional packages: the supplier pays a fixed fee and gets buyer contact for a site visit and quote. */
+export function isSiteVisitService(service: string | undefined): boolean {
+  return isContractorService(service) || isProfessionalService(service);
+}
+
+const GOODS_QUANTITY_PATTERN = /^\d+(?:\.\d+)? (?:units?|tonnes|bags|pallets|m³|skips?)$/;
+const WASTE_TONNES_PATTERN = /^\d+(?:\.\d+)? tonnes$/;
+const DURATION_QUANTITY_PATTERN = /^\d+(?:\.\d+)? (?:days|weeks|months)$/;
+const MEASURED_CONTRACTOR_PATTERN = /^\d+(?:\.\d+)? (?:m|m²|m³|nr|item|week)$/;
+
+/** Stored quantity is a number plus a catalog unit — never a free-text essay. */
+export function isValidTenderQuantity(service: string | undefined, quantity: string): boolean {
+  const value = quantity.trim().replace(/,/g, '');
+  if (String(service ?? '').trim().toLowerCase() === 'waste') return WASTE_TONNES_PATTERN.test(value);
+  if (isGoodsQuantityService(service)) return GOODS_QUANTITY_PATTERN.test(value);
+  if (isSpecifiedItemService(service)) return GOODS_QUANTITY_PATTERN.test(value) || DURATION_QUANTITY_PATTERN.test(value);
+  if (isContractorService(service)) return MEASURED_CONTRACTOR_PATTERN.test(value) || DURATION_QUANTITY_PATTERN.test(value) || value === 'not applicable';
+  return value === 'not applicable' || GOODS_QUANTITY_PATTERN.test(value) || DURATION_QUANTITY_PATTERN.test(value) || MEASURED_CONTRACTOR_PATTERN.test(value);
+}
 
 /** Services eligible for the Provider verification process. */
 export const VERIFICATION_ELIGIBLE_SERVICES: ServiceName[] = ['Materials', 'Waste', 'Plant Hire', 'Contractor Services', 'Professional Services'];

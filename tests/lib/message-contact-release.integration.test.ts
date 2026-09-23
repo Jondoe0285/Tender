@@ -72,13 +72,10 @@ test('retailer messaging requires contact release even after tender unlock', asy
   await prisma.unlock.create({ data: { tenderId, retailerId, method: 'PAID' } });
 
   const retailerActor = { id: retailerId, role: 'USER' as const };
-  await assert.rejects(
-    () => listTenderMessages(tenderId, retailerActor),
-    (error: unknown) => error instanceof ForbiddenError && error.message === 'Contact details must be released before messaging'
-  );
+  assert.deepEqual(await listTenderMessages(tenderId, retailerActor), { messages: [], unavailableReason: 'NO_RELEASE' });
   await assert.rejects(
     () => sendTenderMessage(tenderId, retailerActor, 'Can you confirm the delivery date?'),
-    (error: unknown) => error instanceof ForbiddenError && error.message === 'Contact details must be released before messaging'
+    (error: unknown) => error instanceof ForbiddenError && error.message === 'Questions open after contact details are released.'
   );
 
   const payment = await prisma.payment.create({
@@ -96,14 +93,14 @@ test('retailer messaging requires contact release even after tender unlock', asy
     data: { tenderId, quoteId, clientId, retailerId, authorizingPaymentId: payment.id },
   });
 
-  assert.deepEqual(await listTenderMessages(tenderId, retailerActor), []);
+  assert.deepEqual(await listTenderMessages(tenderId, retailerActor), { messages: [] });
   const message = await sendTenderMessage(tenderId, retailerActor, 'Can you confirm the delivery date?');
   assert.equal(message.body, 'Can you confirm the delivery date?');
 
-  const messages = await listTenderMessages(tenderId, retailerActor);
-  assert.equal(messages.length, 1);
-  assert.equal(messages[0]?.body, 'Can you confirm the delivery date?');
-  assert.equal(messages[0]?.senderRole, 'USER');
+  const listed = await listTenderMessages(tenderId, retailerActor);
+  assert.equal(listed.messages.length, 1);
+  assert.equal(listed.messages[0]?.body, 'Can you confirm the delivery date?');
+  assert.equal(listed.messages[0]?.senderRole, 'USER');
 });
 
 test('contact release writes a minimal immutable audit event', async (context) => {

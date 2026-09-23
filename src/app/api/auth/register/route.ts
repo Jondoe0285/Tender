@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/server/data/prisma';
 import { hashPassword } from '@/server/auth/password';
-import { registerSchema } from '@/lib/schemas/register';
+import { createRegisterSchemaForCatalog } from '@/lib/schemas/register';
+import { getCategoryCatalog } from '@/server/domain/categoryService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { verifyPassword } from '@/server/auth/password';
@@ -15,6 +16,8 @@ import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
 import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from '@/lib/legal/documentVersions';
 import { getPlatformSetting } from '@/server/domain/platformSettings';
 import { serialiseServiceProvisions } from '@/lib/service-provisions';
+import { operatingLocationsFromCoverage } from '@/lib/geography';
+import { defaultLaunchCreditExpiry } from '@/lib/launch-credits';
 
 async function sendVerificationEmail(userId: string, email: string) {
   const token = await createEmailVerificationToken(userId);
@@ -30,7 +33,7 @@ export async function POST(request: Request) {
   const originError = rejectCrossOrigin(request);
   if (originError) return originError;
   const body = await request.json().catch(() => null);
-  const parsed = registerSchema.safeParse(body);
+  const parsed = createRegisterSchemaForCatalog(await getCategoryCatalog()).safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid registration details' }, { status: 400 });
   }
@@ -80,7 +83,7 @@ export async function POST(request: Request) {
             });
       }
       if (input.role === 'USER') {
-        const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', companyType: input.companyType ?? 'LIMITED_COMPANY', services: (input.categories ?? []).join(','), serviceProvisions: serialiseServiceProvisions(input.serviceProvisions ?? []), primaryUserId: existing.id } });
+        const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', companyType: input.companyType ?? 'LIMITED_COMPANY', services: (input.categories ?? []).join(','), serviceProvisions: serialiseServiceProvisions(input.serviceProvisions ?? []), operatingLocations: operatingLocationsFromCoverage({ coverageScope: input.coverageScope, counties: input.counties, regions: input.regions }), primaryUserId: existing.id } });
         await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: existing.id } });
       }
     });
@@ -127,6 +130,8 @@ export async function POST(request: Request) {
                 counties: (input.counties ?? []).join(','),
                 regions: (input.regions ?? []).join(','),
                 launchCreditsLeft: defaultLaunchCredits,
+                launchCreditsExpireAt: defaultLaunchCredits > 0 ? defaultLaunchCreditExpiry() : null,
+                launchCreditsReason: defaultLaunchCredits > 0 ? 'Registration default' : null,
               },
             },
           }
@@ -141,7 +146,7 @@ export async function POST(request: Request) {
       metadata: { termsVersion: CURRENT_TERMS_VERSION, privacyVersion: CURRENT_PRIVACY_VERSION, acceptedAt: acceptedAt.toISOString() },
     }, transaction);
     if (input.role === 'USER') {
-      const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', companyType: input.companyType ?? 'LIMITED_COMPANY', services: (input.categories ?? []).join(','), serviceProvisions: serialiseServiceProvisions(input.serviceProvisions ?? []), primaryUserId: createdUser.id } });
+      const company = await transaction.clientCompany.create({ data: { tradeTenderId: buildClientTradeTenderId(), companyName, branchIdentifier: input.branchIdentifier ?? 'Head Office', companyType: input.companyType ?? 'LIMITED_COMPANY', services: (input.categories ?? []).join(','), serviceProvisions: serialiseServiceProvisions(input.serviceProvisions ?? []), operatingLocations: operatingLocationsFromCoverage({ coverageScope: input.coverageScope, counties: input.counties, regions: input.regions }), primaryUserId: createdUser.id } });
       await transaction.clientCompanyMember.create({ data: { companyId: company.id, userId: createdUser.id } });
     }
     return createdUser;

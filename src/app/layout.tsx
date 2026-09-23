@@ -1,26 +1,19 @@
-import { ClerkProvider } from '@clerk/nextjs';
-import { Montserrat, Source_Sans_3 } from 'next/font/google';
+import { Source_Sans_3 } from 'next/font/google';
 import { AuthSessionProvider } from '@/components/providers/AuthSessionProvider';
+import { SkipLink } from '@/components/layout/SkipLink';
 import './globals.css';
-
-const montserrat = Montserrat({
-  subsets: ['latin'],
-  weight: ['600', '700'],
-  variable: '--font-montserrat',
-  display: 'swap',
-});
 
 const sourceSans = Source_Sans_3({
   subsets: ['latin'],
-  weight: ['400', '500', '600'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-source-sans',
   display: 'swap',
 });
 
 export const metadata = {
-  title: 'Trade Tender | The tender platform for construction supply',
+  title: 'Trade Tender | Tenders and quotes for UK construction',
   description:
-    'Connect. Compare. Construct. Trade Tender connects construction Contractors with Providers through a clear tender and quotation process.',
+    'Set out a construction job, compare quotes from matched Suppliers, and award the work. Trade Tender is for UK construction Buyers and Suppliers.',
 };
 
 export default function RootLayout({
@@ -29,11 +22,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en-GB" className={`${montserrat.variable} ${sourceSans.variable}`}>
-      <body className="min-h-screen bg-site-white font-sans text-foundation-navy antialiased">
-        <ClerkProvider>
-          <AuthSessionProvider>{children}</AuthSessionProvider>
-        </ClerkProvider>
+    <html lang="en-GB" className={sourceSans.variable}>
+      <body className="min-h-screen bg-light-grey font-sans text-foundation-navy antialiased">
+        <SkipLink />
+        <AuthSessionProvider>{children}</AuthSessionProvider>
       </body>
     </html>
   );

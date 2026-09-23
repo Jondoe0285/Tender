@@ -6,11 +6,13 @@ It is intentionally stored in the repository so it travels with the code across 
 
 ## Outstanding Actions
 
-Work top to bottom — production config first, then remaining operational evidence. Items that state "implementation complete" remain open until their listed validation evidence is recorded.
+The ambition is **enterprise-ready**: a specified package workspace that a Tier 1 contractor can trust for closed regional procurement, then national use. Bar is 70. Last honest score on staging `d0699a4` was **59/100**. Live rail remains 12. Production remains **BLOCKED**.
 
-The current release decision remains **BLOCKED**. Repository engineering for payment ledger, privileged MFA, trusted client IP, own-tender IDOR, governing-document canon, and source accessibility/contrast is complete. Live Stripe, Resend, Sentry, retention, an approved staging deploy SHA, real-device QA, and paid-plan capacity evidence remain Before Production items.
+Work top to bottom — live-rail config first, then remaining operational evidence. Specify → Compare → Award was re-walked on localhost (23 September 2026). Localhost axe WCAG 2 A/AA was clean on the public first-journey pages and the signed-in dashboard. Real-device confirmation is still outstanding.
 
-Actions below include the 2026-09-22 enterprise due-diligence recommendations. Existing tracker items were kept; due-diligence items that already appeared here or were closed as Year 1 product decisions were not duplicated.
+Repository engineering for payment ledger, privileged MFA, trusted client IP, own-tender IDOR, Project/Award schema, frozen package revision, PO on accept, four-eyes ControlChange, conversion funnel, measured contractor units, Award/Project backfill, county operating-location remap, `/user` buying URLs, Year 1 fixed release fees, sandbox password repair, workspace 403, Trade Tender IDs, and automated-verification copy is in code. Live Stripe, Resend, Sentry, retention, an approved staging deploy SHA, real-device QA, and paid-plan capacity evidence remain Before Production items.
+
+Actions below include the 2026-09-22 enterprise due-diligence recommendations. Existing tracker items were kept where still open; due-diligence items that already appeared here or were closed as Year 1 product decisions were not duplicated.
 
 ### Before Production
 
@@ -30,22 +32,19 @@ Actions below include the 2026-09-22 enterprise due-diligence recommendations. E
 
 ### Security and Compliance
 
-- [ ] Store tender attachments in private object storage with authorised expiring downloads and malware scanning. Stop persisting user file bytes in Postgres (`TenderAttachment.content`).
+- [ ] Attach a Render persistent disk later for tender and verification files. App uploads already write to `ATTACHMENT_STORE_DIR` (local default `data/attachments`) instead of Postgres bytes; authorised session downloads and signature/PDF active-content checks are in code. When attaching: Starter or higher, mount `/var/data`, set `ATTACHMENT_STORE_DIR=/var/data/documents`. Outstanding after that: independent malware scanner. Disks are not available on free instances and pin a single instance.
 - [ ] Commission an independent web penetration test after live Stripe is proven; close Critical and High findings before wider access.
 - [ ] Execute processor DPAs (Render, Neon, Stripe, Resend, Sentry, Consulthub), a DPIA, and a DSAR/erasure runbook that covers database, files, backups, email, and observability stores.
 - [ ] Name deputies for deploy, Stripe, and incidents so production operations are not a single-person dependency.
 
 ### Engineering Work
 
-- [ ] Complete accessibility, real-device, and first-journey QA, including the mobile sidebar, Client/Provider journeys, and a repeatable browser/axe pass (P2-M01 / P2-M03).
+- [ ] Complete accessibility, real-device, and first-journey QA, including a repeatable axe pass on a physical device (P2-M01 / P2-M03). Localhost axe WCAG 2 A/AA was clean on `/`, `/login`, `/register`, `/security`, `/demo`, and `/user` on 23 September 2026. Mobile nav hit targets are 44px. Real-device confirmation is still outstanding.
 - [ ] Establish production capacity and availability evidence. Free-tier Render services have no demonstrated path to the required 1,000 concurrent users. Select an appropriate plan, document connection/scaling limits, configure alerts, and pass representative load and recovery tests.
 
 ### Data, Product, and Marketplace
 
-- [ ] Add Project and Award entities so a job/site can own multiple tenders and an accepted quote has a tracked outcome after contact release.
-- [ ] Add Client organisation RBAC (buyer, QS/estimator, read-only auditor) beyond today’s two-profile `USER` model.
-- [ ] Define an opportunity search strategy that will not rely on unindexed table scans as Provider and tender volume grows.
-- [ ] Run a closed regional beachhead (one geography, limited trades, invited demand) and instrument match → unlock → quote → accept → release before any national acquisition spend.
+- [ ] Run a closed regional beachhead (one geography, limited trades, invited demand) and instrument match → unlock → quote → accept → release before any national acquisition spend. Conversion funnel exists in Super User code. Owner MFA is required for Owner accounts only; Super User and marketplace accounts do not enroll. The ops board flags a missing or placeholder `PLATFORM_OWNER_EMAIL` and Owners with MFA off. Outstanding: set a real `PLATFORM_OWNER_EMAIL` on each environment and complete Owner MFA enrollment.
 - [ ] Before enterprise sales, move sponsored placements off the quote-comparison surface. Year 1 launch keeps sponsorship on comparison (founder decision 2026-09-18); this is not a Year 1 reopen.
 
 ### Operations and Recovery

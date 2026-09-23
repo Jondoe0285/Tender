@@ -105,7 +105,7 @@ export function Combobox({ id, name, groups, value, onChange, placeholder, disab
         <ul
           id={`${id}-listbox`}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-soft-lg"
+          className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-sm"
         >
           {flatOptions.length === 0 ? (
             <li className="px-4 py-2 text-sm text-concrete-grey">No matches found</li>
@@ -127,8 +127,8 @@ export function Combobox({ id, name, groups, value, onChange, placeholder, disab
                           aria-selected={value === option || flatIndex === activeIndex}
                           onMouseDown={(event) => event.preventDefault()}
                           onClick={() => selectOption(option)}
-                          className={`block w-full px-4 py-2 text-left text-sm hover:bg-safety-amber/10 ${
-                            flatIndex === activeIndex ? 'bg-safety-amber/10' : ''
+                          className={`block w-full px-4 py-2 text-left text-sm hover:bg-trade-blue/10 ${
+                            flatIndex === activeIndex ? 'bg-trade-blue/10' : ''
                           } ${value === option ? 'font-semibold text-foundation-navy' : 'text-foundation-navy/90'}`}
                         >
                           {option}

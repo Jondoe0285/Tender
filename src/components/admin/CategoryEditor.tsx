@@ -9,6 +9,7 @@ type Category = { id: string | null; service: string; name: string; items: strin
 
 export function CategoryEditor() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [version, setVersion] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -17,8 +18,9 @@ export function CategoryEditor() {
   async function load() {
     const response = await fetch('/api/super-user/categories');
     if (!response.ok) { setMessage('Unable to load categories.'); setLoading(false); return; }
-    const data = await response.json() as { categories: Category[] };
+    const data = await response.json() as { version?: string; categories: Category[] };
     setCategories(data.categories);
+    setVersion(data.version ?? null);
     setDrafts(Object.fromEntries(data.categories.map((category) => [keyFor(category), category.items.join('\n')])));
     setLoading(false);
   }
@@ -48,7 +50,7 @@ export function CategoryEditor() {
   }
 
   if (loading) return <p className="text-sm text-concrete-grey">Loading categories...</p>;
-  return <div className="space-y-6">{message && <p role="status" className="rounded-lg border border-steel-blue/20 bg-steel-blue/5 px-4 py-3 text-sm font-semibold text-steel-blue">{message}</p>}{categories.map((category) => <Card key={keyFor(category)}><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">{category.service}</p><h2 className="font-heading text-lg font-bold text-foundation-navy">{category.name}</h2></div><Button variant={category.active ? 'danger' : 'secondary'} onClick={() => toggle(category)} loading={saving === keyFor(category)}>{category.active ? 'Deactivate' : 'Activate'}</Button></div><label className="mt-4 block text-sm font-semibold text-foundation-navy" htmlFor={`items-${keyFor(category)}`}>Items, one per line</label><Textarea id={`items-${keyFor(category)}`} rows={Math.min(10, Math.max(3, (drafts[keyFor(category)] ?? '').split('\n').length))} value={drafts[keyFor(category)] ?? ''} onChange={(event) => setDrafts({ ...drafts, [keyFor(category)]: event.target.value })} /><Button className="mt-3" onClick={() => save(category)} loading={saving === keyFor(category)}>Save category</Button></Card>)}</div>;
+  return <div className="space-y-6">{version && <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">Published catalog {version}</p>}{message && <p role="status" className="rounded-lg border border-steel-blue/20 bg-steel-blue/5 px-4 py-3 text-sm font-semibold text-steel-blue">{message}</p>}{categories.map((category) => <Card key={keyFor(category)}><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">{category.service}</p><h2 className="font-heading text-lg font-bold text-foundation-navy">{category.name}</h2></div><Button variant={category.active ? 'danger' : 'secondary'} onClick={() => toggle(category)} loading={saving === keyFor(category)}>{category.active ? 'Deactivate' : 'Activate'}</Button></div><label className="mt-4 block text-sm font-semibold text-foundation-navy" htmlFor={`items-${keyFor(category)}`}>Items, one per line</label><Textarea id={`items-${keyFor(category)}`} rows={Math.min(10, Math.max(3, (drafts[keyFor(category)] ?? '').split('\n').length))} value={drafts[keyFor(category)] ?? ''} onChange={(event) => setDrafts({ ...drafts, [keyFor(category)]: event.target.value })} /><Button className="mt-3" onClick={() => save(category)} loading={saving === keyFor(category)}>Save category</Button></Card>)}</div>;
 }
 
 function keyFor(category: Category): string { return `${category.service}:${category.name}`; }

@@ -58,7 +58,7 @@ function ResetPasswordForm() {
   if (!token) {
     return (
       <section className="mx-auto max-w-md pt-16 pb-24">
-        <h1 className="font-heading text-3xl font-bold tracking-tight text-foundation-navy">Reset link required</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foundation-navy">Reset link required</h1>
         <p role="alert" className="mt-4 text-sm text-concrete-grey">
           Open the link from your Trade Tender email to set a password.
         </p>
@@ -69,7 +69,7 @@ function ResetPasswordForm() {
   return (
     <section className="mx-auto max-w-md pt-16 pb-24">
       <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-steel-blue">Account security</p>
-      <h1 className="font-heading text-3xl font-bold tracking-tight text-foundation-navy">Set your password</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-foundation-navy">Set your password</h1>
       <p className="mt-4 text-sm text-concrete-grey">Use 10-200 characters, including a capital letter and a special character.</p>
 
       <Card className="mt-8">

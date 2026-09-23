@@ -9,7 +9,7 @@ function formatRequirementSummary(requirements: string[]): string {
   return remaining > 0 ? `${shown} +${remaining} more` : shown;
 }
 
-function formatDeadline(closingDate: string | Date): { label: string; urgent: boolean } {
+export function formatOpportunityDeadline(closingDate: string | Date): { label: string; urgent: boolean } {
   const date = new Date(closingDate);
   const daysLeft = Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   const dateLabel = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -45,13 +45,13 @@ export type OpportunityCardData = {
 };
 
 export function TenderOpportunityCard({ data, href }: { data: OpportunityCardData; href: string }) {
-  const deadline = formatDeadline(data.closingDate);
+  const deadline = formatOpportunityDeadline(data.closingDate);
 
   return (
     <Link href={href} className="block">
       <Card
         interactive
-        className={`relative ${data.strongMatch ? 'border-2 border-approved border-l-8 bg-approved/10 shadow-soft-md' : ''}`}
+        className={`relative ${data.strongMatch ? 'border-approved border-l-2 bg-approved/5' : ''}`}
       >
         {data.isNew && (
           <span className="absolute right-4 top-4 flex items-center gap-1.5 text-xs font-semibold text-safety-amber">

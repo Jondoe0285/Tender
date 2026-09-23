@@ -29,5 +29,5 @@ test('pricing intelligence has a dedicated product-category page with offset con
   assert.match(panel, /Rows are grouped by service, product category, and item rather than by tender/);
   assert.match(panel, /Manual offset/);
   assert.match(panel, /Automatic offset/);
-  assert.match(navigation, /Pricing Intelligence/);
+  assert.match(navigation, /Pricing intelligence/);
 });

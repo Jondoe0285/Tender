@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import QRCode from 'qrcode';
 import { z } from 'zod';
 import { prisma } from '@/server/data/prisma';
-import { requireRole } from '@/server/auth/session';
+import { requireOwnerAccount } from '@/server/auth/session';
 import { buildMfaEnrollment, consumeRecoveryCode, encryptMfaSecret, generateRecoveryCodes, hashRecoveryCode, decryptMfaSecret, verifyMfaCode } from '@/server/auth/mfa';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { toErrorResponse } from '@/server/http/errors';
@@ -11,7 +11,7 @@ const codeSchema = z.object({ action: z.enum(['begin', 'verify', 'disable']), co
 
 export async function GET() {
   try {
-    const user = await requireRole('SUPER_USER');
+    const user = await requireOwnerAccount();
     const account = await prisma.user.findUnique({ where: { id: user.id }, select: { mfaEnabled: true, mfaVerifiedAt: true } });
     return NextResponse.json({ enabled: account?.mfaEnabled ?? false, verifiedAt: account?.mfaVerifiedAt ?? null });
   } catch (error) {
@@ -21,7 +21,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireRole('SUPER_USER');
+    const user = await requireOwnerAccount();
     const parsed = codeSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: 'Invalid MFA request' }, { status: 400 });
 

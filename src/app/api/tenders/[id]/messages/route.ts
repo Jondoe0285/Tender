@@ -13,8 +13,8 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     const user = await requireRole('USER', 'USER');
     const actor = { id: user.id, role: user.role as 'USER' | 'USER' };
     const quoteId = new URL(request.url).searchParams.get('quoteId') ?? undefined;
-    const messages = await listTenderMessages(params.id, actor, quoteId);
-    return NextResponse.json({ messages });
+    const result = await listTenderMessages(params.id, actor, quoteId);
+    return NextResponse.json(result);
   } catch (error) {
     return toErrorResponse(error);
   }

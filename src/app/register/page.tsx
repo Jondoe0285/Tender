@@ -1,206 +1,21 @@
-'use client';
-
-import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { SERVICE_CATALOG, SERVICE_NAMES } from '@/lib/categories';
-import { COMPANY_TYPE_LABELS, COMPANY_TYPES } from '@/lib/companyTypes';
-import { FieldGroup, Input, Label, PasswordInput } from '@/components/ui/Field';
-import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
-import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
+import { RegisterForm, type WorkspaceIntent } from './RegisterForm';
 
-export default function RegisterPage() {
-  const router = useRouter();
-  const [coverageScope, setCoverageScope] = useState<'COUNTY' | 'REGION' | 'UK'>('COUNTY');
-  const [counties, setCounties] = useState<string[]>([]);
-  const [regions, setRegions] = useState<string[]>([]);
-  const [services, setServices] = useState<string[]>([]);
-  const [serviceProvisions, setServiceProvisions] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+function parseIntent(value: string | undefined): WorkspaceIntent {
+  if (value === 'supplying') return 'supplying';
+  if (value === 'buying') return 'buying';
+  return 'buying';
+}
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSubmitting(true);
-    setError(null);
-
-    const form = new FormData(event.currentTarget);
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: form.get('email'),
-        password: form.get('password'),
-        contactName: `${form.get('firstName')} ${form.get('lastName')}`.trim(),
-        firstName: form.get('firstName'),
-        lastName: form.get('lastName'),
-        contactPhone: form.get('contactPhone') || undefined,
-        role: 'USER',
-        termsAccepted: form.get('termsAccepted') === 'on',
-        privacyAccepted: form.get('privacyAccepted') === 'on',
-        companyName: form.get('companyName') || undefined,
-        companyType: form.get('companyType') || undefined,
-        branchIdentifier: form.get('branchIdentifier') || undefined,
-        categories: services,
-        serviceProvisions,
-        coverageScope,
-        counties: coverageScope === 'COUNTY' ? counties : undefined,
-        regions: coverageScope === 'REGION' ? regions : undefined,
-      }),
-    });
-
-    if (!response.ok) {
-      setSubmitting(false);
-      const data = await response.json().catch(() => null);
-      setError(data?.error ?? 'Unable to complete registration. Check your details and try again.');
-      return;
-    }
-    router.push('/login?verification=pending');
-  }
+export default async function RegisterPage({ searchParams }: { searchParams: Promise<{ intent?: string }> }) {
+  const intent = parseIntent((await searchParams).intent);
 
   return (
-    <div className="flex min-h-screen flex-col bg-site-white">
+    <div className="flex min-h-screen flex-col bg-light-grey">
       <SiteHeader />
-      <main className="flex-1 px-6 sm:px-10">
-        <section className="mx-auto max-w-lg pt-16 pb-24">
-          <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-steel-blue">Create an account</p>
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-foundation-navy">Create your Trade Tender account</h1>
-          <p className="mt-3 text-sm leading-relaxed text-concrete-grey">
-            Set up your business to raise tenders and receive relevant tender opportunities.
-          </p>
-
-          <Card className="mt-6">
-            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-              <div className="grid gap-5 sm:grid-cols-2">
-                <FieldGroup>
-                  <Label htmlFor="firstName">First name</Label>
-                  <Input id="firstName" name="firstName" required autoComplete="given-name" />
-                </FieldGroup>
-                <FieldGroup>
-                  <Label htmlFor="lastName">Last name</Label>
-                  <Input id="lastName" name="lastName" required autoComplete="family-name" />
-                </FieldGroup>
-              </div>
-              <FieldGroup>
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" name="email" type="email" required autoComplete="email" />
-              </FieldGroup>
-              <FieldGroup>
-                <Label htmlFor="contactPhone">Phone (optional)</Label>
-                <Input id="contactPhone" name="contactPhone" autoComplete="tel" />
-              </FieldGroup>
-              <FieldGroup>
-                <Label htmlFor="password">Password</Label>
-                <PasswordInput id="password" name="password" minLength={10} required autoComplete="new-password" />
-                <p className="text-xs text-concrete-grey">Use 10-200 characters, including a capital letter and a special character.</p>
-              </FieldGroup>
-              <FieldGroup>
-                <Label htmlFor="companyName">Company name</Label>
-                <Input id="companyName" name="companyName" required autoComplete="organization" />
-              </FieldGroup>
-              <FieldGroup>
-                <Label htmlFor="companyType">Company type</Label>
-                <select id="companyType" name="companyType" required defaultValue="LIMITED_COMPANY" className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm">
-                  {COMPANY_TYPES.map((type) => (
-                    <option key={type} value={type}>{COMPANY_TYPE_LABELS[type]}</option>
-                  ))}
-                </select>
-              </FieldGroup>
-              <FieldGroup>
-                <Label htmlFor="branchIdentifier">Branch or location</Label>
-                <Input id="branchIdentifier" name="branchIdentifier" required placeholder="e.g. Leeds branch or Head Office" />
-                <p className="text-xs text-concrete-grey">This distinguishes businesses with the same company name.</p>
-              </FieldGroup>
-
-              <fieldset className="flex flex-col gap-2">
-                    <legend className="text-sm font-semibold text-foundation-navy">Categories you provide</legend>
-                    <p className="text-xs text-concrete-grey">These categories determine which tender opportunities are matched to you.</p>
-                    {SERVICE_NAMES.map((category) => (
-                      <label key={category} className="flex items-center gap-3 text-sm text-concrete-grey">
-                        <input type="checkbox" name="categories" value={category} checked={services.includes(category)} onChange={() => setServices((current) => {
-                          const nextServices = current.includes(category) ? current.filter((service) => service !== category) : [...current, category];
-                          setServiceProvisions((provisions) => provisions.filter((entry) => nextServices.includes(entry.split('::')[0] ?? '')));
-                          return nextServices;
-                        })} className="h-4 w-4 accent-safety-amber" />
-                        {category}
-                      </label>
-                    ))}
-                  </fieldset>
-                  {services.map((service) => (
-                    <fieldset key={service} className="flex flex-col gap-2">
-                      <legend className="text-sm font-semibold text-foundation-navy">{service} provisions (optional)</legend>
-                      <p className="text-xs text-concrete-grey">Select the areas your business provides to refine your profile.</p>
-                      {Object.keys(SERVICE_CATALOG[service as keyof typeof SERVICE_CATALOG]).map((provision) => {
-                        const value = `${service}::${provision}`;
-                        return <label key={value} className="flex items-center gap-3 text-sm text-concrete-grey"><input type="checkbox" checked={serviceProvisions.includes(value)} onChange={() => setServiceProvisions((current) => current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value])} className="h-4 w-4 accent-safety-amber" />{provision}</label>;
-                      })}
-                    </fieldset>
-                  ))}
-                  <FieldGroup>
-                    <Label htmlFor="coverageScope">Operating area</Label>
-                    <div className="flex flex-wrap gap-4">
-                      {(['COUNTY', 'REGION', 'UK'] as const).map((scope) => (
-                        <label key={scope} className="flex items-center gap-2 text-sm text-concrete-grey">
-                          <input
-                            type="radio"
-                            name="coverageScope"
-                            checked={coverageScope === scope}
-                            onChange={() => setCoverageScope(scope)}
-                            className="h-4 w-4 accent-safety-amber"
-                          />
-                          {scope === 'COUNTY' ? 'Select counties' : scope === 'REGION' ? 'Select regions' : 'UK-wide (all regions)'}
-                        </label>
-                      ))}
-                    </div>
-                    <p className="text-xs text-concrete-grey">A tender is matched to you only when its location falls inside the service areas you select here.</p>
-                  </FieldGroup>
-                  {coverageScope === 'COUNTY' && (
-                    <FieldGroup>
-                      <Label htmlFor="counties">Service areas (counties)</Label>
-                      <MultiSelectDropdown
-                        options={UK_COUNTIES.map((county) => ({ label: county, value: county }))}
-                        selected={counties}
-                        onChange={setCounties}
-                        placeholder="Select one or more counties"
-                      />
-                    </FieldGroup>
-                  )}
-                  {coverageScope === 'REGION' && (
-                    <FieldGroup>
-                      <Label htmlFor="regions">Service areas (regions)</Label>
-                      <MultiSelectDropdown
-                        options={UK_REGIONS.map((region) => ({ label: region, value: region }))}
-                        selected={regions}
-                        onChange={setRegions}
-                        placeholder="Select one or more regions"
-                      />
-                    </FieldGroup>
-                  )}
-              <label className="flex items-start gap-3 text-sm text-concrete-grey">
-                <input type="checkbox" name="termsAccepted" required className="mt-1 h-4 w-4 accent-safety-amber" />
-                I accept the <Link href="/policies/platform-terms" className="font-semibold text-steel-blue underline underline-offset-4">Trade Tender Terms of Use</Link>.
-              </label>
-              <label className="flex items-start gap-3 text-sm text-concrete-grey">
-                <input type="checkbox" name="privacyAccepted" required className="mt-1 h-4 w-4 accent-safety-amber" />
-                I acknowledge the <Link href="/policies/privacy" className="font-semibold text-steel-blue underline underline-offset-4">Privacy Policy</Link>.
-              </label>
-
-              {error && (
-                <p role="alert" className="text-sm font-semibold text-attention">
-                  {error}
-                </p>
-              )}
-
-              <Button type="submit" loading={submitting} size="lg" className="mt-2">
-                Create account
-              </Button>
-            </form>
-          </Card>
-        </section>
+      <main id="main-content" className="flex-1 px-6 sm:px-10">
+        <RegisterForm initialIntent={intent} />
       </main>
       <SiteFooter />
     </div>

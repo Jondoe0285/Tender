@@ -266,7 +266,7 @@ export default function App() {
       <View style={styles.content}>
         <Text style={styles.eyebrow}>Native mobile client</Text>
         <Text style={styles.title}>Trade Tender</Text>
-        <Text style={styles.description}>Connect. Compare. Construct.</Text>
+        <Text style={styles.description}>Specify. Compare. Award.</Text>
         {session ? (
           <View style={styles.form}>
             <Text style={styles.label}>{session.email}</Text>

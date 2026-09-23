@@ -8,11 +8,8 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Input, Label, Textarea, FieldGroup } from '@/components/ui/Field';
-import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
-import { CATEGORIES } from '@/lib/categories';
 import { COMPANY_TYPE_LABELS, COMPANY_TYPES } from '@/lib/companyTypes';
 import { independentReviewTierDescription } from '@/lib/independentReviewTiers';
-import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 
 type TeamMember = {
   id: string;
@@ -146,17 +143,17 @@ export default function RetailerProfilePage() {
       <div className="mx-auto max-w-4xl space-y-6">
         {message && <p role="status" className="rounded-lg border border-steel-blue/20 bg-steel-blue/5 px-4 py-3 text-sm text-steel-blue">{message}</p>}
         {profile.verificationEligible && (
-          <Card className="border-l-4 border-safety-amber bg-amber-50/40">
+          <Card>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="font-heading text-lg font-bold text-foundation-navy">Provider verification</p>
                 <p className="mt-1 max-w-xl text-sm text-concrete-grey">
-                  {profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business is Sole trader AI Verified based on your uploaded self-employment evidence. This is shown to Contractors on every quote you submit.'}
-                  {profile.isSoleTrader && profile.verificationStatus !== 'VERIFIED' && 'Your profile is marked as a sole trader. Upload self-employment evidence to become AI verified; until then your quotes show a Sole Trader status so Contractors can complete suitable checks.'}
-                  {!profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business is Incorporated AI Verified based on your Certificate of Incorporation and required service evidence. This is shown to Contractors on every quote you submit.'}
-                  {profile.verificationStatus === 'PENDING' && 'Your verification request is under review. We will update your status once it has been checked.'}
-                  {profile.verificationStatus === 'REJECTED' && 'Your last verification request was not approved. You can request verification again at any time.'}
-                  {profile.verificationStatus === 'EXPIRED' && 'One or more of your verification documents have expired, so your verified status has been removed. Upload a replacement to restart the review.'}
+                  {profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business has passed sole trader automated assessment based on your uploaded self-employment evidence. This is shown to Contractors on every quote you submit.'}
+                  {profile.isSoleTrader && profile.verificationStatus !== 'VERIFIED' && 'Your profile is marked as a sole trader. Upload self-employment evidence to become eligible for automated verification; until then your quotes show a Sole Trader status so buyers can complete suitable checks.'}
+                  {!profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business has passed incorporated automated assessment based on your Certificate of Incorporation and required service evidence. This is shown to Contractors on every quote you submit.'}
+                  {profile.verificationStatus === 'PENDING' && 'Your verification request is still marked pending.'}
+                  {profile.verificationStatus === 'REJECTED' && 'Automated assessment could not confirm your documents. Upload text PDFs and submit again.'}
+                  {profile.verificationStatus === 'EXPIRED' && 'One or more of your verification documents have expired, so your verified status has been removed. Upload a replacement PDF to restart verification.'}
                   {!profile.isSoleTrader && profile.verificationStatus === 'UNVERIFIED' && 'Materials, Waste, Plant Hire, Contractor Services, and Professional Services providers can complete a verification check. Verified status is shown to Contractors on every quote you submit.'}
                 </p>
               </div>
@@ -211,36 +208,26 @@ export default function RetailerProfilePage() {
               <FieldGroup wide><Label htmlFor="address">Registered or trading address</Label><Textarea id="address" rows={3} value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></FieldGroup>
               <FieldGroup><Label htmlFor="standardQuoteValidityDays">Standard quote validity (days)</Label><Input id="standardQuoteValidityDays" type="number" min="1" max="365" step="1" value={form.standardQuoteValidityDays} onChange={(event) => setForm({ ...form, standardQuoteValidityDays: Number(event.target.value) })} /><p className="mt-1 text-xs text-concrete-grey">Applied automatically to every quote you submit and shown to the purchasing Client.</p></FieldGroup>
               <FieldGroup wide>
-                <Label htmlFor="coverageScope">Operating area</Label>
-                <div className="flex flex-wrap gap-4">
-                  {(['COUNTY', 'REGION', 'UK'] as const).map((scope) => (
-                    <label key={scope} className="flex items-center gap-2 text-sm text-concrete-grey">
-                      <input type="radio" name="coverageScope" checked={form.coverageScope === scope} onChange={() => setForm({ ...form, coverageScope: scope })} className="h-4 w-4 accent-safety-amber" />
-                      {scope === 'COUNTY' ? 'Select counties' : scope === 'REGION' ? 'Select regions' : 'UK-wide (all regions)'}
-                    </label>
-                  ))}
-                </div>
-                <p className="mt-1 text-xs text-concrete-grey">A tender is matched to you only when its postcode falls inside the area you select here.</p>
+                <Label>Matching coverage and services</Label>
+                <p className="text-sm text-concrete-grey">Services, provisions, and operating locations used for tender matching are edited on your <Link href="/user/profile" className="font-semibold text-trade-blue hover:text-foundation-navy">company profile</Link>.</p>
+                <p className="mt-2 text-sm font-semibold text-foundation-navy">{form.coverageScope === 'UK' ? 'UK-wide (all regions)' : form.coverageScope === 'REGION' ? (form.regions.join(', ') || 'Not configured') : (form.counties.join(', ') || 'Not configured')}</p>
+                <p className="mt-1 text-sm text-concrete-grey">{form.categories.join(', ') || 'No supplying services configured'}</p>
               </FieldGroup>
-              {form.coverageScope === 'COUNTY' && (
-                <FieldGroup><Label htmlFor="counties">Operational counties</Label><MultiSelectDropdown options={UK_COUNTIES.map((county) => ({ label: county, value: county }))} selected={form.counties} onChange={(counties) => setForm({ ...form, counties })} placeholder="Select one or more counties" /></FieldGroup>
-              )}
-              {form.coverageScope === 'REGION' && (
-                <FieldGroup><Label htmlFor="regions">Operational regions</Label><MultiSelectDropdown options={UK_REGIONS.map((region) => ({ label: region, value: region }))} selected={form.regions} onChange={(regions) => setForm({ ...form, regions })} placeholder="Select one or more regions" /></FieldGroup>
-              )}
-              <FieldGroup><Label htmlFor="categories">Services provided</Label><MultiSelectDropdown options={Object.keys(CATEGORIES).map((category) => ({ label: category, value: category }))} selected={form.categories} onChange={(categories) => setForm({ ...form, categories })} placeholder="Select service categories" /><p className="mt-1 text-xs font-semibold text-safety-amber">Note: Modifying your services or company type resets your AI verification and enhanced verification statuses due to new legal and compliance requirements for the updated service scope.</p></FieldGroup>
               <FieldGroup><Label htmlFor="masterUserId">Master user</Label><select id="masterUserId" value={form.masterUserId} onChange={(event) => setForm({ ...form, masterUserId: event.target.value })} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm"><option value="">Select a team member</option>{teamMembers.map((member) => <option key={member.userId} value={member.userId}>{member.user.contactName} ({member.user.email})</option>)}</select></FieldGroup>
               <div className="flex items-end gap-3 sm:col-span-2"><Button variant="secondary" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button><Button onClick={saveProfile} loading={saving}>Save profile</Button></div>
             </div>
           ) : (
-            <dl className="mt-6 grid gap-5 sm:grid-cols-2"><ProfileValue label="Company name" value={profile.companyName} /><ProfileValue label="Company number" value={profile.companyNumber ?? 'Not provided'} /><ProfileValue label="Company type" value={COMPANY_TYPE_LABELS[profile.companyType] ?? 'Limited company'} /><ProfileValue label="Address" value={profile.address ?? 'Not provided'} wide /><ProfileValue label="Standard quote validity" value={`${profile.standardQuoteValidityDays} days`} /><ProfileValue label="Operating area" value={profile.coverageScope === 'UK' ? 'UK-wide (all regions)' : profile.coverageScope === 'REGION' ? (profile.regions || 'Not configured') : (profile.counties || 'Not configured')} /><ProfileValue label="Services provided" value={profile.categories || 'Not configured'} /><ProfileValue label="Master user" value={teamMembers.find((member) => member.userId === profile.masterUserId)?.user.email ?? 'Not assigned'} /></dl>
+            <>
+              <dl className="mt-6 grid gap-5 sm:grid-cols-2"><ProfileValue label="Company name" value={profile.companyName} /><ProfileValue label="Company number" value={profile.companyNumber ?? 'Not provided'} /><ProfileValue label="Company type" value={COMPANY_TYPE_LABELS[profile.companyType] ?? 'Limited company'} /><ProfileValue label="Address" value={profile.address ?? 'Not provided'} wide /><ProfileValue label="Standard quote validity" value={`${profile.standardQuoteValidityDays} days`} /><ProfileValue label="Operating area" value={profile.coverageScope === 'UK' ? 'UK-wide (all regions)' : profile.coverageScope === 'REGION' ? (profile.regions || 'Not configured') : (profile.counties || 'Not configured')} /><ProfileValue label="Services provided" value={profile.categories || 'Not configured'} /><ProfileValue label="Master user" value={teamMembers.find((member) => member.userId === profile.masterUserId)?.user.email ?? 'Not assigned'} /></dl>
+              <p className="mt-4 text-sm text-concrete-grey">Edit services, provisions, and operating locations on your <Link href="/user/profile" className="font-semibold text-trade-blue hover:text-foundation-navy">company profile</Link>.</p>
+            </>
           )}
         </Card>
 
         <Card>
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5"><div><h2 className="font-heading text-xl font-bold text-foundation-navy">Team access</h2><p className="mt-1 text-sm text-concrete-grey">Add colleagues and control what they can view, edit, or pay for.</p></div><Button variant="secondary" onClick={() => setAdding((value) => !value)}>{adding ? 'Close' : 'Add team member'}</Button></div>
-          {adding && <div className="mt-6 rounded-lg border-l-4 border-safety-amber bg-amber-50/50 p-4"><div className="grid gap-4 sm:grid-cols-2"><FieldGroup><Label htmlFor="teamEmail">Existing user email</Label><Input id="teamEmail" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="The user must register first" /></FieldGroup><fieldset><legend className="text-sm font-semibold text-foundation-navy">Permissions</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{permissions.map((permission) => <label key={permission.value} className="flex items-center gap-2 text-sm text-concrete-grey"><input type="checkbox" checked={newPermissions.includes(permission.value)} onChange={() => setNewPermissions((current) => current.includes(permission.value) ? current.filter((item) => item !== permission.value) : [...current, permission.value])} className="h-4 w-4 accent-safety-amber" />{permission.label}</label>)}</div></fieldset></div><Button className="mt-4" onClick={addTeamMember} loading={saving} disabled={!email}>Add member</Button></div>}
-          <div className="mt-6 divide-y divide-slate-100">{teamMembers.length === 0 ? <p className="py-8 text-sm text-concrete-grey">No additional users have access to this provider space.</p> : teamMembers.map((member) => { const isMaster = profile.masterUserId === member.userId; return <div key={member.id} className="py-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold text-foundation-navy">{member.user.contactName}{isMaster && <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-steel-blue">Master user</span>}</p><p className="text-sm text-concrete-grey">{member.user.email}</p></div>{!isMaster && <Button variant="danger" size="md" onClick={() => removeTeamMember(member)}>Remove</Button>}</div>{!isMaster && <div className="mt-3 flex flex-wrap gap-3">{permissions.map((permission) => <label key={permission.value} className="flex items-center gap-2 text-sm text-concrete-grey"><input type="checkbox" checked={member.permissions.split(',').includes(permission.value)} onChange={() => updatePermissions(member, permission.value)} className="h-4 w-4 accent-safety-amber" />{permission.label}</label>)}</div>}</div> })}</div>
+          {adding && <div className="mt-6 rounded-md border border-slate-200 bg-slate-50 p-4"><div className="grid gap-4 sm:grid-cols-2"><FieldGroup><Label htmlFor="teamEmail">Existing user email</Label><Input id="teamEmail" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="The user must register first" /></FieldGroup><fieldset><legend className="text-sm font-semibold text-foundation-navy">Permissions</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{permissions.map((permission) => <label key={permission.value} className="flex items-center gap-2 text-sm text-concrete-grey"><input type="checkbox" checked={newPermissions.includes(permission.value)} onChange={() => setNewPermissions((current) => current.includes(permission.value) ? current.filter((item) => item !== permission.value) : [...current, permission.value])} className="h-4 w-4 accent-trade-blue" />{permission.label}</label>)}</div></fieldset></div><Button className="mt-4" onClick={addTeamMember} loading={saving} disabled={!email}>Add member</Button></div>}
+          <div className="mt-6 divide-y divide-slate-100">{teamMembers.length === 0 ? <p className="py-8 text-sm text-concrete-grey">No additional users have access to this provider space.</p> : teamMembers.map((member) => { const isMaster = profile.masterUserId === member.userId; return <div key={member.id} className="py-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold text-foundation-navy">{member.user.contactName}{isMaster && <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-steel-blue">Master user</span>}</p><p className="text-sm text-concrete-grey">{member.user.email}</p></div>{!isMaster && <Button variant="danger" size="md" onClick={() => removeTeamMember(member)}>Remove</Button>}</div>{!isMaster && <div className="mt-3 flex flex-wrap gap-3">{permissions.map((permission) => <label key={permission.value} className="flex items-center gap-2 text-sm text-concrete-grey"><input type="checkbox" checked={member.permissions.split(',').includes(permission.value)} onChange={() => updatePermissions(member, permission.value)} className="h-4 w-4 accent-trade-blue" />{permission.label}</label>)}</div>}</div> })}</div>
         </Card>
       </div>
     </AppShell>
