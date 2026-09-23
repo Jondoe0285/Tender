@@ -1,4 +1,5 @@
 import { prisma } from '@/server/data/prisma';
+import { deleteStoredTenderAttachment } from '@/server/storage/tenderAttachmentStore';
 
 export const UNPURCHASED_QUOTE_RETENTION_DAYS = 30;
 export const PURCHASED_DOCUMENT_RETENTION_YEARS = 5;
@@ -51,7 +52,7 @@ export async function purgeExpiredUnpurchasedQuotes(now = new Date()): Promise<{
 
   const attachments = await prisma.tenderAttachment.findMany({
     where: expiredAttachmentPurgeWhere(cutoff),
-    select: { id: true, fileName: true, tenderId: true, uploadedAt: true },
+    select: { id: true, fileName: true, tenderId: true, uploadedAt: true, objectKey: true },
   });
 
   const tokenCutoff = getCutoff(EXPIRED_AUTH_TOKEN_RETENTION_DAYS, now);
@@ -70,6 +71,7 @@ export async function purgeExpiredUnpurchasedQuotes(now = new Date()): Promise<{
       });
     }
     for (const attachment of attachments) {
+      await deleteStoredTenderAttachment(attachment.objectKey);
       await transaction.tenderAttachment.delete({ where: { id: attachment.id } });
       await transaction.auditLog.create({
         data: {

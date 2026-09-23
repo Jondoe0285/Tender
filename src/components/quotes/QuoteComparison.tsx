@@ -72,6 +72,7 @@ type QuoteComparisonProps = {
   pendingPayment: { quoteId: string; paymentId: string } | null;
   pendingCheckoutUrl?: string | null;
   busyQuoteId: string | null;
+  canAward?: boolean;
   onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string, purchaseOrderNumber?: string) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
@@ -83,6 +84,7 @@ export function QuoteComparison({
   pendingPayment,
   pendingCheckoutUrl,
   busyQuoteId,
+  canAward = true,
   onAccept,
   onSimulateReleasePayment,
   onLoadContact,
@@ -177,6 +179,7 @@ export function QuoteComparison({
                 contact={contacts[quote.id]}
                 isPendingPayment={pendingPayment?.quoteId === quote.id}
                 busy={busyQuoteId === quote.id}
+                canAward={canAward}
                 onAccept={onAccept}
                 onSimulateReleasePayment={onSimulateReleasePayment}
                 pendingCheckoutUrl={pendingCheckoutUrl}
@@ -197,6 +200,7 @@ export function QuoteComparison({
             contact={contacts[quote.id]}
             isPendingPayment={pendingPayment?.quoteId === quote.id}
             busy={busyQuoteId === quote.id}
+            canAward={canAward}
             onAccept={onAccept}
             onSimulateReleasePayment={onSimulateReleasePayment}
             pendingCheckoutUrl={pendingCheckoutUrl}
@@ -243,6 +247,7 @@ function QuoteRow({
   contact,
   isPendingPayment,
   busy,
+  canAward,
   onAccept,
   onSimulateReleasePayment,
   onLoadContact,
@@ -276,6 +281,7 @@ function QuoteRow({
           contact={contact}
           isPendingPayment={isPendingPayment}
           busy={busy}
+          canAward={canAward}
           onAccept={onAccept}
           onSimulateReleasePayment={onSimulateReleasePayment}
           onLoadContact={onLoadContact}
@@ -293,6 +299,7 @@ function QuoteCard({
   contact,
   isPendingPayment,
   busy,
+  canAward,
   onAccept,
   onSimulateReleasePayment,
   onLoadContact,
@@ -324,6 +331,7 @@ function QuoteCard({
           contact={contact}
           isPendingPayment={isPendingPayment}
           busy={busy}
+          canAward={canAward}
           onAccept={onAccept}
           onSimulateReleasePayment={onSimulateReleasePayment}
           onLoadContact={onLoadContact}
@@ -341,6 +349,7 @@ type QuoteRowProps = {
   contact?: Contact;
   isPendingPayment: boolean;
   busy: boolean;
+  canAward: boolean;
   onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string, purchaseOrderNumber?: string) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
@@ -424,6 +433,7 @@ function DecisionActions({
   contact,
   isPendingPayment,
   busy,
+  canAward,
   onAccept,
   onSimulateReleasePayment,
   onLoadContact,
@@ -433,6 +443,7 @@ function DecisionActions({
   contact?: Contact;
   isPendingPayment: boolean;
   busy: boolean;
+  canAward: boolean;
   onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string, purchaseOrderNumber?: string) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
@@ -444,6 +455,9 @@ function DecisionActions({
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState('');
 
   if (quote.status === 'SUBMITTED') {
+    if (!canAward) {
+      return <p className="text-sm text-foundation-navy">A Buyer on this organisation must accept this quote.</p>;
+    }
     const requiresDeclaration = quote.providerVerificationStatus === 'VERIFIED' || quote.independentlyVerified;
     const feeLabel = quote.releaseFeeMode === 'PERCENTAGE'
       ? `Calculated platform charge: £${quote.releaseFeeGbp} excl. VAT (${quote.releaseFeeMode.toLowerCase()} of quote)`
@@ -497,6 +511,9 @@ function DecisionActions({
     );
   }
   if (quote.status === 'ACCEPTED' && isPendingPayment) {
+    if (!canAward) {
+      return <p className="text-sm text-foundation-navy">Waiting for a Buyer to complete the release payment.</p>;
+    }
     if (pendingCheckoutUrl) {
       return <a href={pendingCheckoutUrl} className="inline-flex min-h-11 items-center justify-center rounded-md bg-trade-blue px-5 text-sm font-semibold text-site-white hover:bg-trade-blue/90">Continue payment</a>;
     }

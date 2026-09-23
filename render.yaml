@@ -6,6 +6,9 @@
 # Values marked `sync: false` are secrets or per-environment settings: set them in the Render
 # dashboard, never in git. See README "Environment origins" for the NEXTAUTH_URL of each service.
 # Database persistence is provided by Neon Lakebase Postgres, not a Render-managed database.
+# Document files use ATTACHMENT_STORE_DIR (local default data/attachments). A Render
+# persistent disk can be attached later: Starter or higher, mount /var/data, then set
+# ATTACHMENT_STORE_DIR=/var/data/documents. Disks are not available on free instances.
 
 services:
   - type: web
@@ -25,6 +28,9 @@ services:
         value: production
       - key: TRUSTED_CLIENT_IP_HEADER
         value: x-real-ip
+      # Real Owner mailbox for MFA enrollment. Do not use example.test on staging or production.
+      - key: PLATFORM_OWNER_EMAIL
+        sync: false
       # Production must point at its own database, never the staging instance.
       - key: DATABASE_URL
         sync: false
@@ -89,6 +95,9 @@ services:
         value: production
       - key: TRUSTED_CLIENT_IP_HEADER
         value: x-real-ip
+      # Real Owner mailbox for MFA enrollment. Do not use example.test on staging or production.
+      - key: PLATFORM_OWNER_EMAIL
+        sync: false
       # Staging must point at its Neon staging database or branch.
       - key: DATABASE_URL
         sync: false

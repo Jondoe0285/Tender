@@ -49,9 +49,14 @@ test('accept, four-eyes, masking, conversion, and measured units are wired', () 
   assert.match(waivers, /proposeWaiverGrant/);
   assert.match(controls, /proposedById === confirmerId/);
   assert.match(ops, /maskEmail/);
+  assert.match(ops, /ownersWithoutMfa/);
+  assert.match(ops, /isAssignablePlatformOwnerEmail/);
   assert.match(table, /maskEmail\(account\.email\)/);
   assert.match(dashboard, /ConversionFunnel/);
   assert.match(compiler, /MEASURED_CONTRACTOR_UNITS/);
+  assert.match(readFileSync('src/components/admin/OpsExceptionBoard.tsx', 'utf8'), /Owner MFA/);
+  assert.match(readFileSync('render.yaml', 'utf8'), /PLATFORM_OWNER_EMAIL/);
+  assert.match(readFileSync('prisma/seed.ts', 'utf8'), /isAssignablePlatformOwnerEmail/);
 });
 
 test('contractor measured quantity passes the tender schema', () => {

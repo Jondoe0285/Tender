@@ -7,15 +7,9 @@ import { useSession } from 'next-auth/react';
 import { AccountControls } from '@/components/layout/AccountControls';
 import { TradeTenderLogo } from '@/components/layout/TradeTenderLogo';
 import { SiteFooter } from '@/components/layout/SiteFooter';
-import { USER_NAV, SUPER_USER_NAV, ACCOUNTANT_NAV, type NavGroup } from '@/lib/navigation';
+import { SUPER_USER_NAV, ACCOUNTANT_NAV, userNavForCapabilities, type NavGroup } from '@/lib/navigation';
 
 type Role = 'client' | 'retailer' | 'super-user';
-
-const navByRole: Record<Role, NavGroup[]> = {
-  client: USER_NAV,
-  retailer: USER_NAV,
-  'super-user': SUPER_USER_NAV,
-};
 
 const roleLabels: Record<Role, string> = {
   client: 'Workspace',
@@ -46,7 +40,7 @@ function SidebarNav({ groups, activeHref, unreadOpportunityCount, onNavigate }: 
       {groups.map((group, index) => (
         <div key={group.label ?? `group-${index}`} className="flex flex-col gap-0.5">
           {group.label && (
-            <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-site-white/40">{group.label}</p>
+            <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-site-white">{group.label}</p>
           )}
           {group.items.map((item) => {
             const active = item.href === activeHref;
@@ -84,11 +78,13 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
   const { data: session, update } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [unreadOpportunityCount, setUnreadOpportunityCount] = useState(0);
+  const [canRaiseTender, setCanRaiseTender] = useState(true);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const isOwner = Boolean(session?.user?.isOwner);
   const isAccountant = Boolean(session?.user?.isAccountant);
-  const baseGroups = role === 'super-user' && isAccountant ? ACCOUNTANT_NAV : navByRole[role];
+  const workspaceNav = userNavForCapabilities(canRaiseTender);
+  const baseGroups = role === 'super-user' && isAccountant ? ACCOUNTANT_NAV : role === 'super-user' ? SUPER_USER_NAV : workspaceNav;
   const groups = baseGroups
     .map((group) => ({ ...group, items: group.items.filter((item) => !item.ownerOnly || isOwner) }))
     .filter((group) => group.items.length > 0);
@@ -101,6 +97,12 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
       .then((response) => response.ok ? response.json() : null)
       .then((data: { count?: number } | null) => setUnreadOpportunityCount(data?.count ?? 0))
       .catch(() => setUnreadOpportunityCount(0));
+    fetch('/api/user/capabilities')
+      .then((response) => response.ok ? response.json() : null)
+      .then((data: { canRaiseTender?: boolean } | null) => {
+        if (typeof data?.canRaiseTender === 'boolean') setCanRaiseTender(data.canRaiseTender);
+      })
+      .catch(() => setCanRaiseTender(true));
   }, [role, session?.user?.role]);
 
   async function switchWorkspace(event: React.ChangeEvent<HTMLSelectElement>) {
@@ -196,7 +198,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
                 type="button"
                 aria-label="Close navigation"
                 onClick={() => setMobileOpen(false)}
-                className="rounded-md p-2 text-site-white/80 hover:bg-white/10"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-md text-site-white/80 hover:bg-white/10"
               >
                 &#10005;
               </button>
@@ -216,7 +218,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
               aria-controls="mobile-navigation-drawer"
               ref={menuButtonRef}
               onClick={() => setMobileOpen(true)}
-              className="rounded-md p-2 text-foundation-navy hover:bg-slate-100 md:hidden"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-md text-foundation-navy hover:bg-slate-100 md:hidden"
             >
               &#9776;
             </button>

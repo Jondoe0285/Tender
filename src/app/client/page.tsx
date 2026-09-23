@@ -8,7 +8,8 @@ import { prisma } from '@/server/data/prisma';
 import { getCompanyMemberIds, listMatchedSummariesForRetailer } from '@/server/domain/tenderService';
 import { WorkQueue, type WorkQueueItem } from '@/components/work/WorkQueue';
 import { hydrateEnterpriseRecords } from '@/server/domain/enterpriseRecordRepair';
-import { buyingTenderNewPath, buyingTenderPath, buyingTendersPath } from '@/lib/workspace-paths';
+import { getBuyerCapabilities } from '@/server/domain/workspacePermissions';
+import { buyingTenderNewPath, buyingTenderPath, buyingTendersPath, supplyingTenderPath } from '@/lib/workspace-paths';
 
 export default async function ClientPage() {
   const user = await getCurrentUser();
@@ -16,7 +17,7 @@ export default async function ClientPage() {
 
   const memberIds = await getCompanyMemberIds(user.id);
   await hydrateEnterpriseRecords(memberIds);
-  const [openTenders, awardedCount, quotesReceivedCount, quotesToReview, matches, unlocks, submittedQuotes] = await Promise.all([
+  const [openTenders, awardedCount, quotesReceivedCount, quotesToReview, matches, unlocks, submittedQuotes, capabilities] = await Promise.all([
     prisma.tender.findMany({
       where: { clientId: { in: memberIds }, status: 'OPEN' },
       orderBy: { closingDate: 'asc' },
@@ -40,6 +41,7 @@ export default async function ClientPage() {
       orderBy: { submittedAt: 'desc' },
       take: 8,
     }),
+    getBuyerCapabilities(user.id),
   ]);
 
   const unlockedIds = new Set(unlocks.map((unlock) => unlock.tenderId));
@@ -76,7 +78,7 @@ export default async function ClientPage() {
       .filter(({ tender, viewedAt }) => !unlockedIds.has(tender.id) && !viewedAt)
       .slice(0, 5)
       .map(({ tender }) => ({
-        href: `/retailer/tenders/${tender.id}`,
+        href: supplyingTenderPath(tender.id),
         reference: tender.reference,
         title: tender.category,
         due: tender.closingDate.toLocaleDateString('en-GB'),
@@ -87,7 +89,7 @@ export default async function ClientPage() {
       .filter(({ tender }) => unlockedIds.has(tender.id) && !quotedTenderIds.has(tender.id))
       .slice(0, 5)
       .map(({ tender }) => ({
-        href: `/retailer/tenders/${tender.id}`,
+        href: supplyingTenderPath(tender.id),
         reference: tender.reference,
         title: tender.category,
         due: tender.closingDate.toLocaleDateString('en-GB'),
@@ -95,7 +97,7 @@ export default async function ClientPage() {
         status: 'pending' as const,
       })),
     ...submittedQuotes.slice(0, 5).map((quote) => ({
-      href: `/retailer/tenders/${quote.tenderId}`,
+      href: supplyingTenderPath(quote.tenderId),
       reference: quote.tender.reference,
       title: quote.tender.subcategory,
       due: quote.tender.closingDate.toLocaleDateString('en-GB'),
@@ -110,7 +112,7 @@ export default async function ClientPage() {
         <PageHeader
           kicker="This week"
           description="Review quotes that are waiting, then quote the matches you have unlocked."
-          actions={<LinkButton href={buyingTenderNewPath()}>Create tender</LinkButton>}
+          actions={capabilities.canRaiseTender ? <LinkButton href={buyingTenderNewPath()}>Create tender</LinkButton> : undefined}
         />
 
         <div className="mb-8 grid grid-cols-2 gap-x-8 gap-y-4 border-b border-slate-200 pb-5 sm:grid-cols-4">
@@ -123,9 +125,9 @@ export default async function ClientPage() {
         <WorkQueue
           title="This week"
           items={[...buyingQueue, ...supplyingQueue].slice(0, 8)}
-          emptyLabel="Nothing waiting on you. Raise a tender or keep your supplying profile current."
-          emptyHref={buyingTenderNewPath()}
-          emptyAction="Raise a tender"
+          emptyLabel={capabilities.canRaiseTender ? 'Nothing waiting on you. Raise a tender or keep your supplying profile current.' : 'Nothing waiting on you.'}
+          emptyHref={capabilities.canRaiseTender ? buyingTenderNewPath() : '/user/profile'}
+          emptyAction={capabilities.canRaiseTender ? 'Raise a tender' : 'Update profile'}
         />
 
         <section className="mb-10">
@@ -137,9 +139,9 @@ export default async function ClientPage() {
           <WorkQueue
             title="Buying queue"
             items={buyingQueue}
-            emptyLabel="No open buying work. Raise a specified package to start receiving quotes."
-            emptyHref={buyingTenderNewPath()}
-            emptyAction="Raise your first tender"
+            emptyLabel={capabilities.canRaiseTender ? 'No open buying work. Raise a specified package to start receiving quotes.' : 'No open buying work. A Buyer or QS / estimator on this organisation can raise a package.'}
+            emptyHref={capabilities.canRaiseTender ? buyingTenderNewPath() : undefined}
+            emptyAction={capabilities.canRaiseTender ? 'Raise your first tender' : undefined}
           />
         </section>
 

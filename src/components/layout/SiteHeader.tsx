@@ -14,11 +14,11 @@ export function SiteHeader() {
             <TradeTenderLogo />
           </Link>
           <nav className="hidden items-center gap-6 text-sm font-semibold text-foundation-navy md:flex" aria-label="Marketing">
-            <Link href={{ pathname: '/', hash: 'how-it-works' }} className="hover:text-trade-blue">How it works</Link>
+            <Link href="/#how-it-works" className="hover:text-trade-blue">How it works</Link>
             <Link href="/security" className="hover:text-trade-blue">Security</Link>
             <Link href="/demo" className="hover:text-trade-blue">Request a demo</Link>
-            <Link href={{ pathname: '/', hash: 'buying' }} className="hover:text-trade-blue">Buyers</Link>
-            <Link href={{ pathname: '/', hash: 'supplying' }} className="hover:text-trade-blue">Suppliers</Link>
+            <Link href="/#buying" className="hover:text-trade-blue">Buyers</Link>
+            <Link href="/#supplying" className="hover:text-trade-blue">Suppliers</Link>
           </nav>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">

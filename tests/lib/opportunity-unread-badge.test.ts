@@ -13,8 +13,7 @@ test('User navigation displays an unread tender opportunity count from a protect
   assert.ok(shell.includes("item.href === '/user/opportunities'"));
   assert.ok(shell.includes('unreadOpportunityCount > 99 ? \'99+\' : unreadOpportunityCount'));
   assert.ok(endpoint.includes("requireRole('USER')"));
-  assert.ok(endpoint.includes('listMatchedSummariesForRetailer(user.id)'));
-  assert.ok(endpoint.includes('match.viewedAt === null'));
+  assert.ok(endpoint.includes('countUnreadMatchedOpportunities(user.id)'));
 });
 
 test('Mobile navigation exposes the expanded state to assistive technology', () => {

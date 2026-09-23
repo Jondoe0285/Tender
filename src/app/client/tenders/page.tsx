@@ -10,6 +10,7 @@ import { getCurrentUser } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
 import { getCompanyMemberIds } from '@/server/domain/tenderService';
 import { hydrateEnterpriseRecords } from '@/server/domain/enterpriseRecordRepair';
+import { getBuyerCapabilities } from '@/server/domain/workspacePermissions';
 import { buyingTenderNewPath, buyingTenderPath } from '@/lib/workspace-paths';
 
 export default async function MyTendersPage() {
@@ -18,27 +19,30 @@ export default async function MyTendersPage() {
 
   const memberIds = await getCompanyMemberIds(user.id);
   await hydrateEnterpriseRecords(memberIds);
-  const tenders = await prisma.tender.findMany({
-    where: { clientId: { in: memberIds } },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      _count: { select: { quotes: true, awards: true, packages: true } },
-      project: { select: { name: true } },
-    },
-  });
+  const [tenders, capabilities] = await Promise.all([
+    prisma.tender.findMany({
+      where: { clientId: { in: memberIds } },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: { select: { quotes: true, awards: true, packages: true } },
+        project: { select: { name: true } },
+      },
+    }),
+    getBuyerCapabilities(user.id),
+  ]);
 
   return (
     <AppShell role="client" title="My tenders">
       <div className="mx-auto max-w-6xl">
         <PageHeader
           description="Every package issued for your company, with quote and award counts."
-          actions={<LinkButton href={buyingTenderNewPath()}>Create tender</LinkButton>}
+          actions={capabilities.canRaiseTender ? <LinkButton href={buyingTenderNewPath()}>Create tender</LinkButton> : undefined}
         />
         {tenders.length === 0 ? (
           <EmptyState
             title="No tenders yet"
-            body="Raise a specified package to start receiving comparable quotes. The first tender is the fastest way to see matching suppliers."
-            action={<LinkButton href={buyingTenderNewPath()}>Raise your first tender</LinkButton>}
+            body={capabilities.canRaiseTender ? 'Raise a specified package to start receiving comparable quotes. The first tender is the fastest way to see matching suppliers.' : 'No packages have been issued yet. A Buyer or QS / estimator on this organisation can raise a tender.'}
+            action={capabilities.canRaiseTender ? <LinkButton href={buyingTenderNewPath()}>Raise your first tender</LinkButton> : undefined}
           />
         ) : (
           <DataTable headers={['Reference', 'Project', 'Package', 'Closes', 'Quotes', 'Status']}>

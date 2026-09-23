@@ -553,7 +553,8 @@ model VerificationDocument {
   fileName          String
   mimeType          String
   sizeBytes         Int
-  content           Bytes
+  content           Bytes?
+  objectKey         String?
   expiryDate        DateTime?
   aiConfidencePercent Int?
   aiSummary           String? // Super User visibility only, never returned to the Provider
@@ -682,6 +683,7 @@ model TenderPackage {
 
   @@index([tenderId, status, createdAt])
   @@index([tenderId, packageIndex])
+  @@index([category])
 }
 
 model TenderMessage {
@@ -707,7 +709,7 @@ model TenderAttachment {
   fileName    String
   mimeType    String
   sizeBytes   Int
-  content     Bytes
+  content     Bytes?
   kind        AttachmentKind @default(OTHER)
   version     Int      @default(1)
   packageIndex Int?
@@ -735,6 +737,9 @@ model TenderItem {
   createdAt   DateTime @default(now())
   matches     TenderItemMatch[]
   quoteLines  QuoteLine[]
+
+  @@index([tenderId, packageIndex])
+  @@index([category])
 }
 
 model TenderItemMatch {
@@ -746,6 +751,7 @@ model TenderItemMatch {
   notifiedAt DateTime   @default(now())
 
   @@unique([tenderItemId, retailerId])
+  @@index([retailerId])
 }
 
 model TenderMatch {
@@ -757,6 +763,8 @@ model TenderMatch {
   viewedAt   DateTime?
 
   @@unique([tenderId, retailerId])
+  @@index([retailerId, notifiedAt])
+  @@index([retailerId, viewedAt])
 }
 
 model Unlock {
@@ -771,6 +779,7 @@ model Unlock {
   unlockedAt DateTime     @default(now())
 
   @@unique([tenderId, retailerId])
+  @@index([retailerId])
 }
 
 model Quote {
@@ -797,6 +806,9 @@ model Quote {
   charges      QuoteCharge[]
   legalHolds   LegalHold[] @relation("LegalHoldQuote")
   award        Award?
+
+  @@index([retailerId, submittedAt])
+  @@index([tenderId, status])
 }
 
 model LegalHold {

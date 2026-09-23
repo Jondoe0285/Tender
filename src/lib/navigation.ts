@@ -36,6 +36,15 @@ export const USER_NAV: NavGroup[] = [
   },
 ];
 
+export function userNavForCapabilities(canRaiseTender: boolean): NavGroup[] {
+  return USER_NAV
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.href !== '/user/tenders/new' || canRaiseTender),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
 /** Super User nav: oversee marketplace participants, payments, and configuration. */
 export const SUPER_USER_NAV: NavGroup[] = [
   { label: null, items: [{ label: 'Dashboard', href: '/super-user' }] },

@@ -1,6 +1,18 @@
 import { ForbiddenError } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
-import { type BuyerDuty, canMakeSupplierPayment, hasBuyerDuty } from '@/lib/workspace-duties';
+import { type BuyerDuty, type BuyerWorkspaceCapabilities, canMakeSupplierPayment, capabilitiesFromMembership, hasBuyerDuty } from '@/lib/workspace-duties';
+
+export async function getBuyerCapabilities(userId: string): Promise<BuyerWorkspaceCapabilities> {
+  const membership = await prisma.clientCompanyMember.findUnique({
+    where: { userId },
+    select: { duties: true, company: { select: { primaryUserId: true } } },
+  });
+  if (!membership) return capabilitiesFromMembership(null);
+  return capabilitiesFromMembership({
+    duties: membership.duties,
+    isPrimary: membership.company.primaryUserId === userId,
+  });
+}
 
 export async function assertBuyerDuty(userId: string, duty: BuyerDuty): Promise<void> {
   await assertAnyBuyerDuty(userId, [duty]);

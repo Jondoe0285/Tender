@@ -11,6 +11,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { CATEGORY_NAMES } from '@/lib/categories';
 import { catalogServiceNames, type CategoryCatalog } from '@/lib/catalog';
 import { TenderOpportunityCard, formatOpportunityDeadline, type OpportunityCardData } from '@/components/retailer/TenderOpportunityCard';
+import { supplyingTenderPath } from '@/lib/workspace-paths';
 
 const URGENCY_OPTIONS = ['standard', 'urgent', 'flexible'] as const;
 const SAVED_SEARCHES_KEY = 'tradeTender.retailer.savedSearches.v1';
@@ -198,14 +199,14 @@ export function OpportunitiesExplorer({ opportunities }: { opportunities: Opport
         <>
           <div className="flex flex-col gap-3 md:hidden">
             {filtered.map((item) => (
-              <TenderOpportunityCard key={item.tenderId} data={item} href={`/retailer/tenders/${item.tenderId}`} />
+              <TenderOpportunityCard key={item.tenderId} data={item} href={supplyingTenderPath(item.tenderId)} />
             ))}
           </div>
           <div className="hidden md:block">
             <DataTable headers={['Reference', 'Package', 'Location', 'Closes', 'Match', 'Fee', 'Status']}>
               {filtered.map((item) => {
                 const deadline = formatOpportunityDeadline(item.closingDate);
-                const href = `/retailer/tenders/${item.tenderId}`;
+                const href = supplyingTenderPath(item.tenderId);
                 return (
                   <DataRow key={item.tenderId}>
                     <DataCell strong numeric>

@@ -17,6 +17,7 @@ import { userOwnsTender } from '@/server/domain/tenderService';
 import { issuedTenderSpecHash, STALE_QUOTE_REVISION_MESSAGE } from '@/lib/package-spec';
 import { isValidPurchaseOrderNumber } from '@/lib/enterprise-controls';
 import { assertReleaseSpendCap } from '@/server/domain/purchaseControl';
+import { buyingTenderPath, supplyingTenderPath } from '@/lib/workspace-paths';
 
 type AcceptOutcome = { status: 'PAYMENT_REQUIRED' | 'RELEASED_WITH_CREDIT'; paymentId: string; checkoutUrl: string | null; devMode: boolean; feeGbp: number; vatGbp: number; totalAmountGbp: number; creditsLeft?: number };
 
@@ -180,7 +181,7 @@ export async function acceptQuote(clientId: string, quoteId: string, mobileRetur
   }
   await sendTransactionalEmail(
     quote.retailer.email,
-    quoteAcceptedTemplate({ quoteReference: quote.reference, tenderReference: quote.tender.reference, feeGbp: releaseFeeGbp, paymentPath: `/retailer/tenders/${quote.tenderId}` })
+    quoteAcceptedTemplate({ quoteReference: quote.reference, tenderReference: quote.tender.reference, feeGbp: releaseFeeGbp, paymentPath: supplyingTenderPath(quote.tenderId) })
   ).catch(() => undefined);
   return payment;
 }
@@ -277,7 +278,7 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
           quoteReference: quote.reference,
           tenderReference: quote.tender.reference,
           recipientRole,
-          workspacePath: recipientRole === 'CONTRACTOR' ? `/user/tenders/${quote.tenderId}` : `/retailer/tenders/${quote.tenderId}`,
+          workspacePath: recipientRole === 'CONTRACTOR' ? buyingTenderPath(quote.tenderId) : supplyingTenderPath(quote.tenderId),
         })
       ).catch(() => ({ sent: false as const }));
       await recordAuditEvent({

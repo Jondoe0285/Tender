@@ -1,4 +1,5 @@
 import { appUrl as resolveAppUrl } from '@/server/config/appUrl';
+import { supplyingTenderPath } from '@/lib/workspace-paths';
 
 const NAVY = '#0D1B2A';
 const TRADE_BLUE = '#1D6FB8';
@@ -69,7 +70,7 @@ export function tenderOpportunityTemplate(input: { id: string; reference: string
         ['Requirement', input.requirementSummary],
         ['Quote deadline', input.closingDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })],
       ]) + note('Contractor identity, precise site information, full specification, attachments, and direct communication details remain restricted until the required unlock stage.'),
-      action: { label: 'Review opportunity', href: appUrl(`/retailer/tenders/${encodeURIComponent(input.id)}`) },
+      action: { label: 'Review opportunity', href: appUrl(supplyingTenderPath(encodeURIComponent(input.id))) },
     }),
   };
 }
@@ -87,7 +88,7 @@ export function tenderUpdatedTemplate(input: { id: string; reference: string; ca
         ['Location area', input.locationArea],
         ['Quote deadline', input.closingDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })],
       ]) + note('Your existing tender access remains available. Contractor identity and direct contact details remain restricted until the required release condition is met.'),
-      action: { label: 'Review tender', href: appUrl(`/retailer/tenders/${encodeURIComponent(input.id)}`) },
+      action: { label: 'Review tender', href: appUrl(supplyingTenderPath(encodeURIComponent(input.id))) },
     }),
   };
 }

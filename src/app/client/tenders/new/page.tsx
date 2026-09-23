@@ -352,6 +352,7 @@ function NewTenderForm() {
   const [draftRestored, setDraftRestored] = useState(false);
   const [packagesNeedReset, setPackagesNeedReset] = useState(true);
   const [catalog, setCatalog] = useState<Record<string, Record<string, string[]>>>(() => Object.fromEntries(Object.entries(SERVICE_CATALOG).map(([service, categories]) => [service, Object.fromEntries(Object.entries(categories).map(([name, items]) => [name, [...items]]))])));
+  const [canRaiseTender, setCanRaiseTender] = useState<boolean | null>(null);
 
   const hasDetectedContactDetails = [
     getModerationMessage('description', form.description),
@@ -361,6 +362,13 @@ function NewTenderForm() {
     ? form.category
     : form.items[activePackageIndex - 1]?.category ?? form.category;
   const activePackageLabels = packageLabels(activeCategory);
+
+  useEffect(() => {
+    fetch('/api/user/capabilities')
+      .then((response) => response.ok ? response.json() : null)
+      .then((data: { canRaiseTender?: boolean } | null) => setCanRaiseTender(data?.canRaiseTender !== false))
+      .catch(() => setCanRaiseTender(true));
+  }, []);
 
   // Restore a saved draft after mount only, so server and first client render still match.
   useEffect(() => {
@@ -802,6 +810,32 @@ function NewTenderForm() {
       setSubmitting(false);
       setError('We could not reach Trade Tender. Check your connection and try again.');
     }
+  }
+
+  if (canRaiseTender === null) {
+    return (
+      <AppShell role="client" title="Create tender">
+        <div className="mx-auto max-w-4xl">
+          <Card>
+            <p role="status" className="text-sm text-foundation-navy">Checking organisation role…</p>
+          </Card>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (canRaiseTender === false) {
+    return (
+      <AppShell role="client" title="Create tender">
+        <div className="mx-auto max-w-4xl">
+          <PageHeader description="Raising a tender is limited to the Buyer and QS / estimator roles on this organisation." />
+          <Card>
+            <p className="text-sm text-foundation-navy">Your organisation role is read-only for buying. Ask a workspace owner to assign Buyer or QS / estimator if you need to issue packages.</p>
+            <Link href={buyingTendersPath()} className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-trade-blue hover:text-foundation-navy">Back to my tenders</Link>
+          </Card>
+        </div>
+      </AppShell>
+    );
   }
 
   return (

@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { getCurrentUser } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
+import { supplyingTenderPath } from '@/lib/workspace-paths';
 
 export default async function SubmittedQuotesPage() {
   const user = await getCurrentUser();
@@ -42,7 +43,7 @@ export default async function SubmittedQuotesPage() {
                   <tr key={quote.id} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80">
                     <td className="px-4 py-2.5 font-semibold tabular-nums text-foundation-navy">{quote.reference}</td>
                     <td className="px-4 py-2.5">
-                      <Link href={`/retailer/tenders/${quote.tender.id}`} className="font-semibold text-foundation-navy hover:text-trade-blue">
+                      <Link href={supplyingTenderPath(quote.tender.id)} className="font-semibold text-foundation-navy hover:text-trade-blue">
                         {quote.tender.reference}
                       </Link>
                     </td>

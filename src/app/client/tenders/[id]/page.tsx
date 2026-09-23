@@ -77,12 +77,22 @@ export default function ClientTenderDetailPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [capabilities, setCapabilities] = useState({ canRaiseTender: true, canEstimate: true, canAward: true });
 
   async function load() {
-    const [tenderResponse, quotesResponse] = await Promise.all([
+    const [tenderResponse, quotesResponse, capabilitiesResponse] = await Promise.all([
       fetch(`/api/tenders/${params.id}`),
       fetch(`/api/tenders/${params.id}/quotes`),
+      fetch('/api/user/capabilities'),
     ]);
+    if (capabilitiesResponse.ok) {
+      const nextCapabilities = await capabilitiesResponse.json() as { canRaiseTender?: boolean; canEstimate?: boolean; canAward?: boolean };
+      setCapabilities({
+        canRaiseTender: nextCapabilities.canRaiseTender !== false,
+        canEstimate: nextCapabilities.canEstimate !== false,
+        canAward: nextCapabilities.canAward !== false,
+      });
+    }
     if (tenderResponse.ok) {
       setTender((await tenderResponse.json()).tender);
       setLoadError(null);
@@ -250,16 +260,18 @@ export default function ClientTenderDetailPage() {
           <p className="mt-2 text-sm text-steel-blue">Issued revision {tender.packages[0].revision}{tender.awards?.[0] ? ' · Award on record' : ''}</p>
         )}
         <div className="mt-5 flex flex-wrap gap-3">
-          <Button variant="secondary" onClick={() => setEditing((current) => !current)}>
-            {editing ? 'Cancel edit' : 'Edit tender'}
-          </Button>
-          {(tender.status === 'CLOSED' || new Date(tender.closingDate).getTime() <= Date.now()) && (
+          {capabilities.canEstimate ? (
+            <Button variant="secondary" onClick={() => setEditing((current) => !current)}>
+              {editing ? 'Cancel edit' : 'Edit tender'}
+            </Button>
+          ) : null}
+          {capabilities.canRaiseTender && (tender.status === 'CLOSED' || new Date(tender.closingDate).getTime() <= Date.now()) && (
             <Link href={`/user/tenders/new?copyFrom=${encodeURIComponent(tender.id)}`} className="inline-flex h-11 items-center justify-center rounded-md bg-trade-blue px-5 text-sm font-semibold text-site-white hover:bg-trade-blue/90">
               Re-tender
             </Link>
           )}
         </div>
-        {editing ? (
+        {editing && capabilities.canEstimate ? (
           <Card className="mt-5">
             <form onSubmit={handleTenderUpdate} className="flex flex-col gap-5">
               <h3 className="text-base font-semibold tracking-tight text-foundation-navy">Edit tender</h3>
@@ -410,6 +422,7 @@ export default function ClientTenderDetailPage() {
               pendingPayment={pendingPayment}
               pendingCheckoutUrl={pendingPayment?.checkoutUrl}
               busyQuoteId={busyQuoteId}
+              canAward={capabilities.canAward}
               onAccept={handleAccept}
               onSimulateReleasePayment={handleSimulateReleasePayment}
               onLoadContact={loadContact}

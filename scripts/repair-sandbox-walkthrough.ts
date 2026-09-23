@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { hash } from 'bcryptjs';
 import { isValidEmail } from '../src/lib/email-format';
+import { passwordSchema } from '../src/lib/schemas/password';
 import {
   assignMissingTradeTenderId,
   backfillMissingAwards,
@@ -12,6 +13,7 @@ import {
 
 const prisma = new PrismaClient();
 const FALLBACK_OWNER_EMAIL = 'owner@example.test';
+const LOCAL_SANDBOX_PASSWORD = 'TradeTenderDev!2026';
 const SANDBOX_EMAILS = [
   'client@example.test',
   'retailer@example.test',
@@ -25,15 +27,23 @@ const SANDBOX_EMAILS = [
 ];
 
 async function main() {
-  const sandboxPassword = process.env.SANDBOX_USER_PASSWORD?.trim();
-  if (sandboxPassword) {
-    const passwordHash = await hash(sandboxPassword, 12);
-    const result = await prisma.user.updateMany({
-      where: { email: { in: SANDBOX_EMAILS } },
-      data: { passwordHash },
-    });
-    console.log(`Rehashed ${result.count} sandbox users to SANDBOX_USER_PASSWORD.`);
+  const configuredSandboxPassword = process.env.SANDBOX_USER_PASSWORD?.trim();
+  const parsedSandboxPassword = configuredSandboxPassword ? passwordSchema.safeParse(configuredSandboxPassword) : null;
+  const sandboxPassword = parsedSandboxPassword?.success ? parsedSandboxPassword.data : LOCAL_SANDBOX_PASSWORD;
+  if (configuredSandboxPassword && !parsedSandboxPassword?.success) {
+    console.log('SANDBOX_USER_PASSWORD does not meet the password policy; rehashing sandbox users to the local seed default.');
   }
+  const passwordHash = await hash(sandboxPassword, 12);
+  const result = await prisma.user.updateMany({
+    where: { email: { in: SANDBOX_EMAILS } },
+    data: {
+      passwordHash,
+      failedLoginAttempts: 0,
+      loginLockedUntil: null,
+      suspended: false,
+    },
+  });
+  console.log(`Rehashed ${result.count} sandbox users.`);
 
   const requestedOwnerEmail = process.env.PLATFORM_OWNER_EMAIL?.trim().toLowerCase() ?? '';
   const ownerEmail = isValidEmail(requestedOwnerEmail) ? requestedOwnerEmail : FALLBACK_OWNER_EMAIL;

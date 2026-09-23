@@ -1,11 +1,12 @@
 import { prisma } from '@/server/data/prisma';
 import { UNLOCK_HARVEST_CAP, UNLOCK_HARVEST_WINDOW_DAYS, harvestUnlockCount } from '@/lib/harvest';
 import { maskEmail } from '@/lib/enterprise-controls';
+import { isAssignablePlatformOwnerEmail } from '@/lib/email-format';
 
 export async function getOpsExceptions() {
   const since = new Date(Date.now() - UNLOCK_HARVEST_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const closingSoon = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
-  const [failedPayments, pendingVerification, closingTenders, recentUnlocks] = await Promise.all([
+  const [failedPayments, pendingVerification, closingTenders, recentUnlocks, ownersWithoutMfa] = await Promise.all([
     prisma.payment.findMany({
       where: { status: 'FAILED' },
       orderBy: { createdAt: 'desc' },
@@ -27,6 +28,12 @@ export async function getOpsExceptions() {
     prisma.unlock.findMany({
       where: { unlockedAt: { gte: since } },
       select: { tenderId: true, retailerId: true },
+    }),
+    prisma.user.findMany({
+      where: { isOwner: true, suspended: false, mfaEnabled: false },
+      orderBy: { createdAt: 'asc' },
+      take: 8,
+      select: { id: true, email: true },
     }),
   ]);
 
@@ -54,5 +61,7 @@ export async function getOpsExceptions() {
     pendingVerification,
     closingTenders,
     harvestFlags,
+    ownersWithoutMfa: ownersWithoutMfa.map((owner) => ({ id: owner.id, email: maskEmail(owner.email) })),
+    ownerMailboxConfigured: isAssignablePlatformOwnerEmail(process.env.PLATFORM_OWNER_EMAIL ?? ''),
   };
 }

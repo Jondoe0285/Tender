@@ -8,6 +8,7 @@ import { prisma } from '@/server/data/prisma';
 import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
 import { WorkQueue, type WorkQueueItem } from '@/components/work/WorkQueue';
 import { effectiveLaunchCredits } from '@/lib/launch-credits';
+import { supplyingTenderPath } from '@/lib/workspace-paths';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +38,7 @@ export default async function RetailerPage() {
     ...matches
       .filter(({ tender, viewedAt }) => !unlockedIds.has(tender.id) && !viewedAt)
       .map(({ tender }) => ({
-        href: `/retailer/tenders/${tender.id}`,
+        href: supplyingTenderPath(tender.id),
         reference: tender.reference,
         title: tender.category,
         due: tender.closingDate.toLocaleDateString('en-GB'),
@@ -47,7 +48,7 @@ export default async function RetailerPage() {
     ...matches
       .filter(({ tender }) => unlockedIds.has(tender.id) && !quotedIds.has(tender.id))
       .map(({ tender }) => ({
-        href: `/retailer/tenders/${tender.id}`,
+        href: supplyingTenderPath(tender.id),
         reference: tender.reference,
         title: tender.category,
         due: tender.closingDate.toLocaleDateString('en-GB'),
@@ -58,7 +59,7 @@ export default async function RetailerPage() {
       .filter((quote) => quote.status === 'SUBMITTED')
       .slice(0, 5)
       .map((quote) => ({
-        href: `/retailer/tenders/${quote.tenderId}`,
+        href: supplyingTenderPath(quote.tenderId),
         reference: quote.tender.reference,
         title: quote.tender.subcategory,
         due: quote.tender.closingDate.toLocaleDateString('en-GB'),

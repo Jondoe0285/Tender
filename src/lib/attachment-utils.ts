@@ -59,7 +59,7 @@ export function verifyVerificationDocument(input: { name: string; mimeType: stri
   if (verified.mimeType !== 'application/pdf') {
     throw new Error('Verification evidence must be a PDF');
   }
-  return verified;
+  return { mimeType: 'application/pdf', sizeBytes: verified.sizeBytes, dataBase64: verified.dataBase64 };
 }
 
 export function buildSafeAttachmentName(input: string): string {

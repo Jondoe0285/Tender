@@ -52,14 +52,14 @@ export default function HomePage() {
 
         <section id="how-it-works" className="mx-auto max-w-6xl px-6 py-12 sm:px-10">
           <h2 className="text-xl font-semibold tracking-tight text-foundation-navy">How it works</h2>
-          <p className="mt-1 max-w-2xl text-sm text-concrete-grey">Three steps. No marketplace chat. No guessing what was quoted.</p>
+          <p className="mt-1 max-w-2xl text-sm text-foundation-navy">Three steps. No marketplace chat. No guessing what was quoted.</p>
           <ol className="mt-6 divide-y divide-slate-200 border-y border-slate-200">
             {steps.map((step, index) => (
               <li key={step.title} className="grid gap-2 py-5 sm:grid-cols-[7rem_1fr] sm:items-baseline">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-steel-blue">Step {index + 1}</p>
                 <div>
                   <h3 className="text-base font-semibold text-foundation-navy">{step.title}</h3>
-                  <p className="mt-1 text-sm leading-6 text-concrete-grey">{step.body}</p>
+                  <p className="mt-1 text-sm leading-6 text-foundation-navy">{step.body}</p>
                 </div>
               </li>
             ))}

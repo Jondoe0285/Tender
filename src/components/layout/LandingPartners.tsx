@@ -23,7 +23,7 @@ export function LandingPartners() {
         <div className="max-w-xl">
           <p className="text-xs font-semibold uppercase tracking-widest text-steel-blue">Partner information</p>
           <h2 id="partner-information" className="mt-2 text-base font-semibold tracking-tight text-foundation-navy">Affiliated construction support</h2>
-          <p className="mt-2 text-sm leading-relaxed text-concrete-grey">Partner information is separate from tender matching, quote ranking, supplier selection, and Contractor decisions.</p>
+          <p className="mt-2 text-sm leading-relaxed text-foundation-navy">Partner information is separate from tender matching, quote ranking, supplier selection, and Buyer decisions.</p>
         </div>
         <div className="grid w-full min-w-0 grid-cols-2 gap-3 sm:flex sm:flex-wrap lg:justify-end">
           {partners.map((partner) => (

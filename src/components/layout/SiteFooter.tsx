@@ -11,10 +11,8 @@ type FooterPartner = { id: string; name: string; logoPath: string; destinationUr
 export function SiteFooter() {
   const support = supportEmail();
   const [partners, setPartners] = useState<FooterPartner[]>([]);
-  const [year, setYear] = useState(2026);
 
   useEffect(() => {
-    setYear(new Date().getFullYear());
     fetch('/api/partners/footer')
       .then((response) => (response.ok ? response.json() : null))
       .then((data: { partners?: FooterPartner[] } | null) => setPartners(data?.partners ?? []))
@@ -33,11 +31,11 @@ export function SiteFooter() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-site-white">Product</p>
           <div className="mt-4 flex flex-col gap-3 text-xs font-semibold">
-            <Link href={{ pathname: '/', hash: 'how-it-works' }} className="inline-flex min-h-11 items-center hover:text-sky-blue">How it works</Link>
+            <Link href="/#how-it-works" className="inline-flex min-h-11 items-center hover:text-sky-blue">How it works</Link>
             <Link href="/security" className="inline-flex min-h-11 items-center hover:text-sky-blue">Security</Link>
             <Link href="/demo" className="inline-flex min-h-11 items-center hover:text-sky-blue">Request a demo</Link>
-            <Link href={{ pathname: '/', hash: 'buying' }} className="inline-flex min-h-11 items-center hover:text-sky-blue">Buyers</Link>
-            <Link href={{ pathname: '/', hash: 'supplying' }} className="inline-flex min-h-11 items-center hover:text-sky-blue">Suppliers</Link>
+            <Link href="/#buying" className="inline-flex min-h-11 items-center hover:text-sky-blue">Buyers</Link>
+            <Link href="/#supplying" className="inline-flex min-h-11 items-center hover:text-sky-blue">Suppliers</Link>
             <Link href="/login" className="inline-flex min-h-11 items-center hover:text-sky-blue">Sign in</Link>
             <Link href="/register" className="inline-flex min-h-11 items-center hover:text-sky-blue">Create account</Link>
           </div>
@@ -81,12 +79,12 @@ export function SiteFooter() {
                   )
                 )}
               </div>
-              <p className="mt-3 text-xs leading-relaxed text-site-white/60">Affiliated partner information is separate from tender matching, quote ranking, supplier selection, and Contractor decisions.</p>
+              <p className="mt-3 text-xs leading-relaxed text-site-white/60">Affiliated partner information is separate from tender matching, quote ranking, supplier selection, and Buyer decisions.</p>
             </div>
           )}
         </div>
       </div>
-      <p className="mx-auto mt-8 max-w-6xl border-t border-site-white/15 pt-5 text-xs text-site-white/50">&copy; {year} Trade Tender.</p>
+      <p className="mx-auto mt-8 max-w-6xl border-t border-site-white/15 pt-5 text-xs text-site-white/50">&copy; 2026 Trade Tender.</p>
     </footer>
   );
 }

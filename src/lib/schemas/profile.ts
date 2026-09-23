@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { passwordSchema } from '@/lib/schemas/password';
 import { COMPANY_OPERATING_LOCATIONS } from '@/lib/geography';
-import { BUYER_DUTIES } from '@/lib/workspace-duties';
+import { BUYER_DUTIES, BUYER_ORG_ROLES } from '@/lib/workspace-duties';
 import { catalogServiceNames, isCatalogProvision, isCatalogService, type CategoryCatalog } from '@/lib/catalog';
 
 export const personalProfileSchema = z.object({
@@ -42,5 +42,6 @@ export function createProfileUpdateSchemaForCatalog(catalog: CategoryCatalog) {
 
 export const additionalUserSchema = personalProfileSchema.extend({
   password: passwordSchema,
+  orgRole: z.enum(BUYER_ORG_ROLES).optional(),
   duties: z.array(z.enum(BUYER_DUTIES)).min(1).max(BUYER_DUTIES.length).optional(),
 });

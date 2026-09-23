@@ -44,7 +44,7 @@ export default function DemoPage() {
         <section className="mx-auto max-w-3xl px-6 py-16 sm:px-10">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-steel-blue">For buyers and suppliers</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foundation-navy">Request a demo</h1>
-          <p className="mt-3 max-w-xl text-base leading-7 text-concrete-grey">Tell us the buying or supplying job you need to run. We will walk the tender, quote, and award path — not a generic product tour.</p>
+          <p className="mt-3 max-w-xl text-base leading-7 text-foundation-navy">Tell us the buying or supplying job you need to run. We will walk the tender, quote, and award path — not a generic product tour.</p>
           <Card className="mt-8">
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <FieldGroup><Label htmlFor="name">Name</Label><Input id="name" name="name" required minLength={2} /></FieldGroup>

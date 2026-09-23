@@ -5,19 +5,42 @@ import Link from 'next/link';
 type OpsExceptions = Awaited<ReturnType<typeof import('@/server/domain/opsExceptions').getOpsExceptions>>;
 
 export function OpsExceptionBoard({ data }: { data: OpsExceptions }) {
-  const empty = data.failedPayments.length === 0 && data.pendingVerification.length === 0 && data.closingTenders.length === 0 && data.harvestFlags.length === 0;
+  const ownerMfaOpen = !data.ownerMailboxConfigured || data.ownersWithoutMfa.length > 0;
+  const empty = data.failedPayments.length === 0 && data.pendingVerification.length === 0 && data.closingTenders.length === 0 && data.harvestFlags.length === 0 && !ownerMfaOpen;
 
   return (
     <div className="mb-10">
       <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-steel-blue">Exceptions</p>
-      <p className="mb-5 max-w-2xl text-sm text-concrete-grey">Failed payments, harvest flags, verification backlog, and SLA. Analytics stay below this row.</p>
+      <p className="mb-5 max-w-2xl text-sm text-concrete-grey">Failed payments, harvest flags, verification backlog, Owner MFA, and SLA. Analytics stay below this row.</p>
       {empty ? (
         <Card>
           <p className="text-sm font-semibold text-foundation-navy">No open exceptions</p>
-          <p className="mt-1 text-sm text-concrete-grey">Failed payments, harvest caps, pending verification, and closing tenders appear here first.</p>
+          <p className="mt-1 text-sm text-concrete-grey">Failed payments, harvest caps, pending verification, Owner MFA, and closing tenders appear here first.</p>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">Owner MFA</p>
+            {ownerMfaOpen ? (
+              <ul className="mt-3 flex flex-col gap-2 text-sm">
+                {!data.ownerMailboxConfigured && (
+                  <li className="flex items-start justify-between gap-3">
+                    <span>PLATFORM_OWNER_EMAIL is missing or still a placeholder mailbox.</span>
+                    <StatusBadge status="attention">Set mailbox</StatusBadge>
+                  </li>
+                )}
+                {data.ownersWithoutMfa.map((owner) => (
+                  <li key={owner.id} className="flex items-start justify-between gap-3">
+                    <Link href={`/super-user/users/${owner.id}`} className="hover:text-trade-blue">{owner.email}</Link>
+                    <StatusBadge status="attention">MFA off</StatusBadge>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-concrete-grey">None</p>
+            )}
+            <Link href="/account/security" className="mt-3 inline-block text-xs font-semibold text-trade-blue">Open security</Link>
+          </Card>
           <Card>
             <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">Failed payments</p>
             {data.failedPayments.length === 0 ? <p className="mt-2 text-sm text-concrete-grey">None</p> : (

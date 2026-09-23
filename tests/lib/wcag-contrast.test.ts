@@ -92,3 +92,8 @@ test('the focus-visible ring colour meets the AA non-text UI-component contrast 
 test('white text on the dark foundation-navy surface (footer, dark logo background) meets AA normal-text contrast', () => {
   assert.ok(contrastRatio(TOKENS['site-white'], TOKENS['foundation-navy']) >= AA_NORMAL_TEXT);
 });
+
+test('body copy on light-grey uses navy rather than concrete-grey', () => {
+  assert.ok(contrastRatio(TOKENS['foundation-navy'], TOKENS['light-grey']) >= AA_NORMAL_TEXT, 'navy on light-grey');
+  assert.ok(contrastRatio(TOKENS['concrete-grey'], TOKENS['light-grey']) < AA_NORMAL_TEXT, 'concrete-grey on light-grey is below AA and must not be used for body copy');
+});

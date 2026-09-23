@@ -2,6 +2,7 @@ import { ForbiddenError } from '@/server/auth/session';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { prisma } from '@/server/data/prisma';
 import { getCompanyMemberIds } from '@/server/domain/tenderService';
+import { readTenderAttachmentBytes } from '@/server/storage/tenderAttachmentStore';
 
 type AttachmentActor = { id: string };
 
@@ -17,9 +18,12 @@ export async function getTenderAttachmentForDownload(tenderId: string, attachmen
         { tender: { unlocks: { some: { retailerId: actor.id } } } },
       ],
     },
-    select: { id: true, fileName: true, mimeType: true, content: true },
+    select: { id: true, fileName: true, mimeType: true, content: true, objectKey: true },
   });
   if (!attachment) throw new ForbiddenError('Attachment is not available');
+
+  const content = await readTenderAttachmentBytes(attachment);
+  if (!content) throw new ForbiddenError('Attachment is not available');
 
   await recordAuditEvent({
     actorId: actor.id,
@@ -29,6 +33,5 @@ export async function getTenderAttachmentForDownload(tenderId: string, attachmen
     metadata: { tenderId },
   });
 
-  // The query engine may return Bytes as a plain Uint8Array; normalize so .toString() decodes text.
-  return { ...attachment, content: Buffer.from(attachment.content) };
+  return { id: attachment.id, fileName: attachment.fileName, mimeType: attachment.mimeType, content };
 }

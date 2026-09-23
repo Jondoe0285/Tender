@@ -169,7 +169,7 @@ export function RegisterForm({ initialIntent }: { initialIntent: WorkspaceIntent
     <section className="mx-auto max-w-lg pt-12 pb-24">
       <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-steel-blue">Create an account</p>
       <h1 className="text-2xl font-semibold tracking-tight text-foundation-navy">Create your Trade Tender account</h1>
-      <p className="mt-3 text-sm leading-relaxed text-concrete-grey">
+      <p className="mt-3 text-sm leading-relaxed text-foundation-navy">
         {supplies
           ? 'Set up the business, then tell us what you supply and where you operate.'
           : 'Set up the business. You will not be asked for supplier coverage on a buying account.'}

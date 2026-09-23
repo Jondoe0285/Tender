@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { ADDITIONAL_BUYER_DUTIES, canMakeSupplierPayment, hasBuyerDuty, PRIMARY_BUYER_DUTIES, serialiseBuyerDuties } from '../../src/lib/workspace-duties';
 
-test('primary buyer duties include accept-and-pay; additional users do not', () => {
+test('primary buyer duties include accept-and-pay; default additional QS role does not', () => {
   assert.equal(hasBuyerDuty(PRIMARY_BUYER_DUTIES, 'APPROVER'), true);
   assert.equal(hasBuyerDuty(ADDITIONAL_BUYER_DUTIES, 'APPROVER'), false);
   assert.equal(hasBuyerDuty(ADDITIONAL_BUYER_DUTIES, 'RAISER'), true);

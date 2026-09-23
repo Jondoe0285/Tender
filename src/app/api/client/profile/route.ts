@@ -16,7 +16,7 @@ import { markUploadedDocumentsVerified } from '@/server/domain/verificationDocum
 import { INDEPENDENT_REVIEW_RESET_DATA } from '@/server/domain/independentReviewService';
 import { Prisma } from '@prisma/client';
 import { getCategoryCatalog } from '@/server/domain/categoryService';
-import { ADDITIONAL_BUYER_DUTIES, serialiseBuyerDuties } from '@/lib/workspace-duties';
+import { DEFAULT_ADDITIONAL_BUYER_ORG_ROLE, dutiesForBuyerOrgRole, serialiseBuyerDuties } from '@/lib/workspace-duties';
 import { personNameFromAccount } from '@/lib/person-name';
 import { assignMissingTradeTenderId, persistNormalisedOperatingLocations } from '@/server/domain/enterpriseRecordRepair';
 
@@ -233,7 +233,7 @@ export async function POST(request: Request) {
         contactPhone: parsed.data.phoneNumber || null,
         termsAcceptedAt: new Date(),
         roleMemberships: { create: { role: 'USER' } },
-        clientCompanyMembership: { create: { companyId: membership.companyId, duties: serialiseBuyerDuties(parsed.data.duties ?? ADDITIONAL_BUYER_DUTIES.split(',')) } },
+        clientCompanyMembership: { create: { companyId: membership.companyId, duties: serialiseBuyerDuties(parsed.data.orgRole ? dutiesForBuyerOrgRole(parsed.data.orgRole) : parsed.data.duties ?? dutiesForBuyerOrgRole(DEFAULT_ADDITIONAL_BUYER_ORG_ROLE)) } },
         ...(opportunityProfile ? { retailerProfile: { create: opportunityProfile } } : {}),
       },
       select: { id: true, email: true, firstName: true, lastName: true, contactName: true },

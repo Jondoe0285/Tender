@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { getCurrentUser } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
+import { supplyingTenderPath } from '@/lib/workspace-paths';
 
 export default async function UnlockedTendersPage() {
   const user = await getCurrentUser();
@@ -45,7 +46,7 @@ export default async function UnlockedTendersPage() {
                 {unlocks.map((unlock) => (
                   <tr key={unlock.id} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80">
                     <td className="px-4 py-2.5 font-semibold tabular-nums text-foundation-navy">
-                      <Link href={`/retailer/tenders/${unlock.tender.id}`} className="hover:text-trade-blue">{unlock.tender.reference}</Link>
+                      <Link href={supplyingTenderPath(unlock.tender.id)} className="hover:text-trade-blue">{unlock.tender.reference}</Link>
                     </td>
                     <td className="px-4 py-2.5 text-concrete-grey">{unlock.tender.category}</td>
                     <td className="px-4 py-2.5 text-foundation-navy">{unlock.tender.subcategory}</td>

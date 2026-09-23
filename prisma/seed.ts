@@ -2,7 +2,7 @@ import { PrismaClient, Role } from '@prisma/client';
 import { hash } from 'bcryptjs';
 import { SERVICE_NAMES } from '../src/lib/categories';
 import { UK_COUNTIES, UK_REGIONS, coverageFieldsFromOperatingLocations } from '../src/lib/geography';
-import { isValidEmail } from '../src/lib/email-format';
+import { isAssignablePlatformOwnerEmail, isValidEmail } from '../src/lib/email-format';
 import { buildClientTradeTenderId } from '../src/lib/identifiers';
 
 const DEFAULT_MEMBERSHIP_TIERS = [
@@ -167,6 +167,9 @@ async function seedDefaultMembershipTiers() {
 async function main() {
   if (process.env.NODE_ENV === 'production' && !(isDeployedSandbox && isSandboxSeedEnabled)) {
     throw new Error('Sandbox accounts may only be seeded locally or in an explicitly enabled sandbox environment.');
+  }
+  if (process.env.NODE_ENV === 'production' && isDeployedSandbox && !isAssignablePlatformOwnerEmail(requestedOwnerEmail)) {
+    throw new Error('PLATFORM_OWNER_EMAIL must be a real mailbox before seeding a deployed environment.');
   }
   if (!platformOwnerPassword) {
     throw new Error('PLATFORM_OWNER_PASSWORD is required to seed the platform owner.');

@@ -9,3 +9,7 @@ export function buyingTenderPath(tenderId: string): string {
 export function buyingTenderNewPath(): string {
   return '/user/tenders/new';
 }
+
+export function supplyingTenderPath(tenderId: string): string {
+  return `/provider/tenders/${tenderId}`;
+}

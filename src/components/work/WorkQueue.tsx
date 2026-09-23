@@ -23,8 +23,8 @@ export function WorkQueue({
   title: string;
   items: WorkQueueItem[];
   emptyLabel: string;
-  emptyHref: string;
-  emptyAction: string;
+  emptyHref?: string;
+  emptyAction?: string;
 }) {
   return (
     <section className="mb-8">
@@ -33,7 +33,7 @@ export function WorkQueue({
         <EmptyState
           title="Nothing in this queue"
           body={emptyLabel}
-          action={<LinkButton href={emptyHref}>{emptyAction}</LinkButton>}
+          action={emptyHref && emptyAction ? <LinkButton href={emptyHref}>{emptyAction}</LinkButton> : undefined}
         />
       ) : (
         <DataTable headers={['Reference', 'Work', 'Due', 'Next action']}>

@@ -256,7 +256,7 @@ Exports require the same authorization and privacy checks as the dashboard. Cont
 ## 15. Deployment Architecture
 
 - GitHub Actions runs type checking, relevant tests, security checks, and a production build.
-- Render hosts the Next.js application with environment-specific configuration. Persistence is Neon Lakebase Postgres (`DATABASE_URL` / `DATABASE_URL_UNPOOLED`), not a Render-managed database.
+- Render hosts the Next.js application with environment-specific configuration. Relational persistence is Neon Lakebase Postgres (`DATABASE_URL` / `DATABASE_URL_UNPOOLED`), not a Render-managed database. Tender attachments and verification PDFs write to `ATTACHMENT_STORE_DIR` (local default `data/attachments`; a Render disk at `/var/data/documents` when one is attached).
 - Database migrations run through `prisma migrate deploy` as an approved, ordered deployment step.
 - Secrets are supplied through GitHub Actions secrets or Render environment variables marked as non-syncing.
 - Development, test, staging, and production settings and data remain separated.

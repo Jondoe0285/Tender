@@ -8,13 +8,22 @@ test('primary journeys keep associated labels, live regions, and 44px footer tar
   const footer = readFileSync('src/components/layout/SiteFooter.tsx', 'utf8');
   const loadState = readFileSync('src/components/ui/PageLoadState.tsx', 'utf8');
   const fields = readFileSync('src/components/ui/Field.tsx', 'utf8');
+  const shell = readFileSync('src/components/layout/AppShell.tsx', 'utf8');
+  const skip = readFileSync('src/components/layout/SkipLink.tsx', 'utf8');
 
   assert.match(opportunities, /<fieldset/);
   assert.match(opportunities, /aria-pressed/);
   assert.match(comparison, /aria-live="polite"/);
   assert.match(footer, /min-h-11/);
+  assert.doesNotMatch(footer, /getFullYear/);
   assert.match(loadState, /role="status"/);
   assert.match(fields, /export function Label/);
+  assert.match(shell, /aria-controls="mobile-navigation-drawer"/);
+  assert.match(shell, /h-11 w-11/);
+  assert.doesNotMatch(shell, /text-site-white\/40/);
+  assert.match(skip, /focus:min-h-11/);
+  const header = readFileSync('src/components/ui/PageHeader.tsx', 'utf8');
+  assert.match(header, /description \? <p className="mt-1 text-sm leading-6 text-foundation-navy">/);
 });
 
 test('repeatable browser/axe coverage is still required on a real device for first-journey QA', () => {
@@ -28,5 +37,8 @@ test('the public header always pairs Sign in with Create account', () => {
   assert.match(header, />\s*Sign in\s*</);
   assert.match(header, /href="\/register"/);
   assert.match(header, />\s*Create account\s*</);
+  assert.match(header, /href="\/#how-it-works"/);
+  assert.match(header, /href="\/#buying"/);
+  assert.match(header, /href="\/#supplying"/);
   assert.doesNotMatch(header, /session/);
 });
