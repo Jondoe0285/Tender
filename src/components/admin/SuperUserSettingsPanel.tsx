@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Input, Label, Select, Textarea } from '@/components/ui/Field';
 import { SERVICE_NAMES } from '@/lib/categories';
 import { isPreLaunchActive, toDatetimeLocalInput, datetimeLocalToIso, formatLaunchDate } from '@/lib/public-launch';
+import { VERIFICATION_DOCUMENT_TYPES } from '@/lib/verification-documents';
 
 export type AdminSettings = {
   fees: { retailerUnlockGbp: number; retailerUnlockMode: string; retailerUnlockPercentageLow: number; retailerUnlockPercentageHigh: number; retailerUnlockPercentageTop: number; contractorServiceUnlockGbp: number; professionalServiceUnlockGbp: number; clientReleaseGbp: number; clientReleaseMode: string; clientReleasePercentageLow: number; clientReleasePercentageHigh: number; clientReleasePercentageTop: number; quoteEstimateOffsetPercentage: number; quoteEstimateMasterReductionPercentage: number; vatPercentage: number; sponsoredPlacementActive: boolean; sponsoredPlacementFeeGbp: number; membershipTiersActive: boolean; retailerLaunchCreditsDefault: number; adspaceActive: boolean; independentReviewActive: boolean; independentReviewFeeBronzeGbp: number; independentReviewFeeSilverGbp: number; independentReviewFeeGoldGbp: number; directContactActive: boolean; directContactFeeGbp: number; humanReviewActive: boolean; signInActive: boolean; verificationDocumentRequirements: Array<[string, boolean]> };
