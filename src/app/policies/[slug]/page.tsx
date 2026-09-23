@@ -107,7 +107,7 @@ const policies = [
       },
       {
         heading: 'Verification levels',
-        content: 'The platform defines six verification statuses for documentation and assessment purposes:\n\n1. Unverified: No approved verification evidence is recorded on the platform (Banner label: Unverified).\n2. Sole trader AI Verified: Automated evidence assessment confirmed self-employment credentials (HMRC UTR confirmation, SA302 tax calculation, VAT registration certificate, CIS registration proof, insurance, bank statement, invoices, quotations/contracts, trade body membership, or trading activity evidence) (Banner label: Verified).\n3. Incorporated AI Verified: Automated evidence assessment confirmed legal entity standing, mandatory Certificate of Incorporation (required for Limited Company, LLP, and PLC company types), and required service evidence (Banner label: Verified).\n4. Enhanced Bronze Verification: Health & Safety professional reviewed legal requirements such as permits, insurances, and competent advice (Banner label: Bronze).\n5. Enhanced Silver Verification: Health & Safety professional reviewed Bronze criteria plus evidence of industry-specific employee and managerial training (Banner label: Silver).\n6. Enhanced Gold Verification: Health & Safety professional reviewed Bronze and Silver criteria plus either a comprehensive management system or validated SSIP membership (Banner label: Gold).\n\nNote: Enhanced Verification is a single professional assessment purchase. Individual tiers (Bronze, Silver, Gold) cannot be purchased separately; they are the assessed outcome awarded by the Health & Safety auditor.',
+        content: 'The platform defines six verification statuses for documentation and assessment purposes:\n\n1. Unverified: No approved verification evidence is recorded on the platform (Banner label: Unverified).\n2. Sole trader automated assessment: Automated evidence assessment confirmed self-employment credentials (HMRC UTR confirmation, SA302 tax calculation, VAT registration certificate, CIS registration proof, insurance, bank statement, invoices, quotations/contracts, trade body membership, or trading activity evidence) (Banner label: Verified).\n3. Incorporated automated assessment: Automated evidence assessment confirmed legal entity standing, mandatory Certificate of Incorporation (required for Limited Company, LLP, and PLC company types), and required service evidence (Banner label: Verified).\n4. Enhanced Bronze Verification: Health & Safety professional reviewed legal requirements such as permits, insurances, and competent advice (Banner label: Bronze).\n5. Enhanced Silver Verification: Health & Safety professional reviewed Bronze criteria plus evidence of industry-specific employee and managerial training (Banner label: Silver).\n6. Enhanced Gold Verification: Health & Safety professional reviewed Bronze and Silver criteria plus either a comprehensive management system or validated SSIP membership (Banner label: Gold).\n\nNote: Enhanced Verification is a single professional assessment purchase. Individual tiers (Bronze, Silver, Gold) cannot be purchased separately; they are the assessed outcome awarded by the Health & Safety auditor.',
       },
       {
         heading: 'Evidence and review process',
@@ -115,7 +115,7 @@ const policies = [
       },
       {
         heading: 'Sole trader status',
-        content: 'A Provider may declare that they operate as a sole trader by selecting Sole Trader as their company type. Sole trader Providers can become Sole trader AI Verified by uploading self-employment evidence. Quotes from sole traders who have not yet completed verification display a Sole Trader flag (Banner label: Sole Trader) with explanatory text so Contractors can complete appropriate identity, insurance, competence, and commercial due diligence before appointment.',
+        content: 'A Provider may declare that they operate as a sole trader by selecting Sole Trader as their company type. Sole trader Providers can complete sole trader automated assessment by uploading self-employment evidence. Quotes from sole traders who have not yet completed verification display a Sole Trader flag (Banner label: Sole Trader) with explanatory text so Contractors can complete appropriate identity, insurance, competence, and commercial due diligence before appointment.',
       },
       {
         heading: 'User due diligence',
@@ -323,14 +323,14 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
           </Link>
           <div className="mt-6">
             <p className="text-xs font-semibold uppercase tracking-widest text-steel-blue">Trade Tender policy</p>
-            <h1 className="mt-3 font-heading text-3xl font-bold text-foundation-navy sm:text-4xl">{policy.title}</h1>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foundation-navy">{policy.title}</h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-concrete-grey">{policy.summary}</p>
           </div>
 
           <div className="mt-8 space-y-5">
             {policy.sections.map((section) => (
-              <section key={`${policy.id}-${section.heading}`} className="rounded-xl border border-slate-200 bg-white p-5 shadow-soft">
-                <h2 className="font-heading text-lg font-bold text-foundation-navy">{section.heading}</h2>
+              <section key={`${policy.id}-${section.heading}`} className="rounded-md border border-slate-200 bg-white p-5">
+                <h2 className="text-base font-semibold tracking-tight text-foundation-navy">{section.heading}</h2>
                 <p className="mt-3 text-sm leading-relaxed text-concrete-grey">{section.content}</p>
               </section>
             ))}

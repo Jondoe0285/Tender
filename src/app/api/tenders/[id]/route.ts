@@ -20,7 +20,9 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
       where: { id: params.id },
       include: {
         items: { orderBy: { createdAt: 'asc' } },
-        attachments: { select: { id: true, fileName: true, mimeType: true, sizeBytes: true } },
+        attachments: { select: { id: true, fileName: true, mimeType: true, sizeBytes: true, kind: true, version: true } },
+        packages: { select: { id: true, reference: true, revision: true, specHash: true, issuedAt: true, packageIndex: true }, orderBy: { packageIndex: 'asc' } },
+        awards: { select: { id: true, awardedAt: true, quoteId: true, packageSpecHash: true }, orderBy: { awardedAt: 'desc' } },
       },
     }) : null;
     if (ownedTender) {

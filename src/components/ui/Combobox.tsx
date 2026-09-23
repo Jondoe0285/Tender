@@ -105,7 +105,7 @@ export function Combobox({ id, name, groups, value, onChange, placeholder, disab
         <ul
           id={`${id}-listbox`}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-soft-lg"
+          className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-sm"
         >
           {flatOptions.length === 0 ? (
             <li className="px-4 py-2 text-sm text-concrete-grey">No matches found</li>

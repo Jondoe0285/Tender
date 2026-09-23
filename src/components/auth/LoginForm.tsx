@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -70,18 +71,18 @@ export function LoginForm() {
 
   return (
     <section className="mx-auto max-w-5xl py-10 pb-20 sm:py-16">
-      <div className="grid overflow-hidden rounded-card border border-slate-200 bg-white shadow-soft-lg lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="flex min-h-[480px] flex-col justify-between bg-foundation-navy p-8 text-white sm:p-12">
+      <div className="grid overflow-hidden rounded-md border border-slate-200 bg-white lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="flex min-h-[440px] flex-col justify-between bg-foundation-navy p-8 text-white sm:p-12">
           <div>
             <TradeTenderLogo variant="dark" />
-            <p className="mt-10 text-xs font-semibold uppercase tracking-[0.2em] text-sky-blue">Workspace access</p>
-            <p className="mt-4 max-w-sm font-heading text-3xl font-bold leading-tight sm:text-4xl">Specify. Compare. Award.</p>
-            <p className="mt-5 max-w-sm text-base leading-relaxed text-white/75">Sign in to raise tenders, quote against a specification, and keep awards on the record.</p>
+            <p className="mt-10 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-blue">Workspace access</p>
+            <p className="mt-4 max-w-sm text-3xl font-semibold leading-tight tracking-tight sm:text-[2rem]">Specify. Compare. Award.</p>
+            <p className="mt-5 max-w-sm text-sm leading-6 text-white/75">Sign in to raise tenders, quote against a specification, and keep awards on the record.</p>
           </div>
         </div>
 
         <div className="bg-light-grey p-6 sm:p-10">
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-foundation-navy">Sign in</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foundation-navy">Sign in</h1>
           {searchParams.get('verification') === 'pending' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Check your email and use the verification link to activate your account.</p>}
           {searchParams.get('verification') === 'verified' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your email address is verified. You can now sign in.</p>}
           {searchParams.get('verification') === 'invalid' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">This verification link is invalid or has expired. Register again with the same details to request a new link.</p>}
@@ -108,13 +109,13 @@ export function LoginForm() {
           </Card>
 
           <p className="mt-6 text-center text-sm text-concrete-grey">
-            New to Trade Tender? <a href="/register" className="font-semibold text-steel-blue hover:text-foundation-navy">Create an account</a>
+            New to Trade Tender? <Link href="/register" className="font-semibold text-steel-blue hover:text-foundation-navy">Create an account</Link>
           </p>
 
           <Card className="mt-8">
             <form onSubmit={handlePasswordResetRequest} className="flex flex-col gap-4">
               <div>
-                <h2 className="font-heading text-lg font-bold text-foundation-navy">Forgotten password?</h2>
+                <h2 className="text-base font-semibold tracking-tight text-foundation-navy">Forgotten password?</h2>
                 <p className="mt-2 text-sm text-concrete-grey">Enter your email address and we will send a reset link if the account exists.</p>
               </div>
               <FieldGroup>

@@ -305,12 +305,12 @@ export default function RetailerTenderDetailPage() {
 
   return (
     <AppShell role="retailer" title={tender.reference}>
-      <section className="mx-auto max-w-2xl">
-        <Link href="/retailer/opportunities" className="mb-6 inline-block text-sm font-semibold text-concrete-grey hover:text-foundation-navy">
+      <section className="mx-auto max-w-4xl">
+        <Link href="/retailer/opportunities" className="mb-5 inline-block text-sm font-semibold text-concrete-grey hover:text-foundation-navy">
           &larr; Back to opportunities
         </Link>
         <div className="flex items-center gap-3">
-          <h2 className="font-heading text-2xl font-bold tracking-tight text-foundation-navy">{tender.category}</h2>
+          <h2 className="text-xl font-semibold tracking-tight text-foundation-navy">{tender.category}</h2>
           <StatusBadge status={unlocked ? 'approved' : 'pending'}>{unlocked ? 'Unlocked' : 'Locked'}</StatusBadge>
         </div>
         {(tender.packageCount ?? 0) > 1 && (
@@ -322,7 +322,7 @@ export default function RetailerTenderDetailPage() {
         )}
       </section>
 
-      <section className="mx-auto mt-6 max-w-2xl">
+      <section className="mx-auto mt-6 max-w-4xl">
           <Card className="mb-6">
             <p className="text-sm text-concrete-grey">Location: {tender.location}</p>
             {deliveryPostcode && <p className="mt-1 text-sm font-semibold text-foundation-navy">Delivery postcode: {deliveryPostcode}</p>}

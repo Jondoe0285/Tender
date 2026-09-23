@@ -167,8 +167,8 @@ export function RegisterForm({ initialIntent }: { initialIntent: WorkspaceIntent
 
   return (
     <section className="mx-auto max-w-lg pt-12 pb-24">
-      <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-steel-blue">Create an account</p>
-      <h1 className="font-heading text-3xl font-bold tracking-tight text-foundation-navy">Create your Trade Tender account</h1>
+      <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-steel-blue">Create an account</p>
+      <h1 className="text-2xl font-semibold tracking-tight text-foundation-navy">Create your Trade Tender account</h1>
       <p className="mt-3 text-sm leading-relaxed text-concrete-grey">
         {supplies
           ? 'Set up the business, then tell us what you supply and where you operate.'

@@ -148,9 +148,9 @@ export default function RetailerProfilePage() {
               <div>
                 <p className="font-heading text-lg font-bold text-foundation-navy">Provider verification</p>
                 <p className="mt-1 max-w-xl text-sm text-concrete-grey">
-                  {profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business is Sole trader AI Verified based on your uploaded self-employment evidence. This is shown to Contractors on every quote you submit.'}
+                  {profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business has passed sole trader automated assessment based on your uploaded self-employment evidence. This is shown to Contractors on every quote you submit.'}
                   {profile.isSoleTrader && profile.verificationStatus !== 'VERIFIED' && 'Your profile is marked as a sole trader. Upload self-employment evidence to become AI verified; until then your quotes show a Sole Trader status so Contractors can complete suitable checks.'}
-                  {!profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business is Incorporated AI Verified based on your Certificate of Incorporation and required service evidence. This is shown to Contractors on every quote you submit.'}
+                  {!profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business has passed incorporated automated assessment based on your Certificate of Incorporation and required service evidence. This is shown to Contractors on every quote you submit.'}
                   {profile.verificationStatus === 'PENDING' && 'Your verification request is under review. We will update your status once it has been checked.'}
                   {profile.verificationStatus === 'REJECTED' && 'Your last verification request was not approved. You can request verification again at any time.'}
                   {profile.verificationStatus === 'EXPIRED' && 'One or more of your verification documents have expired, so your verified status has been removed. Upload a replacement to restart the review.'}

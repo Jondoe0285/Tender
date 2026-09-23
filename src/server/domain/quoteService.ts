@@ -14,6 +14,7 @@ import { syncVerificationExpiryForUserIds } from '@/server/domain/verificationDo
 import { VERIFICATION_DOCUMENT_TYPES } from '@/lib/verification-documents';
 import { pricedQuoteLine } from '@/lib/quote-pricing';
 import { PERCENTAGE_RELEASE_SECOND_APPROVER_GBP } from '@/lib/launch-credits';
+import { issuedTenderSpecHash } from '@/lib/package-spec';
 
 export function isQuoteRetentionLocked(retentionLockedUntil: Date | null | undefined, now = new Date()): boolean {
   return retentionLockedUntil !== null && retentionLockedUntil !== undefined && retentionLockedUntil > now;
@@ -65,8 +66,13 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
   const serviceCategories = await getUserTenderServiceCategories(retailerId);
   const tender = await prisma.tender.findUniqueOrThrow({
     where: { id: tenderId },
-    include: { client: { select: { email: true } }, items: { where: { category: { in: serviceCategories } }, select: { id: true, category: true, quantity: true } } },
+    include: {
+      client: { select: { email: true } },
+      items: { where: { category: { in: serviceCategories } }, select: { id: true, category: true, quantity: true } },
+      packages: { select: { specHash: true }, orderBy: { packageIndex: 'asc' } },
+    },
   });
+  const packageSpecHash = issuedTenderSpecHash(tender.packages.map((pkg) => pkg.specHash).filter(Boolean));
   const providerProfile = await prisma.retailerProfile.findUnique({ where: { userId: retailerId }, select: { standardQuoteValidityDays: true } });
   const validityDays = providerProfile?.standardQuoteValidityDays ?? 30;
   if (tender.supplyDate && !input.deliveryDateConfirmed) {
@@ -108,6 +114,7 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
       deliveryInfo: input.deliveryInfo,
       validityDays,
       status: 'SUBMITTED' as const,
+      packageSpecHash,
       lines: { create: pricedLines },
       charges: { create: input.charges },
   };
@@ -171,6 +178,7 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
       deliveryDateConfirmed: true,
       deliveryInfo: true,
       validityDays: true,
+      packageSpecHash: true,
       lines: {
         select: {
           tenderItemId: true,
@@ -186,6 +194,7 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
       charges: { select: { id: true, description: true, priceGbp: true } },
       status: true,
       submittedAt: true,
+      award: { select: { id: true, awardedAt: true, packageSpecHash: true } },
     },
     orderBy: { submittedAt: 'asc' },
   });
@@ -222,6 +231,7 @@ export async function listQuotesForClientTender(clientId: string, tenderId: stri
         verifiedDocumentLabels: verifiedDocumentsByRetailerId.get(retailerId) ?? [],
         independentlyVerified: independentTierByRetailerId.has(retailerId),
         independentReviewTier: independentTierByRetailerId.get(retailerId) ?? null,
+        award: quote.award,
       };
     }
 

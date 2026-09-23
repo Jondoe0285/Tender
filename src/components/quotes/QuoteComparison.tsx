@@ -20,6 +20,7 @@ type QuoteCommon = {
   verifiedDocumentLabels: string[];
   independentlyVerified: boolean;
   independentReviewTier: 'BRONZE' | 'SILVER' | 'GOLD' | null;
+  award?: { id: string; awardedAt: string; packageSpecHash: string } | null;
 };
 
 type ActiveQuote = QuoteCommon & {
@@ -50,13 +51,13 @@ function ProviderVerificationBadge({ status, verifiedDocumentLabels, independent
     return <span title={`${docLabel} — ${independentReviewTierDescription(tier)} Sinclair Safety Solutions Ltd completed this professional review through the HSQE Consult Hub platform. This does not replace your own due diligence before any formal agreement.`}><StatusBadge status="approved">{bannerLabel}</StatusBadge></span>;
   }
   if (status === 'VERIFIED') {
-    const docLabel = soleTrader ? 'Sole trader AI Verified' : 'Incorporated AI Verified';
+    const docLabel = soleTrader ? 'Sole trader automated assessment' : 'Incorporated automated assessment';
     const evidenceLabel = soleTrader ? 'self-employment' : 'legal-compliance & incorporation';
-    const title = verifiedDocumentLabels.length > 0 ? `${docLabel} — Automated ${evidenceLabel} evidence reviewed: ${verifiedDocumentLabels.join(', ')}. AI may make mistakes; complete your own due diligence.` : `${docLabel} — Automated ${evidenceLabel} assessment passed. AI may make mistakes; complete your own due diligence.`;
+    const title = verifiedDocumentLabels.length > 0 ? `${docLabel} — Automated ${evidenceLabel} evidence reviewed: ${verifiedDocumentLabels.join(', ')}. Complete your own due diligence.` : `${docLabel} — Automated ${evidenceLabel} assessment passed. Complete your own due diligence.`;
     return <span title={title}><StatusBadge status="approved">Verified</StatusBadge></span>;
   }
   if (soleTrader) {
-    return <span title="Sole Trader (Unverified) — This Provider declared sole-trader status and has not yet completed AI verification. Complete your own identity, insurance, competence, and commercial checks before appointing them."><StatusBadge status="neutral">Sole Trader</StatusBadge></span>;
+    return <span title="Sole Trader (Unverified) — This Provider declared sole-trader status and has not yet completed automated assessment. Complete your own identity, insurance, competence, and commercial checks before appointing them."><StatusBadge status="neutral">Sole Trader</StatusBadge></span>;
   }
   if (status === 'PENDING') return <StatusBadge status="pending">Verification pending</StatusBadge>;
   if (status === 'EXPIRED') return <span title="This Provider's verification lapsed because a document expired."><StatusBadge status="attention">Verification expired</StatusBadge></span>;
@@ -121,6 +122,8 @@ export function QuoteComparison({
     submittedAt: 'Submitted date',
   };
 
+  const awarded = quotes.find((quote) => quote.award)?.award;
+
   return (
     <>
       <p className="sr-only" aria-live="polite">
@@ -130,22 +133,28 @@ export function QuoteComparison({
         <p className="text-sm text-concrete-grey">Compare {quotes.length} formal quote{quotes.length === 1 ? '' : 's'} side by side.</p>
         <p className="text-xs text-concrete-grey">Select a column heading to sort</p>
       </div>
+      {awarded && (
+        <div className="mb-5 rounded-lg border border-approved/40 bg-approved/5 px-4 py-3">
+          <p className="text-sm font-semibold text-foundation-navy">Award recorded</p>
+          <p className="mt-1 text-xs text-concrete-grey">This package was awarded on {new Date(awarded.awardedAt).toLocaleDateString('en-GB')} against the issued specification hash.</p>
+        </div>
+      )}
 
-      <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Verification key</p>
+      <details className="mb-5 rounded-md border border-slate-200 bg-white px-4 py-3">
+        <summary className="cursor-pointer text-sm font-semibold text-foundation-navy">Verification key</summary>
         <div className="mt-3 grid gap-3 text-sm md:grid-cols-3 lg:grid-cols-6">
           <div><StatusBadge status="neutral">Unverified</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Unverified</p><p className="mt-1 text-xs text-concrete-grey">No approved verification evidence recorded on the platform.</p></div>
           <div><StatusBadge status="neutral">Sole Trader</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Sole Trader (Unverified)</p><p className="mt-1 text-xs text-concrete-grey">Declared sole trader status; complete suitable due diligence before appointment.</p></div>
-          <div><StatusBadge status="approved">Verified</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Sole trader AI Verified / Incorporated AI Verified</p><p className="mt-1 text-xs text-concrete-grey">Passed automated self-employment or incorporation &amp; legal-compliance checks.</p></div>
+          <div><StatusBadge status="approved">Verified</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Sole trader automated assessment / Incorporated automated assessment</p><p className="mt-1 text-xs text-concrete-grey">Passed automated self-employment or incorporation &amp; legal-compliance checks.</p></div>
           <div><StatusBadge status="approved">Bronze</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Enhanced Bronze Verification</p><p className="mt-1 text-xs text-concrete-grey">Health &amp; Safety legal requirements, permits, insurances, and competent advice reviewed.</p></div>
           <div><StatusBadge status="approved">Silver</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Enhanced Silver Verification</p><p className="mt-1 text-xs text-concrete-grey">Bronze criteria plus employee &amp; managerial safety training evidence reviewed.</p></div>
           <div><StatusBadge status="approved">Gold</StatusBadge><p className="mt-2 text-xs font-semibold text-foundation-navy">Enhanced Gold Verification</p><p className="mt-1 text-xs text-concrete-grey">Bronze &amp; Silver criteria plus comprehensive management system or SSIP membership reviewed.</p></div>
         </div>
         <p className="mt-3 text-xs text-concrete-grey">These statuses do not replace your own suitable due diligence before entering a formal agreement.</p>
         <Link href="/policies/verification-policy" className="mt-2 inline-block text-xs font-semibold text-steel-blue hover:text-foundation-navy">Read the detailed verification policy</Link>
-      </div>
+      </details>
 
-      <div className="hidden overflow-x-auto rounded-card border border-slate-200 bg-white shadow-soft lg:block">
+      <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white lg:block">
         <table className="w-full min-w-[900px] border-collapse text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-concrete-grey">
             <tr>
@@ -249,7 +258,7 @@ function QuoteRow({
         <div className="mt-2"><ProviderVerificationBadge status={quote.providerVerificationStatus} verifiedDocumentLabels={quote.verifiedDocumentLabels} independentlyVerified={quote.independentlyVerified} independentReviewTier={quote.independentReviewTier} soleTrader={quote.providerIsSoleTrader} /></div>
       </td>
       <td className="px-5 py-5">
-        <p className="font-heading text-xl font-bold text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
+        <p className="text-lg font-semibold tabular-nums tracking-tight text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
         {quote.status === 'SUBMITTED' && quote.priceGbp === bestPrice && <StatusBadge status="approved">Best price</StatusBadge>}
       </td>
       <td className="px-5 py-5">
@@ -296,7 +305,7 @@ function QuoteCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">{quote.reference}</p>
-          <p className="mt-1 font-heading text-2xl font-bold text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums tracking-tight text-foundation-navy">£{quote.priceGbp} excl. VAT</p>
           <div className="mt-2"><ProviderVerificationBadge status={quote.providerVerificationStatus} verifiedDocumentLabels={quote.verifiedDocumentLabels} independentlyVerified={quote.independentlyVerified} independentReviewTier={quote.independentReviewTier} soleTrader={quote.providerIsSoleTrader} /></div>
         </div>
         <StatusBadge status={quote.status === 'ACCEPTED' ? 'approved' : 'neutral'}>{quote.status}</StatusBadge>
@@ -458,7 +467,7 @@ function DecisionActions({
         {showDeclaration && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-foundation-navy/50 p-4">
             <Card className="max-w-lg">
-              <h3 className="font-heading text-lg font-bold text-foundation-navy">Before you proceed</h3>
+              <h3 className="text-base font-semibold tracking-tight text-foundation-navy">Before you proceed</h3>
             <p className="mt-3 text-sm text-concrete-grey">Trade Tender&rsquo;s automated review assesses legal-compliance evidence only and may make mistakes. You retain full responsibility for suitable independent due diligence before entering any formal agreement, and Trade Tender accepts no liability for the Provider&rsquo;s work, conduct, or the outcome of your engagement with them.</p>
               <label className="mt-4 flex items-start gap-3 text-sm text-foundation-navy">
                 <input type="checkbox" checked={declarationChecked} onChange={(event) => setDeclarationChecked(event.target.checked)} className="mt-1 h-4 w-4 accent-trade-blue" />
@@ -476,7 +485,7 @@ function DecisionActions({
   }
   if (quote.status === 'ACCEPTED' && isPendingPayment) {
     if (pendingCheckoutUrl) {
-      return <a href={pendingCheckoutUrl} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-trade-blue px-5 text-sm font-semibold text-site-white shadow-soft hover:bg-foundation-navy">Continue payment</a>;
+      return <a href={pendingCheckoutUrl} className="inline-flex min-h-11 items-center justify-center rounded-md bg-trade-blue px-5 text-sm font-semibold text-site-white hover:bg-trade-blue/90">Continue payment</a>;
     }
     if (allowTestPayments) {
       return <Button onClick={onSimulateReleasePayment} loading={busy}>Complete test payment</Button>;

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CATEGORIES, isSpecifiedItemService, isValidTenderQuantity, URGENCY_OPTIONS, REQUIREMENT_OPTIONS } from '@/lib/categories';
 import type { CategoryCatalog } from '@/lib/catalog';
 import { locationHasPostcode } from '@/lib/geography';
+import { ATTACHMENT_KINDS } from '@/lib/attachment-kinds';
 import { MAX_TENDER_ATTACHMENT_TOTAL_BYTES, verifyTenderAttachment } from '@/lib/attachment-utils';
 import { MATERIAL_PACKS, WASTE_CONTAINERS, specIssues, type TenderLineSpec } from '@/lib/tender-spec';
 
@@ -10,6 +11,7 @@ const tenderAttachmentSchema = z.object({
   mimeType: z.string().trim().min(1).max(128),
   sizeBytes: z.number().int().nonnegative(),
   dataBase64: z.string().min(1).max(Math.ceil((10 * 1024 * 1024) * 4 / 3) + 4),
+  kind: z.enum(ATTACHMENT_KINDS).optional().default('OTHER'),
 }).transform((attachment, context) => {
   try {
     return { ...attachment, ...verifyTenderAttachment(attachment) };

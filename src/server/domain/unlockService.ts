@@ -9,12 +9,31 @@ import { getTenderUnlockFeeGbp } from '@/server/domain/platformSettings';
 import { consumePaymentWaiver } from '@/server/domain/paymentWaiverService';
 import { HARVEST_CAP_MESSAGE, UNLOCK_HARVEST_CAP, UNLOCK_HARVEST_WINDOW_DAYS, harvestUnlockCount } from '@/lib/harvest';
 import { effectiveLaunchCredits } from '@/lib/launch-credits';
+import { credentialsMessage, missingCredentials } from '@/lib/package-credentials';
 
 type UnlockOutcome =
   | { status: 'ALREADY_UNLOCKED' }
   | { status: 'UNLOCKED_WITH_CREDIT' }
   | { status: 'UNLOCKED_WITHOUT_PAYMENT_REQUIRED' }
   | { status: 'PAYMENT_REQUIRED'; paymentId: string; checkoutUrl: string | null; devMode: boolean };
+
+export async function assertPackageUnlockCredentials(retailerId: string, tenderId: string) {
+  const [tender, profile] = await Promise.all([
+    prisma.tender.findUnique({
+      where: { id: tenderId },
+      select: { items: { select: { category: true, subcategory: true, specJson: true } }, packages: { select: { category: true, subcategory: true, specJson: true } } },
+    }),
+    prisma.retailerProfile.findUnique({
+      where: { userId: retailerId },
+      select: { verificationDocuments: { select: { documentType: true, expiryDate: true, verified: true } } },
+    }),
+  ]);
+  const packages = (tender?.packages.length ? tender.packages : tender?.items) ?? [];
+  const missing = missingCredentials(packages, profile?.verificationDocuments ?? [], 'unlock');
+  if (missing.length > 0) {
+    throw new ForbiddenError(credentialsMessage(missing) || 'Required credentials are missing for this package.');
+  }
+}
 
 export async function assertUnlockHarvestCap(retailerId: string) {
   const since = new Date(Date.now() - UNLOCK_HARVEST_WINDOW_DAYS * 24 * 60 * 60 * 1000);
@@ -37,6 +56,7 @@ export async function assertUnlockHarvestCap(retailerId: string) {
 export async function requestUnlock(retailerId: string, tenderId: string, mobileReturnUrl?: string): Promise<UnlockOutcome> {
   await assertRetailerEligibleForTender(retailerId, tenderId);
   await assertTenderOpenForActivity(tenderId);
+  await assertPackageUnlockCredentials(retailerId, tenderId);
   await assertUnlockHarvestCap(retailerId);
 
   const existing = await prisma.unlock.findUnique({
@@ -189,7 +209,7 @@ export async function getUnlockedTenderForRetailer(retailerId: string, tenderId:
       status: true,
       createdAt: true,
       attachments: {
-        select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
+        select: { id: true, fileName: true, mimeType: true, sizeBytes: true, kind: true, version: true },
       },
       items: {
         where: provisionWhere,
@@ -208,6 +228,10 @@ export async function getUnlockedTenderForRetailer(retailerId: string, tenderId:
           quantity: true,
           description: true,
           specJson: true,
+          revision: true,
+          specHash: true,
+          issuedAt: true,
+          packageIndex: true,
           urgency: true,
           closingDate: true,
           status: true,

@@ -11,8 +11,8 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-card border border-slate-200 bg-white p-6 shadow-soft ${
-        interactive ? 'transition-colors duration-150 hover:border-trade-blue/40' : ''
+      className={`rounded-md border border-slate-200 bg-white p-5 ${
+        interactive ? 'transition-colors duration-150 hover:border-trade-blue/50 hover:bg-slate-50/60' : ''
       } ${className}`}
     >
       {children}

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
 import { LinkButton } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { PageHeader, Metric } from '@/components/ui/PageHeader';
 import { getCurrentUser } from '@/server/auth/session';
 import { listMatchedSummariesForRetailer } from '@/server/domain/tenderService';
 import { prisma } from '@/server/data/prisma';
@@ -76,12 +76,17 @@ export default async function RetailerPage() {
 
   return (
     <AppShell role="retailer" title="Dashboard">
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <p className="max-w-xl text-base leading-relaxed text-concrete-grey">
-            Quote the briefs you have unlocked this week. Contact stays closed until the buyer accepts.
-          </p>
-          <LinkButton href="/retailer/opportunities" size="lg">Opportunities</LinkButton>
+      <div className="mx-auto max-w-6xl">
+        <PageHeader
+          kicker="This week"
+          description="Quote the briefs you have unlocked. Contact stays closed until the buyer accepts."
+          actions={<LinkButton href="/retailer/opportunities">Opportunities</LinkButton>}
+        />
+
+        <div className="mb-8 grid gap-3 sm:grid-cols-4">
+          {metrics.map((metric) => (
+            <Metric key={metric.label} label={metric.label} value={metric.value} />
+          ))}
         </div>
 
         <WorkQueue
@@ -91,15 +96,6 @@ export default async function RetailerPage() {
           emptyHref="/user/profile"
           emptyAction="Update supplying profile"
         />
-
-        <div className="mb-10 grid gap-5 sm:grid-cols-4">
-          {metrics.map((metric) => (
-            <Card key={metric.label} className="border-l-4 border-l-steel-blue">
-              <p className="font-heading text-4xl font-bold text-foundation-navy">{metric.value}</p>
-              <p className="mt-2 text-sm font-medium text-concrete-grey">{metric.label}</p>
-            </Card>
-          ))}
-        </div>
         {unlockFeeGbp > 0 && (
           <p className="text-xs text-concrete-grey">Unlock fee is £{unlockFeeGbp} excl. VAT unless a launch credit applies.</p>
         )}

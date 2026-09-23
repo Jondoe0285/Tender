@@ -16,6 +16,7 @@ export const USER_NAV: NavGroup[] = [
     items: [
       { label: 'Create tender', href: '/user/tenders/new' },
       { label: 'My tenders', href: '/user/tenders' },
+      { label: 'Awarded', href: '/user/awarded' },
     ],
   },
   {

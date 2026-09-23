@@ -32,6 +32,15 @@ enum QuoteStatus {
   REJECTED
 }
 
+enum AttachmentKind {
+  DRAWING
+  SPECIFICATION
+  RAMS
+  METHOD_STATEMENT
+  INSURANCE
+  OTHER
+}
+
 enum LegalHoldScope {
   TENDER
   QUOTE
@@ -187,6 +196,8 @@ model User {
   revokedPaymentWaivers PaymentWaiver[] @relation("PaymentWaiverRevokedBy")
   receivedTenderWarnings TenderWarning[] @relation("TenderWarningRecipient")
   issuedTenderWarnings TenderWarning[] @relation("TenderWarningIssuer")
+  projectsCreated   Project[] @relation("ProjectCreator")
+  awardsGiven       Award[]   @relation("AwardActor")
 }
 
 model RateLimitEntry {
@@ -304,6 +315,7 @@ model ClientCompany {
   updatedAt     DateTime @updatedAt
 
   members ClientCompanyMember[]
+  projects Project[]
 
   @@unique([companyName, branchIdentifier])
 }
@@ -564,11 +576,30 @@ model RetailerTeamMember {
   @@unique([retailerId, userId])
 }
 
+model Project {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  location    String
+  createdById String
+  createdBy   User     @relation("ProjectCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenders     Tender[]
+  awards      Award[]
+
+  @@unique([companyId, name])
+  @@index([companyId, createdAt])
+}
+
 model Tender {
   id            String       @id @default(cuid())
   reference     String       @unique
   clientId      String
   client        User         @relation("ClientTenders", fields: [clientId], references: [id])
+  projectId     String?
+  project       Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
   category      String
   subcategory   String
   service       String   @default("Materials")
@@ -597,6 +628,12 @@ model Tender {
   directContactRequests DirectContactRequest[]
   legalHolds    LegalHold[] @relation("LegalHoldTender")
   warnings      TenderWarning[]
+  awards        Award[]
+
+  @@index([status, closingDate])
+  @@index([category, subcategory, status])
+  @@index([projectId])
+  @@index([clientId, status, closingDate])
 }
 
 model TenderWarning {
@@ -633,10 +670,15 @@ model TenderPackage {
   requirements String       // comma-separated tick-box requirements
   description  String
   specJson     String       @default("{}")
+  revision     Int          @default(1)
+  specHash     String       @default("")
+  issuedAt     DateTime?
+  packageIndex Int          @default(0)
   status       TenderStatus @default(OPEN)
   createdAt    DateTime     @default(now())
 
   @@index([tenderId, status, createdAt])
+  @@index([tenderId, packageIndex])
 }
 
 model TenderMessage {
@@ -663,9 +705,15 @@ model TenderAttachment {
   mimeType    String
   sizeBytes   Int
   content     Bytes
+  kind        AttachmentKind @default(OTHER)
+  version     Int      @default(1)
+  packageIndex Int?
+  objectKey   String?
   uploadedAt  DateTime @default(now())
   retentionLockedUntil DateTime?
   legalHolds  LegalHold[] @relation("LegalHoldTenderAttachment")
+
+  @@index([tenderId, kind])
 }
 
 model TenderItem {
@@ -676,8 +724,11 @@ model TenderItem {
   subcategory String
   item        String?
   quantity    String
+  quantityValue Float?
+  unit        String?
   description String
   specJson    String   @default("{}")
+  packageIndex Int     @default(0)
   createdAt   DateTime @default(now())
   matches     TenderItemMatch[]
   quoteLines  QuoteLine[]
@@ -735,12 +786,14 @@ model Quote {
   submittedAt  DateTime    @default(now())
   retentionLockedUntil DateTime?
   verificationDeclarationAcceptedAt DateTime?
+  packageSpecHash String @default("")
 
   releases     ContactRelease[]
   releasePayment Payment? @relation("QuoteReleasePayment")
   lines        QuoteLine[]
   charges      QuoteCharge[]
   legalHolds   LegalHold[] @relation("LegalHoldQuote")
+  award        Award?
 }
 
 model LegalHold {
@@ -775,6 +828,23 @@ model QuoteCharge {
   priceGbp    Int
 
   @@index([quoteId])
+}
+
+model Award {
+  id              String   @id @default(cuid())
+  projectId       String?
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  tenderId        String
+  tender          Tender   @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  quoteId         String   @unique
+  quote           Quote    @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  packageSpecHash String
+  awardedById     String
+  awardedBy       User     @relation("AwardActor", fields: [awardedById], references: [id])
+  awardedAt       DateTime @default(now())
+
+  @@index([tenderId, awardedAt])
+  @@index([projectId])
 }
 
 model QuoteLine {

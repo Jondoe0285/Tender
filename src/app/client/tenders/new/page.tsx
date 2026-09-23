@@ -8,10 +8,13 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Combobox } from '@/components/ui/Combobox';
 import { Stepper, type WizardStep } from '@/components/ui/Stepper';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Label, Input, Select, Textarea, FieldGroup } from '@/components/ui/Field';
-import { REQUIREMENT_OPTIONS, SERVICE_CATALOG, isSpecifiedItemService, type ServiceName } from '@/lib/categories';
+import { SERVICE_CATALOG, isSpecifiedItemService, type ServiceName } from '@/lib/categories';
 import { COMMON_EWC_CODES, MATERIAL_PACKS, WASTE_CONTAINERS, specIssues, type TenderLineSpec } from '@/lib/tender-spec';
 import { buildSafeAttachmentName } from '@/lib/attachment-utils';
+import { ATTACHMENT_KIND_LABELS, ATTACHMENT_KINDS, type AttachmentKind } from '@/lib/attachment-kinds';
+import { laneComplianceForServices } from '@/lib/lane-compliance';
 import { getModerationMessage, stripDetectedContactDetails } from '@/lib/moderation';
 
 function getServiceSenseCheck(service: string | undefined, quantityValue: string, quantityUnit: string): { quantityError?: string; unitError?: string; message?: string } {
@@ -68,11 +71,9 @@ const SERVICE_MINIMUM_REQUIREMENTS = ['CSCS carded operatives required', 'SSIP m
 const PLANT_HIRE_SUPPORT_OPTIONS = ['Driver/operator required', 'Lift plan required', 'Delivery and collection required', 'Fuel included', 'Lifting accessories required', 'Banksman or slinger/signaller required', 'Ground protection mats required', 'Operator CPCS or NPORS evidence required', 'Thorough examination certificate required', 'Out-of-hours delivery required', 'Road permits or traffic management required', 'Machine insurance evidence required'];
 
 const STEPS: WizardStep[] = [
-  { id: 1, label: 'Project Details' },
-  { id: 2, label: 'Tender Packages' },
-  { id: 3, label: 'Additional Requirements' },
-  { id: 4, label: 'Upload Files' },
-  { id: 5, label: 'Review & Submit' },
+  { id: 1, label: 'Project' },
+  { id: 2, label: 'Packages' },
+  { id: 3, label: 'Issue' },
 ];
 
 type FormState = {
@@ -336,7 +337,7 @@ function NewTenderForm() {
   const [furthestStep, setFurthestStep] = useState(1);
   const [activePackageIndex, setActivePackageIndex] = useState(0);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [files, setFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<Array<{ id: string; file: File; kind: AttachmentKind }>>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -384,7 +385,7 @@ function NewTenderForm() {
       const attachments = await Promise.all(tender.attachments.map(async (attachment) => {
         const attachmentResponse = await fetch(`/api/tenders/${encodeURIComponent(sourceTenderId)}/attachments/${encodeURIComponent(attachment.id)}`);
         if (!attachmentResponse.ok) throw new Error('Unable to copy tender attachments');
-        return new File([await attachmentResponse.blob()], attachment.fileName, { type: attachment.mimeType });
+        return { id: attachment.id, file: new File([await attachmentResponse.blob()], attachment.fileName, { type: attachment.mimeType }), kind: 'OTHER' as AttachmentKind };
       }));
       if (cancelled) return;
       setForm({
@@ -660,12 +661,12 @@ function NewTenderForm() {
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(event.target.files ?? []);
-    setFiles((prev) => [...prev, ...selected]);
+    setFiles((prev) => [...prev, ...selected.map((file) => ({ id: `${file.name}-${file.size}-${file.lastModified}`, file, kind: 'OTHER' as AttachmentKind }))]);
     event.target.value = '';
   }
 
   function removeFile(name: string) {
-    setFiles((prev) => prev.filter((file) => file.name !== name));
+    setFiles((prev) => prev.filter((entry) => entry.file.name !== name));
   }
 
   function removeDetectedContactDetails() {
@@ -686,8 +687,8 @@ function NewTenderForm() {
 
   async function prepareAttachments() {
     return Promise.all(
-      files.map(async (file) => {
-        const arrayBuffer = await file.arrayBuffer();
+      files.map(async (entry) => {
+        const arrayBuffer = await entry.file.arrayBuffer();
         const bytes = new Uint8Array(arrayBuffer);
         let binary = '';
         bytes.forEach((byte) => {
@@ -695,17 +696,18 @@ function NewTenderForm() {
         });
 
         return {
-          name: buildSafeAttachmentName(file.name),
-          mimeType: file.type || 'application/octet-stream',
-          sizeBytes: file.size,
+          name: buildSafeAttachmentName(entry.file.name),
+          mimeType: entry.file.type || 'application/octet-stream',
+          sizeBytes: entry.file.size,
           dataBase64: btoa(binary),
+          kind: entry.kind,
         };
       })
     );
   }
 
   async function handleSubmit() {
-    const requiredStepsValid = [1, 2, 3].every((targetStep) => validateStep(targetStep));
+    const requiredStepsValid = [1, 2].every((targetStep) => validateStep(targetStep));
     if (!requiredStepsValid) {
       setError('Some required details are missing — please check the earlier steps.');
       return;
@@ -784,10 +786,10 @@ function NewTenderForm() {
 
   return (
     <AppShell role="client" title="Create tender">
-      <div className="mx-auto max-w-2xl">
-        <p className="mb-6 max-w-xl text-sm leading-relaxed text-concrete-grey">
-          {copyFrom ? 'Review the copied tender details, set a new quote deadline, and submit it as a new tender.' : 'Complete the project details, then provide requirements for each selected service. Providers only see full details once they unlock your tender.'}
-        </p>
+      <div className="mx-auto max-w-4xl">
+        <PageHeader
+          description={copyFrom ? 'Review the copied tender details, set a new quote deadline, and issue it as a new package.' : 'Compile a project, specify each package, then issue the frozen tender. Suppliers only see full details once they unlock.'}
+        />
 
         <Stepper steps={STEPS} currentStep={step} furthestStep={furthestStep} onStepClick={fastTravel} />
 
@@ -806,7 +808,7 @@ function NewTenderForm() {
 
         {step === 1 && (
           <Card className="flex flex-col gap-6">
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">Project Details</h2>
+            <h2 className="text-base font-semibold tracking-tight text-foundation-navy">Project</h2>
             <FieldGroup>
               <Label htmlFor="project-name">Project name</Label>
               <Input
@@ -891,9 +893,10 @@ function NewTenderForm() {
         )}
 
         {step === 2 && (
+          <>
           <Card className="flex flex-col gap-6">
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">{activeCategory} Requirements</h2>
-            <p className="text-sm text-concrete-grey">Complete {currentPackageLabel()} of {form.items.length + 1}. If more than one service was selected, Continue opens the next package before the Additional Requirements step.</p>
+            <h2 className="text-base font-semibold tracking-tight text-foundation-navy">{activeCategory}</h2>
+            <p className="text-sm text-concrete-grey">Complete {currentPackageLabel()} of {form.items.length + 1}. If more than one service was selected, Continue opens the next package before Issue.</p>
             {Object.keys(errors).length > 0 && (
               <div role="alert" className="rounded-lg border border-attention/40 bg-attention/5 px-4 py-3 text-sm text-attention">
                 <p className="font-semibold">{currentPackageLabel()} cannot continue yet.</p>
@@ -1027,15 +1030,13 @@ function NewTenderForm() {
               </button>
             </div>
           </Card>
-        )}
-
-        {step === 3 && (
           <Card className="flex flex-col gap-6">
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">Additional Requirements</h2>
+            <h2 className="text-base font-semibold tracking-tight text-foundation-navy">Lane compliance</h2>
+            <p className="text-sm text-concrete-grey">Only requirements that apply to the selected supply lanes are shown.</p>
             <fieldset>
               <legend className="text-sm font-semibold text-foundation-navy">Site, delivery and supporting requirements</legend>
               <div className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-                {REQUIREMENT_OPTIONS.map((option) => (
+                {laneComplianceForServices([form.category, ...form.items.map((item) => item.category), ...form.selectedServices]).map((option) => (
                   <label key={option} className="flex items-center gap-3 text-sm text-concrete-grey">
                     <input
                       type="checkbox"
@@ -1049,14 +1050,10 @@ function NewTenderForm() {
               </div>
             </fieldset>
           </Card>
-        )}
-
-        {step === 4 && (
           <Card className="flex flex-col gap-4">
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">Upload Files (optional)</h2>
+            <h2 className="text-base font-semibold tracking-tight text-foundation-navy">Classed documents</h2>
             <p className="text-sm text-concrete-grey">
-              Attach drawings, specifications, or site photos. These files are saved with the tender, but
-              Providers cannot preview or download them until they unlock the full detail set.
+              Classify each file as a drawing, specification, RAMS, method statement, insurance, or other. Suppliers cannot download these until they unlock.
             </p>
             <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-6 py-10 text-center hover:border-steel-blue">
               <span className="text-sm font-semibold text-steel-blue">Choose files or drag them here</span>
@@ -1071,27 +1068,39 @@ function NewTenderForm() {
             </label>
             {files.length > 0 && (
               <ul className="flex flex-col gap-2">
-                {files.map((file) => (
-                  <li key={file.name} className="flex items-center justify-between gap-4 rounded-md bg-slate-50 px-4 py-2 text-sm">
-                    <span className="truncate text-foundation-navy">{file.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeFile(file.name)}
-                      className="text-xs font-semibold text-attention hover:underline"
-                    >
-                      Remove
-                    </button>
+                {files.map((entry) => (
+                  <li key={entry.id} className="flex flex-col gap-2 rounded-md bg-slate-50 px-4 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+                    <span className="truncate text-foundation-navy">{entry.file.name}</span>
+                    <div className="flex items-center gap-3">
+                      <select
+                        value={entry.kind}
+                        onChange={(event) => setFiles((current) => current.map((file) => file.id === entry.id ? { ...file, kind: event.target.value as AttachmentKind } : file))}
+                        className="min-h-11 rounded-md border border-slate-300 px-2 text-sm"
+                      >
+                        {ATTACHMENT_KINDS.map((kind) => (
+                          <option key={kind} value={kind}>{ATTACHMENT_KIND_LABELS[kind]}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(entry.file.name)}
+                        className="text-xs font-semibold text-attention hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
             )}
           </Card>
+        </>
         )}
 
-        {step === 5 && (
+        {step === 3 && (
           <Card className="flex flex-col gap-5">
-            <h2 className="font-heading text-lg font-bold text-foundation-navy">Review &amp; Submit</h2>
-            <ReviewSection title="Project Details" onEdit={() => setStep(1)}>
+            <h2 className="text-base font-semibold tracking-tight text-foundation-navy">Issue package</h2>
+            <ReviewSection title="Project" onEdit={() => setStep(1)}>
               <dl className="grid gap-4 sm:grid-cols-2">
                 <ReviewItem label="Project name" value={form.projectName} />
                 <ReviewItem label="Selected services" value={form.selectedServices.join(', ')} />
@@ -1105,7 +1114,7 @@ function NewTenderForm() {
                 <p className="whitespace-pre-line text-sm text-foundation-navy">{form.description || 'None'}</p>
               </div>
             </ReviewSection>
-            <ReviewSection title="Tender Packages" onEdit={() => { setActivePackageIndex(0); setStep(2); }}>
+            <ReviewSection title="Packages" onEdit={() => { setActivePackageIndex(0); setStep(2); }}>
               <dl className="grid gap-4 sm:grid-cols-2">
                 <ReviewItem label="Tender packages" value={`${form.items.length + 1} package(s)`} />
                 <ReviewItem label="Primary quantity" value={`${form.quantityValue} ${form.quantityUnit}`.trim()} />
@@ -1117,11 +1126,11 @@ function NewTenderForm() {
                 </ul>
               )}
             </ReviewSection>
-            <ReviewSection title="Additional Requirements" onEdit={() => setStep(3)}>
+            <ReviewSection title="Lane compliance" onEdit={() => setStep(2)}>
               <ReviewItem label="Requirements" value={form.requirements.join(', ') || 'None'} />
             </ReviewSection>
-            <ReviewSection title="Attachments" onEdit={() => setStep(4)}>
-              <ReviewItem label="Files" value={files.length > 0 ? `${files.length} file(s) selected and saved with this tender` : 'None'} />
+            <ReviewSection title="Classed documents" onEdit={() => setStep(2)}>
+              <ReviewItem label="Files" value={files.length > 0 ? files.map((entry) => `${entry.file.name} (${ATTACHMENT_KIND_LABELS[entry.kind]})`).join(', ') : 'None'} />
             </ReviewSection>
             <ReviewSection title="Supplier contact" onEdit={() => setStep(3)}>
               <p className="mb-3 text-sm text-concrete-grey">Quotes stay the default path. Direct contact and professional interest stay off unless you opt in for this tender.</p>
@@ -1179,7 +1188,7 @@ function NewTenderForm() {
               </Button>
             ) : (
               <Button size="lg" loading={submitting} success={success} onClick={handleSubmit}>
-                Submit tender
+                Issue package
               </Button>
             )}
           </div>

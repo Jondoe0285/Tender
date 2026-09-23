@@ -58,8 +58,8 @@ test('verification policy and quote comparison document all 6 verification level
   const quoteComparison = readFileSync('src/components/quotes/QuoteComparison.tsx', 'utf8');
 
   // Documentation levels
-  assert.match(policyPage, /Sole trader AI Verified/);
-  assert.match(policyPage, /Incorporated AI Verified/);
+  assert.match(policyPage, /Sole trader automated assessment/);
+  assert.match(policyPage, /Incorporated automated assessment/);
   assert.match(policyPage, /Enhanced Bronze Verification/);
   assert.match(policyPage, /Enhanced Silver Verification/);
   assert.match(policyPage, /Enhanced Gold Verification/);

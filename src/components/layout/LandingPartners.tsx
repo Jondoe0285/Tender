@@ -22,7 +22,7 @@ export function LandingPartners() {
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-9 sm:px-10 lg:flex-row lg:items-center lg:justify-between">
         <div className="max-w-xl">
           <p className="text-xs font-semibold uppercase tracking-widest text-steel-blue">Partner information</p>
-          <h2 id="partner-information" className="mt-2 font-heading text-xl font-bold text-foundation-navy">Affiliated construction support</h2>
+          <h2 id="partner-information" className="mt-2 text-base font-semibold tracking-tight text-foundation-navy">Affiliated construction support</h2>
           <p className="mt-2 text-sm leading-relaxed text-concrete-grey">Partner information is separate from tender matching, quote ranking, supplier selection, and Contractor decisions.</p>
         </div>
         <div className="grid w-full min-w-0 grid-cols-2 gap-3 sm:flex sm:flex-wrap lg:justify-end">

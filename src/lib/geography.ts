@@ -96,15 +96,19 @@ export function locationHasPostcode(location: string): boolean {
   return extractPostcode(location) !== null;
 }
 
-/** Returns a broad town/area label suitable for pre-unlock opportunity views. */
-export function getBroadLocation(location: string): string {
-  const normalized = location.trim();
-  const knownTown = Object.keys(TOWN_COORDINATES).find((town) => normalized.toLowerCase().includes(town));
-  if (knownTown) return knownTown.replace(/\b\w/g, (letter) => letter.toUpperCase());
+/** Pre-unlock location is local authority plus postcode district only — never plot, street, or site name. */
+export function formatRetailerSummaryLocation(location: string): string {
+  const postcodeDistrict = getPostcodeDistrict(location);
+  const authority = getCountyForPostcode(location) ?? getRegionForPostcode(location);
+  if (postcodeDistrict && authority) return `${authority} (${postcodeDistrict})`;
+  if (postcodeDistrict) return postcodeDistrict;
+  if (authority) return authority;
+  return 'Location area available after unlock';
+}
 
-  const withoutPostcode = normalized.replace(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/gi, '').trim();
-  const area = withoutPostcode.split(',')[0]?.trim();
-  return area || 'Location area available after unlock';
+/** Returns a broad area label suitable for pre-unlock opportunity views. */
+export function getBroadLocation(location: string): string {
+  return formatRetailerSummaryLocation(location);
 }
 
 /** Finds the first known town name contained within free-text location/coverage strings. */

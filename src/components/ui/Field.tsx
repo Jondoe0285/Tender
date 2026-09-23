@@ -5,7 +5,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import type { InputHTMLAttributes, LabelHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 
 export const fieldControlClasses =
-  'w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-foundation-navy shadow-soft ' +
+  'w-full min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-foundation-navy ' +
   'transition-colors placeholder:text-concrete-grey hover:border-steel-blue/50 ' +
   'focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue focus:ring-offset-2 focus:ring-offset-site-white ' +
   'disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-concrete-grey';

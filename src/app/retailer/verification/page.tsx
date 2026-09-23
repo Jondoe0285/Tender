@@ -197,14 +197,14 @@ export default function ProviderVerificationPage() {
               className={`rounded-lg border p-4 transition-all ${selectedOption === 'ai' ? 'border-steel-blue bg-white shadow-sm ring-2 ring-steel-blue/20' : 'border-slate-200 bg-white'}`}
             >
               <div className="flex items-center justify-between gap-2">
-                <p className="font-heading text-base font-bold text-foundation-navy">AI Verification</p>
+                <p className="font-heading text-base font-bold text-foundation-navy">Automated assessment</p>
                 <StatusBadge status={verificationStatus === 'VERIFIED' ? 'approved' : verificationStatus === 'PENDING' ? 'pending' : 'neutral'}>
-                  {verificationStatus === 'VERIFIED' ? 'Verified' : 'AI Verified'}
+                  {verificationStatus === 'VERIFIED' ? 'Verified' : 'Automated'}
                 </StatusBadge>
               </div>
               <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-steel-blue">Automated Evidence Check &middot; Included</p>
               <p className="mt-2 text-xs leading-relaxed text-concrete-grey">
-                Upload your legal entity or self-employment evidence for automated AI verification assessment.
+                Upload your legal entity or self-employment evidence for automated assessment. This is not a human or AI professional review.
               </p>
               <div className="mt-4">
                 <Button

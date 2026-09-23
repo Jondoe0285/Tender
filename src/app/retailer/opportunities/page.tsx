@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { getCurrentUser } from '@/server/auth/session';
 import { listMatchedSummariesForRetailer } from '@/server/domain/tenderService';
 import { prisma } from '@/server/data/prisma';
@@ -69,11 +70,8 @@ export default async function NewOpportunitiesPage() {
 
   return (
     <AppShell role="retailer" title="Opportunities">
-      <div className="mx-auto max-w-4xl">
-        <p className="mb-6 max-w-xl text-sm text-concrete-grey">
-          Tenders matched to your categories and coverage areas that remain available to unlock.
-          Filter and save searches to quickly spot the opportunities worth unlocking.
-        </p>
+      <div className="mx-auto max-w-6xl">
+        <PageHeader description="Matched packages still available to unlock. Filter by lane and coverage, then unlock to quote against the frozen specification." />
         <OpportunitiesExplorer opportunities={opportunities} />
       </div>
     </AppShell>

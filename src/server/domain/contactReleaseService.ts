@@ -14,12 +14,13 @@ import { getPurchasedRetentionDeadline } from '@/server/domain/retentionService'
 import { consumePaymentWaiver } from '@/server/domain/paymentWaiverService';
 import { syncVerificationExpiry } from '@/server/domain/verificationDocumentService';
 import { userOwnsTender } from '@/server/domain/tenderService';
+import { issuedTenderSpecHash, STALE_QUOTE_REVISION_MESSAGE } from '@/lib/package-spec';
 
 type AcceptOutcome = { status: 'PAYMENT_REQUIRED' | 'RELEASED_WITH_CREDIT'; paymentId: string; checkoutUrl: string | null; devMode: boolean; feeGbp: number; vatGbp: number; totalAmountGbp: number; creditsLeft?: number };
 
 /** Accepting a quote enters a pending release-fee state — no contact data is exposed yet (SEC-035). */
 export async function acceptQuote(clientId: string, quoteId: string, mobileReturnUrl?: string, declarationAccepted = false, secondApproverEmail?: string): Promise<AcceptOutcome> {
-  const quote = await prisma.quote.findUnique({ where: { id: quoteId }, include: { tender: true, retailer: { select: { email: true } }, releasePayment: true } });
+  const quote = await prisma.quote.findUnique({ where: { id: quoteId }, include: { tender: { include: { packages: { select: { specHash: true } } } }, retailer: { select: { email: true } }, releasePayment: true, award: true } });
   if (!quote || !await userOwnsTender(clientId, quote.tenderId)) throw new ForbiddenError('Quote not found for this Client');
   await assertBuyerDuty(clientId, 'APPROVER');
   if (quote.status === 'SUBMITTED' || quote.status === 'ACCEPTED') {
@@ -51,17 +52,39 @@ export async function acceptQuote(clientId: string, quoteId: string, mobileRetur
   }
 
   if (quote.status === 'SUBMITTED') {
+    const currentHash = issuedTenderSpecHash(quote.tender.packages.map((pkg) => pkg.specHash).filter(Boolean));
+    if (currentHash && quote.packageSpecHash && quote.packageSpecHash !== currentHash) {
+      throw new ValidationError(STALE_QUOTE_REVISION_MESSAGE);
+    }
     const retentionLockedUntil = getPurchasedRetentionDeadline();
     await prisma.$transaction([
       prisma.quote.update({ where: { id: quoteId }, data: { status: 'ACCEPTED', retentionLockedUntil } }),
       prisma.tenderAttachment.updateMany({ where: { tenderId: quote.tenderId }, data: { retentionLockedUntil } }),
+      prisma.award.upsert({
+        where: { quoteId },
+        create: {
+          projectId: quote.tender.projectId,
+          tenderId: quote.tenderId,
+          quoteId,
+          packageSpecHash: quote.packageSpecHash || currentHash,
+          awardedById: clientId,
+        },
+        update: {},
+      }),
     ]);
     await recordAuditEvent({
       actorId: clientId,
       action: 'QUOTE_ACCEPTED',
       targetType: 'Quote',
       targetId: quoteId,
-      metadata: { tenderId: quote.tenderId },
+      metadata: { tenderId: quote.tenderId, projectId: quote.tender.projectId, specHash: quote.packageSpecHash || currentHash },
+    });
+    await recordAuditEvent({
+      actorId: clientId,
+      action: 'AWARD_RECORDED',
+      targetType: 'Tender',
+      targetId: quote.tenderId,
+      metadata: { quoteId, projectId: quote.tender.projectId },
     });
   }
 

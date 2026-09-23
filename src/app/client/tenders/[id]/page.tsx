@@ -25,7 +25,9 @@ type Tender = {
   requirements: string;
   description: string;
   items: { id: string; category: string; subcategory: string; item: string | null; quantity: string; description: string }[];
-  attachments: { id: string; fileName: string; mimeType: string; sizeBytes: number }[];
+  attachments: { id: string; fileName: string; mimeType: string; sizeBytes: number; kind?: string; version?: number }[];
+  packages?: { id: string; reference: string; revision: number; specHash: string; issuedAt: string | null }[];
+  awards?: { id: string; awardedAt: string; quoteId: string; packageSpecHash: string }[];
 };
 
 type QuoteCommon = {
@@ -41,6 +43,7 @@ type QuoteCommon = {
   verifiedDocumentLabels: string[];
   independentlyVerified: boolean;
   independentReviewTier: 'BRONZE' | 'SILVER' | 'GOLD' | null;
+  award?: { id: string; awardedAt: string; packageSpecHash: string } | null;
 };
 
 type Quote = QuoteCommon & ({
@@ -219,7 +222,7 @@ export default function ClientTenderDetailPage() {
       return;
     }
     setEditing(false);
-    setMessage('Tender updated. Matched Providers have been notified; existing Provider access remains available.');
+    setMessage('Package revision issued. Matched suppliers have been notified. Quotes bound to the previous specification cannot be awarded.');
     await load();
   }
 
@@ -233,21 +236,24 @@ export default function ClientTenderDetailPage() {
 
   return (
     <AppShell role="client" title={tender.reference}>
-      <section className="mx-auto max-w-2xl">
-        <Link href="/client/tenders" className="mb-6 inline-block text-sm font-semibold text-concrete-grey hover:text-foundation-navy">
+      <section className="mx-auto max-w-6xl">
+        <Link href="/client/tenders" className="mb-5 inline-block text-sm font-semibold text-concrete-grey hover:text-foundation-navy">
           &larr; Back to my tenders
         </Link>
-        <h2 className="font-heading text-2xl font-bold tracking-tight text-foundation-navy">{tender.subcategory}</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-foundation-navy">{tender.subcategory}</h2>
         <p className="mt-2 max-w-xl text-sm text-concrete-grey">
           {tender.category} &middot; {tender.location} &middot; Closes{' '}
           {new Date(tender.closingDate).toLocaleDateString('en-GB')}
         </p>
+        {tender.packages?.[0] && (
+          <p className="mt-2 text-sm text-steel-blue">Issued revision {tender.packages[0].revision}{tender.awards?.[0] ? ' · Award on record' : ''}</p>
+        )}
         <div className="mt-5 flex flex-wrap gap-3">
           <Button variant="secondary" onClick={() => setEditing((current) => !current)}>
             {editing ? 'Cancel edit' : 'Edit tender'}
           </Button>
           {(tender.status === 'CLOSED' || new Date(tender.closingDate).getTime() <= Date.now()) && (
-            <Link href={`/user/tenders/new?copyFrom=${encodeURIComponent(tender.id)}`} className="inline-flex h-11 items-center justify-center rounded-lg bg-trade-blue px-5 text-sm font-semibold text-site-white shadow-soft hover:bg-foundation-navy hover:shadow-soft-md">
+            <Link href={`/user/tenders/new?copyFrom=${encodeURIComponent(tender.id)}`} className="inline-flex h-11 items-center justify-center rounded-md bg-trade-blue px-5 text-sm font-semibold text-site-white hover:bg-trade-blue/90">
               Re-tender
             </Link>
           )}
@@ -255,8 +261,8 @@ export default function ClientTenderDetailPage() {
         {editing ? (
           <Card className="mt-5">
             <form onSubmit={handleTenderUpdate} className="flex flex-col gap-5">
-              <h3 className="font-heading text-lg font-bold text-foundation-navy">Edit tender</h3>
-              <p className="text-sm text-concrete-grey">The tender reference stays the same. Existing Provider access remains active after this update.</p>
+              <h3 className="text-base font-semibold tracking-tight text-foundation-navy">Edit tender</h3>
+              <p className="text-sm text-concrete-grey">The tender reference stays the same. Editing issues a new package revision. Existing quotes stay on the previous hash and cannot be awarded until the supplier requotes.</p>
               <label className="flex flex-col gap-1.5 text-sm font-semibold text-foundation-navy">
                 Jobsite or delivery postcode
                 <input name="location" required defaultValue={tender.location} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" />
@@ -380,7 +386,7 @@ export default function ClientTenderDetailPage() {
           {quotes.length > 0 && (
             <a
               href={`/api/tenders/${params.id}/quotes/pdf`}
-              className="inline-flex min-h-11 items-center rounded-lg border border-steel-blue/40 bg-white px-4 text-sm font-semibold text-steel-blue shadow-soft hover:border-steel-blue hover:bg-steel-blue/5"
+              className="inline-flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-foundation-navy hover:bg-slate-50"
             >
               Download PDF
             </a>

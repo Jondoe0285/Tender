@@ -18,9 +18,9 @@ export default function SecurityPage() {
       <main id="main-content" className="flex-1">
         <section className="border-b border-slate-200 bg-white">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:px-10 sm:py-20">
-            <p className="text-xs font-semibold uppercase tracking-widest text-steel-blue">Public security</p>
-            <h1 className="mt-4 max-w-3xl font-heading text-4xl font-bold leading-tight text-foundation-navy">Confidential until award. Payments on the record.</h1>
-            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-concrete-grey">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-steel-blue">Public security</p>
+            <h1 className="mt-3 max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-foundation-navy sm:text-4xl">Confidential until award. Payments on the record.</h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-concrete-grey">
               Trade Tender is a connection platform for UK construction buying and supplying. Contact stays private until a Buyer accepts a formal quote. We are not the contracting party.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -33,7 +33,7 @@ export default function SecurityPage() {
           <div className="grid gap-4 md:grid-cols-2">
             {controls.map((control) => (
               <Card key={control.title}>
-                <h2 className="font-heading text-lg font-bold text-foundation-navy">{control.title}</h2>
+                <h2 className="text-base font-semibold tracking-tight text-foundation-navy">{control.title}</h2>
                 <p className="mt-2 text-sm leading-relaxed text-concrete-grey">{control.body}</p>
               </Card>
             ))}

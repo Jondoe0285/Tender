@@ -7,11 +7,11 @@ type Size = 'md' | 'lg';
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    'bg-trade-blue text-site-white shadow-soft hover:bg-foundation-navy hover:shadow-soft-md active:bg-foundation-navy',
+    'bg-trade-blue text-site-white hover:bg-trade-blue/90 active:bg-trade-blue',
   secondary:
-    'border border-foundation-navy bg-site-white text-foundation-navy shadow-soft hover:bg-sky-blue/20 hover:shadow-soft-md active:bg-sky-blue/30',
+    'border border-foundation-navy bg-site-white text-foundation-navy hover:bg-slate-50 active:bg-slate-100',
   ghost: 'bg-transparent text-concrete-grey hover:bg-foundation-navy/5 hover:text-foundation-navy',
-  danger: 'bg-attention text-white shadow-soft hover:bg-attention/90 hover:shadow-soft-md',
+  danger: 'bg-attention text-white hover:bg-attention/90 active:bg-attention',
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -20,7 +20,7 @@ const sizeClasses: Record<Size, string> = {
 };
 
 const baseClasses =
-  'inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-all duration-150 ' +
+  'inline-flex items-center justify-center gap-2 rounded-md font-semibold transition-colors duration-150 ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-trade-blue focus-visible:ring-offset-2 focus-visible:ring-offset-site-white ' +
   'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none';
 

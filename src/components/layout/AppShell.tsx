@@ -42,11 +42,11 @@ function findActiveHref(pathname: string | null, groups: NavGroup[]): string | n
 
 function SidebarNav({ groups, activeHref, unreadOpportunityCount, onNavigate }: { groups: NavGroup[]; activeHref: string | null; unreadOpportunityCount: number; onNavigate?: () => void }) {
   return (
-    <nav aria-label="Primary" className="flex flex-col gap-6 px-4 py-6">
+    <nav aria-label="Primary" className="flex flex-col gap-5 px-3 py-4">
       {groups.map((group, index) => (
-        <div key={group.label ?? `group-${index}`} className="flex flex-col gap-1">
+        <div key={group.label ?? `group-${index}`} className="flex flex-col gap-0.5">
           {group.label && (
-            <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-widest text-site-white/45">{group.label}</p>
+            <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-site-white/40">{group.label}</p>
           )}
           {group.items.map((item) => {
             const active = item.href === activeHref;
@@ -57,10 +57,10 @@ function SidebarNav({ groups, activeHref, unreadOpportunityCount, onNavigate }: 
                 href={item.href}
                 onClick={onNavigate}
                 aria-current={active ? 'page' : undefined}
-                className={`flex items-center justify-between gap-3 rounded-md px-3 py-2.5 text-sm font-semibold transition-colors ${
+                className={`flex items-center justify-between gap-3 rounded-md border-l-2 px-3 py-2 text-[13px] font-medium transition-colors ${
                   active
-                    ? 'bg-white/15 text-site-white'
-                    : 'text-site-white/80 hover:bg-white/10 hover:text-site-white'
+                    ? 'border-sky-blue bg-white/10 text-site-white'
+                    : 'border-transparent text-site-white/75 hover:bg-white/10 hover:text-site-white'
                 }`}
               >
                 <span>{item.label}</span>
@@ -161,10 +161,10 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
   }, [pathname, session?.user?.id]);
 
   return (
-    <div className="flex min-h-screen bg-site-white">
+    <div className="flex min-h-screen bg-light-grey">
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 flex-shrink-0 bg-foundation-navy md:flex md:flex-col">
-        <Link href="/" className="mx-4 mt-5 block px-1" aria-label="Trade Tender home">
+      <aside className="hidden w-60 flex-shrink-0 bg-foundation-navy md:flex md:flex-col">
+        <Link href="/" className="mx-3 mt-4 block border-b border-white/10 px-2 pb-4" aria-label="Trade Tender home">
           <TradeTenderLogo variant="dark" />
         </Link>
         <SidebarNav groups={groups} activeHref={activeHref} unreadOpportunityCount={unreadOpportunityCount} />
@@ -186,7 +186,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
             aria-modal="true"
             aria-label="Navigation menu"
             tabIndex={-1}
-            className="relative flex h-full w-72 flex-col bg-foundation-navy shadow-soft-lg"
+            className="relative flex h-full w-60 flex-col bg-foundation-navy"
           >
             <div className="flex items-center justify-between px-6 py-5">
               <Link href="/" className="block" aria-label="Trade Tender home">
@@ -207,8 +207,8 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
       )}
 
       <div className="flex min-h-screen flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur sm:px-8">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 sm:px-8">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
               aria-label="Open navigation"
@@ -216,13 +216,13 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
               aria-controls="mobile-navigation-drawer"
               ref={menuButtonRef}
               onClick={() => setMobileOpen(true)}
-              className="rounded-md p-2 text-foundation-navy hover:bg-foundation-navy/5 md:hidden"
+              className="rounded-md p-2 text-foundation-navy hover:bg-slate-100 md:hidden"
             >
               &#9776;
             </button>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-concrete-grey">{roleLabels[role]}</p>
-              <h1 className="font-heading text-lg font-bold text-foundation-navy">{title}</h1>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-concrete-grey">{roleLabels[role]}</p>
+              <h1 className="truncate text-base font-semibold tracking-tight text-foundation-navy">{title}</h1>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -245,7 +245,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
             <AccountControls />
           </div>
         </header>
-        <main id="main-content" className="flex-1 px-6 py-8 sm:px-8">{children}</main>
+        <main id="main-content" className="flex-1 px-5 py-6 sm:px-8">{children}</main>
         <SiteFooter />
       </div>
     </div>

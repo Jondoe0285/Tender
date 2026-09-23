@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
-import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { PageHeader, Metric } from '@/components/ui/PageHeader';
 import { getCurrentUser } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
 
@@ -59,51 +59,61 @@ export default async function UserActivityAndPaymentsPage({ searchParams }: { se
 
   return (
     <AppShell role="retailer" title="Activity and payments">
-      <div className="mx-auto max-w-3xl">
-        <p className="mb-6 max-w-xl text-sm text-concrete-grey">
-          Buying fees and supplying activity for the selected period, on one account.
-        </p>
-        <div className="mb-6 flex flex-wrap gap-2" aria-label="Activity period">
-          {(Object.keys(PERIODS) as Period[]).map((key) => (
-            <Link
-              key={key}
-              href={`/user/billing?period=${key}`}
-              className={`rounded-md border px-3 py-2 text-sm font-semibold ${key === period ? 'border-trade-blue bg-trade-blue text-site-white' : 'border-slate-300 bg-white text-concrete-grey hover:border-trade-blue hover:text-foundation-navy'}`}
-            >
-              {PERIODS[key].label}
-            </Link>
-          ))}
-        </div>
-        <h2 className="mb-3 font-heading text-lg font-bold text-foundation-navy">Supplying</h2>
-        <div className="mb-10 grid gap-4 sm:grid-cols-3">
-          {metrics.map((metric) => (
-            <Card key={metric.label} className="border-l-4 border-l-steel-blue">
-              <p className="font-heading text-4xl font-bold text-foundation-navy">{metric.value}</p>
-              <p className="mt-2 text-sm font-semibold text-concrete-grey">{metric.label}</p>
-            </Card>
-          ))}
-        </div>
-        <h2 className="mb-3 font-heading text-lg font-bold text-foundation-navy">Payments</h2>
-        {payments.length === 0 ? (
-          <Card className="py-16 text-center text-sm text-concrete-grey">No payments are recorded for this period.</Card>
-        ) : (
-          <Card className="divide-y divide-slate-100 p-0">
-            {payments.map((payment) => (
-              <div key={payment.id} className="flex flex-wrap items-center justify-between gap-4 px-6 py-5">
-                <div>
-                  <p className="font-heading text-base font-bold text-foundation-navy">&pound;{payment.totalAmountGbp.toFixed(2)} inc. VAT</p>
-                  <p className="mt-1 text-sm text-concrete-grey">
-                    {PAYMENT_TYPE_LABELS[payment.type] ?? payment.type} &middot; {payment.createdAt.toLocaleDateString('en-GB')}
-                  </p>
-                </div>
-                <StatusBadge
-                  status={payment.status === 'CONFIRMED' ? 'approved' : payment.status === 'FAILED' ? 'attention' : 'pending'}
+      <div className="mx-auto max-w-6xl">
+        <PageHeader
+          description="Buying fees and supplying activity for the selected period, on one account."
+          actions={
+            <div className="flex flex-wrap gap-2" aria-label="Activity period">
+              {(Object.keys(PERIODS) as Period[]).map((key) => (
+                <Link
+                  key={key}
+                  href={`/user/billing?period=${key}`}
+                  className={`inline-flex min-h-11 items-center rounded-md border px-3 text-sm font-semibold ${key === period ? 'border-trade-blue bg-trade-blue text-site-white' : 'border-slate-300 bg-white text-concrete-grey hover:border-trade-blue hover:text-foundation-navy'}`}
                 >
-                  {payment.status}
-                </StatusBadge>
-              </div>
-            ))}
-          </Card>
+                  {PERIODS[key].label}
+                </Link>
+              ))}
+            </div>
+          }
+        />
+        <div className="mb-8 grid gap-3 sm:grid-cols-3">
+          {metrics.map((metric) => (
+            <Metric key={metric.label} label={metric.label} value={metric.value} />
+          ))}
+        </div>
+        {payments.length === 0 ? (
+          <div className="rounded-md border border-dashed border-slate-300 bg-white px-6 py-16 text-center text-sm text-concrete-grey">
+            No payments are recorded for this period.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-[0.08em] text-concrete-grey">
+                <tr>
+                  <th className="px-4 py-2.5">Date</th>
+                  <th className="px-4 py-2.5">Type</th>
+                  <th className="px-4 py-2.5">Total inc. VAT</th>
+                  <th className="px-4 py-2.5">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((payment) => (
+                  <tr key={payment.id} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80">
+                    <td className="px-4 py-2.5 tabular-nums text-concrete-grey">{payment.createdAt.toLocaleDateString('en-GB')}</td>
+                    <td className="px-4 py-2.5 text-foundation-navy">{PAYMENT_TYPE_LABELS[payment.type] ?? payment.type}</td>
+                    <td className="px-4 py-2.5 font-semibold tabular-nums text-foundation-navy">&pound;{payment.totalAmountGbp.toFixed(2)}</td>
+                    <td className="px-4 py-2.5">
+                      <StatusBadge
+                        status={payment.status === 'CONFIRMED' ? 'approved' : payment.status === 'FAILED' ? 'attention' : 'pending'}
+                      >
+                        {payment.status}
+                      </StatusBadge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </AppShell>

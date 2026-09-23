@@ -1,6 +1,6 @@
 import { isSpecifiedItemService } from '@/lib/categories';
 
-function parseQuantity(quantity: string): { value: number; unit: string } | null {
+export function parseQuantity(quantity: string): { value: number; unit: string } | null {
   const match = quantity.trim().replace(/,/g, '').match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
   if (!match) return null;
   const value = Number(match[1]);

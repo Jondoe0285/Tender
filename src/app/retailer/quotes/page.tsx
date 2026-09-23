@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Card } from '@/components/ui/Card';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { getCurrentUser } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
 
@@ -17,26 +18,44 @@ export default async function SubmittedQuotesPage() {
 
   return (
     <AppShell role="retailer" title="Submitted quotes">
-      <div className="mx-auto max-w-4xl">
-        <p className="mb-6 max-w-xl text-sm text-concrete-grey">Every quote you&rsquo;ve submitted, and its current status.</p>
+      <div className="mx-auto max-w-6xl">
+        <PageHeader description="Every quote you have submitted, bound to the issued package, with current status." />
         {quotes.length === 0 ? (
-          <Card className="py-16 text-center text-sm text-concrete-grey">No quotes have been submitted for this account.</Card>
+          <div className="rounded-md border border-dashed border-slate-300 bg-white px-6 py-16 text-center text-sm text-concrete-grey">
+            No quotes have been submitted for this account.
+          </div>
         ) : (
-          <div className="flex flex-col gap-4">
-            {quotes.map((quote) => (
-              <a key={quote.id} href={`/retailer/tenders/${quote.tender.id}`} className="block">
-                <Card interactive className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-steel-blue">
-                      {quote.reference} &middot; {quote.tender.subcategory}
-                    </p>
-                    <h3 className="font-heading text-lg font-bold text-foundation-navy">&pound;{quote.priceGbp} excl. VAT</h3>
-                    <p className="mt-1 text-sm text-concrete-grey">Valid for {quote.validityDays} days</p>
-                  </div>
-                  <StatusBadge status={quote.status === 'ACCEPTED' ? 'approved' : 'neutral'}>{quote.status}</StatusBadge>
-                </Card>
-              </a>
-            ))}
+          <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-[0.08em] text-concrete-grey">
+                <tr>
+                  <th className="px-4 py-2.5">Quote</th>
+                  <th className="px-4 py-2.5">Tender</th>
+                  <th className="px-4 py-2.5">Package</th>
+                  <th className="px-4 py-2.5">Amount</th>
+                  <th className="px-4 py-2.5">Validity</th>
+                  <th className="px-4 py-2.5">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quotes.map((quote) => (
+                  <tr key={quote.id} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80">
+                    <td className="px-4 py-2.5 font-semibold tabular-nums text-foundation-navy">{quote.reference}</td>
+                    <td className="px-4 py-2.5">
+                      <Link href={`/retailer/tenders/${quote.tender.id}`} className="font-semibold text-foundation-navy hover:text-trade-blue">
+                        {quote.tender.reference}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-2.5 text-concrete-grey">{quote.tender.subcategory}</td>
+                    <td className="px-4 py-2.5 tabular-nums text-foundation-navy">&pound;{quote.priceGbp} excl. VAT</td>
+                    <td className="px-4 py-2.5 tabular-nums text-concrete-grey">{quote.validityDays} days</td>
+                    <td className="px-4 py-2.5">
+                      <StatusBadge status={quote.status === 'ACCEPTED' ? 'approved' : 'neutral'}>{quote.status}</StatusBadge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

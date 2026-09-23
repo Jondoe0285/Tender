@@ -12,7 +12,7 @@ export function TradeTenderLogo({ className = '', variant = 'light' }: { classNa
         <path fill={mark} d="M14 11h6.2v24H14z" />
         <path fill={mark} d="M14 11h18l-3.4 7H14z" />
       </svg>
-      <span className="font-heading text-lg font-bold tracking-tight sm:text-xl" style={{ color: ink }}>
+      <span className="text-[15px] font-semibold tracking-tight sm:text-base" style={{ color: ink }}>
         Trade Tender
       </span>
     </span>

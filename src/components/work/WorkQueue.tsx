@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { LinkButton } from '@/components/ui/Button';
 
@@ -26,34 +25,36 @@ export function WorkQueue({
   emptyAction: string;
 }) {
   return (
-    <section className="mb-10">
-      <h2 className="mb-4 font-heading text-xl font-bold text-foundation-navy">{title}</h2>
+    <section className="mb-8">
+      <h2 className="mb-3 text-sm font-semibold tracking-tight text-foundation-navy">{title}</h2>
       {items.length === 0 ? (
-        <Card className="py-10 text-center">
+        <div className="rounded-md border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
           <p className="text-sm text-concrete-grey">{emptyLabel}</p>
-          <LinkButton href={emptyHref} className="mx-auto mt-5">{emptyAction}</LinkButton>
-        </Card>
+          <LinkButton href={emptyHref} className="mx-auto mt-4">{emptyAction}</LinkButton>
+        </div>
       ) : (
-        <div className="overflow-x-auto rounded-card border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-steel-blue">
+            <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-[0.08em] text-concrete-grey">
               <tr>
-                <th className="px-4 py-3">Reference</th>
-                <th className="px-4 py-3">Work</th>
-                <th className="px-4 py-3">Due</th>
-                <th className="px-4 py-3">Next action</th>
+                <th className="px-4 py-2.5">Reference</th>
+                <th className="px-4 py-2.5">Work</th>
+                <th className="px-4 py-2.5">Due</th>
+                <th className="px-4 py-2.5">Next action</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.href} className="border-b border-slate-100 last:border-b-0">
-                  <td className="px-4 py-3 font-semibold text-foundation-navy">
+                <tr key={item.href} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80">
+                  <td className="px-4 py-2.5 font-semibold tabular-nums text-foundation-navy">
                     <Link href={item.href} className="hover:text-trade-blue">{item.reference}</Link>
                   </td>
-                  <td className="px-4 py-3 text-concrete-grey">{item.title}</td>
-                  <td className="px-4 py-3 text-concrete-grey">{item.due ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={item.status ?? 'pending'}>{item.action}</StatusBadge>
+                  <td className="px-4 py-2.5 text-concrete-grey">{item.title}</td>
+                  <td className="px-4 py-2.5 tabular-nums text-concrete-grey">{item.due ?? '—'}</td>
+                  <td className="px-4 py-2.5">
+                    <Link href={item.href} className="inline-flex min-h-11 items-center">
+                      <StatusBadge status={item.status ?? 'pending'}>{item.action}</StatusBadge>
+                    </Link>
                   </td>
                 </tr>
               ))}

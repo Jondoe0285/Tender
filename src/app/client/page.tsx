@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
 import { LinkButton } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { PageHeader, Metric } from '@/components/ui/PageHeader';
 import { getCurrentUser } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
 import { getCompanyMemberIds, listMatchedSummariesForRetailer } from '@/server/domain/tenderService';
@@ -19,7 +19,7 @@ export default async function ClientPage() {
       orderBy: { closingDate: 'asc' },
       include: { quotes: { select: { id: true, status: true } } },
     }),
-    prisma.quote.count({ where: { tender: { clientId: { in: memberIds } }, status: 'ACCEPTED' } }),
+    prisma.award.count({ where: { tender: { clientId: { in: memberIds } } } }),
     listMatchedSummariesForRetailer(user.id),
     prisma.unlock.findMany({ where: { retailerId: user.id }, select: { tenderId: true } }),
     prisma.quote.findMany({
@@ -33,6 +33,7 @@ export default async function ClientPage() {
   const unlockedIds = new Set(unlocks.map((unlock) => unlock.tenderId));
   const quotedTenderIds = new Set(submittedQuotes.map((quote) => quote.tenderId));
   const quotesReceivedCount = openTenders.reduce((total, tender) => total + tender.quotes.length, 0);
+  const quotesToReview = openTenders.filter((tender) => tender.quotes.some((quote) => quote.status === 'SUBMITTED') && !tender.quotes.some((quote) => quote.status === 'ACCEPTED')).length;
 
   const buyingQueue: WorkQueueItem[] = openTenders.flatMap((tender): WorkQueueItem[] => {
     const hasSubmitted = tender.quotes.some((quote) => quote.status === 'SUBMITTED');
@@ -93,18 +94,21 @@ export default async function ClientPage() {
     })),
   ].slice(0, 8);
 
-  const buyingMetrics = [
-    { label: 'Open tenders', value: openTenders.length },
-    { label: 'Quotes on open tenders', value: quotesReceivedCount },
-    { label: 'Awarded projects', value: awardedCount },
-  ];
-
   return (
     <AppShell role="client" title="Dashboard">
-      <div className="mx-auto max-w-4xl">
-        <p className="mb-8 max-w-2xl text-base leading-relaxed text-concrete-grey">
-          This week: review quotes that are waiting, then quote the matches you have unlocked.
-        </p>
+      <div className="mx-auto max-w-6xl">
+        <PageHeader
+          kicker="This week"
+          description="Review quotes that are waiting, then quote the matches you have unlocked."
+          actions={<LinkButton href="/client/tenders/new">Create tender</LinkButton>}
+        />
+
+        <div className="mb-8 grid gap-3 sm:grid-cols-4">
+          <Metric label="Open tenders" value={openTenders.length} />
+          <Metric label="Quotes to review" value={quotesToReview} />
+          <Metric label="Quotes received" value={quotesReceivedCount} />
+          <Metric label="Awards on record" value={awardedCount} />
+        </div>
 
         <WorkQueue
           title="This week"
@@ -114,24 +118,12 @@ export default async function ClientPage() {
           emptyAction="Raise a tender"
         />
 
-        <section className="mb-12">
-          <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-steel-blue">Buying</p>
-              <h2 className="mt-1 font-heading text-xl font-bold text-foundation-navy">Open tenders</h2>
-            </div>
-            <LinkButton href="/client/tenders/new" size="lg">Create tender</LinkButton>
-          </div>
-
-          <div className="mb-6 grid gap-5 sm:grid-cols-3">
-            {buyingMetrics.map((metric) => (
-              <Card key={metric.label} className="border-l-4 border-l-steel-blue">
-                <p className="font-heading text-4xl font-bold text-foundation-navy">{metric.value}</p>
-                <p className="mt-2 text-sm font-medium text-concrete-grey">{metric.label}</p>
-              </Card>
-            ))}
-          </div>
-
+        <section className="mb-10">
+          <PageHeader
+            kicker="Buying"
+            title="Open tenders"
+            actions={<Link href="/client/tenders" className="text-sm font-semibold text-trade-blue hover:text-foundation-navy">View all tenders</Link>}
+          />
           <WorkQueue
             title="Buying queue"
             items={buyingQueue}
@@ -139,21 +131,14 @@ export default async function ClientPage() {
             emptyHref="/client/tenders/new"
             emptyAction="Raise your first tender"
           />
-          <p className="mt-3 text-right">
-            <Link href="/client/tenders" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">
-              View all tenders &rarr;
-            </Link>
-          </p>
         </section>
 
         <section>
-          <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-steel-blue">Supplying</p>
-              <h2 className="mt-1 font-heading text-xl font-bold text-foundation-navy">Matched demand</h2>
-            </div>
-            <LinkButton href="/user/opportunities" variant="secondary" size="lg">Opportunities</LinkButton>
-          </div>
+          <PageHeader
+            kicker="Supplying"
+            title="Matched demand"
+            actions={<LinkButton href="/user/opportunities" variant="secondary">Opportunities</LinkButton>}
+          />
           <WorkQueue
             title="Supplying queue"
             items={supplyingQueue}

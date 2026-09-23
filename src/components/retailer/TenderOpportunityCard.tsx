@@ -51,7 +51,7 @@ export function TenderOpportunityCard({ data, href }: { data: OpportunityCardDat
     <Link href={href} className="block">
       <Card
         interactive
-        className={`relative ${data.strongMatch ? 'border-2 border-approved border-l-8 bg-approved/10 shadow-soft-md' : ''}`}
+        className={`relative ${data.strongMatch ? 'border-approved border-l-2 bg-approved/5' : ''}`}
       >
         {data.isNew && (
           <span className="absolute right-4 top-4 flex items-center gap-1.5 text-xs font-semibold text-safety-amber">
