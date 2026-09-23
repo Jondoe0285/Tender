@@ -8,7 +8,7 @@ import { SERVICE_NAMES } from '@/lib/categories';
 import { VERIFICATION_DOCUMENT_TYPES } from '@/lib/verification-documents';
 
 export type AdminSettings = {
-  fees: { retailerUnlockGbp: number; retailerUnlockMode: string; retailerUnlockPercentageLow: number; retailerUnlockPercentageHigh: number; retailerUnlockPercentageTop: number; contractorServiceUnlockGbp: number; professionalServiceUnlockGbp: number; clientReleaseGbp: number; clientReleaseMode: string; clientReleasePercentageLow: number; clientReleasePercentageHigh: number; clientReleasePercentageTop: number; quoteEstimateOffsetPercentage: number; quoteEstimateMasterReductionPercentage: number; vatPercentage: number; sponsoredPlacementActive: boolean; sponsoredPlacementFeeGbp: number; membershipTiersActive: boolean; retailerLaunchCreditsDefault: number; adspaceActive: boolean; independentReviewActive: boolean; independentReviewFeeBronzeGbp: number; independentReviewFeeSilverGbp: number; independentReviewFeeGoldGbp: number; directContactActive: boolean; directContactFeeGbp: number; humanReviewActive: boolean; verificationDocumentRequirements: Array<[string, boolean]> };
+  fees: { retailerUnlockGbp: number; retailerUnlockMode: string; retailerUnlockPercentageLow: number; retailerUnlockPercentageHigh: number; retailerUnlockPercentageTop: number; contractorServiceUnlockGbp: number; professionalServiceUnlockGbp: number; clientReleaseGbp: number; clientReleaseMode: string; clientReleasePercentageLow: number; clientReleasePercentageHigh: number; clientReleasePercentageTop: number; quoteEstimateOffsetPercentage: number; quoteEstimateMasterReductionPercentage: number; vatPercentage: number; sponsoredPlacementActive: boolean; sponsoredPlacementFeeGbp: number; membershipTiersActive: boolean; retailerLaunchCreditsDefault: number; adspaceActive: boolean; independentReviewActive: boolean; independentReviewFeeBronzeGbp: number; independentReviewFeeSilverGbp: number; independentReviewFeeGoldGbp: number; directContactActive: boolean; directContactFeeGbp: number; humanReviewActive: boolean; signInActive: boolean; verificationDocumentRequirements: Array<[string, boolean]> };
   supportRecipientEmail?: string | null;
   tiers: Array<{ id: string; name: string; description: string; monthlyPriceGbp: number; freeTenderOpportunitiesPerMonth: number; additionalCreditDiscountPercentage: number; active: boolean }>;
   subscriptions: Array<{ id: string; name: string; description: string; annualPriceGbp: number; active: boolean }>;
@@ -38,7 +38,7 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner, currentUserId
     return data;
   }
 
-  async function saveFee(key: 'RETAILER_UNLOCK_FEE_GBP' | 'RETAILER_UNLOCK_FEE_MODE' | 'RETAILER_UNLOCK_PERCENTAGE_LOW' | 'RETAILER_UNLOCK_PERCENTAGE_HIGH' | 'RETAILER_UNLOCK_PERCENTAGE_TOP' | 'CONTRACTOR_SERVICE_UNLOCK_FEE_GBP' | 'PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP' | 'CLIENT_RELEASE_FEE_GBP' | 'CLIENT_RELEASE_FEE_MODE' | 'CLIENT_RELEASE_PERCENTAGE_LOW' | 'CLIENT_RELEASE_PERCENTAGE_HIGH' | 'CLIENT_RELEASE_PERCENTAGE_TOP' | 'QUOTE_ESTIMATE_OFFSET_PERCENTAGE' | 'QUOTE_ESTIMATE_MASTER_REDUCTION_PERCENTAGE' | 'VAT_PERCENTAGE' | 'SPONSORED_PLACEMENT_ACTIVE' | 'SPONSORED_PLACEMENT_FEE_GBP' | 'MEMBERSHIP_TIERS_ACTIVE' | 'RETAILER_LAUNCH_CREDITS_DEFAULT' | 'ADSPACE_ACTIVE' | 'INDEPENDENT_REVIEW_FEE_BRONZE_GBP' | 'INDEPENDENT_REVIEW_FEE_SILVER_GBP' | 'INDEPENDENT_REVIEW_FEE_GOLD_GBP' | 'DIRECT_CONTACT_ACTIVE' | 'DIRECT_CONTACT_FEE_GBP', value: number | string | boolean) {
+  async function saveFee(key: 'RETAILER_UNLOCK_FEE_GBP' | 'RETAILER_UNLOCK_FEE_MODE' | 'RETAILER_UNLOCK_PERCENTAGE_LOW' | 'RETAILER_UNLOCK_PERCENTAGE_HIGH' | 'RETAILER_UNLOCK_PERCENTAGE_TOP' | 'CONTRACTOR_SERVICE_UNLOCK_FEE_GBP' | 'PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP' | 'CLIENT_RELEASE_FEE_GBP' | 'CLIENT_RELEASE_FEE_MODE' | 'CLIENT_RELEASE_PERCENTAGE_LOW' | 'CLIENT_RELEASE_PERCENTAGE_HIGH' | 'CLIENT_RELEASE_PERCENTAGE_TOP' | 'QUOTE_ESTIMATE_OFFSET_PERCENTAGE' | 'QUOTE_ESTIMATE_MASTER_REDUCTION_PERCENTAGE' | 'VAT_PERCENTAGE' | 'SPONSORED_PLACEMENT_ACTIVE' | 'SPONSORED_PLACEMENT_FEE_GBP' | 'MEMBERSHIP_TIERS_ACTIVE' | 'RETAILER_LAUNCH_CREDITS_DEFAULT' | 'ADSPACE_ACTIVE' | 'INDEPENDENT_REVIEW_FEE_BRONZE_GBP' | 'INDEPENDENT_REVIEW_FEE_SILVER_GBP' | 'INDEPENDENT_REVIEW_FEE_GOLD_GBP' | 'DIRECT_CONTACT_ACTIVE' | 'DIRECT_CONTACT_FEE_GBP' | 'SIGN_IN_ACTIVE', value: number | string | boolean) {
     setSaving(true);
     setMessage(null);
     try {
@@ -48,6 +48,8 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner, currentUserId
         const next = await request('/api/super-user/settings', { method: 'GET' });
         setPendingChanges(next.pendingControlChanges ?? []);
         setFees(next.fees);
+      } else if (key === 'SIGN_IN_ACTIVE') {
+        setMessage(value ? 'Sign in is open.' : 'Sign in is closed. Registration remains open. Owner accounts can still sign in.');
       } else {
         setMessage('Fee updated. New payments will use this amount.');
       }
@@ -141,6 +143,32 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner, currentUserId
     <div className="space-y-8">
       {locked && <p role="status" className="rounded-lg border border-safety-amber/40 bg-safety-amber/10 px-4 py-3 text-sm font-semibold text-foundation-navy">Fees, affiliated partner links, membership tiers, and subscriptions are Owner-controlled. Ask an Owner to make changes here.</p>}
       {message && <p role="status" className="rounded-lg border border-steel-blue/20 bg-steel-blue/5 px-4 py-3 text-sm font-semibold text-steel-blue">{message}</p>}
+      <section>
+        <h2 className="mb-4 font-heading text-lg font-bold text-foundation-navy">Sign in access</h2>
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <Label>Marketplace sign in</Label>
+              <p className="mt-1 max-w-3xl text-sm text-concrete-grey">
+                Close sign in when you want people to register but not enter the workspace yet. Registration and email verification stay open. Owner accounts can always sign in so this cannot lock you out. People already signed in stay in until they sign out.
+              </p>
+              <p className="mt-2 text-sm font-semibold text-foundation-navy">{fees.signInActive ? 'Sign in is open.' : 'Sign in is closed.'}</p>
+            </div>
+            <Button
+              variant={fees.signInActive ? 'danger' : 'secondary'}
+              disabled={locked}
+              onClick={() => {
+                const active = !fees.signInActive;
+                setFees({ ...fees, signInActive: active });
+                void saveFee('SIGN_IN_ACTIVE', active);
+              }}
+              loading={saving}
+            >
+              {fees.signInActive ? 'Close sign in' : 'Open sign in'}
+            </Button>
+          </div>
+        </Card>
+      </section>
       {pendingChanges.length > 0 && (
         <section>
           <h2 className="mb-4 font-heading text-lg font-bold text-foundation-navy">Pending four-eyes changes</h2>

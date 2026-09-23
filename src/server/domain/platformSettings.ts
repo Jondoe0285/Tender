@@ -34,6 +34,7 @@ const defaultSettings: Record<string, string> = {
   DIRECT_CONTACT_ACTIVE: 'false',
   DIRECT_CONTACT_FEE_GBP: '25',
   HUMAN_REVIEW_ACTIVE: 'true',
+  SIGN_IN_ACTIVE: 'true',
   VERIFICATION_DOCUMENT_REQUIREMENTS: '{}',
   RETAILER_ANALYTICS_SECTION_TRENDS: 'true',
   RETAILER_ANALYTICS_SECTION_CATEGORY: 'true',
@@ -313,6 +314,11 @@ export async function isHumanReviewActive(): Promise<boolean> {
   return await getPlatformSetting('HUMAN_REVIEW_ACTIVE') !== 'false';
 }
 
+/** Owner-controlled: registration stays open. Non-Owner sign-in is blocked when this is false. */
+export async function isSignInActive(): Promise<boolean> {
+  return await getPlatformSetting('SIGN_IN_ACTIVE') !== 'false';
+}
+
 export type VerificationDocumentRequirementKey = `${string}:${VerificationDocumentType}`;
 
 export function verificationDocumentRequirementKey(service: string, documentType: VerificationDocumentType): VerificationDocumentRequirementKey {
@@ -377,6 +383,7 @@ export async function getAdminSettings(includeSupportRecipient = false) {
       directContactActive: (settings.find((setting) => setting.key === 'DIRECT_CONTACT_ACTIVE')?.value ?? defaultSettings.DIRECT_CONTACT_ACTIVE) === 'true',
       directContactFeeGbp: Number(settings.find((setting) => setting.key === 'DIRECT_CONTACT_FEE_GBP')?.value ?? defaultSettings.DIRECT_CONTACT_FEE_GBP),
       humanReviewActive: (settings.find((setting) => setting.key === 'HUMAN_REVIEW_ACTIVE')?.value ?? defaultSettings.HUMAN_REVIEW_ACTIVE) === 'true',
+      signInActive: (settings.find((setting) => setting.key === 'SIGN_IN_ACTIVE')?.value ?? defaultSettings.SIGN_IN_ACTIVE) !== 'false',
       verificationDocumentRequirements: Object.entries(verificationDocumentRequirements),
     },
     tiers,

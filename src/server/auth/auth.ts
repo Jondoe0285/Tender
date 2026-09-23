@@ -4,6 +4,8 @@ import { prisma } from '@/server/data/prisma';
 import { verifyPassword } from '@/server/auth/password';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { consumeRecoveryCode, decryptMfaSecret, verifyMfaCode } from '@/server/auth/mfa';
+import { signInAllowed } from '@/server/auth/signInAccess';
+import { isSignInActive } from '@/server/domain/platformSettings';
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
@@ -33,6 +35,7 @@ export async function authenticateCredentials(credentials: Record<string, unknow
     }
     if (!verified) throw new Error(mfaCode ? 'MFA_INVALID' : 'MFA_REQUIRED');
   }
+  if (!signInAllowed(user, await isSignInActive())) throw new Error('LOGIN_DISABLED');
   await prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, loginLockedUntil: null } });
   const roles = user.roleMemberships.length > 0 ? user.roleMemberships.map((membership) => membership.role) : [user.role];
   return { id: user.id, email: user.email, role: user.role, roles, isOwner: user.isOwner, isAccountant: user.isAccountant, sessionVersion: user.sessionVersion, mfaEnabled: user.mfaEnabled };

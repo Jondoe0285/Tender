@@ -13,7 +13,7 @@ type LoginNotices = {
   error?: string;
 };
 
-export function LoginForm({ notices = {} }: { notices?: LoginNotices }) {
+export function LoginForm({ notices = {}, signInActive = true }: { notices?: LoginNotices; signInActive?: boolean }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [resetEmailSent, setResetEmailSent] = useState(false);
@@ -43,6 +43,8 @@ export function LoginForm({ notices = {} }: { notices?: LoginNotices }) {
       } else if (result.error.includes('MFA_INVALID')) {
         setMfaRequired(true);
         setError('That MFA code was not accepted. Try again.');
+      } else if (result.error.includes('LOGIN_DISABLED')) {
+        setError('Sign in is currently closed. You can still create an account.');
       } else setError('Incorrect email or password.');
       return;
     }
@@ -77,10 +79,11 @@ export function LoginForm({ notices = {} }: { notices?: LoginNotices }) {
       <h1 className="text-2xl font-semibold tracking-tight text-foundation-navy">Sign in</h1>
       <p className="mt-2 text-sm leading-6 text-foundation-navy">Use your Trade Tender account to continue.</p>
       {notices.verification === 'pending' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Check your email and use the verification link to activate your account.</p>}
-      {notices.verification === 'verified' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your email address is verified. You can now sign in.</p>}
+      {notices.verification === 'verified' && <p role="status" className="mt-4 text-sm font-semibold text-approved">{signInActive ? 'Your email address is verified. You can now sign in.' : 'Your email address is verified. Sign in will be available when access is opened.'}</p>}
       {notices.verification === 'invalid' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">This verification link is invalid or has expired. Register again with the same details to request a new link.</p>}
-      {notices.password === 'set' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your password is set. Sign in with your new password.</p>}
+      {notices.password === 'set' && <p role="status" className="mt-4 text-sm font-semibold text-approved">{signInActive ? 'Your password is set. Sign in with your new password.' : 'Your password is set. Sign in will be available when access is opened.'}</p>}
       {notices.error === 'workspace' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">Your account is not assigned to an approved workspace.</p>}
+      {!signInActive && <p role="status" className="mt-4 text-sm font-semibold text-foundation-navy">Sign in is currently closed. You can still create an account. Access will open when the Owner enables it.</p>}
 
       <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
         <FieldGroup>

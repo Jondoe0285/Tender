@@ -10,7 +10,14 @@ export async function POST(request: Request) {
   if (limited) return limited;
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
-  const user = await authenticateCredentials(body as Record<string, unknown>);
+  let user;
+  try {
+    user = await authenticateCredentials(body as Record<string, unknown>);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('LOGIN_DISABLED')) return NextResponse.json({ error: 'Sign in is currently closed.' }, { status: 403 });
+    throw error;
+  }
   if (!user) return NextResponse.json({ error: 'Incorrect email or password.' }, { status: 401 });
   const role = user.role;
   if (role !== 'USER') return NextResponse.json({ error: 'Mobile access is unavailable.' }, { status: 403 });
