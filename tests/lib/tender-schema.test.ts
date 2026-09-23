@@ -117,6 +117,18 @@ test('matches any UK postcode when a Retailer covers the whole UK', () => {
   assert.equal(retailerCoversTenderLocation(retailer, 'Cardiff CF10 1AA'), true);
 });
 
+test('mixed county and nation operating locations match either side', () => {
+  const retailer = {
+    coverageScope: 'REGION',
+    counties: 'Greater Manchester,Merseyside,West Midlands',
+    regions: 'West Midlands,Wales',
+  };
+  assert.equal(retailerCoversTenderLocation(retailer, 'Manchester M1 1AA'), true);
+  assert.equal(retailerCoversTenderLocation(retailer, 'Cardiff CF10 1EP'), true);
+  assert.equal(retailerCoversTenderLocation(retailer, 'Birmingham B1 1AA'), true);
+  assert.equal(retailerCoversTenderLocation(retailer, 'Exeter EX1 1AA'), false);
+});
+
 test('requires both provision-level capability and configured coverage before creating tender matches', () => {
   const bricksPackage = [{ category: 'Materials', subcategory: 'Bricks' }];
   const insulationPackage = [{ category: 'Materials', subcategory: 'Insulation' }];

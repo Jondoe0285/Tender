@@ -71,7 +71,7 @@ test('company service provisions support selecting every provision in a group', 
 test('company profile updates refresh active tender opportunity matching', () => {
   const profileRoute = readFileSync(path.join(process.cwd(), 'src/app/api/client/profile/route.ts'), 'utf8');
   assert.ok(profileRoute.includes('if (companyProfileChanged) await matchRetailerToOpenTenders(user.id)'));
-  assert.ok(profileRoute.includes("coverageScope: parsed.data.operatingLocations.includes('United Kingdom') ? 'UK'"));
+  assert.ok(profileRoute.includes('coverageFieldsFromOperatingLocations'));
 });
 
 test('provider matching coverage is edited on the company profile, not a second retailer form', () => {

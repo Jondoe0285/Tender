@@ -148,7 +148,7 @@ export async function submitQuote(retailerId: string, tenderId: string, input: S
       category: tender.category,
       priceGbp: quote.priceGbp,
       leadTimeDays: quote.leadTimeDays,
-      reviewPath: `/client/tenders/${tender.id}`,
+      reviewPath: `/user/tenders/${tender.id}`,
     })
   ).catch((error: unknown) => ({ sent: false as const, reason: error instanceof Error ? error.message : 'Email delivery failed' }));
   await recordAuditEvent({

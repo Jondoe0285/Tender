@@ -9,7 +9,11 @@ export function AccountControls() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  if (status === 'loading' || !session?.user) {
+  if (status === 'loading') {
+    return <div className="h-9 w-28" aria-hidden="true" />;
+  }
+
+  if (!session?.user) {
     return (
       <div className="flex items-center gap-3">
         <Link href="/login" className="text-sm font-semibold text-foundation-navy hover:text-trade-blue">

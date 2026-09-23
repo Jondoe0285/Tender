@@ -11,6 +11,7 @@ test('buying and supplying home screens lead with a this-week work queue', () =>
   assert.match(client, /Review quotes/);
   assert.match(retailer, /WorkQueue/);
   assert.match(retailer, /Submit quote/);
-  assert.match(queue, /<table/);
+  assert.match(queue, /DataTable/);
+  assert.match(readFileSync('src/components/ui/DataTable.tsx', 'utf8'), /<table/);
   assert.match(queue, /emptyAction/);
 });

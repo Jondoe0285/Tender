@@ -1,10 +1,8 @@
 import { z } from 'zod';
 import { passwordSchema } from '@/lib/schemas/password';
-import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
+import { COMPANY_OPERATING_LOCATIONS } from '@/lib/geography';
 import { BUYER_DUTIES } from '@/lib/workspace-duties';
 import { catalogServiceNames, isCatalogProvision, isCatalogService, type CategoryCatalog } from '@/lib/catalog';
-
-const COMPANY_OPERATING_LOCATIONS = ['United Kingdom', ...UK_COUNTIES, ...UK_REGIONS] as const;
 
 export const personalProfileSchema = z.object({
   firstName: z.string().trim().min(1).max(80),

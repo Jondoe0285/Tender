@@ -54,25 +54,27 @@ export function SiteFooter() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-site-white">Support</p>
           <p className="mt-4 text-xs leading-relaxed text-site-white/70">Account access, payments, and technical issues.</p>
+          <div className="mt-4 flex flex-col gap-1 text-xs font-semibold">
           {support && (
-            <a href={`mailto:${support}`} className="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-site-white underline underline-offset-4 hover:text-sky-blue">
+            <a href={`mailto:${support}`} className="inline-flex min-h-11 items-center text-site-white underline underline-offset-4 hover:text-sky-blue">
               Email support
             </a>
           )}
-          <Link href="/policies/support" className="mt-1 inline-flex min-h-11 items-center text-xs font-semibold text-site-white underline underline-offset-4 hover:text-sky-blue">
+          <Link href="/policies/support" className="inline-flex min-h-11 items-center text-site-white underline underline-offset-4 hover:text-sky-blue">
             Support policy
           </Link>
+          </div>
           {partners.length > 0 && (
             <div className="mt-6">
               <p className="text-xs font-semibold uppercase tracking-widest text-site-white">Affiliated partners</p>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {partners.map((partner) =>
                   partner.destinationUrl ? (
-                    <a key={partner.id} href={partner.destinationUrl} target="_blank" rel="noreferrer" className="flex min-h-16 items-center bg-white p-2" aria-label={`Visit ${partner.name}`}>
+                    <a key={partner.id} href={partner.destinationUrl} target="_blank" rel="noreferrer" className="flex min-h-16 items-center border border-white/15 bg-white/5 p-2" aria-label={`Visit ${partner.name}`}>
                       <Image src={partner.logoPath} alt={partner.name} width={512} height={192} className="h-auto w-full" />
                     </a>
                   ) : (
-                    <div key={partner.id} className="flex min-h-16 items-center bg-white p-2">
+                    <div key={partner.id} className="flex min-h-16 items-center border border-white/15 bg-white/5 p-2">
                       <Image src={partner.logoPath} alt={partner.name} width={512} height={192} className="h-auto w-full" />
                     </div>
                   )

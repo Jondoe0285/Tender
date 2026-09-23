@@ -14,7 +14,7 @@ test('Contractor tender builder sequences selected service package requirements'
   assert.ok(source.indexOf('id="closing-date"') < source.indexOf('{step === 2 && ('));
   assert.ok(source.includes("{step === 2 && ("));
   assert.ok(source.includes('activePackageIndex'));
-  assert.ok(source.includes('Complete {currentPackageLabel()} of {form.items.length + 1}.'));
+  assert.ok(source.includes('Complete {currentPackageLabel()} of {form.items.length + 1} packages.'));
   assert.ok(source.includes('Add another item'));
   assert.ok(source.includes("Package 1: {form.item || form.subcategory || 'Untitled package'}"));
   assert.ok(source.includes('const isActive = index === activePackageIndex - 1;'));

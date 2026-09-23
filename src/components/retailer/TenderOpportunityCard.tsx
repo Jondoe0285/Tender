@@ -9,7 +9,7 @@ function formatRequirementSummary(requirements: string[]): string {
   return remaining > 0 ? `${shown} +${remaining} more` : shown;
 }
 
-function formatDeadline(closingDate: string | Date): { label: string; urgent: boolean } {
+export function formatOpportunityDeadline(closingDate: string | Date): { label: string; urgent: boolean } {
   const date = new Date(closingDate);
   const daysLeft = Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   const dateLabel = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -45,7 +45,7 @@ export type OpportunityCardData = {
 };
 
 export function TenderOpportunityCard({ data, href }: { data: OpportunityCardData; href: string }) {
-  const deadline = formatDeadline(data.closingDate);
+  const deadline = formatOpportunityDeadline(data.closingDate);
 
   return (
     <Link href={href} className="block">

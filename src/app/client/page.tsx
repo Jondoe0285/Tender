@@ -7,19 +7,31 @@ import { getCurrentUser } from '@/server/auth/session';
 import { prisma } from '@/server/data/prisma';
 import { getCompanyMemberIds, listMatchedSummariesForRetailer } from '@/server/domain/tenderService';
 import { WorkQueue, type WorkQueueItem } from '@/components/work/WorkQueue';
+import { hydrateEnterpriseRecords } from '@/server/domain/enterpriseRecordRepair';
+import { buyingTenderNewPath, buyingTenderPath, buyingTendersPath } from '@/lib/workspace-paths';
 
 export default async function ClientPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== 'USER') redirect('/login');
 
   const memberIds = await getCompanyMemberIds(user.id);
-  const [openTenders, awardedCount, matches, unlocks, submittedQuotes] = await Promise.all([
+  await hydrateEnterpriseRecords(memberIds);
+  const [openTenders, awardedCount, quotesReceivedCount, quotesToReview, matches, unlocks, submittedQuotes] = await Promise.all([
     prisma.tender.findMany({
       where: { clientId: { in: memberIds }, status: 'OPEN' },
       orderBy: { closingDate: 'asc' },
-      include: { quotes: { select: { id: true, status: true } } },
+      include: { quotes: { select: { id: true, status: true } }, _count: { select: { awards: true } } },
     }),
     prisma.award.count({ where: { tender: { clientId: { in: memberIds } } } }),
+    prisma.quote.count({ where: { tender: { clientId: { in: memberIds } } } }),
+    prisma.tender.count({
+      where: {
+        clientId: { in: memberIds },
+        status: 'OPEN',
+        quotes: { some: { status: 'SUBMITTED' } },
+        awards: { none: {} },
+      },
+    }),
     listMatchedSummariesForRetailer(user.id),
     prisma.unlock.findMany({ where: { retailerId: user.id }, select: { tenderId: true } }),
     prisma.quote.findMany({
@@ -32,15 +44,13 @@ export default async function ClientPage() {
 
   const unlockedIds = new Set(unlocks.map((unlock) => unlock.tenderId));
   const quotedTenderIds = new Set(submittedQuotes.map((quote) => quote.tenderId));
-  const quotesReceivedCount = openTenders.reduce((total, tender) => total + tender.quotes.length, 0);
-  const quotesToReview = openTenders.filter((tender) => tender.quotes.some((quote) => quote.status === 'SUBMITTED') && !tender.quotes.some((quote) => quote.status === 'ACCEPTED')).length;
 
   const buyingQueue: WorkQueueItem[] = openTenders.flatMap((tender): WorkQueueItem[] => {
     const hasSubmitted = tender.quotes.some((quote) => quote.status === 'SUBMITTED');
-    const hasAccepted = tender.quotes.some((quote) => quote.status === 'ACCEPTED');
-    if (hasSubmitted && !hasAccepted) {
+    const awarded = tender._count.awards > 0;
+    if (hasSubmitted && !awarded) {
       return [{
-        href: `/client/tenders/${tender.id}`,
+        href: buyingTenderPath(tender.id),
         reference: tender.reference,
         title: tender.subcategory,
         due: tender.closingDate.toLocaleDateString('en-GB'),
@@ -50,7 +60,7 @@ export default async function ClientPage() {
     }
     if (tender.quotes.length === 0) {
       return [{
-        href: `/client/tenders/${tender.id}`,
+        href: buyingTenderPath(tender.id),
         reference: tender.reference,
         title: tender.subcategory,
         due: tender.closingDate.toLocaleDateString('en-GB'),
@@ -100,10 +110,10 @@ export default async function ClientPage() {
         <PageHeader
           kicker="This week"
           description="Review quotes that are waiting, then quote the matches you have unlocked."
-          actions={<LinkButton href="/client/tenders/new">Create tender</LinkButton>}
+          actions={<LinkButton href={buyingTenderNewPath()}>Create tender</LinkButton>}
         />
 
-        <div className="mb-8 grid gap-3 sm:grid-cols-4">
+        <div className="mb-8 grid grid-cols-2 gap-x-8 gap-y-4 border-b border-slate-200 pb-5 sm:grid-cols-4">
           <Metric label="Open tenders" value={openTenders.length} />
           <Metric label="Quotes to review" value={quotesToReview} />
           <Metric label="Quotes received" value={quotesReceivedCount} />
@@ -114,7 +124,7 @@ export default async function ClientPage() {
           title="This week"
           items={[...buyingQueue, ...supplyingQueue].slice(0, 8)}
           emptyLabel="Nothing waiting on you. Raise a tender or keep your supplying profile current."
-          emptyHref="/client/tenders/new"
+          emptyHref={buyingTenderNewPath()}
           emptyAction="Raise a tender"
         />
 
@@ -122,13 +132,13 @@ export default async function ClientPage() {
           <PageHeader
             kicker="Buying"
             title="Open tenders"
-            actions={<Link href="/client/tenders" className="text-sm font-semibold text-trade-blue hover:text-foundation-navy">View all tenders</Link>}
+            actions={<Link href={buyingTendersPath()} className="text-sm font-semibold text-trade-blue hover:text-foundation-navy">View all tenders</Link>}
           />
           <WorkQueue
             title="Buying queue"
             items={buyingQueue}
             emptyLabel="No open buying work. Raise a specified package to start receiving quotes."
-            emptyHref="/client/tenders/new"
+            emptyHref={buyingTenderNewPath()}
             emptyAction="Raise your first tender"
           />
         </section>

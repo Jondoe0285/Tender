@@ -54,14 +54,29 @@ export async function acceptQuote(clientId: string, quoteId: string, mobileRetur
   }
 
   const poNumber = purchaseOrderNumber?.trim() ?? quote.award?.purchaseOrderNumber ?? '';
-  if (!quote.award?.purchaseOrderNumber) {
+  if (!quote.award?.purchaseOrderNumber && quote.status === 'SUBMITTED') {
     if (!isValidPurchaseOrderNumber(poNumber)) {
       throw new ValidationError('Enter a purchase order number (3-40 characters, letters, numbers, spaces, / or -).');
     }
   }
 
+  const currentHash = issuedTenderSpecHash(quote.tender.packages.map((pkg) => pkg.specHash).filter(Boolean));
+  if (quote.status === 'ACCEPTED' && !quote.award) {
+    await prisma.award.upsert({
+      where: { quoteId },
+      create: {
+        projectId: quote.tender.projectId,
+        tenderId: quote.tenderId,
+        quoteId,
+        packageSpecHash: quote.packageSpecHash || currentHash,
+        awardedById: clientId,
+        purchaseOrderNumber: poNumber || 'LEGACY',
+      },
+      update: {},
+    });
+  }
+
   if (quote.status === 'SUBMITTED') {
-    const currentHash = issuedTenderSpecHash(quote.tender.packages.map((pkg) => pkg.specHash).filter(Boolean));
     if (currentHash && quote.packageSpecHash && quote.packageSpecHash !== currentHash) {
       throw new ValidationError(STALE_QUOTE_REVISION_MESSAGE);
     }
@@ -262,7 +277,7 @@ export async function finalizeContactRelease(clientId: string, quoteId: string, 
           quoteReference: quote.reference,
           tenderReference: quote.tender.reference,
           recipientRole,
-          workspacePath: recipientRole === 'CONTRACTOR' ? `/client/tenders/${quote.tenderId}` : `/retailer/tenders/${quote.tenderId}`,
+          workspacePath: recipientRole === 'CONTRACTOR' ? `/user/tenders/${quote.tenderId}` : `/retailer/tenders/${quote.tenderId}`,
         })
       ).catch(() => ({ sent: false as const }));
       await recordAuditEvent({

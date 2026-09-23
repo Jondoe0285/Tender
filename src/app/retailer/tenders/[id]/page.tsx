@@ -495,7 +495,7 @@ export default function RetailerTenderDetailPage() {
                                 onChange={() => setUnavailableItemIds((current) => (
                                   current.includes(item.id) ? current.filter((itemId) => itemId !== item.id) : [...current, item.id]
                                 ))}
-                                className="h-4 w-4 accent-safety-amber"
+                                className="h-4 w-4 accent-trade-blue"
                               />
                               Cannot supply
                             </label>
@@ -570,7 +570,7 @@ export default function RetailerTenderDetailPage() {
                     </FieldGroup>
                     {full.supplyDate && (
                       <label className="flex items-center gap-3 rounded-md bg-slate-50 px-4 py-3 text-sm font-semibold text-foundation-navy">
-                        <input id="deliveryDateConfirmed" name="deliveryDateConfirmed" type="checkbox" required className="h-4 w-4 accent-safety-amber" />
+                        <input id="deliveryDateConfirmed" name="deliveryDateConfirmed" type="checkbox" required className="h-4 w-4 accent-trade-blue" />
                         {`I can deliver or supply on ${new Date(full.supplyDate).toLocaleDateString('en-GB')}`}
                       </label>
                     )}

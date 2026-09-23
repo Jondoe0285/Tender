@@ -127,10 +127,10 @@ export function QuoteComparison({
   return (
     <>
       <p className="sr-only" aria-live="polite">
-        Sorted by {sortLabels[sortKey]}, {sortAscending ? 'ascending' : 'descending'}
+        Sorted by {sortLabels[sortKey]} ({sortAscending ? 'ascending' : 'descending'})
       </p>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-concrete-grey">Compare {quotes.length} formal quote{quotes.length === 1 ? '' : 's'} side by side.</p>
+        <p className="text-sm text-concrete-grey">Compare {quotes.length === 1 ? '1 formal quote' : `${quotes.length} formal quotes`} side by side.</p>
         <p className="text-xs text-concrete-grey">Select a column heading to sort</p>
       </div>
       {awarded && (

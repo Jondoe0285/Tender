@@ -1,12 +1,16 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Field';
+import { DataCell, DataRow, DataTable } from '@/components/ui/DataTable';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { CATEGORY_NAMES } from '@/lib/categories';
 import { catalogServiceNames, type CategoryCatalog } from '@/lib/catalog';
-import { TenderOpportunityCard, type OpportunityCardData } from '@/components/retailer/TenderOpportunityCard';
+import { TenderOpportunityCard, formatOpportunityDeadline, type OpportunityCardData } from '@/components/retailer/TenderOpportunityCard';
 
 const URGENCY_OPTIONS = ['standard', 'urgent', 'flexible'] as const;
 const SAVED_SEARCHES_KEY = 'tradeTender.retailer.savedSearches.v1';
@@ -186,15 +190,46 @@ export function OpportunitiesExplorer({ opportunities }: { opportunities: Opport
       </Card>
 
       {filtered.length === 0 ? (
-        <Card className="py-16 text-center text-sm text-concrete-grey">
-          <p role="status">No matching tenders. Try a different search or filter.</p>
-        </Card>
+        <EmptyState
+          title="No matching tenders"
+          body="Try a different location, category, or saved search. Coverage and provisions on your profile also control which tenders appear here."
+        />
       ) : (
-        <div className="flex flex-col gap-4">
-          {filtered.map((item) => (
-            <TenderOpportunityCard key={item.tenderId} data={item} href={`/retailer/tenders/${item.tenderId}`} />
-          ))}
-        </div>
+        <>
+          <div className="flex flex-col gap-3 md:hidden">
+            {filtered.map((item) => (
+              <TenderOpportunityCard key={item.tenderId} data={item} href={`/retailer/tenders/${item.tenderId}`} />
+            ))}
+          </div>
+          <div className="hidden md:block">
+            <DataTable headers={['Reference', 'Package', 'Location', 'Closes', 'Match', 'Fee', 'Status']}>
+              {filtered.map((item) => {
+                const deadline = formatOpportunityDeadline(item.closingDate);
+                const href = `/retailer/tenders/${item.tenderId}`;
+                return (
+                  <DataRow key={item.tenderId}>
+                    <DataCell strong numeric>
+                      <Link href={href} className="hover:text-trade-blue">{item.reference}</Link>
+                      {item.isNew ? <span className="ml-2 text-[11px] font-semibold text-safety-amber">New</span> : null}
+                    </DataCell>
+                    <DataCell strong>{item.category}</DataCell>
+                    <DataCell>{item.distanceMiles != null ? `${item.location} · ${item.distanceMiles.toFixed(0)} mi` : item.location}</DataCell>
+                    <DataCell numeric>{deadline.label}</DataCell>
+                    <DataCell>{item.strongMatch ? 'Great match' : item.categoryMatch ? 'Category' : 'Coverage'}</DataCell>
+                    <DataCell>{item.unlockFeeLabel}</DataCell>
+                    <DataCell>
+                      <Link href={href} className="inline-flex min-h-11 items-center">
+                        <StatusBadge status={item.unlocked ? 'approved' : deadline.urgent ? 'attention' : 'pending'}>
+                          {item.unlocked ? 'Unlocked' : 'Unlock to quote'}
+                        </StatusBadge>
+                      </Link>
+                    </DataCell>
+                  </DataRow>
+                );
+              })}
+            </DataTable>
+          </div>
+        </>
       )}
     </div>
   );

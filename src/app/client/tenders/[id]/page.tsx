@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { QuoteComparison } from '@/components/quotes/QuoteComparison';
 import { TenderMessages } from '@/components/quotes/TenderMessages';
+import { buyingTendersPath } from '@/lib/workspace-paths';
 import { REQUIREMENT_OPTIONS } from '@/lib/categories';
 import { PageLoadState } from '@/components/ui/PageLoadState';
 import { allowTestPayments } from '@/lib/runtime';
@@ -237,7 +238,7 @@ export default function ClientTenderDetailPage() {
   return (
     <AppShell role="client" title={tender.reference}>
       <section className="mx-auto max-w-6xl">
-        <Link href="/client/tenders" className="mb-5 inline-block text-sm font-semibold text-concrete-grey hover:text-foundation-navy">
+        <Link href={buyingTendersPath()} className="mb-5 inline-block text-sm font-semibold text-concrete-grey hover:text-foundation-navy">
           &larr; Back to my tenders
         </Link>
         <h2 className="text-xl font-semibold tracking-tight text-foundation-navy">{tender.subcategory}</h2>
@@ -289,7 +290,7 @@ export default function ClientTenderDetailPage() {
                 <legend className="text-sm font-semibold text-foundation-navy">Site, delivery and supporting requirements</legend>
                 {REQUIREMENT_OPTIONS.map((requirement) => (
                   <label key={requirement} className="flex items-center gap-3 text-sm text-concrete-grey">
-                    <input name="requirements" type="checkbox" value={requirement} defaultChecked={tender.requirements.split(',').includes(requirement)} className="h-4 w-4 accent-safety-amber" />
+                    <input name="requirements" type="checkbox" value={requirement} defaultChecked={tender.requirements.split(',').includes(requirement)} className="h-4 w-4 accent-trade-blue" />
                     {requirement}
                   </label>
                 ))}
@@ -415,11 +416,15 @@ export default function ClientTenderDetailPage() {
             />
           </>
         )}
-        {quotes.filter((quote) => !quote.expired).map((quote) => (
-          <div key={quote.id} className="mt-6">
-            <TenderMessages tenderId={params.id} quoteId={quote.id} role="client" />
-          </div>
-        ))}
+        {(() => {
+          const threadQuote = quotes.find((quote) => quote.status === 'ACCEPTED') ?? quotes.find((quote) => !quote.expired) ?? quotes[0];
+          const tenderClosed = tender.status === 'CLOSED' || new Date(tender.closingDate).getTime() <= Date.now();
+          return (
+            <div className="mt-6">
+              <TenderMessages tenderId={params.id} quoteId={threadQuote?.id} role="client" tenderClosed={tenderClosed} />
+            </div>
+          );
+        })()}
       </section>
     </AppShell>
   );

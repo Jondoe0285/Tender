@@ -124,7 +124,7 @@ export function ActivityLogTable({ entries, filters }: { entries: AuditEntry[]; 
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="unlock, User, quote..."
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
               />
             </label>
             <label className="text-sm text-concrete-grey">
@@ -132,7 +132,7 @@ export function ActivityLogTable({ entries, filters }: { entries: AuditEntry[]; 
               <select
                 value={action}
                 onChange={(event) => setAction(event.target.value)}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
               >
                 <option value="">Any</option>
                 {actionOptions.map((item) => (
@@ -145,7 +145,7 @@ export function ActivityLogTable({ entries, filters }: { entries: AuditEntry[]; 
               <select
                 value={targetType}
                 onChange={(event) => setTargetType(event.target.value)}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
               >
                 <option value="">Any</option>
                 {targetTypeOptions.map((item) => (
@@ -158,7 +158,7 @@ export function ActivityLogTable({ entries, filters }: { entries: AuditEntry[]; 
               <select
                 value={actorRole}
                 onChange={(event) => setActorRole(event.target.value)}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
               >
                 <option value="">Any</option>
                 <option value="SUPER_USER">Super User</option>
@@ -172,7 +172,7 @@ export function ActivityLogTable({ entries, filters }: { entries: AuditEntry[]; 
                 type="date"
                 value={from}
                 onChange={(event) => setFrom(event.target.value)}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
               />
             </label>
             <label className="text-sm text-concrete-grey">
@@ -181,7 +181,7 @@ export function ActivityLogTable({ entries, filters }: { entries: AuditEntry[]; 
                 type="date"
                 value={to}
                 onChange={(event) => setTo(event.target.value)}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
               />
             </label>
           </form>

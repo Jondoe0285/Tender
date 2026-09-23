@@ -6,11 +6,13 @@ It is intentionally stored in the repository so it travels with the code across 
 
 ## Outstanding Actions
 
-Work top to bottom — production config first, then remaining operational evidence. Items that state "implementation complete" remain open until their listed validation evidence is recorded.
+The ambition is **enterprise-ready**: a specified package workspace that a Tier 1 contractor can trust for closed regional procurement, then national use. Bar is 70. Last honest score on staging `5120c73` was **56/100**. Live rail remains 12. Production remains **BLOCKED**.
 
-The current release decision remains **BLOCKED**. Repository engineering for payment ledger, privileged MFA, trusted client IP, own-tender IDOR, governing-document canon, and source accessibility/contrast is complete. Live Stripe, Resend, Sentry, retention, an approved staging deploy SHA, real-device QA, and paid-plan capacity evidence remain Before Production items.
+Work top to bottom — live-rail config first, then remaining operational evidence. Walkthrough engineering for WT-01–WT-12 is in code; a repeat browser pass is still required before claiming Specify → Compare → Award on the record.
 
-Actions below include the 2026-09-22 enterprise due-diligence recommendations. Existing tracker items were kept; due-diligence items that already appeared here or were closed as Year 1 product decisions were not duplicated.
+Repository engineering for payment ledger, privileged MFA, trusted client IP, own-tender IDOR, Project/Award schema, frozen package revision, PO on accept, four-eyes ControlChange, conversion funnel, measured contractor units, Award/Project backfill, county operating-location remap, `/user` buying URLs, Year 1 fixed release fees, sandbox password repair, workspace 403, Trade Tender IDs, and automated-verification copy is in code. Live Stripe, Resend, Sentry, retention, an approved staging deploy SHA, real-device QA, and paid-plan capacity evidence remain Before Production items.
+
+Actions below include the 2026-09-22 enterprise due-diligence recommendations. Existing tracker items were kept where still open; due-diligence items that already appeared here or were closed as Year 1 product decisions were not duplicated.
 
 ### Before Production
 
@@ -37,15 +39,15 @@ Actions below include the 2026-09-22 enterprise due-diligence recommendations. E
 
 ### Engineering Work
 
-- [ ] Complete accessibility, real-device, and first-journey QA, including the mobile sidebar, Client/Provider journeys, and a repeatable browser/axe pass (P2-M01 / P2-M03).
+- [ ] Complete accessibility, real-device, and first-journey QA, including the mobile sidebar, Client/Provider journeys, and a repeatable browser/axe pass (P2-M01 / P2-M03). Re-run the 23 September walkthrough (WT-01–WT-12) against current staging; engineering is in code, the pass is not recorded yet.
 - [ ] Establish production capacity and availability evidence. Free-tier Render services have no demonstrated path to the required 1,000 concurrent users. Select an appropriate plan, document connection/scaling limits, configure alerts, and pass representative load and recovery tests.
 
 ### Data, Product, and Marketplace
 
-- [ ] Add Project and Award entities so a job/site can own multiple tenders and an accepted quote has a tracked outcome after contact release.
-- [ ] Add Client organisation RBAC (buyer, QS/estimator, read-only auditor) beyond today’s two-profile `USER` model.
+- [ ] Project and Award schema shipped (`543df67` / `5120c73`). Award/Project backfill and `/user` buying URLs are in code; confirm on a repeat walk that accepted demo quotes appear on Awarded and My tenders shows a project heading.
+- [ ] Add Client organisation RBAC (buyer, QS/estimator, read-only auditor) beyond today’s two-profile `USER` model. Duties exist (RAISER, ESTIMATOR, APPROVER, AUDITOR); this item stays open until org roles are first-class, not only additional-user ticks.
 - [ ] Define an opportunity search strategy that will not rely on unindexed table scans as Provider and tender volume grows.
-- [ ] Run a closed regional beachhead (one geography, limited trades, invited demand) and instrument match → unlock → quote → accept → release before any national acquisition spend.
+- [ ] Run a closed regional beachhead (one geography, limited trades, invited demand) and instrument match → unlock → quote → accept → release before any national acquisition spend. Conversion funnel exists in Super User code; Owner MFA enrollment still needs a valid `PLATFORM_OWNER_EMAIL` on the environment.
 - [ ] Before enterprise sales, move sponsored placements off the quote-comparison surface. Year 1 launch keeps sponsorship on comparison (founder decision 2026-09-18); this is not a Year 1 reopen.
 
 ### Operations and Recovery

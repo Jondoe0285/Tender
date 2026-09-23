@@ -23,7 +23,7 @@ export default withAuth(
       return NextResponse.redirect(appUrl('/login'));
     }
     if (path.startsWith('/super-user') && role !== 'SUPER_USER') {
-      return NextResponse.redirect(appUrl('/login'));
+      return NextResponse.redirect(appUrl(role === 'USER' ? '/forbidden' : '/login'));
     }
 
     if (path.startsWith('/user')) {
@@ -34,14 +34,11 @@ export default withAuth(
       if (path.startsWith('/user/billing')) return NextResponse.rewrite(new URL(path.replace(/^\/user\/billing/, '/retailer/billing'), request.url));
       return NextResponse.rewrite(new URL(path.replace(/^\/user/, '/client'), request.url));
     }
-    if (path.startsWith('/client')) {
-      return NextResponse.redirect(new URL(path.replace(/^\/client/, '/contractor'), request.url));
+    if (path.startsWith('/client') || path.startsWith('/contractor')) {
+      return NextResponse.redirect(new URL(path.replace(/^\/(client|contractor)/, '/user'), request.url));
     }
     if (path.startsWith('/retailer')) {
       return NextResponse.redirect(new URL(path.replace(/^\/retailer/, '/provider'), request.url));
-    }
-    if (path.startsWith('/contractor')) {
-      return NextResponse.rewrite(new URL(path.replace(/^\/contractor/, '/client'), request.url));
     }
     if (path.startsWith('/provider')) {
       return NextResponse.rewrite(new URL(path.replace(/^\/provider/, '/retailer'), request.url));

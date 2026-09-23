@@ -101,7 +101,7 @@ export function tenderFlaggedForReviewTemplate(input: { reference: string }): Em
       title: 'Your tender is paused for a Trade Tender review',
       intro: `Tender ${input.reference} requires a Trade Tender review before further action may be taken.`,
       body: note('Thank you for your patience. No action is required from you at this time. We will contact you through your account if we need further information.'),
-      action: { label: 'View your tender', href: appUrl('/client/tenders') },
+      action: { label: 'View your tender', href: appUrl('/user/tenders') },
     }),
   };
 }

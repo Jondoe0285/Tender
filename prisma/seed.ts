@@ -1,7 +1,9 @@
 import { PrismaClient, Role } from '@prisma/client';
 import { hash } from 'bcryptjs';
 import { SERVICE_NAMES } from '../src/lib/categories';
-import { UK_COUNTIES, UK_REGIONS } from '../src/lib/geography';
+import { UK_COUNTIES, UK_REGIONS, coverageFieldsFromOperatingLocations } from '../src/lib/geography';
+import { isValidEmail } from '../src/lib/email-format';
+import { buildClientTradeTenderId } from '../src/lib/identifiers';
 
 const DEFAULT_MEMBERSHIP_TIERS = [
   { name: 'Free', monthlyPriceGbp: 0, freeTenderOpportunitiesPerMonth: 0, description: 'Matched summaries and pay-per-tender unlocks.' },
@@ -13,8 +15,10 @@ const DEFAULT_MEMBERSHIP_TIERS = [
 
 const prisma = new PrismaClient();
 const DEFAULT_SANDBOX_PASSWORD = 'TradeTenderDev!2026';
+const FALLBACK_OWNER_EMAIL = 'owner@example.test';
 const TRIAL_RETAILER_COUNT = 300;
-const platformOwnerEmail = process.env.PLATFORM_OWNER_EMAIL?.trim().toLowerCase();
+const requestedOwnerEmail = process.env.PLATFORM_OWNER_EMAIL?.trim().toLowerCase() ?? '';
+const platformOwnerEmail = isValidEmail(requestedOwnerEmail) ? requestedOwnerEmail : FALLBACK_OWNER_EMAIL;
 const platformOwnerPassword = process.env.PLATFORM_OWNER_PASSWORD;
 const isDeployedSandbox = process.env.TRADE_TENDER_ENV === 'sandbox';
 const isSandboxSeedEnabled = process.env.SANDBOX_SEED_ENABLED === 'true';
@@ -164,8 +168,16 @@ async function main() {
   if (process.env.NODE_ENV === 'production' && !(isDeployedSandbox && isSandboxSeedEnabled)) {
     throw new Error('Sandbox accounts may only be seeded locally or in an explicitly enabled sandbox environment.');
   }
-  if (!platformOwnerEmail || !platformOwnerPassword) {
-    throw new Error('PLATFORM_OWNER_EMAIL and PLATFORM_OWNER_PASSWORD are required to seed the platform owner.');
+  if (!platformOwnerPassword) {
+    throw new Error('PLATFORM_OWNER_PASSWORD is required to seed the platform owner.');
+  }
+
+  if (requestedOwnerEmail && requestedOwnerEmail !== platformOwnerEmail) {
+    const stale = await prisma.user.findUnique({ where: { email: requestedOwnerEmail }, select: { id: true } });
+    const taken = await prisma.user.findUnique({ where: { email: platformOwnerEmail }, select: { id: true } });
+    if (stale && !taken) {
+      await prisma.user.update({ where: { id: stale.id }, data: { email: platformOwnerEmail } });
+    }
   }
 
   const configuredSandboxPassword = process.env.SANDBOX_USER_PASSWORD?.trim();
@@ -184,6 +196,8 @@ async function main() {
       role: Role.SUPER_USER,
       isOwner: true,
       contactName: 'Demo Super User',
+      firstName: 'Demo',
+      lastName: 'Owner',
       contactPhone: '07000000000',
       suspended: false,
       emailVerifiedAt: new Date(),
@@ -195,6 +209,8 @@ async function main() {
       role: Role.SUPER_USER,
       isOwner: true,
       contactName: 'Demo Super User',
+      firstName: 'Demo',
+      lastName: 'Owner',
       contactPhone: '07000000000',
       emailVerifiedAt: new Date(),
       termsAcceptedAt: new Date(),
@@ -208,6 +224,8 @@ async function main() {
       passwordHash: sandboxPasswordHash,
       role: Role.USER,
       contactName: 'Demo Client',
+      firstName: 'Demo',
+      lastName: 'Client',
       contactPhone: '07123456789',
       suspended: false,
       emailVerifiedAt: new Date(),
@@ -218,16 +236,19 @@ async function main() {
       passwordHash: sandboxPasswordHash,
       role: Role.USER,
       contactName: 'Demo Client',
+      firstName: 'Demo',
+      lastName: 'Client',
       contactPhone: '07123456789',
       emailVerifiedAt: new Date(),
       termsAcceptedAt: new Date(),
     },
   });
   await upsertRoleMembership(client.id, Role.USER);
+  const clientCoverage = coverageFieldsFromOperatingLocations(['West Midlands', 'Wales', 'Greater Manchester', 'Merseyside']);
   const clientCompany = await prisma.clientCompany.upsert({
     where: { primaryUserId: client.id },
-    update: { companyName: 'Demo Construction Client Ltd' },
-    create: { companyName: 'Demo Construction Client Ltd', primaryUserId: client.id },
+    update: { companyName: 'Demo Construction Client Ltd', operatingLocations: clientCoverage.operatingLocations },
+    create: { companyName: 'Demo Construction Client Ltd', primaryUserId: client.id, operatingLocations: clientCoverage.operatingLocations, tradeTenderId: buildClientTradeTenderId() },
   });
   await prisma.clientCompanyMember.upsert({
     where: { companyId_userId: { companyId: clientCompany.id, userId: client.id } },
@@ -246,6 +267,8 @@ async function main() {
       passwordHash: sandboxPasswordHash,
       role: Role.USER,
       contactName: 'Demo Retailer',
+      firstName: 'Demo',
+      lastName: 'Retailer',
       contactPhone: '07987654321',
       suspended: false,
       emailVerifiedAt: new Date(),
@@ -256,6 +279,8 @@ async function main() {
       passwordHash: sandboxPasswordHash,
       role: Role.USER,
       contactName: 'Demo Retailer',
+      firstName: 'Demo',
+      lastName: 'Retailer',
       contactPhone: '07987654321',
       emailVerifiedAt: new Date(),
       termsAcceptedAt: new Date(),
@@ -263,13 +288,16 @@ async function main() {
   });
   await upsertRoleMembership(retailer.id, Role.USER);
 
+  const retailerCoverage = coverageFieldsFromOperatingLocations(['West Midlands']);
   await prisma.retailerProfile.upsert({
     where: { userId: retailer.id },
     update: {
       companyName: 'Demo Builders Merchant Ltd',
       categories: 'Materials,Waste',
       coverageAreas: 'Birmingham',
-      coverageScope: 'UK',
+      coverageScope: retailerCoverage.coverageScope,
+      counties: retailerCoverage.counties,
+      regions: retailerCoverage.regions,
     },
     create: {
       userId: retailer.id,
@@ -277,13 +305,15 @@ async function main() {
       companyName: 'Demo Builders Merchant Ltd',
       categories: 'Materials,Waste',
       coverageAreas: 'Birmingham',
-      coverageScope: 'UK',
+      coverageScope: retailerCoverage.coverageScope,
+      counties: retailerCoverage.counties,
+      regions: retailerCoverage.regions,
     },
   });
   const retailerCompany = await prisma.clientCompany.upsert({
     where: { primaryUserId: retailer.id },
-    update: { companyName: 'Demo Builders Merchant Ltd', services: 'Materials,Waste', operatingLocations: 'Birmingham' },
-    create: { companyName: 'Demo Builders Merchant Ltd', primaryUserId: retailer.id, services: 'Materials,Waste', operatingLocations: 'Birmingham' },
+    update: { companyName: 'Demo Builders Merchant Ltd', services: 'Materials,Waste', operatingLocations: retailerCoverage.operatingLocations },
+    create: { companyName: 'Demo Builders Merchant Ltd', primaryUserId: retailer.id, services: 'Materials,Waste', operatingLocations: retailerCoverage.operatingLocations, tradeTenderId: buildClientTradeTenderId() },
   });
   await prisma.clientCompanyMember.upsert({
     where: { companyId_userId: { companyId: retailerCompany.id, userId: retailer.id } },
@@ -294,6 +324,16 @@ async function main() {
   await seedTrialRetailers(sandboxPasswordHash);
   await seedInitialPartners();
   await seedDefaultMembershipTiers();
+  await prisma.platformSetting.upsert({
+    where: { key: 'CLIENT_RELEASE_FEE_MODE' },
+    update: { value: 'FIXED' },
+    create: { key: 'CLIENT_RELEASE_FEE_MODE', value: 'FIXED' },
+  });
+  await prisma.platformSetting.upsert({
+    where: { key: 'RETAILER_UNLOCK_FEE_MODE' },
+    update: { value: 'FIXED' },
+    create: { key: 'RETAILER_UNLOCK_FEE_MODE', value: 'FIXED' },
+  });
 
   console.log(`Seeded persistent sandbox accounts, ${TRIAL_RETAILER_COUNT} trial Retailers, ${INITIAL_PARTNERS.length} partner records, and ${DEFAULT_MEMBERSHIP_TIERS.length} inactive membership tiers.`);
 }

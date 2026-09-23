@@ -20,6 +20,7 @@
     "db:restore-initial-partners": "tsx --env-file=.env scripts/restore-initial-partners.ts",
     "db:seed-fake-tenders": "tsx --env-file=.env scripts/seed-fake-tenders.ts",
     "db:seed-demo-scenarios": "tsx --env-file=.env scripts/seed-demo-scenarios.ts",
+    "db:repair-sandbox": "tsx --env-file=.env scripts/repair-sandbox-walkthrough.ts",
     "db:verify-owner-password": "tsx --env-file=.env scripts/verify-owner-password.ts",
     "retention:purge": "tsx --env-file=.env scripts/purge-retention.ts",
     "pricing:refresh-estimates": "tsx --env-file=.env scripts/refresh-quote-estimate-baselines.ts",

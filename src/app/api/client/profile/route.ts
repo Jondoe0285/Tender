@@ -9,7 +9,7 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { isPrimaryClientUser } from '@/lib/client-company';
 import { toErrorResponse } from '@/server/http/errors';
-import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
+import { coverageFieldsFromOperatingLocations, normaliseOperatingLocations } from '@/lib/geography';
 import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
 import { parseServiceProvisions, serialiseServiceProvisions } from '@/lib/service-provisions';
 import { markUploadedDocumentsVerified } from '@/server/domain/verificationDocumentService';
@@ -17,6 +17,8 @@ import { INDEPENDENT_REVIEW_RESET_DATA } from '@/server/domain/independentReview
 import { Prisma } from '@prisma/client';
 import { getCategoryCatalog } from '@/server/domain/categoryService';
 import { ADDITIONAL_BUYER_DUTIES, serialiseBuyerDuties } from '@/lib/workspace-duties';
+import { personNameFromAccount } from '@/lib/person-name';
+import { assignMissingTradeTenderId, persistNormalisedOperatingLocations } from '@/server/domain/enterpriseRecordRepair';
 
 const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1).max(200),
@@ -48,9 +50,22 @@ export async function GET() {
       }),
     ]);
 
+    const names = personNameFromAccount({
+      firstName: account.firstName,
+      lastName: account.lastName,
+      contactName: account.contactName,
+      companyName: membership?.company.companyName,
+    });
+    const operatingLocations = membership
+      ? await persistNormalisedOperatingLocations(membership.companyId, membership.company.operatingLocations, user.id)
+      : [];
+    const tradeTenderId = membership
+      ? await assignMissingTradeTenderId(membership.companyId, membership.company.tradeTenderId)
+      : null;
+
     return NextResponse.json({
-      firstName: account.firstName ?? account.contactName.split(' ')[0] ?? '',
-      lastName: account.lastName ?? account.contactName.split(' ').slice(1).join(' '),
+      firstName: names.firstName,
+      lastName: names.lastName,
       email: account.email,
       phoneNumber: account.contactPhone ?? '',
       companyName: membership?.company.companyName ?? null,
@@ -58,9 +73,9 @@ export async function GET() {
       branchIdentifier: membership?.company.branchIdentifier ?? null,
       services: membership?.company.services ? membership.company.services.split(',').filter(Boolean) : [],
       serviceProvisions: parseServiceProvisions(membership?.company.serviceProvisions, membership?.company.services.split(',').filter(Boolean) ?? [], catalog),
-      operatingLocations: membership?.company.operatingLocations ? membership.company.operatingLocations.split(',').filter(Boolean) : [],
+      operatingLocations,
       releaseSpendCapGbp: membership?.company.releaseSpendCapGbp ?? null,
-      tradeTenderId: membership?.company.tradeTenderId ?? null,
+      tradeTenderId,
       isPrimaryUser: membership ? isPrimaryClientUser(membership.company.primaryUserId, user.id) : false,
         verificationStatus: retailerProfile?.verificationStatus ?? null,
       additionalUsers: membership && isPrimaryClientUser(membership.company.primaryUserId, user.id)
@@ -82,7 +97,11 @@ export async function PUT(request: Request) {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
     const user = await requireRole('USER');
-    const parsed = createProfileUpdateSchemaForCatalog(await getCategoryCatalog()).safeParse(await request.json().catch(() => null));
+    const body = await request.json().catch(() => null) as Record<string, unknown> | null;
+    if (body && Array.isArray(body.operatingLocations)) {
+      body.operatingLocations = normaliseOperatingLocations(body.operatingLocations.map((value) => String(value)));
+    }
+    const parsed = createProfileUpdateSchemaForCatalog(await getCategoryCatalog()).safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid profile details', issues: parsed.error.flatten() }, { status: 400 });
     }
@@ -143,11 +162,14 @@ export async function PUT(request: Request) {
       ...(parsed.data.operatingLocations !== undefined
         ? [prisma.retailerProfile.updateMany({
             where: { userId: user.id },
-            data: {
-              coverageScope: parsed.data.operatingLocations.includes('United Kingdom') ? 'UK' : parsed.data.operatingLocations.some((location) => UK_REGIONS.includes(location as typeof UK_REGIONS[number])) ? 'REGION' : 'COUNTY',
-              counties: parsed.data.operatingLocations.filter((location) => UK_COUNTIES.includes(location as typeof UK_COUNTIES[number])).join(','),
-              regions: parsed.data.operatingLocations.filter((location) => UK_REGIONS.includes(location as typeof UK_REGIONS[number])).join(','),
-            },
+            data: (() => {
+              const coverage = coverageFieldsFromOperatingLocations(parsed.data.operatingLocations ?? []);
+              return {
+                coverageScope: coverage.coverageScope,
+                counties: coverage.counties,
+                regions: coverage.regions,
+              };
+            })(),
           })]
         : []),
     ]);

@@ -157,7 +157,7 @@ export function ComplianceMonitoringPanel({ overview }: { overview: ComplianceOv
                       onChange={(input) => setNotes((current) => ({ ...current, [event.id]: input.target.value }))}
                       placeholder="Review outcome and action taken"
                       maxLength={500}
-                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
                     />
                     <Select value={outcomes[event.id] ?? 'HOLD_CONFIRMED'} onChange={(input) => setOutcomes((current) => ({ ...current, [event.id]: input.target.value as 'RELEASED_SAFE' | 'HOLD_CONFIRMED' }))} className="sm:w-52">
                       <option value="HOLD_CONFIRMED">Confirm hold</option>

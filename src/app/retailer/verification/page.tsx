@@ -306,9 +306,9 @@ export default function ProviderVerificationPage() {
               </div>
             </Card>
 
-            {isSoleTrader && <Card className="border-l-4 border-safety-amber bg-amber-50/40"><p className="text-sm font-semibold text-foundation-navy">Sole trader evidence rule</p><p className="mt-2 text-sm text-concrete-grey">Upload one strong evidence document, or at least two moderate evidence documents, to become eligible for AI verification. Strong evidence: HMRC UTR confirmation, SA302 tax calculation, VAT registration certificate, proof of CIS registration, or public liability/professional indemnity insurance in the trading name. Moderate evidence: business bank statement, customer invoices, customer quotations or contracts, trade body membership, or trading activity evidence (business website, trading-domain email, or marketing materials).</p></Card>}
+            {isSoleTrader && <Card><p className="text-sm font-semibold text-foundation-navy">Sole trader evidence rule</p><p className="mt-2 text-sm text-concrete-grey">Upload one strong evidence document, or at least two moderate evidence documents, to become eligible for automated verification. Strong evidence: HMRC UTR confirmation, SA302 tax calculation, VAT registration certificate, proof of CIS registration, or public liability/professional indemnity insurance in the trading name. Moderate evidence: business bank statement, customer invoices, customer quotations or contracts, trade body membership, or trading activity evidence (business website, trading-domain email, or marketing materials).</p></Card>}
 
-        <Card className="border-l-4 border-safety-amber bg-amber-50/40">
+        <Card>
           <p className="text-sm font-semibold text-foundation-navy">Compliance score disclaimer</p>
           <p className="mt-2 text-sm text-concrete-grey">
             The automated review assesses legal-compliance evidence only and may make mistakes. Each uploaded document

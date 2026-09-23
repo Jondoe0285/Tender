@@ -111,7 +111,7 @@ export type VerificationTierKey = 'INDEPENDENTLY_VERIFIED' | 'VERIFIED_BY_AI' | 
 
 const VERIFICATION_TIER_LABELS: Record<VerificationTierKey, string> = {
   INDEPENDENTLY_VERIFIED: 'Enhanced Verified',
-  VERIFIED_BY_AI: 'Verified by Ai',
+  VERIFIED_BY_AI: 'Verified',
   UNVERIFIED: 'Unverified',
 };
 

@@ -209,7 +209,7 @@ export function RegisterForm({ initialIntent }: { initialIntent: WorkspaceIntent
               </FieldGroup>
               <FieldGroup>
                 <Label htmlFor="companyType">Company type</Label>
-                <select id="companyType" name="companyType" required value={companyType} onChange={(event) => setCompanyType(event.target.value as typeof companyType)} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm">
+                <select id="companyType" name="companyType" required value={companyType} onChange={(event) => setCompanyType(event.target.value as typeof companyType)} className="w-full min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-foundation-navy">
                   {COMPANY_TYPES.map((type) => (
                     <option key={type} value={type}>{COMPANY_TYPE_LABELS[type]}</option>
                   ))}
@@ -232,7 +232,7 @@ export function RegisterForm({ initialIntent }: { initialIntent: WorkspaceIntent
                 return (
                   <label
                     key={option.value}
-                    className={`flex cursor-pointer flex-col gap-1 rounded-lg border p-4 ${selected ? 'border-trade-blue bg-trade-blue/5' : 'border-slate-200 bg-white hover:border-steel-blue/40'}`}
+                    className={`flex cursor-pointer flex-col gap-1 rounded-md border p-4 ${selected ? 'border-trade-blue bg-trade-blue/5' : 'border-slate-200 bg-white hover:border-steel-blue/40'}`}
                   >
                     <span className="flex items-center gap-3">
                       <input

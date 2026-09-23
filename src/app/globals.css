@@ -4,15 +4,20 @@
 
 @layer base {
   html {
-    background: #f7f8fa;
+    background: #F2F4F7;
   }
 
   body {
-    background: #f7f8fa;
+    background: #F2F4F7;
   }
 
   :focus-visible {
     outline: 2px solid theme('colors.trade-blue');
     outline-offset: 2px;
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: #1D6FB8;
   }
 }

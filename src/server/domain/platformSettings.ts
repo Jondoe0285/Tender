@@ -62,7 +62,30 @@ export async function getRetailerAnalyticsSectionSettings(): Promise<Record<Reta
   ) as Record<RetailerAnalyticsSectionKey, boolean>;
 }
 
+const YEAR1_FIXED_FEE_KEYS = ['CLIENT_RELEASE_FEE_MODE', 'RETAILER_UNLOCK_FEE_MODE'] as const;
+let year1FeeDefaultsEnsured = false;
+
+async function ensureYear1FixedFeeModes(): Promise<void> {
+  if (year1FeeDefaultsEnsured) return;
+  year1FeeDefaultsEnsured = true;
+  const confirmed = await prisma.controlChange.findMany({
+    where: { settingKey: { in: [...YEAR1_FIXED_FEE_KEYS] }, status: 'CONFIRMED' },
+    select: { settingKey: true },
+  });
+  const confirmedKeys = new Set(confirmed.map((change) => change.settingKey));
+  for (const key of YEAR1_FIXED_FEE_KEYS) {
+    if (confirmedKeys.has(key)) continue;
+    const current = await prisma.platformSetting.findUnique({ where: { key } });
+    if (current?.value === 'PERCENTAGE') {
+      await prisma.platformSetting.update({ where: { key }, data: { value: 'FIXED' } });
+    }
+  }
+}
+
 export async function getPlatformSetting(key: string): Promise<string | null> {
+  if (YEAR1_FIXED_FEE_KEYS.includes(key as (typeof YEAR1_FIXED_FEE_KEYS)[number])) {
+    await ensureYear1FixedFeeModes();
+  }
   const setting = await prisma.platformSetting.findUnique({ where: { key } });
   return setting?.value ?? defaultSettings[key] ?? null;
 }

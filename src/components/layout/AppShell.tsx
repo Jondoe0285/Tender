@@ -245,7 +245,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
             <AccountControls />
           </div>
         </header>
-        <main id="main-content" className="flex-1 px-5 py-6 sm:px-8">{children}</main>
+        <main id="main-content" className="flex-1 px-5 py-5 sm:px-8">{children}</main>
         <SiteFooter />
       </div>
     </div>

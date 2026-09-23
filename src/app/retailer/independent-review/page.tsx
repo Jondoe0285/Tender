@@ -99,7 +99,7 @@ export default function IndependentReviewPage() {
           </p>
 
           {state?.note?.includes('Service scope changed') && (
-            <div className="mt-4 rounded-lg border-l-4 border-safety-amber bg-amber-50/40 p-4">
+            <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-4">
               <p className="text-sm font-semibold text-foundation-navy">Service scope updated</p>
               <p className="mt-2 text-sm text-concrete-grey">Changing your service scope reset your enhanced verification. Purchase the tier you need for your updated services.</p>
             </div>

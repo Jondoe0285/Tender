@@ -26,7 +26,7 @@ export function RetailerAnalyticsDashboard({ data, sections }: Props) {
       </div>
 
       {strongestCategory && (
-        <Card className="mb-8 border-l-4 border-l-safety-amber bg-amber-50/40">
+        <Card className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-widest text-steel-blue">Performance insight</p>
           <h2 className="mt-2 font-heading text-lg font-bold text-foundation-navy">
             {strongestCategory.category} is your strongest category with {strongestCategory.matched} matched tender{strongestCategory.matched === 1 ? '' : 's'}.

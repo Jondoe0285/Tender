@@ -404,22 +404,66 @@ export function retailerCoversTenderLocation(
   if (retailer.coverageScope === 'UK') return true;
 
   const normalizedLocation = tenderLocation.trim().toLowerCase();
+  const selectedCounties = retailer.counties.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+  const selectedRegions = retailer.regions.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+  const county = getCountyForPostcode(tenderLocation);
+  const region = getRegionForPostcode(tenderLocation);
+  const countyHit = selectedCounties.length > 0 && (
+    Boolean(county && selectedCounties.includes(county.toLowerCase()))
+    || selectedCounties.some((selected) => normalizedLocation.includes(selected))
+  );
+  const regionHit = selectedRegions.length > 0 && (
+    Boolean(region && selectedRegions.includes(region.toLowerCase()))
+    || selectedRegions.some((selected) => normalizedLocation.includes(selected))
+  );
 
-  if (retailer.coverageScope === 'REGION') {
-    const region = getRegionForPostcode(tenderLocation);
-    const selectedRegions = retailer.regions.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
-    if (region && selectedRegions.includes(region.toLowerCase())) return true;
-    if (selectedRegions.some((selected) => normalizedLocation.includes(selected))) return true;
-    return false;
+  if (retailer.coverageScope === 'REGION' && selectedCounties.length === 0) return regionHit;
+  if (retailer.coverageScope === 'COUNTY' && selectedRegions.length === 0) return countyHit;
+  if (selectedCounties.length === 0 && selectedRegions.length === 0) return false;
+  return countyHit || regionHit;
+}
+
+const COMPANY_OPERATING_LOCATION_LIST = Array.from(new Set(['United Kingdom', ...UK_COUNTIES, ...UK_REGIONS]));
+export const COMPANY_OPERATING_LOCATIONS = COMPANY_OPERATING_LOCATION_LIST as [string, ...string[]];
+const OPERATING_LOCATION_SET = new Set<string>(COMPANY_OPERATING_LOCATION_LIST);
+
+function canonicalOperatingLocation(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (OPERATING_LOCATION_SET.has(trimmed)) return trimmed;
+  const town = TOWN_LOCATION_MAP[trimmed.toLowerCase()];
+  if (!town) return null;
+  if (OPERATING_LOCATION_SET.has(town.county)) return town.county;
+  if (OPERATING_LOCATION_SET.has(town.region)) return town.region;
+  return null;
+}
+
+/** Maps stored towns or mixed labels onto the county/region enum used by company profiles. */
+export function normaliseOperatingLocations(values: readonly string[]): string[] {
+  const resolved: string[] = [];
+  for (const value of values) {
+    const location = canonicalOperatingLocation(value);
+    if (location && !resolved.includes(location)) resolved.push(location);
   }
+  return resolved;
+}
 
-  if (retailer.coverageScope === 'COUNTY') {
-    const county = getCountyForPostcode(tenderLocation);
-    const selectedCounties = retailer.counties.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
-    if (county && selectedCounties.includes(county.toLowerCase())) return true;
-    if (selectedCounties.some((selected) => normalizedLocation.includes(selected))) return true;
-    return false;
-  }
-
-  return false;
+export function coverageFieldsFromOperatingLocations(values: readonly string[]): {
+  operatingLocations: string;
+  coverageScope: RetailerCoverageScope;
+  counties: string;
+  regions: string;
+} {
+  const locations = normaliseOperatingLocations(values);
+  return {
+    operatingLocations: locations.join(','),
+    coverageScope: locations.includes('United Kingdom')
+      ? 'UK'
+      : locations.some((location) => (UK_REGIONS as readonly string[]).includes(location))
+        && !locations.some((location) => (UK_COUNTIES as readonly string[]).includes(location) && !(UK_REGIONS as readonly string[]).includes(location))
+        ? 'REGION'
+        : 'COUNTY',
+    counties: locations.filter((location) => (UK_COUNTIES as readonly string[]).includes(location)).join(','),
+    regions: locations.filter((location) => (UK_REGIONS as readonly string[]).includes(location)).join(','),
+  };
 }

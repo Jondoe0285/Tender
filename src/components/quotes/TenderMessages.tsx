@@ -17,25 +17,36 @@ type TenderMessagesProps = {
   tenderId: string;
   quoteId?: string;
   role: 'client' | 'retailer';
+  tenderClosed?: boolean;
 };
 
-export function TenderMessages({ tenderId, quoteId, role }: TenderMessagesProps) {
+export function TenderMessages({ tenderId, quoteId, role, tenderClosed = false }: TenderMessagesProps) {
   const [messages, setMessages] = useState<TenderMessage[]>([]);
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [unavailableReason, setUnavailableReason] = useState<'NO_RELEASE' | 'CLOSED' | null>(null);
 
   async function loadMessages() {
     const query = quoteId ? `?quoteId=${encodeURIComponent(quoteId)}` : '';
     const response = await fetch(`/api/tenders/${tenderId}/messages${query}`);
     if (!response.ok) {
-      setMessage('Messages are unavailable for this tender.');
+      setUnavailableReason(tenderClosed ? 'CLOSED' : 'NO_RELEASE');
+      setMessage(tenderClosed
+        ? 'This tender is closed. Questions are no longer available.'
+        : 'Questions open after a quote is accepted and contact details are released.');
       setLoading(false);
       return;
     }
-    const data = await response.json() as { messages: TenderMessage[] };
+    const data = await response.json() as { messages: TenderMessage[]; unavailableReason?: 'NO_RELEASE' | 'CLOSED' };
     setMessages(data.messages);
+    setUnavailableReason(data.unavailableReason ?? null);
+    if (data.unavailableReason === 'CLOSED') {
+      setMessage('This tender is closed. Questions are no longer available.');
+    } else if (data.unavailableReason === 'NO_RELEASE') {
+      setMessage('Questions open after a quote is accepted and contact details are released.');
+    }
     setLoading(false);
   }
 
@@ -75,6 +86,12 @@ export function TenderMessages({ tenderId, quoteId, role }: TenderMessagesProps)
       </div>
       {loading ? (
         <p className="mt-5 text-sm text-concrete-grey">Loading messages...</p>
+      ) : unavailableReason ? (
+        <p className="mt-5 rounded-lg border border-dashed border-slate-200 px-4 py-5 text-sm text-concrete-grey">
+          {unavailableReason === 'CLOSED'
+            ? 'This tender is closed. Questions are no longer available.'
+            : 'Questions open after a quote is accepted and contact details are released.'}
+        </p>
       ) : (
         <div className="mt-5 flex flex-col gap-3">
           {messages.length === 0 ? (
@@ -82,7 +99,7 @@ export function TenderMessages({ tenderId, quoteId, role }: TenderMessagesProps)
               {role === 'retailer' ? 'Ask a question about the tender specification or quote.' : 'The Provider has not asked a question yet.'}
             </p>
           ) : messages.map((item) => (
-            <div key={item.id} className={`rounded-lg border px-4 py-3 ${item.isOwn ? 'border-safety-amber/40 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}>
+            <div key={item.id} className={`rounded-md border px-4 py-3 ${item.isOwn ? 'border-trade-blue/30 bg-trade-blue/5' : 'border-slate-200 bg-slate-50'}`}>
               <div className="flex items-center justify-between gap-3 text-xs text-concrete-grey">
                 <span className="font-semibold text-foundation-navy">{item.isOwn ? 'You' : item.senderRole === 'USER' ? 'Contractor' : 'Provider'}</span>
                 <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString('en-GB')}</time>
@@ -92,7 +109,8 @@ export function TenderMessages({ tenderId, quoteId, role }: TenderMessagesProps)
           ))}
         </div>
       )}
-      <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-3">
+      {!unavailableReason && (
+        <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-3">
         <label htmlFor={`message-${tenderId}-${quoteId ?? 'retailer'}`} className="text-sm font-semibold text-foundation-navy">Message</label>
         <Textarea
           id={`message-${tenderId}-${quoteId ?? 'retailer'}`}
@@ -107,6 +125,7 @@ export function TenderMessages({ tenderId, quoteId, role }: TenderMessagesProps)
         {message && <p className="text-sm font-semibold text-attention">{message}</p>}
         <Button type="submit" loading={sending} className="self-start">Send message</Button>
       </form>
+      )}
     </Card>
   );
 }
