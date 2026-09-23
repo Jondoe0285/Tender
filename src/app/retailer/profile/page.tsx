@@ -151,9 +151,9 @@ export default function RetailerProfilePage() {
                   {profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business has passed sole trader automated assessment based on your uploaded self-employment evidence. This is shown to Contractors on every quote you submit.'}
                   {profile.isSoleTrader && profile.verificationStatus !== 'VERIFIED' && 'Your profile is marked as a sole trader. Upload self-employment evidence to become eligible for automated verification; until then your quotes show a Sole Trader status so buyers can complete suitable checks.'}
                   {!profile.isSoleTrader && profile.verificationStatus === 'VERIFIED' && 'Your business has passed incorporated automated assessment based on your Certificate of Incorporation and required service evidence. This is shown to Contractors on every quote you submit.'}
-                  {profile.verificationStatus === 'PENDING' && 'Your verification request is under review. We will update your status once it has been checked.'}
-                  {profile.verificationStatus === 'REJECTED' && 'Your last verification request was not approved. You can request verification again at any time.'}
-                  {profile.verificationStatus === 'EXPIRED' && 'One or more of your verification documents have expired, so your verified status has been removed. Upload a replacement to restart the review.'}
+                  {profile.verificationStatus === 'PENDING' && 'Your verification request is still marked pending.'}
+                  {profile.verificationStatus === 'REJECTED' && 'Automated assessment could not confirm your documents. Upload text PDFs and submit again.'}
+                  {profile.verificationStatus === 'EXPIRED' && 'One or more of your verification documents have expired, so your verified status has been removed. Upload a replacement PDF to restart verification.'}
                   {!profile.isSoleTrader && profile.verificationStatus === 'UNVERIFIED' && 'Materials, Waste, Plant Hire, Contractor Services, and Professional Services providers can complete a verification check. Verified status is shown to Contractors on every quote you submit.'}
                 </p>
               </div>

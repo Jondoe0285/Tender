@@ -21,7 +21,9 @@ export function SiteHeader() {
             <Link href={{ pathname: '/', hash: 'supplying' }} className="hover:text-trade-blue">Suppliers</Link>
           </nav>
         </div>
-        <AccountControls />
+          <div className="flex flex-shrink-0 items-center gap-3">
+            <AccountControls />
+          </div>
       </div>
     </header>
   );

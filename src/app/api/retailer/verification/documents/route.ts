@@ -6,15 +6,14 @@ import { uploadVerificationDocumentSchema } from '@/lib/schemas/verificationDocu
 import { getOwnRetailerProfileOrThrow, listVerificationDocuments, uploadVerificationDocument } from '@/server/domain/verificationDocumentService';
 import { getApplicableVerificationDocuments, getRequiredVerificationDocumentTypes, isSoleTraderEvidenceSufficient, SOLE_TRADER_MODERATE_DOCUMENT_TYPES, SOLE_TRADER_STRONG_DOCUMENT_TYPES } from '@/lib/verification-documents';
 import { isIncorporatedCompanyType } from '@/lib/companyTypes';
-import { getVerificationDocumentRequirements, isHumanReviewActive } from '@/server/domain/platformSettings';
+import { getVerificationDocumentRequirements } from '@/server/domain/platformSettings';
 
 export async function GET() {
   try {
     const user = await requireRole('USER');
     const profile = await getOwnRetailerProfileOrThrow(user.id);
-    const [documents, humanReviewActive, requirements] = await Promise.all([
+    const [documents, requirements] = await Promise.all([
       listVerificationDocuments(profile.id),
-      isHumanReviewActive(),
       getVerificationDocumentRequirements(),
     ]);
     const applicableDocuments = getApplicableVerificationDocuments(profile.categories);
@@ -24,7 +23,6 @@ export async function GET() {
       applicableDocumentTypes: applicableDocuments.map((doc) => doc.type),
       requiredDocumentTypes: getRequiredVerificationDocumentTypes(profile.categories, profile.companyType, requirements, profile.isSoleTrader),
       documents,
-      humanReviewActive,
       isSoleTrader: profile.isSoleTrader,
       isIncorporated: !profile.isSoleTrader && isIncorporatedCompanyType(profile.companyType),
       soleTraderEvidence: profile.isSoleTrader ? {

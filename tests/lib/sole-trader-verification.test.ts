@@ -51,6 +51,10 @@ test('provider profile and verification pages support the sole trader evidence f
   assert.doesNotMatch(profilePage, /Sole trader profiles cannot be AI verified/);
   assert.match(verificationPage, /soleTraderEvidence/);
   assert.doesNotMatch(verificationPage, /Sole traders cannot be AI verified/);
+  assert.match(verificationPage, /accept="application\/pdf,\.pdf"/);
+  assert.doesNotMatch(verificationPage, /\.jpg/);
+  assert.match(verificationPage, /There is no human review of this upload path/);
+  assert.doesNotMatch(verificationPage, /flagged this for human review/);
 });
 
 test('verification policy and quote comparison document all 6 verification levels and use approved banner labels', () => {

@@ -24,8 +24,9 @@ export default function HomePage() {
             <p className="mt-4 max-w-xl text-base leading-7 text-concrete-grey">
               A workspace for buyers and suppliers. Raise a structured tender. Quote against a frozen specification. Contact stays private until you award.
             </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <LinkButton href="/register">Create an account</LinkButton>
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <LinkButton href="/login" size="lg">Sign in</LinkButton>
+              <LinkButton href="/register" variant="secondary" size="lg">Create an account</LinkButton>
               <LinkButton href="/demo" variant="secondary">Request a demo</LinkButton>
             </div>
             <dl className="mt-10 grid gap-x-8 gap-y-5 border-t border-slate-200 pt-8 sm:grid-cols-2 lg:grid-cols-4">

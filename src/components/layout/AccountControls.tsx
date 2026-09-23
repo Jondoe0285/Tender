@@ -2,7 +2,6 @@
 
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { LinkButton, Button } from '@/components/ui/Button';
 
 export function AccountControls() {
@@ -10,16 +9,16 @@ export function AccountControls() {
   const router = useRouter();
 
   if (status === 'loading') {
-    return <div className="h-9 w-28" aria-hidden="true" />;
+    return <div className="h-12 w-72" aria-hidden="true" />;
   }
 
   if (!session?.user) {
     return (
-      <div className="flex items-center gap-3">
-        <Link href="/login" className="text-sm font-semibold text-foundation-navy hover:text-trade-blue">
+      <div className="flex flex-shrink-0 items-center gap-2">
+        <LinkButton href="/login" size="lg">
           Sign in
-        </Link>
-        <LinkButton href="/register" size="md" className="h-9 px-4 text-sm">
+        </LinkButton>
+        <LinkButton href="/register" variant="secondary" size="lg">
           Create account
         </LinkButton>
       </div>

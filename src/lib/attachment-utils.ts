@@ -54,6 +54,14 @@ export function verifyTenderAttachment(input: { name: string; mimeType: string; 
   return { mimeType: detectedMimeType, sizeBytes: bytes.length, dataBase64: bytes.toString('base64') };
 }
 
+export function verifyVerificationDocument(input: { name: string; mimeType: string; dataBase64: string }): { mimeType: 'application/pdf'; sizeBytes: number; dataBase64: string } {
+  const verified = verifyTenderAttachment(input);
+  if (verified.mimeType !== 'application/pdf') {
+    throw new Error('Verification evidence must be a PDF');
+  }
+  return verified;
+}
+
 export function buildSafeAttachmentName(input: string): string {
   const cleaned = input
     .replace(/\\/g, '/')

@@ -47,6 +47,7 @@ export async function uploadVerificationDocument(userId: string, input: UploadVe
     content,
     expiryDate: input.expiryDate,
     companyName: profile.companyName,
+    companyNumber: profile.companyNumber,
     address: profile.address,
   });
 
@@ -58,7 +59,7 @@ export async function uploadVerificationDocument(userId: string, input: UploadVe
     expiryDate: input.expiryDate,
     aiConfidencePercent: assessment.confidencePercent,
     aiSummary: assessment.summary,
-    aiRequiresHumanReview: assessment.requiresHumanReview,
+    aiRequiresHumanReview: !assessment.passed,
     aiAssessedAt: new Date(),
     verified: false,
   };
@@ -101,13 +102,13 @@ export async function getVerificationDocumentForDownload(retailerUserId: string,
 
 export type VerificationEvaluation = {
   canProceed: boolean;
-  requiresHumanReview: boolean;
+  passed: boolean;
   confidencePercent: number;
   report: string;
   missingOrExpiredRequiredTypes: VerificationDocumentType[];
 };
 
-/** Aggregates the per-document AI assessments into one decision: auto-approve, or send for human review. */
+/** Aggregates the per-document assessments into one decision: pass or fail. There is no human-review queue. */
 export async function evaluateProviderVerification(retailerProfileId: string, categories: string, companyType?: string | null, isSoleTrader?: boolean | null): Promise<VerificationEvaluation> {
   const requirements = await getVerificationDocumentRequirements();
   const requiredTypes = getRequiredVerificationDocumentTypes(categories, companyType, requirements, isSoleTrader);
@@ -127,7 +128,7 @@ export async function evaluateProviderVerification(retailerProfileId: string, ca
   if (missingOrExpiredRequiredTypes.length > 0) {
     return {
       canProceed: false,
-      requiresHumanReview: true,
+      passed: false,
       confidencePercent: 0,
       report: `Required documents missing or expired: ${missingOrExpiredRequiredTypes.join(', ')}.`,
       missingOrExpiredRequiredTypes,
@@ -139,16 +140,16 @@ export async function evaluateProviderVerification(retailerProfileId: string, ca
   const confidencePercent = documentsForScore.length > 0
     ? Math.min(...documentsForScore.map((document) => document.aiConfidencePercent ?? 0))
     : 0;
-  const requiresHumanReview = confidencePercent < 90 || reviewDocuments.some((document) => document.aiRequiresHumanReview);
+  const passed = confidencePercent >= 90 && reviewDocuments.every((document) => document.aiRequiresHumanReview === false);
 
   const report = [
     'Basic legal eligibility assessment for the services declared by this User.',
-    `Overall AI confidence score: ${confidencePercent}%.`,
-    `Human review required: ${requiresHumanReview ? 'yes' : 'no'}.`,
+    `Overall automated confidence score: ${confidencePercent}%.`,
+    `Automated verification passed: ${passed ? 'yes' : 'no'}.`,
     ...reviewDocuments.map((document) => `- ${document.documentType}: ${document.aiSummary ?? 'No assessment recorded.'}`),
   ].join('\n');
 
-  return { canProceed: true, requiresHumanReview, confidencePercent, report, missingOrExpiredRequiredTypes: [] };
+  return { canProceed: true, passed, confidencePercent, report, missingOrExpiredRequiredTypes: [] };
 }
 
 /** Sole trader evidence rule: any one strong document (e.g. HMRC UTR, SA302, VAT certificate, CIS proof, PLI/PII insurance), or at least two distinct moderate documents (bank statement, invoices, quotations/contracts, trade body membership, trading activity evidence). */
@@ -161,7 +162,7 @@ export async function evaluateSoleTraderVerification(retailerProfileId: string):
   if (!isSoleTraderEvidenceSufficient(validTypes)) {
     return {
       canProceed: false,
-      requiresHumanReview: true,
+      passed: false,
       confidencePercent: 0,
       report: 'Insufficient sole trader evidence: upload one strong document (HMRC UTR confirmation, SA302 tax calculation, VAT registration certificate, CIS registration proof, or public liability/professional indemnity insurance), or at least two moderate documents (business bank statement, customer invoices, customer quotations or contracts, trade body membership, or trading activity evidence).',
       missingOrExpiredRequiredTypes: [],
@@ -169,16 +170,16 @@ export async function evaluateSoleTraderVerification(retailerProfileId: string):
   }
 
   const confidencePercent = validDocuments.length > 0 ? Math.min(...validDocuments.map((document) => document.aiConfidencePercent ?? 0)) : 0;
-  const requiresHumanReview = confidencePercent < 90 || validDocuments.some((document) => document.aiRequiresHumanReview);
+  const passed = confidencePercent >= 90 && validDocuments.every((document) => document.aiRequiresHumanReview === false);
 
   const report = [
     'Sole trader self-employment evidence assessment.',
-    `Overall AI confidence score: ${confidencePercent}%.`,
-    `Human review required: ${requiresHumanReview ? 'yes' : 'no'}.`,
+    `Overall automated confidence score: ${confidencePercent}%.`,
+    `Automated verification passed: ${passed ? 'yes' : 'no'}.`,
     ...validDocuments.map((document) => `- ${document.documentType}: ${document.aiSummary ?? 'No assessment recorded.'}`),
   ].join('\n');
 
-  return { canProceed: true, requiresHumanReview, confidencePercent, report, missingOrExpiredRequiredTypes: [] };
+  return { canProceed: true, passed, confidencePercent, report, missingOrExpiredRequiredTypes: [] };
 }
 
 /** Marks every currently-uploaded applicable document as verified evidence, shown to Contractors as the "what was checked" list. */

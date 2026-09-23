@@ -91,7 +91,7 @@ export function LoginForm() {
           <Input id="mfaCode" name="mfaCode" inputMode="numeric" autoComplete="one-time-code" placeholder="123456 or recovery code" required />
         </FieldGroup>}
         {error && <p role="alert" className="text-sm font-semibold text-attention">{error}</p>}
-        <Button type="submit" loading={submitting}>Sign in</Button>
+        <Button type="submit" loading={submitting} size="lg">Sign in</Button>
       </form>
 
       <p className="mt-6 text-sm text-concrete-grey">

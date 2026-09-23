@@ -27,3 +27,15 @@ test('still requires a future expiry date for document types that expire', () =>
   const valid = uploadVerificationDocumentSchema.safeParse(pdfPayload({ documentType: 'PUBLIC_LIABILITY_INSURANCE', expiryDate: future }));
   assert.equal(valid.success, true);
 });
+
+test('rejects image uploads for automated verification', () => {
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const result = uploadVerificationDocumentSchema.safeParse({
+    documentType: 'CERTIFICATE_OF_INCORPORATION',
+    name: 'certificate.png',
+    mimeType: 'image/png',
+    sizeBytes: png.length,
+    dataBase64: png.toString('base64'),
+  });
+  assert.equal(result.success, false);
+});

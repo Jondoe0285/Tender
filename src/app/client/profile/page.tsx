@@ -153,8 +153,8 @@ export default function ClientProfilePage() {
                 <p className="font-heading text-lg font-bold text-foundation-navy">Provider verification</p>
                 <p className="mt-1 max-w-xl text-sm text-concrete-grey">
                   {profile.verificationStatus === 'VERIFIED' && 'Your business has passed automated verification. This status is shown to Buyers on every quote you submit.'}
-                  {profile.verificationStatus === 'PENDING' && 'Your verification request is under review.'}
-                  {profile.verificationStatus === 'REJECTED' && 'Your verification request was not approved. You can submit updated evidence.'}
+                  {profile.verificationStatus === 'PENDING' && 'Your verification request is still marked pending.'}
+                  {profile.verificationStatus === 'REJECTED' && 'Automated assessment could not confirm your documents. You can submit updated PDFs.'}
                   {profile.verificationStatus === 'EXPIRED' && 'A required verification document has expired. Upload a replacement to restart verification.'}
                   {profile.verificationStatus === 'UNVERIFIED' && 'Complete the verification process to show your verified status on quotes submitted to Contractors.'}
                 </p>

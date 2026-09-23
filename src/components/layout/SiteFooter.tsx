@@ -38,6 +38,7 @@ export function SiteFooter() {
             <Link href="/demo" className="inline-flex min-h-11 items-center hover:text-sky-blue">Request a demo</Link>
             <Link href={{ pathname: '/', hash: 'buying' }} className="inline-flex min-h-11 items-center hover:text-sky-blue">Buyers</Link>
             <Link href={{ pathname: '/', hash: 'supplying' }} className="inline-flex min-h-11 items-center hover:text-sky-blue">Suppliers</Link>
+            <Link href="/login" className="inline-flex min-h-11 items-center hover:text-sky-blue">Sign in</Link>
             <Link href="/register" className="inline-flex min-h-11 items-center hover:text-sky-blue">Create account</Link>
           </div>
         </div>

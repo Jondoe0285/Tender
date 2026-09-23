@@ -35,6 +35,10 @@ function formatFileSize(sizeBytes: number) {
   return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function isPdfFile(file: File) {
+  return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+}
+
 export default function ProviderVerificationPage() {
   const [selectedOption, setSelectedOption] = useState<'ai' | 'enhanced'>('ai');
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>('UNVERIFIED');
@@ -98,7 +102,11 @@ export default function ProviderVerificationPage() {
     const expiryDate = expiryDates[documentType];
     const expires = verificationDocumentExpires(documentType);
     if (!file || (expires && !expiryDate)) {
-      setError(expires ? 'Choose a file and an expiry date before uploading.' : 'Choose a file before uploading.');
+      setError(expires ? 'Choose a PDF and an expiry date before uploading.' : 'Choose a PDF before uploading.');
+      return;
+    }
+    if (!isPdfFile(file)) {
+      setError('Upload a PDF. Photographs and other file types are not accepted.');
       return;
     }
     setUploadingType(documentType);
@@ -112,7 +120,7 @@ export default function ProviderVerificationPage() {
         body: JSON.stringify({
           documentType,
           name: buildSafeAttachmentName(file.name),
-          mimeType: file.type || 'application/octet-stream',
+          mimeType: 'application/pdf',
           sizeBytes: file.size,
           dataBase64,
           ...(expires ? { expiryDate } : {}),
@@ -157,9 +165,11 @@ export default function ProviderVerificationPage() {
       return;
     }
     setVerificationStatus(data.verificationStatus);
-    setMessage(data.verificationStatus === 'VERIFIED'
-      ? 'Your documents passed automated assessment and your account is now verified.'
-      : 'Verification request submitted. An automated check flagged this for human review — our team will confirm your status shortly.');
+    if (data.verificationStatus === 'VERIFIED') {
+      setMessage('Your documents passed automated assessment and your account is now verified.');
+      return;
+    }
+    setError('Automated assessment could not confirm the required documents. Verification failed. Upload text PDFs that show the registered company name, the correct document type, and a matching expiry date, then submit again.');
   }
 
   function documentLabel(documentType: VerificationDocumentType) {
@@ -190,7 +200,7 @@ export default function ProviderVerificationPage() {
         <Card className="border-l-4 border-steel-blue bg-steel-blue/5">
           <h2 className="font-heading text-xl font-bold text-foundation-navy">Choose your verification option</h2>
           <p className="mt-1 text-sm text-concrete-grey">
-            Trade Tender offers two verification options. Select whether you want automated AI Verification or professional Enhanced Verification.
+            Trade Tender offers two verification options. Automated assessment reads PDF text for company name, document type, and expiry. If it cannot confirm those facts, verification fails. Enhanced Verification is a paid professional review.
           </p>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div
@@ -204,7 +214,7 @@ export default function ProviderVerificationPage() {
               </div>
               <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-steel-blue">Automated Evidence Check &middot; Included</p>
               <p className="mt-2 text-xs leading-relaxed text-concrete-grey">
-                Upload your legal entity or self-employment evidence for automated assessment. This is not a human or AI professional review.
+                Upload a text PDF of your legal-entity or self-employment evidence. The checker reads company name, document type, and expiry from the file. PDFs only — photographs and scans are not accepted. If the checker cannot confirm the document, the upload path fails.
               </p>
               <div className="mt-4">
                 <Button
@@ -212,7 +222,7 @@ export default function ProviderVerificationPage() {
                   size="md"
                   onClick={() => setSelectedOption('ai')}
                 >
-                  {selectedOption === 'ai' ? 'Selected: Upload Evidence Below' : 'Select AI Verification'}
+                  {selectedOption === 'ai' ? 'Selected: Upload Evidence Below' : 'Select automated assessment'}
                 </Button>
               </div>
             </div>
@@ -295,8 +305,8 @@ export default function ProviderVerificationPage() {
                   <h2 className="font-heading text-xl font-bold text-foundation-navy">Verification documents</h2>
                   <p className="mt-1 max-w-xl text-sm text-concrete-grey">
                     {isSoleTrader
-                      ? 'Upload sole trader self-employment evidence below. Every upload is submitted separately, so you can complete this at your own pace.'
-                      : 'Upload each document below with its expiry date. Every upload is submitted separately, so you can complete this checklist at your own pace.'}
+                      ? 'Upload sole trader self-employment evidence as PDFs below. Every upload is submitted separately, so you can complete this at your own pace.'
+                      : 'Upload each required PDF below with its expiry date. Every upload is submitted separately, so you can complete this checklist at your own pace.'}
                     {!isSoleTrader && requiredTypes.length > 0 && ` Required documents uploaded: ${requiredUploaded.length} of ${requiredTypes.length}.`}
                   </p>
                 </div>
@@ -311,9 +321,10 @@ export default function ProviderVerificationPage() {
         <Card>
           <p className="text-sm font-semibold text-foundation-navy">Compliance score disclaimer</p>
           <p className="mt-2 text-sm text-concrete-grey">
-            The automated review assesses legal-compliance evidence only and may make mistakes. Each uploaded document
-            receives a compliance score from 0-100%. To achieve a verified status, the required documents must together
-            reach at least 90%. Trade Tender does not replace client due diligence, and clients must carry out suitable
+            The automated check assesses legal-compliance evidence only and may make mistakes. Each uploaded PDF
+            receives a compliance score from 0-100%. Required documents must together reach at least 90%. If automated
+            assessment cannot confirm the documents, verification fails. There is no human review of this upload path.
+            Trade Tender does not replace client due diligence, and clients must carry out suitable
             checks before entering any formal agreement.
           </p>
         </Card>
@@ -348,14 +359,22 @@ export default function ProviderVerificationPage() {
               {(canEdit || verificationStatus === 'PENDING') && (
                 <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-slate-100 pt-4">
                   <label className="flex flex-col gap-1 text-sm">
-                    <span className="font-semibold text-foundation-navy">File</span>
+                    <span className="font-semibold text-foundation-navy">PDF</span>
+                    <span className="text-xs font-normal text-concrete-grey">PDF only. Text PDFs can be read; photographs are not accepted.</span>
                     <input
                       type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      accept="application/pdf,.pdf"
                       disabled={busy}
                       onChange={(event) => {
                         const file = event.target.files?.[0];
-                        if (file) setPendingFiles((current) => ({ ...current, [doc.type]: file }));
+                        if (!file) return;
+                        if (!isPdfFile(file)) {
+                          event.target.value = '';
+                          setError('Upload a PDF. Photographs and other file types are not accepted.');
+                          return;
+                        }
+                        setError(null);
+                        setPendingFiles((current) => ({ ...current, [doc.type]: file }));
                       }}
                       className="text-sm"
                     />
@@ -390,13 +409,13 @@ export default function ProviderVerificationPage() {
             <p className="text-sm text-concrete-grey">
               {verificationStatus === 'VERIFIED' && 'This account is verified. No further action is required.'}
               {verificationStatus === 'PENDING' && 'Your request is under review. You can still upload or replace documents while it is pending.'}
-              {canEdit && isSoleTrader && !canSubmit && 'Upload one strong evidence document, or at least two moderate evidence documents, then submit your request for review.'}
-              {canEdit && isSoleTrader && canSubmit && 'Your sole trader evidence meets the verification rule. Submit your request for review.'}
-              {canEdit && !isSoleTrader && !canSubmit && 'Upload every required document above, with a future expiry date, then submit your request for review.'}
-              {canEdit && !isSoleTrader && canSubmit && 'All required documents are uploaded. Submit your request for review.'}
+              {canEdit && isSoleTrader && !canSubmit && 'Upload one strong evidence PDF, or at least two moderate evidence PDFs, then submit for automated verification.'}
+              {canEdit && isSoleTrader && canSubmit && 'Your sole trader evidence meets the verification rule. Submit for automated verification.'}
+              {canEdit && !isSoleTrader && !canSubmit && 'Upload every required PDF above, with a future expiry date, then submit for automated verification.'}
+              {canEdit && !isSoleTrader && canSubmit && 'All required PDFs are uploaded. Submit for automated verification.'}
             </p>
             {canEdit && (
-              <Button onClick={handleSubmitForReview} loading={submitting} disabled={!canSubmit}>Submit for review</Button>
+              <Button onClick={handleSubmitForReview} loading={submitting} disabled={!canSubmit}>Submit verification</Button>
             )}
           </div>
         </Card>

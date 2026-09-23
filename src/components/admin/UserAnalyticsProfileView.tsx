@@ -187,7 +187,7 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
                   </div>
                   <p className="text-xs text-concrete-grey">
                     {document.expiryDate ? `Expires ${new Date(document.expiryDate).toLocaleDateString('en-GB')}${expired ? ' (expired)' : ''} \u00b7 ` : 'Does not expire \u00b7 '}
-                    Assessment confidence {document.aiConfidencePercent ?? 'n/a'}% &middot; Human review required: {document.aiRequiresHumanReview ? 'yes' : 'no'}
+                    Assessment confidence {document.aiConfidencePercent ?? 'n/a'}% &middot; Automated check passed: {document.aiRequiresHumanReview ? 'no' : 'yes'}
                   </p>
                   {document.aiSummary && <p className="text-xs text-concrete-grey">{document.aiSummary}</p>}
                 </li>
