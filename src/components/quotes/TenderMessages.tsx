@@ -90,7 +90,7 @@ export function TenderMessages({ tenderId, quoteId, role, tenderClosed = false }
         <p className="mt-5 rounded-lg border border-dashed border-slate-200 px-4 py-5 text-sm text-concrete-grey">
           {unavailableReason === 'CLOSED'
             ? 'This tender is closed. Questions are no longer available.'
-            : 'Questions open after a quote is accepted and contact details are released.'}
+            : 'Questions open after contact details are released.'}
         </p>
       ) : (
         <div className="mt-5 flex flex-col gap-3">

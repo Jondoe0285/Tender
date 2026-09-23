@@ -75,7 +75,7 @@ test('retailer messaging requires contact release even after tender unlock', asy
   assert.deepEqual(await listTenderMessages(tenderId, retailerActor), { messages: [], unavailableReason: 'NO_RELEASE' });
   await assert.rejects(
     () => sendTenderMessage(tenderId, retailerActor, 'Can you confirm the delivery date?'),
-    (error: unknown) => error instanceof ForbiddenError && error.message === 'Questions open after a quote is accepted and contact details are released.'
+    (error: unknown) => error instanceof ForbiddenError && error.message === 'Questions open after contact details are released.'
   );
 
   const payment = await prisma.payment.create({

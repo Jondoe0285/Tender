@@ -431,7 +431,7 @@ export default function ClientTenderDetailPage() {
         ) : (
           <>
             <p className="mb-4 text-sm text-concrete-grey">
-              Compare the commercial details first. For materials, waste, and plant, accepting a quote and paying the release fee shares contact details for that quote. Contractors and professionals who already paid the unlock fee can contact you for a site visit before they quote.
+              Compare the commercial details first. Acceptance applies to the full submitted quote value, not selected quote lines. For materials, waste, and plant, accepting a quote and paying the release fee shares contact details for that quote. Contractors and professionals who already paid the unlock fee can contact you for a site visit before they quote.
             </p>
             <QuoteComparison
               quotes={quotes}
