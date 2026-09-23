@@ -1,5 +1,6 @@
 import { prisma } from '@/server/data/prisma';
 import { UNLOCK_HARVEST_CAP, UNLOCK_HARVEST_WINDOW_DAYS, harvestUnlockCount } from '@/lib/harvest';
+import { maskEmail } from '@/lib/enterprise-controls';
 
 export async function getOpsExceptions() {
   const since = new Date(Date.now() - UNLOCK_HARVEST_WINDOW_DAYS * 24 * 60 * 60 * 1000);
@@ -9,7 +10,7 @@ export async function getOpsExceptions() {
       where: { status: 'FAILED' },
       orderBy: { createdAt: 'desc' },
       take: 8,
-      select: { id: true, type: true, amountGbp: true, createdAt: true, user: { select: { email: true } } },
+      select: { id: true, type: true, amountGbp: true, createdAt: true, user: { select: { id: true, email: true } } },
     }),
     prisma.retailerProfile.findMany({
       where: { verificationStatus: 'PENDING' },
@@ -42,11 +43,14 @@ export async function getOpsExceptions() {
     const harvestCount = harvestUnlockCount(unlocks, quoted);
     if (harvestCount < UNLOCK_HARVEST_CAP) return null;
     const user = await prisma.user.findUnique({ where: { id: retailerId }, select: { email: true } });
-    return { retailerId, email: user?.email ?? retailerId, harvestCount };
+    return { retailerId, email: maskEmail(user?.email ?? ''), harvestCount };
   }))).filter((row): row is { retailerId: string; email: string; harvestCount: number } => row !== null);
 
   return {
-    failedPayments,
+    failedPayments: failedPayments.map((payment) => ({
+      ...payment,
+      user: { id: payment.user.id, email: maskEmail(payment.user.email) },
+    })),
     pendingVerification,
     closingTenders,
     harvestFlags,

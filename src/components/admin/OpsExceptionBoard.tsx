@@ -24,7 +24,7 @@ export function OpsExceptionBoard({ data }: { data: OpsExceptions }) {
               <ul className="mt-3 flex flex-col gap-2 text-sm">
                 {data.failedPayments.map((payment) => (
                   <li key={payment.id} className="flex items-start justify-between gap-3">
-                    <span>{payment.user.email} · {payment.type.replace(/_/g, ' ')}</span>
+                    <Link href={`/super-user/users/${payment.user.id}`} className="hover:text-trade-blue">{payment.user.email} · {payment.type.replace(/_/g, ' ')}</Link>
                     <StatusBadge status="attention">{`£${payment.amountGbp}`}</StatusBadge>
                   </li>
                 ))}
@@ -37,7 +37,7 @@ export function OpsExceptionBoard({ data }: { data: OpsExceptions }) {
             {data.harvestFlags.length === 0 ? <p className="mt-2 text-sm text-concrete-grey">None</p> : (
               <ul className="mt-3 flex flex-col gap-2 text-sm">
                 {data.harvestFlags.map((flag) => (
-                  <li key={flag.retailerId}>{flag.email} · {flag.harvestCount} unlocks without quote</li>
+                  <li key={flag.retailerId}><Link href={`/super-user/users/${flag.retailerId}`} className="hover:text-trade-blue">{flag.email}</Link> · {flag.harvestCount} unlocks without quote</li>
                 ))}
               </ul>
             )}
@@ -47,7 +47,7 @@ export function OpsExceptionBoard({ data }: { data: OpsExceptions }) {
             {data.pendingVerification.length === 0 ? <p className="mt-2 text-sm text-concrete-grey">None</p> : (
               <ul className="mt-3 flex flex-col gap-2 text-sm">
                 {data.pendingVerification.map((row) => (
-                  <li key={row.userId}>{row.companyName}</li>
+                  <li key={row.userId}><Link href={`/super-user/users/${row.userId}`} className="hover:text-trade-blue">{row.companyName}</Link></li>
                 ))}
               </ul>
             )}

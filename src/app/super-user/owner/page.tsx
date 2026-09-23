@@ -36,7 +36,7 @@ export default async function OwnerConsolePage() {
     <AppShell role="super-user" title="Owner Console">
       <div className="space-y-8">
         <OwnerConsolePanel initialSuperUsers={superUsers} currentUserId={user.id} />
-        <SuperUserSettingsPanel initialSettings={settings} isOwner />
+        <SuperUserSettingsPanel initialSettings={settings} isOwner currentUserId={user.id} />
         <PaymentWaiverPanel initialUsers={users} initialWaivers={waivers} />
       </div>
     </AppShell>

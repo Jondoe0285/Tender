@@ -16,8 +16,12 @@ test('requires Owner authorization and records immutable waiver use before entit
   const grantRoute = readFileSync('src/app/api/super-user/owner/payment-waivers/route.ts', 'utf8');
   const revokeRoute = readFileSync('src/app/api/super-user/owner/payment-waivers/[id]/route.ts', 'utf8');
   const service = readFileSync('src/server/domain/paymentWaiverService.ts', 'utf8');
+  const controls = readFileSync('src/server/domain/controlChangeService.ts', 'utf8');
   assert.match(grantRoute, /requireOwner\(\)/);
+  assert.match(grantRoute, /proposeWaiverGrant/);
   assert.match(revokeRoute, /requireOwner\(\)/);
+  assert.match(revokeRoute, /proposeWaiverRevoke/);
+  assert.match(controls, /grantPaymentWaiver\(change\.proposedById/);
   assert.match(service, /amountGbp: 0, vatPercentage: 0, vatGbp: 0, totalAmountGbp: 0, status: 'CONFIRMED'/);
   assert.match(service, /paymentWaiverId: waiver\.id/);
   assert.match(service, /action: 'PAYMENT_WAIVER_GRANTED'/);

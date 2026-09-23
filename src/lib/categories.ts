@@ -172,9 +172,14 @@ export function isGoodsQuantityService(service: string | undefined): boolean {
   return value === 'materials' || value === 'waste';
 }
 
+export function isContractorService(service: string | undefined): boolean {
+  return String(service ?? '').trim().toLowerCase().includes('contractor');
+}
+
 const GOODS_QUANTITY_PATTERN = /^\d+(?:\.\d+)? (?:units?|tonnes|bags|pallets|m³|skips?)$/;
 const WASTE_TONNES_PATTERN = /^\d+(?:\.\d+)? tonnes$/;
 const DURATION_QUANTITY_PATTERN = /^\d+(?:\.\d+)? (?:days|weeks|months)$/;
+const MEASURED_CONTRACTOR_PATTERN = /^\d+(?:\.\d+)? (?:m|m²|m³|nr|item|week)$/;
 
 /** Stored quantity is a number plus a catalog unit — never a free-text essay. */
 export function isValidTenderQuantity(service: string | undefined, quantity: string): boolean {
@@ -182,7 +187,8 @@ export function isValidTenderQuantity(service: string | undefined, quantity: str
   if (String(service ?? '').trim().toLowerCase() === 'waste') return WASTE_TONNES_PATTERN.test(value);
   if (isGoodsQuantityService(service)) return GOODS_QUANTITY_PATTERN.test(value);
   if (isSpecifiedItemService(service)) return GOODS_QUANTITY_PATTERN.test(value) || DURATION_QUANTITY_PATTERN.test(value);
-  return value === 'not applicable' || GOODS_QUANTITY_PATTERN.test(value) || DURATION_QUANTITY_PATTERN.test(value);
+  if (isContractorService(service)) return MEASURED_CONTRACTOR_PATTERN.test(value) || DURATION_QUANTITY_PATTERN.test(value) || value === 'not applicable';
+  return value === 'not applicable' || GOODS_QUANTITY_PATTERN.test(value) || DURATION_QUANTITY_PATTERN.test(value) || MEASURED_CONTRACTOR_PATTERN.test(value);
 }
 
 /** Services eligible for the Provider verification process. */

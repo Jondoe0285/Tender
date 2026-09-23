@@ -26,7 +26,7 @@ export default async function RetailerManagementPage() {
 
   return (
     <AppShell role="super-user" title="Provider Management">
-      <p className="mb-6 max-w-xl text-sm text-concrete-grey">Registered Provider accounts and their activity.</p>
+      <p className="mb-6 max-w-xl text-sm text-concrete-grey">Registered Provider accounts and their activity. Emails are masked here; open the user profile for the case file.</p>
       <AccountManagementTable
         role="USER"
         isOwner={user.isOwner}

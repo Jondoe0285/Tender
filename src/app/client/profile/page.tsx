@@ -33,6 +33,7 @@ type Profile = {
   services: string[];
   serviceProvisions: string[];
   operatingLocations: string[];
+  releaseSpendCapGbp: number | null;
   tradeTenderId: string | null;
   isPrimaryUser: boolean;
   additionalUsers: Array<{ id: string; duties: string; user: { firstName: string | null; lastName: string | null; contactName: string; email: string } }>;
@@ -41,7 +42,7 @@ type Profile = {
 };
 
 const emptyProfile: Profile = {
-  firstName: '', lastName: '', email: '', phoneNumber: '', companyName: null, companyType: 'LIMITED_COMPANY', branchIdentifier: null, services: [], serviceProvisions: [], operatingLocations: [], tradeTenderId: null, isPrimaryUser: false, additionalUsers: [], warnings: [], verificationStatus: null,
+  firstName: '', lastName: '', email: '', phoneNumber: '', companyName: null, companyType: 'LIMITED_COMPANY', branchIdentifier: null, services: [], serviceProvisions: [], operatingLocations: [], releaseSpendCapGbp: null, tradeTenderId: null, isPrimaryUser: false, additionalUsers: [], warnings: [], verificationStatus: null,
 };
 
 export default function ClientProfilePage() {
@@ -79,7 +80,7 @@ export default function ClientProfilePage() {
       body: JSON.stringify({
         firstName: profile.firstName, lastName: profile.lastName, email: profile.email,
         phoneNumber: profile.phoneNumber || undefined,
-        ...(profile.isPrimaryUser ? { companyName: profile.companyName, companyType: profile.companyType, branchIdentifier: profile.branchIdentifier, services: profile.services, serviceProvisions: profile.serviceProvisions, operatingLocations: profile.operatingLocations } : {}),
+        ...(profile.isPrimaryUser ? { companyName: profile.companyName, companyType: profile.companyType, branchIdentifier: profile.branchIdentifier, services: profile.services, serviceProvisions: profile.serviceProvisions, operatingLocations: profile.operatingLocations, releaseSpendCapGbp: profile.releaseSpendCapGbp } : {}),
       }),
     });
     setSaving(false);
@@ -202,6 +203,7 @@ export default function ClientProfilePage() {
                 </FieldGroup>
               ))}
               {profile.isPrimaryUser && <FieldGroup wide><Label>Operating locations</Label><MultiSelectDropdown options={['United Kingdom', ...UK_REGIONS, ...UK_COUNTIES].map((location) => ({ label: location, value: location }))} selected={profile.operatingLocations} onChange={(operatingLocations) => setProfile({ ...profile, operatingLocations })} placeholder="Select United Kingdom, regions, or counties" />{fieldErrors.operatingLocations && <p className="text-sm text-attention">{fieldErrors.operatingLocations}</p>}</FieldGroup>}
+              {profile.isPrimaryUser && <FieldGroup wide><Label htmlFor="releaseSpendCapGbp">30-day award spend cap (excl. VAT)</Label><Input id="releaseSpendCapGbp" inputMode="decimal" value={profile.releaseSpendCapGbp ?? ''} onChange={(event) => setProfile({ ...profile, releaseSpendCapGbp: event.target.value.trim() ? Number(event.target.value) : null })} placeholder="Leave blank for unlimited" />{fieldErrors.releaseSpendCapGbp && <p className="text-sm text-attention">{fieldErrors.releaseSpendCapGbp}</p>}<p className="mt-1 text-xs text-concrete-grey">Optional. Limits confirmed award release fees in a rolling 30 days. Credits and waivers are excluded.</p></FieldGroup>}
               <FieldGroup wide><Label htmlFor="tradeTenderId">Trade Tender ID</Label><Input id="tradeTenderId" value={profile.tradeTenderId ?? 'Not assigned'} readOnly /></FieldGroup>
               <div className="sm:col-span-2"><Button onClick={saveProfile} loading={saving}>Save profile</Button></div>
             </div>

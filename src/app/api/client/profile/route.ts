@@ -59,6 +59,7 @@ export async function GET() {
       services: membership?.company.services ? membership.company.services.split(',').filter(Boolean) : [],
       serviceProvisions: parseServiceProvisions(membership?.company.serviceProvisions, membership?.company.services.split(',').filter(Boolean) ?? [], catalog),
       operatingLocations: membership?.company.operatingLocations ? membership.company.operatingLocations.split(',').filter(Boolean) : [],
+      releaseSpendCapGbp: membership?.company.releaseSpendCapGbp ?? null,
       tradeTenderId: membership?.company.tradeTenderId ?? null,
       isPrimaryUser: membership ? isPrimaryClientUser(membership.company.primaryUserId, user.id) : false,
         verificationStatus: retailerProfile?.verificationStatus ?? null,
@@ -90,7 +91,7 @@ export async function PUT(request: Request) {
     if (!membership) return NextResponse.json({ error: 'Client company membership is required' }, { status: 409 });
     const isPrimaryUser = isPrimaryClientUser(membership.company.primaryUserId, user.id);
     const companyProfileChanged = parsed.data.services !== undefined || parsed.data.operatingLocations !== undefined || parsed.data.serviceProvisions !== undefined;
-    if ((parsed.data.companyName !== undefined || parsed.data.branchIdentifier !== undefined || parsed.data.companyType !== undefined || parsed.data.services !== undefined || parsed.data.serviceProvisions !== undefined || parsed.data.operatingLocations !== undefined) && !isPrimaryUser) {
+    if ((parsed.data.companyName !== undefined || parsed.data.branchIdentifier !== undefined || parsed.data.companyType !== undefined || parsed.data.services !== undefined || parsed.data.serviceProvisions !== undefined || parsed.data.operatingLocations !== undefined || parsed.data.releaseSpendCapGbp !== undefined) && !isPrimaryUser) {
       return NextResponse.json({ error: 'Only the primary user can update company details' }, { status: 403 });
     }
 
@@ -133,8 +134,8 @@ export async function PUT(request: Request) {
           contactPhone: parsed.data.phoneNumber || null,
         },
       }),
-      ...(parsed.data.companyName !== undefined || parsed.data.branchIdentifier !== undefined || parsed.data.companyType !== undefined || parsed.data.services !== undefined || parsed.data.serviceProvisions !== undefined || parsed.data.operatingLocations !== undefined
-        ? [prisma.clientCompany.update({ where: { id: membership.companyId }, data: { ...(parsed.data.companyName !== undefined ? { companyName: parsed.data.companyName } : {}), ...(parsed.data.branchIdentifier !== undefined ? { branchIdentifier: parsed.data.branchIdentifier } : {}), ...(parsed.data.companyType !== undefined ? { companyType: parsed.data.companyType } : {}), ...(parsed.data.services !== undefined ? { services: parsed.data.services.join(',') } : {}), ...(parsed.data.serviceProvisions !== undefined ? { serviceProvisions: serialiseServiceProvisions(parsed.data.serviceProvisions) } : {}), ...(parsed.data.operatingLocations !== undefined ? { operatingLocations: parsed.data.operatingLocations.join(',') } : {}) } })]
+      ...(parsed.data.companyName !== undefined || parsed.data.branchIdentifier !== undefined || parsed.data.companyType !== undefined || parsed.data.services !== undefined || parsed.data.serviceProvisions !== undefined || parsed.data.operatingLocations !== undefined || parsed.data.releaseSpendCapGbp !== undefined
+        ? [prisma.clientCompany.update({ where: { id: membership.companyId }, data: { ...(parsed.data.companyName !== undefined ? { companyName: parsed.data.companyName } : {}), ...(parsed.data.branchIdentifier !== undefined ? { branchIdentifier: parsed.data.branchIdentifier } : {}), ...(parsed.data.companyType !== undefined ? { companyType: parsed.data.companyType } : {}), ...(parsed.data.services !== undefined ? { services: parsed.data.services.join(',') } : {}), ...(parsed.data.serviceProvisions !== undefined ? { serviceProvisions: serialiseServiceProvisions(parsed.data.serviceProvisions) } : {}), ...(parsed.data.operatingLocations !== undefined ? { operatingLocations: parsed.data.operatingLocations.join(',') } : {}), ...(parsed.data.releaseSpendCapGbp !== undefined ? { releaseSpendCapGbp: parsed.data.releaseSpendCapGbp } : {}) } })]
         : []),
       ...(parsed.data.services !== undefined
         ? [prisma.retailerProfile.updateMany({ where: { userId: user.id }, data: { categories: parsed.data.services.join(',') } })]

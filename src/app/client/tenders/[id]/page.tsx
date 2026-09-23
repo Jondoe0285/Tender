@@ -131,13 +131,13 @@ export default function ClientTenderDetailPage() {
     }
   }
 
-  async function handleAccept(quoteId: string, declarationAccepted = false, secondApproverEmail?: string) {
+  async function handleAccept(quoteId: string, declarationAccepted = false, secondApproverEmail?: string, purchaseOrderNumber?: string) {
     setBusyQuoteId(quoteId);
     setMessage(null);
     const response = await fetch(`/api/quotes/${quoteId}/accept`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ declarationAccepted, secondApproverEmail }),
+      body: JSON.stringify({ declarationAccepted, secondApproverEmail, purchaseOrderNumber }),
     });
     const data = await response.json();
     setBusyQuoteId(null);

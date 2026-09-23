@@ -46,7 +46,8 @@ test('Contractor tender builder sequences selected service package requirements'
   assert.ok(source.includes('Detailed provision (optional)'));
   assert.ok(source.includes("provision: 'Material category'"));
   assert.ok(source.includes("if (isSpecifiedItemService(form.category) && !form.item) next.item = 'Select a specified item.';"));
-  assert.ok(source.includes('GOODS_QUANTITY_UNITS'));
+  assert.ok(source.includes('MEASURED_CONTRACTOR_UNITS'));
+  assert.ok(source.includes('m²'));
   assert.ok(source.includes('EWC code'));
   assert.ok(source.includes('WASTE_QUANTITY_UNITS'));
   assert.ok(!source.includes("if (!form.item) next.item = 'Select an item.';"));

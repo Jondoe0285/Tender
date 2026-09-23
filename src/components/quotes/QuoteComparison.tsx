@@ -72,7 +72,7 @@ type QuoteComparisonProps = {
   pendingPayment: { quoteId: string; paymentId: string } | null;
   pendingCheckoutUrl?: string | null;
   busyQuoteId: string | null;
-  onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string) => void;
+  onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string, purchaseOrderNumber?: string) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
 };
@@ -341,7 +341,7 @@ type QuoteRowProps = {
   contact?: Contact;
   isPendingPayment: boolean;
   busy: boolean;
-  onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string) => void;
+  onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string, purchaseOrderNumber?: string) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
   pendingCheckoutUrl?: string | null;
@@ -433,7 +433,7 @@ function DecisionActions({
   contact?: Contact;
   isPendingPayment: boolean;
   busy: boolean;
-  onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string) => void;
+  onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string, purchaseOrderNumber?: string) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
   pendingCheckoutUrl?: string | null;
@@ -441,16 +441,29 @@ function DecisionActions({
   const [showDeclaration, setShowDeclaration] = useState(false);
   const [declarationChecked, setDeclarationChecked] = useState(false);
   const [secondApproverEmail, setSecondApproverEmail] = useState('');
+  const [purchaseOrderNumber, setPurchaseOrderNumber] = useState('');
 
   if (quote.status === 'SUBMITTED') {
     const requiresDeclaration = quote.providerVerificationStatus === 'VERIFIED' || quote.independentlyVerified;
     const feeLabel = quote.releaseFeeMode === 'PERCENTAGE'
       ? `Calculated platform charge: £${quote.releaseFeeGbp} excl. VAT (${quote.releaseFeeMode.toLowerCase()} of quote)`
       : `Calculated platform charge: £${quote.releaseFeeGbp} excl. VAT (fixed)`;
-    const accept = (declarationAccepted?: boolean) => onAccept(quote.id, declarationAccepted, quote.requiresSecondApprover ? secondApproverEmail : undefined);
+    const accept = (declarationAccepted?: boolean) => onAccept(quote.id, declarationAccepted, quote.requiresSecondApprover ? secondApproverEmail : undefined, purchaseOrderNumber);
     return (
       <>
         <p className="mb-2 text-xs font-semibold text-foundation-navy">{feeLabel}</p>
+        <label className="mb-2 block text-xs font-semibold text-foundation-navy">
+          Purchase order number
+          <input
+            type="text"
+            value={purchaseOrderNumber}
+            onChange={(event) => setPurchaseOrderNumber(event.target.value)}
+            className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+            placeholder="PO-2026-00412"
+            maxLength={40}
+            required
+          />
+        </label>
         {quote.requiresSecondApprover && (
           <label className="mb-2 block text-xs font-semibold text-foundation-navy">
             Second Approver email
@@ -463,7 +476,7 @@ function DecisionActions({
             />
           </label>
         )}
-        <Button onClick={() => requiresDeclaration ? setShowDeclaration(true) : accept()} loading={busy} disabled={Boolean(quote.requiresSecondApprover && !secondApproverEmail.trim())}>Accept full quote · £{quote.releaseFeeGbp} excl. VAT</Button>
+        <Button onClick={() => requiresDeclaration ? setShowDeclaration(true) : accept()} loading={busy} disabled={Boolean(!purchaseOrderNumber.trim() || (quote.requiresSecondApprover && !secondApproverEmail.trim()))}>Accept full quote · £{quote.releaseFeeGbp} excl. VAT</Button>
         {showDeclaration && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-foundation-navy/50 p-4">
             <Card className="max-w-lg">

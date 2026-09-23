@@ -39,6 +39,7 @@ export default async function AwardedProjectsPage() {
                   <th className="px-4 py-2.5">Project</th>
                   <th className="px-4 py-2.5">Package</th>
                   <th className="px-4 py-2.5">Quote</th>
+                  <th className="px-4 py-2.5">PO</th>
                   <th className="px-4 py-2.5">Awarded</th>
                   <th className="px-4 py-2.5">Status</th>
                 </tr>
@@ -52,6 +53,7 @@ export default async function AwardedProjectsPage() {
                     <td className="px-4 py-2.5 text-concrete-grey">{award.project?.name ?? '—'}</td>
                     <td className="px-4 py-2.5 text-foundation-navy">{award.tender.subcategory}</td>
                     <td className="px-4 py-2.5 tabular-nums text-foundation-navy">{award.quote.reference} · £{award.quote.priceGbp} excl. VAT</td>
+                    <td className="px-4 py-2.5 font-semibold tabular-nums text-foundation-navy">{award.purchaseOrderNumber || '—'}</td>
                     <td className="px-4 py-2.5 tabular-nums text-concrete-grey">{award.awardedAt.toLocaleDateString('en-GB')}</td>
                     <td className="px-4 py-2.5"><StatusBadge status="approved">Awarded</StatusBadge></td>
                   </tr>

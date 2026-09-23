@@ -4,6 +4,9 @@ export type WasteContainer = (typeof WASTE_CONTAINERS)[number];
 export const MATERIAL_PACKS = ['bag', 'pallet', 'pack', 'bulk', 'each'] as const;
 export type MaterialPack = (typeof MATERIAL_PACKS)[number];
 
+export const MEASURED_CONTRACTOR_UNITS = ['m', 'm²', 'm³', 'nr', 'item', 'week'] as const;
+export type MeasuredContractorUnit = (typeof MEASURED_CONTRACTOR_UNITS)[number];
+
 export const COMMON_EWC_CODES = [
   { code: '17 01 01', label: 'Concrete' },
   { code: '17 01 02', label: 'Bricks' },

@@ -5,7 +5,10 @@ import { rejectCrossOrigin } from '@/server/http/origin';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { getAdminSettings, assertIndependentReviewFeeOrder } from '@/server/domain/platformSettings';
 import { requireFullSuperUser, requireOwner } from '@/server/auth/session';
+import { isFourEyesSettingKey } from '@/lib/enterprise-controls';
+import { proposeFeeChange } from '@/server/domain/controlChangeService';
 import { ensureDefaultMembershipTiers } from '@/server/domain/membershipService';
+import { toErrorResponse } from '@/server/http/errors';
 
 const settingSchema = z.object({
   action: z.enum(['fee', 'tier', 'subscription', 'support-recipient', 'verification-document']),
@@ -76,6 +79,15 @@ export async function PATCH(request: Request) {
       if (orderError) return NextResponse.json({ error: orderError }, { status: 400 });
     }
     if ((input.key.includes('PERCENTAGE') || input.key === 'VAT_PERCENTAGE') && input.key !== 'QUOTE_ESTIMATE_OFFSET_PERCENTAGE' && typeof input.value === 'number' && (input.value > 100 || Math.round(input.value * 100) !== input.value * 100)) return NextResponse.json({ error: 'Percentage must be between 0 and 100 with up to two decimal places' }, { status: 400 });
+    if (isFourEyesSettingKey(input.key)) {
+      if (typeof input.value === 'boolean') return NextResponse.json({ error: 'A fee mode or VAT value is required' }, { status: 400 });
+      try {
+        const change = await proposeFeeChange(admin.id, input.key, input.value);
+        return NextResponse.json({ status: 'pending', changeId: change.id });
+      } catch (error) {
+        return toErrorResponse(error);
+      }
+    }
     await prisma.platformSetting.upsert({ where: { key: input.key }, update: { value: String(input.value) }, create: { key: input.key, value: String(input.value) } });
     await recordAuditEvent({ actorId: admin.id, action: 'PLATFORM_FEE_UPDATED', targetType: 'PlatformSetting', targetId: input.key, metadata: { value: input.value } });
     return NextResponse.json({ status: 'updated' });

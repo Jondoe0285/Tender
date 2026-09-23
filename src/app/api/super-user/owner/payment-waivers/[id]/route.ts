@@ -3,7 +3,7 @@ import { requireOwner } from '@/server/auth/session';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { toErrorResponse } from '@/server/http/errors';
 import { revokePaymentWaiverSchema } from '@/lib/schemas/paymentWaiver';
-import { revokePaymentWaiver } from '@/server/domain/paymentWaiverService';
+import { proposeWaiverRevoke } from '@/server/domain/controlChangeService';
 
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const originError = rejectCrossOrigin(request);
@@ -13,8 +13,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const parsed = revokePaymentWaiverSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: 'A valid revocation reason is required' }, { status: 400 });
     const { id } = await props.params;
-    await revokePaymentWaiver(owner.id, id, parsed.data.reason);
-    return NextResponse.json({ status: 'revoked' });
+    await proposeWaiverRevoke(owner.id, id, parsed.data.reason);
+    return NextResponse.json({ status: 'pending' });
   } catch (error) {
     return toErrorResponse(error);
   }

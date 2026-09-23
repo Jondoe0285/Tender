@@ -22,6 +22,7 @@ export function createProfileUpdateSchemaForCatalog(catalog: CategoryCatalog) {
     services: z.array(z.string().trim().min(1)).max(Math.max(services.length, 1)).optional(),
     serviceProvisions: z.array(z.string().trim().min(1).max(160)).max(100).optional(),
     operatingLocations: z.array(z.enum(COMPANY_OPERATING_LOCATIONS)).max(COMPANY_OPERATING_LOCATIONS.length).optional(),
+    releaseSpendCapGbp: z.number().nonnegative().max(10_000_000).nullable().optional(),
   }).superRefine((value, context) => {
     value.services?.forEach((service, index) => {
       if (!isCatalogService(catalog, service)) {

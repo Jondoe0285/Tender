@@ -1,7 +1,7 @@
 import type { PaymentType } from '@prisma/client';
 import { prisma } from '@/server/data/prisma';
-import { CLIENT_RELEASE_FEE_GBP, RETAILER_UNLOCK_FEE_GBP } from '@/lib/categories';
-import { SERVICE_NAMES } from '@/lib/categories';
+import { listPendingControlChanges } from '@/server/domain/controlChangeService';
+import { CLIENT_RELEASE_FEE_GBP, RETAILER_UNLOCK_FEE_GBP, SERVICE_NAMES } from '@/lib/categories';
 import { type IndependentReviewTier } from '@/lib/independentReviewTiers';
 import { VERIFICATION_DOCUMENT_TYPES, type VerificationDocumentType } from '@/lib/verification-documents';
 import { applyMasterEstimateReduction, estimateTenderQuoteValue, getReviewedQuoteEstimateBaselines } from '@/server/domain/quoteEstimateService';
@@ -313,12 +313,13 @@ export async function getVerificationDocumentRequirements(): Promise<Record<stri
 }
 
 export async function getAdminSettings(includeSupportRecipient = false) {
-  const [settings, tiers, subscriptions, categoryDefinitions, verificationDocumentRequirements] = await Promise.all([
+  const [settings, tiers, subscriptions, categoryDefinitions, verificationDocumentRequirements, pendingControlChanges] = await Promise.all([
     prisma.platformSetting.findMany({ orderBy: { key: 'asc' } }),
     prisma.membershipTier.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.subscriptionPlan.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.categoryDefinition.findMany({ orderBy: [{ service: 'asc' }, { name: 'asc' }] }),
     getVerificationDocumentRequirements(),
+    listPendingControlChanges(),
   ]);
   return {
     fees: {
@@ -358,5 +359,14 @@ export async function getAdminSettings(includeSupportRecipient = false) {
       RETAILER_ANALYTICS_SECTION_KEYS.map((key) => [key, (settings.find((setting) => setting.key === key)?.value ?? defaultSettings[key]) === 'true'])
     ) as Record<RetailerAnalyticsSectionKey, boolean>,
     ...(includeSupportRecipient ? { supportRecipientEmail: settings.find((setting) => setting.key === 'SUPPORT_RECIPIENT_EMAIL')?.value ?? null } : {}),
+    pendingControlChanges: pendingControlChanges.map((change) => ({
+      id: change.id,
+      kind: change.kind,
+      settingKey: change.settingKey,
+      proposedValue: change.proposedValue,
+      proposedById: change.proposedById,
+      proposedByName: change.proposedBy.contactName,
+      createdAt: change.createdAt.toISOString(),
+    })),
   };
 }

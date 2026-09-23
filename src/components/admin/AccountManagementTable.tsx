@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { maskEmail } from '@/lib/enterprise-controls';
 
 export type AccountRow = {
   id: string;
@@ -240,8 +241,8 @@ export function AccountManagementTable({ role, rows, isOwner }: { role: 'USER'; 
                   {account.companyName ?? account.contactName}
                 </h3>
                 <p className="mt-1 text-sm text-concrete-grey">
-                  {account.email}
-                  {account.categories ? ` &middot; ${account.categories}` : ''}
+                  {maskEmail(account.email)}
+                  {account.categories ? ` · ${account.categories}` : ''}
                 </p>
                 <p className="mt-1 text-sm text-concrete-grey">
                   {account.tenders ?? 0} tender(s) raised &middot; {account.unlocks ?? 0} unlock(s) &middot; {account.quotes ?? 0} quote(s)

@@ -198,6 +198,8 @@ model User {
   issuedTenderWarnings TenderWarning[] @relation("TenderWarningIssuer")
   projectsCreated   Project[] @relation("ProjectCreator")
   awardsGiven       Award[]   @relation("AwardActor")
+  controlChangesProposed ControlChange[] @relation("ControlChangeProposer")
+  controlChangesConfirmed ControlChange[] @relation("ControlChangeConfirmer")
 }
 
 model RateLimitEntry {
@@ -311,6 +313,7 @@ model ClientCompany {
   primaryUserId String   @unique
   primaryUser   User     @relation("ClientCompanyPrimary", fields: [primaryUserId], references: [id])
   releaseCreditsLeft Int  @default(0)
+  releaseSpendCapGbp Float?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -841,6 +844,7 @@ model Award {
   packageSpecHash String
   awardedById     String
   awardedBy       User     @relation("AwardActor", fields: [awardedById], references: [id])
+  purchaseOrderNumber String @default("")
   awardedAt       DateTime @default(now())
 
   @@index([tenderId, awardedAt])
@@ -1005,6 +1009,25 @@ model AuditLog {
   targetId   String
   metadata   String?
   createdAt  DateTime @default(now())
+}
+
+model ControlChange {
+  id             String   @id @default(cuid())
+  kind           String
+  settingKey     String?
+  proposedValue  String
+  payloadJson    String   @default("{}")
+  proposedById   String
+  proposedBy     User     @relation("ControlChangeProposer", fields: [proposedById], references: [id])
+  confirmedById  String?
+  confirmedBy    User?    @relation("ControlChangeConfirmer", fields: [confirmedById], references: [id])
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now())
+  confirmedAt    DateTime?
+  rejectedAt     DateTime?
+
+  @@index([status, createdAt])
+  @@index([kind, status])
 }
 
 model SupportRequest {

@@ -15,11 +15,13 @@ import { consumePaymentWaiver } from '@/server/domain/paymentWaiverService';
 import { syncVerificationExpiry } from '@/server/domain/verificationDocumentService';
 import { userOwnsTender } from '@/server/domain/tenderService';
 import { issuedTenderSpecHash, STALE_QUOTE_REVISION_MESSAGE } from '@/lib/package-spec';
+import { isValidPurchaseOrderNumber } from '@/lib/enterprise-controls';
+import { assertReleaseSpendCap } from '@/server/domain/purchaseControl';
 
 type AcceptOutcome = { status: 'PAYMENT_REQUIRED' | 'RELEASED_WITH_CREDIT'; paymentId: string; checkoutUrl: string | null; devMode: boolean; feeGbp: number; vatGbp: number; totalAmountGbp: number; creditsLeft?: number };
 
 /** Accepting a quote enters a pending release-fee state — no contact data is exposed yet (SEC-035). */
-export async function acceptQuote(clientId: string, quoteId: string, mobileReturnUrl?: string, declarationAccepted = false, secondApproverEmail?: string): Promise<AcceptOutcome> {
+export async function acceptQuote(clientId: string, quoteId: string, mobileReturnUrl?: string, declarationAccepted = false, secondApproverEmail?: string, purchaseOrderNumber?: string): Promise<AcceptOutcome> {
   const quote = await prisma.quote.findUnique({ where: { id: quoteId }, include: { tender: { include: { packages: { select: { specHash: true } } } }, retailer: { select: { email: true } }, releasePayment: true, award: true } });
   if (!quote || !await userOwnsTender(clientId, quote.tenderId)) throw new ForbiddenError('Quote not found for this Client');
   await assertBuyerDuty(clientId, 'APPROVER');
@@ -51,6 +53,13 @@ export async function acceptQuote(clientId: string, quoteId: string, mobileRetur
     throw new ValidationError("This quote has exceeded the Provider's validity period and is no longer valid.");
   }
 
+  const poNumber = purchaseOrderNumber?.trim() ?? quote.award?.purchaseOrderNumber ?? '';
+  if (!quote.award?.purchaseOrderNumber) {
+    if (!isValidPurchaseOrderNumber(poNumber)) {
+      throw new ValidationError('Enter a purchase order number (3-40 characters, letters, numbers, spaces, / or -).');
+    }
+  }
+
   if (quote.status === 'SUBMITTED') {
     const currentHash = issuedTenderSpecHash(quote.tender.packages.map((pkg) => pkg.specHash).filter(Boolean));
     if (currentHash && quote.packageSpecHash && quote.packageSpecHash !== currentHash) {
@@ -68,8 +77,9 @@ export async function acceptQuote(clientId: string, quoteId: string, mobileRetur
           quoteId,
           packageSpecHash: quote.packageSpecHash || currentHash,
           awardedById: clientId,
+          purchaseOrderNumber: poNumber,
         },
-        update: {},
+        update: { awardedById: clientId, purchaseOrderNumber: poNumber },
       }),
     ]);
     await recordAuditEvent({
@@ -136,6 +146,10 @@ export async function acceptQuote(clientId: string, quoteId: string, mobileRetur
       await finalizeContactRelease(clientId, quoteId, creditPayment.id);
       return { status: 'RELEASED_WITH_CREDIT', paymentId: creditPayment.id, checkoutUrl: null, devMode: false, feeGbp: 0, vatGbp: 0, totalAmountGbp: 0, creditsLeft: clientCompanyMembership!.company.releaseCreditsLeft - 1 };
     }
+  }
+
+  if (releaseFeeGbp > 0) {
+    await assertReleaseSpendCap(clientId, releaseFeeGbp);
   }
 
   let payment: AcceptOutcome;
