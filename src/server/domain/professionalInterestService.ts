@@ -10,21 +10,31 @@ function isPaidInterest(payment: { status: string } | null | undefined) {
   return payment?.status === 'CONFIRMED';
 }
 
+async function professionalInterestAvailableForTender(tenderId: string): Promise<boolean> {
+  const tender = await prisma.tender.findFirst({
+    where: { id: tenderId, status: 'OPEN', closingDate: { gt: new Date() }, allowProfessionalInterest: true, items: { some: { category: 'Professional Services' } } },
+    select: { id: true },
+  });
+  return Boolean(tender);
+}
+
 async function assertProfessionalTender(userId: string, tenderId: string) {
   if (!await getUserTenderServiceCategories(userId).then((services) => services.includes('Professional Services'))) {
     throw new ForbiddenError('Professional Services are not active for this company');
   }
   await assertRetailerEligibleForTender(userId, tenderId);
-  const tender = await prisma.tender.findFirst({ where: { id: tenderId, status: 'OPEN', closingDate: { gt: new Date() }, items: { some: { category: 'Professional Services' } } }, select: { id: true } });
-  if (!tender) throw new ForbiddenError('Professional interest is not available for this tender');
+  if (!await professionalInterestAvailableForTender(tenderId)) {
+    throw new ForbiddenError('Professional interest is not available for this tender');
+  }
 }
 
 export async function getProfessionalInterestStatus(userId: string, tenderId: string) {
-  const [feeGbp, interest] = await Promise.all([
+  const [feeGbp, interest, available] = await Promise.all([
     getPaymentFeeGbp('PROFESSIONAL_INTEREST'),
     prisma.professionalInterest.findUnique({ where: { tenderId_retailerId: { tenderId, retailerId: userId } }, include: { payment: true } }),
+    professionalInterestAvailableForTender(tenderId),
   ]);
-  return { feeGbp, interest };
+  return { feeGbp, interest, available };
 }
 
 export async function registerProfessionalInterest(userId: string, tenderId: string) {

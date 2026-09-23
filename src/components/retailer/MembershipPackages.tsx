@@ -44,7 +44,7 @@ export function MembershipPackages({ enabled, tiers }: { enabled: boolean; tiers
       window.location.href = data.checkoutUrl;
       return;
     }
-    if (data?.devMode && data.paymentId) {
+    if (data?.devMode && data.paymentId && process.env.NODE_ENV !== 'production') {
       const confirmResponse = await fetch('/api/dev/confirm-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

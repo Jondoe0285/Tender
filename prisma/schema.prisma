@@ -314,6 +314,7 @@ model ClientCompanyMember {
   userId    String        @unique
   company   ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  duties    String        @default("RAISER,ESTIMATOR,APPROVER,AUDITOR")
   createdAt DateTime      @default(now())
 
   @@unique([companyId, userId])
@@ -484,6 +485,8 @@ model RetailerProfile {
   accreditations    String?
   standardQuoteValidityDays Int           @default(30)
   launchCreditsLeft Int                   @default(3)
+  launchCreditsExpireAt DateTime?
+  launchCreditsReason   String?
   verificationStatus     ProviderVerificationStatus @default(UNVERIFIED)
   verificationRequestedAt DateTime?
   verificationDecidedAt   DateTime?
@@ -578,6 +581,8 @@ model Tender {
   requirements  String       // comma-separated tick-box requirements
   description   String
   status        TenderStatus @default(OPEN)
+  allowDirectContact Boolean @default(false)
+  allowProfessionalInterest Boolean @default(false)
   createdAt     DateTime     @default(now())
 
   packages      TenderPackage[]
@@ -627,6 +632,7 @@ model TenderPackage {
   supplyDate   DateTime?
   requirements String       // comma-separated tick-box requirements
   description  String
+  specJson     String       @default("{}")
   status       TenderStatus @default(OPEN)
   createdAt    DateTime     @default(now())
 
@@ -671,6 +677,7 @@ model TenderItem {
   item        String?
   quantity    String
   description String
+  specJson    String   @default("{}")
   createdAt   DateTime @default(now())
   matches     TenderItemMatch[]
   quoteLines  QuoteLine[]
@@ -777,6 +784,10 @@ model QuoteLine {
   tenderItemId String
   tenderItem   TenderItem @relation(fields: [tenderItemId], references: [id])
   priceGbp     Int?
+  unitRateGbp  Float?
+  quantityValue Float?
+  unit         String?
+  pricingKind  String     @default("LUMP")
   available    Boolean    @default(true)
 
   @@unique([quoteId, tenderItemId])

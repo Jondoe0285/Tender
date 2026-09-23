@@ -66,6 +66,8 @@ export async function getUserAnalyticsProfile(userId: string, period: ActivityPe
     address,
     isSoleTrader: user.retailerProfile?.isSoleTrader ?? false,
     launchCreditsLeft: user.retailerProfile?.launchCreditsLeft ?? null,
+    launchCreditsExpireAt: user.retailerProfile?.launchCreditsExpireAt ?? null,
+    launchCreditsReason: user.retailerProfile?.launchCreditsReason ?? null,
     releaseCreditsLeft: user.clientCompanyMembership?.company.releaseCreditsLeft ?? null,
     verificationStatus: user.retailerProfile?.verificationStatus ?? null,
     verificationEligible: user.retailerProfile ? isVerificationEligible(user.retailerProfile.categories) : false,

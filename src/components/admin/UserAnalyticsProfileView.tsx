@@ -33,6 +33,8 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
   const [membershipStartDate, setMembershipStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [membershipExpiryMonths, setMembershipExpiryMonths] = useState<'6' | '12'>('12');
   const [launchCredits, setLaunchCredits] = useState(String(profile.launchCreditsLeft ?? 0));
+  const [launchCreditReason, setLaunchCreditReason] = useState(profile.launchCreditsReason ?? '');
+  const [launchCreditExpiry, setLaunchCreditExpiry] = useState(profile.launchCreditsExpireAt ? new Date(profile.launchCreditsExpireAt).toISOString().slice(0, 10) : '');
   const [releaseCredits, setReleaseCredits] = useState(String(profile.releaseCreditsLeft ?? 0));
   const [verificationStatus, setVerificationStatus] = useState(profile.verificationStatus);
   const [decidingVerification, setDecidingVerification] = useState(false);
@@ -88,7 +90,10 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
   async function saveCredits(action: 'set-launch-credits' | 'set-release-credits', value: string) {
     const credits = Number(value);
     if (!Number.isInteger(credits) || credits < 0) return setMessage('Credits must be a non-negative whole number.');
-    const response = await fetch(`/api/super-user/users/${profile.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...(action === 'set-launch-credits' ? { launchCreditsLeft: credits } : { releaseCreditsLeft: credits }) }) });
+    const payload = action === 'set-launch-credits'
+      ? { action, launchCreditsLeft: credits, reason: launchCreditReason, expiresAt: launchCreditExpiry }
+      : { action, releaseCreditsLeft: credits };
+    const response = await fetch(`/api/super-user/users/${profile.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     const data = await response.json().catch(() => null);
     if (!response.ok) return setMessage(data?.error ?? 'Unable to update credits.');
     if (action === 'set-launch-credits') setLaunchCredits(String(data.launchCreditsLeft));
@@ -261,7 +266,18 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-steel-blue">Individual credit allocation</p>
         <p className="mt-1 text-sm text-concrete-grey">Assign credits to this individual account. List-level editing is disabled.</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          {profile.launchCreditsLeft !== null && <div><Label htmlFor="profile-launch-credits">Tender release credits</Label><div className="mt-2 flex gap-3"><Input id="profile-launch-credits" type="number" min="0" step="1" value={launchCredits} onChange={(event) => setLaunchCredits(event.target.value)} /><Button onClick={() => void saveCredits('set-launch-credits', launchCredits)}>Save</Button></div></div>}
+          {profile.launchCreditsLeft !== null && (
+            <div>
+              <Label htmlFor="profile-launch-credits">Tender unlock credits</Label>
+              <p className="mt-1 text-xs text-concrete-grey">Owner-attested. Requires a reason and expiry. Silent minting is not allowed.</p>
+              <div className="mt-2 flex flex-col gap-3">
+                <Input id="profile-launch-credits" type="number" min="0" step="1" value={launchCredits} onChange={(event) => setLaunchCredits(event.target.value)} />
+                <div><Label htmlFor="profile-launch-reason">Attestation reason</Label><Input id="profile-launch-reason" className="mt-2" value={launchCreditReason} onChange={(event) => setLaunchCreditReason(event.target.value)} placeholder="Why these credits exist" /></div>
+                <div><Label htmlFor="profile-launch-expiry">Expiry</Label><Input id="profile-launch-expiry" className="mt-2" type="date" value={launchCreditExpiry} onChange={(event) => setLaunchCreditExpiry(event.target.value)} /></div>
+                <Button onClick={() => void saveCredits('set-launch-credits', launchCredits)}>Save attested credits</Button>
+              </div>
+            </div>
+          )}
           {profile.releaseCreditsLeft !== null && <div><Label htmlFor="profile-release-credits">Quote acceptance release credits</Label><div className="mt-2 flex gap-3"><Input id="profile-release-credits" type="number" min="0" step="1" value={releaseCredits} onChange={(event) => setReleaseCredits(event.target.value)} /><Button onClick={() => void saveCredits('set-release-credits', releaseCredits)}>Save</Button></div></div>}
         </div>
       </Card>}

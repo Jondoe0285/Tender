@@ -1,5 +1,6 @@
 import { prisma } from '@/server/data/prisma';
 import { SERVICE_CATALOG } from '@/lib/categories';
+import { cloneCatalog, type CategoryCatalog } from '@/lib/catalog';
 
 export type TenderEstimateInput = {
   category?: string | null;
@@ -183,7 +184,7 @@ export function standardUnitForPurchase(service: string, category: string, item:
   if (text.includes('concrete') || text.includes('screed')) return { standardUnit: 'm3', standardUnitSize: 1 };
   if (text.includes('aggregate') || text.includes('sand') || text.includes('stone') || text.includes('spoil')) return { standardUnit: 'tonne', standardUnitSize: 1 };
   if (text.includes('timber') || text.includes('sheet') || text.includes('insulation') || text.includes('plasterboard')) return { standardUnit: 'units', standardUnitSize: 1 };
-  if (service === 'Waste') return { standardUnit: 'skip', standardUnitSize: 1 };
+  if (service === 'Waste') return { standardUnit: 'tonne', standardUnitSize: 1 };
   if (service === 'Plant Hire') return { standardUnit: 'week', standardUnitSize: 1 };
   if (service === 'Contractor Services' || service === 'Professional Services') return { standardUnit: 'week', standardUnitSize: 1 };
   return { standardUnit: 'unit', standardUnitSize: 1 };
@@ -201,8 +202,8 @@ export function estimatedUnitPriceForPurchase(service: string, category: string,
   return roundCurrency(Math.max(25, base * itemMultiplier));
 }
 
-export function buildPricingCatalogue(): PricingCatalogueRow[] {
-  return Object.entries(SERVICE_CATALOG).flatMap(([service, categories]) => Object.entries(categories).flatMap(([category, items]) => {
+export function buildPricingCatalogue(catalog: CategoryCatalog = cloneCatalog(SERVICE_CATALOG)): PricingCatalogueRow[] {
+  return Object.entries(catalog).flatMap(([service, categories]) => Object.entries(categories).flatMap(([category, items]) => {
     const itemRows = (items as readonly string[]).map((item) => {
       const unit = standardUnitForPurchase(service, category, item);
       return { key: buildEstimateBaselineKey(service, category, item), service, category, item, ...unit, estimatedUnitPriceGbp: estimatedUnitPriceForPurchase(service, category, item) };

@@ -5,12 +5,14 @@ import { rejectCrossOrigin } from '@/server/http/origin';
 import { createTenderSchemaForCatalog } from '@/lib/schemas/tender';
 import { createTender, listTendersForClient } from '@/server/domain/tenderService';
 import { getCategoryCatalog } from '@/server/domain/categoryService';
+import { assertBuyerDuty } from '@/server/domain/workspacePermissions';
 
 export async function POST(request: Request) {
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
     const user = await requireRole('USER');
+    await assertBuyerDuty(user.id, 'RAISER');
     const body = await request.json().catch(() => null);
     const parsed = createTenderSchemaForCatalog(await getCategoryCatalog()).safeParse(body);
     if (!parsed.success) {

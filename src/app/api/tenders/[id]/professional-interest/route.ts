@@ -34,6 +34,7 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
       }
     }
     return NextResponse.json({
+      available: status.available,
       feeGbp: status.feeGbp,
       registered,
       paymentId: status.interest?.payment?.status === 'PENDING' ? status.interest.paymentId : null,

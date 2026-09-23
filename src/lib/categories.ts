@@ -153,6 +153,29 @@ export const REQUIREMENT_OPTIONS = [
 export const RETAILER_UNLOCK_FEE_GBP = 10;
 export const CLIENT_RELEASE_FEE_GBP = 10;
 
+export function isSpecifiedItemService(service: string | undefined): boolean {
+  const value = String(service ?? '').trim().toLowerCase();
+  return value === 'materials' || value === 'waste' || value === 'plant hire';
+}
+
+export function isGoodsQuantityService(service: string | undefined): boolean {
+  const value = String(service ?? '').trim().toLowerCase();
+  return value === 'materials' || value === 'waste';
+}
+
+const GOODS_QUANTITY_PATTERN = /^\d+(?:\.\d+)? (?:units?|tonnes|bags|pallets|m³|skips?)$/;
+const WASTE_TONNES_PATTERN = /^\d+(?:\.\d+)? tonnes$/;
+const DURATION_QUANTITY_PATTERN = /^\d+(?:\.\d+)? (?:days|weeks|months)$/;
+
+/** Stored quantity is a number plus a catalog unit — never a free-text essay. */
+export function isValidTenderQuantity(service: string | undefined, quantity: string): boolean {
+  const value = quantity.trim().replace(/,/g, '');
+  if (String(service ?? '').trim().toLowerCase() === 'waste') return WASTE_TONNES_PATTERN.test(value);
+  if (isGoodsQuantityService(service)) return GOODS_QUANTITY_PATTERN.test(value);
+  if (isSpecifiedItemService(service)) return GOODS_QUANTITY_PATTERN.test(value) || DURATION_QUANTITY_PATTERN.test(value);
+  return value === 'not applicable' || GOODS_QUANTITY_PATTERN.test(value) || DURATION_QUANTITY_PATTERN.test(value);
+}
+
 /** Services eligible for the Provider verification process. */
 export const VERIFICATION_ELIGIBLE_SERVICES: ServiceName[] = ['Materials', 'Waste', 'Plant Hire', 'Contractor Services', 'Professional Services'];
 

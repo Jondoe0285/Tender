@@ -83,7 +83,7 @@ test('a reversal delivered before the completion event blocks the later out-of-o
   clientId = client.id;
   retailerId = retailer.id;
   const company = await prisma.clientCompany.create({
-    data: { companyName: `Out Of Order Supplies ${suffix}`, branchIdentifier: suffix, primaryUserId: retailerId, services: 'Construction Materials', operatingLocations: 'United Kingdom', members: { create: { userId: retailerId } } },
+    data: { companyName: `Out Of Order Supplies ${suffix}`, branchIdentifier: suffix, primaryUserId: retailerId, services: 'Construction Materials', serviceProvisions: JSON.stringify(['Construction Materials::Aggregate']), operatingLocations: 'United Kingdom', members: { create: { userId: retailerId } } },
   });
   companyId = company.id;
   await prisma.retailerProfile.create({
@@ -180,7 +180,7 @@ test('a retry after a partial failure resumes entitlement finalisation instead o
   clientId = client.id;
   retailerId = retailer.id;
   const company = await prisma.clientCompany.create({
-    data: { companyName: `Partial Failure Supplies ${suffix}`, branchIdentifier: suffix, primaryUserId: retailerId, services: 'Construction Materials', operatingLocations: 'United Kingdom', members: { create: { userId: retailerId } } },
+    data: { companyName: `Partial Failure Supplies ${suffix}`, branchIdentifier: suffix, primaryUserId: retailerId, services: 'Construction Materials', serviceProvisions: JSON.stringify(['Construction Materials::Aggregate']), operatingLocations: 'United Kingdom', members: { create: { userId: retailerId } } },
   });
   companyId = company.id;
   await prisma.retailerProfile.create({

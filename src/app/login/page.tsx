@@ -5,9 +5,9 @@ import { LoginForm } from '@/components/auth/LoginForm';
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-site-white">
+    <div className="flex min-h-screen flex-col bg-light-grey">
       <SiteHeader />
-      <main className="flex-1 px-6 sm:px-10">
+      <main id="main-content" className="flex-1 px-6 sm:px-10">
         <Suspense fallback={null}><LoginForm /></Suspense>
       </main>
       <SiteFooter />

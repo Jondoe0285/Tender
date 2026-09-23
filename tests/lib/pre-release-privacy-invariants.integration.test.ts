@@ -35,7 +35,7 @@ test('an unlocked tender view never exposes the Contractor identity or contact d
   });
   retailerId = retailer.id;
   const company = await prisma.clientCompany.create({
-    data: { companyName: `Privacy Test Supplies ${suffix}`, branchIdentifier: suffix, primaryUserId: retailerId, services: 'Construction Materials', operatingLocations: 'United Kingdom', members: { create: { userId: retailerId } } },
+    data: { companyName: `Privacy Test Supplies ${suffix}`, branchIdentifier: suffix, primaryUserId: retailerId, services: 'Construction Materials', serviceProvisions: JSON.stringify(['Construction Materials::Aggregate']), operatingLocations: 'United Kingdom', members: { create: { userId: retailerId } } },
   });
   companyId = company.id;
   const tender = await prisma.tender.create({

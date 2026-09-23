@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { FieldGroup, Input, Label, PasswordInput } from '@/components/ui/Field';
 import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
-import { SERVICE_CATALOG, SERVICE_NAMES, isVerificationEligible } from '@/lib/categories';
+import { SERVICE_CATALOG, isVerificationEligible } from '@/lib/categories';
+import { cloneCatalog, type CategoryCatalog } from '@/lib/catalog';
+import { ADDITIONAL_BUYER_DUTIES, BUYER_DUTIES, parseBuyerDuties, type BuyerDuty } from '@/lib/workspace-duties';
 import { COMPANY_TYPE_LABELS, COMPANY_TYPES, type CompanyType } from '@/lib/companyTypes';
 import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 
@@ -33,7 +35,7 @@ type Profile = {
   operatingLocations: string[];
   tradeTenderId: string | null;
   isPrimaryUser: boolean;
-  additionalUsers: Array<{ id: string; user: { firstName: string | null; lastName: string | null; contactName: string; email: string } }>;
+  additionalUsers: Array<{ id: string; duties: string; user: { firstName: string | null; lastName: string | null; contactName: string; email: string } }>;
   warnings: Array<{ id: string; reason: string; note: string; createdAt: string; tenderReference: string }>;
   verificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED' | null;
 };
@@ -50,13 +52,19 @@ export default function ClientProfilePage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [additionalUserErrors, setAdditionalUserErrors] = useState<Record<string, string>>({});
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '' });
-  const [additionalUser, setAdditionalUser] = useState({ firstName: '', lastName: '', email: '', phoneNumber: '', password: '' });
+  const [additionalUser, setAdditionalUser] = useState({ firstName: '', lastName: '', email: '', phoneNumber: '', password: '', duties: ADDITIONAL_BUYER_DUTIES.split(',') as BuyerDuty[] });
   const [showAdditionalUser, setShowAdditionalUser] = useState(false);
+  const [catalog, setCatalog] = useState<CategoryCatalog>(() => cloneCatalog(SERVICE_CATALOG));
+  const serviceNames = Object.keys(catalog);
 
   async function loadProfile() {
-    const response = await fetch('/api/client/profile');
-    if (response.ok) setProfile(await response.json());
+    const [profileResponse, catalogResponse] = await Promise.all([fetch('/api/client/profile'), fetch('/api/categories')]);
+    if (profileResponse.ok) setProfile(await profileResponse.json());
     else setMessage('Unable to load your profile.');
+    if (catalogResponse.ok) {
+      const data = await catalogResponse.json() as { catalog?: CategoryCatalog };
+      if (data.catalog) setCatalog(data.catalog);
+    }
     setLoading(false);
   }
 
@@ -114,14 +122,14 @@ export default function ClientProfilePage() {
       setMessage(data?.error ?? 'Unable to add additional user.');
       return;
     }
-    setAdditionalUser({ firstName: '', lastName: '', email: '', phoneNumber: '', password: '' });
+    setAdditionalUser({ firstName: '', lastName: '', email: '', phoneNumber: '', password: '', duties: ADDITIONAL_BUYER_DUTIES.split(',') as BuyerDuty[] });
     setShowAdditionalUser(false);
     setMessage('Additional user added.');
     await loadProfile();
   }
 
   function toggleAllProvisions(service: string) {
-    const values = Object.keys(SERVICE_CATALOG[service as keyof typeof SERVICE_CATALOG]).map((provision) => `${service}::${provision}`);
+    const values = Object.keys(catalog[service] ?? {}).map((provision) => `${service}::${provision}`);
     setProfile((current) => {
       const allSelected = values.every((value) => current.serviceProvisions.includes(value));
       return {
@@ -169,17 +177,17 @@ export default function ClientProfilePage() {
               {profile.isPrimaryUser && <FieldGroup wide><Label htmlFor="companyName">Company name</Label><Input id="companyName" value={profile.companyName ?? ''} onChange={(event) => setProfile({ ...profile, companyName: event.target.value })} autoComplete="organization" />{fieldErrors.companyName && <p className="text-sm text-attention">{fieldErrors.companyName}</p>}</FieldGroup>}
               {profile.isPrimaryUser && <FieldGroup wide><Label htmlFor="companyType">Company type</Label><select id="companyType" value={profile.companyType} onChange={(event) => setProfile({ ...profile, companyType: event.target.value as CompanyType })} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm">{COMPANY_TYPES.map((type) => <option key={type} value={type}>{COMPANY_TYPE_LABELS[type]}</option>)}</select>{fieldErrors.companyType && <p className="text-sm text-attention">{fieldErrors.companyType}</p>}</FieldGroup>}
               {profile.isPrimaryUser && <FieldGroup wide><Label htmlFor="branchIdentifier">Branch or location</Label><Input id="branchIdentifier" value={profile.branchIdentifier ?? ''} onChange={(event) => setProfile({ ...profile, branchIdentifier: event.target.value })} />{fieldErrors.branchIdentifier && <p className="text-sm text-attention">{fieldErrors.branchIdentifier}</p>}</FieldGroup>}
-              {profile.isPrimaryUser && <FieldGroup wide><Label>Services</Label><MultiSelectDropdown options={SERVICE_NAMES.map((service) => ({ label: PROFILE_SERVICE_LABELS[service] ?? service, value: service }))} selected={profile.services} onChange={(services) => setProfile({ ...profile, services, serviceProvisions: profile.serviceProvisions.filter((entry) => services.includes(entry.split('::')[0] ?? '')) })} placeholder="Select services offered" /><p className="mt-1 text-xs font-semibold text-safety-amber">Note: Modifying your company services resets your AI verification and enhanced verification statuses due to new legal and compliance requirements for the updated service scope.</p>{fieldErrors.services && <p className="text-sm text-attention">{fieldErrors.services}</p>}</FieldGroup>}
+              {profile.isPrimaryUser && <FieldGroup wide><Label>Services</Label><MultiSelectDropdown options={serviceNames.map((service) => ({ label: PROFILE_SERVICE_LABELS[service] ?? service, value: service }))} selected={profile.services} onChange={(services) => setProfile({ ...profile, services, serviceProvisions: profile.serviceProvisions.filter((entry) => services.includes(entry.split('::')[0] ?? '')) })} placeholder="Select services offered" /><p className="mt-1 text-xs font-semibold text-safety-amber">Note: Modifying your company services resets your AI verification and enhanced verification statuses due to new legal and compliance requirements for the updated service scope.</p>{fieldErrors.services && <p className="text-sm text-attention">{fieldErrors.services}</p>}</FieldGroup>}
               {profile.isPrimaryUser && profile.services.map((service) => (
                 <FieldGroup key={service} wide>
                   <div className="flex items-center justify-between gap-3">
                     <Label>{service} provisions</Label>
                     <button type="button" onClick={() => toggleAllProvisions(service)} className="text-xs font-semibold text-steel-blue hover:text-foundation-navy">
-                      {Object.keys(SERVICE_CATALOG[service as keyof typeof SERVICE_CATALOG]).every((provision) => profile.serviceProvisions.includes(`${service}::${provision}`)) ? 'Clear all' : 'Select all'}
+                      {Object.keys(catalog[service] ?? {}).every((provision) => profile.serviceProvisions.includes(`${service}::${provision}`)) ? 'Clear all' : 'Select all'}
                     </button>
                   </div>
                   <div className="mt-1 grid gap-2 sm:grid-cols-2">
-                    {Object.keys(SERVICE_CATALOG[service as keyof typeof SERVICE_CATALOG]).map((provision) => {
+                    {Object.keys(catalog[service] ?? {}).map((provision) => {
                       const value = `${service}::${provision}`;
                       const selected = profile.serviceProvisions.includes(value);
                       return (
@@ -207,9 +215,9 @@ export default function ClientProfilePage() {
             <div className="mt-5 space-y-4">{profile.warnings.map((warning) => <div key={warning.id} className="border-l-4 border-attention bg-slate-50 px-4 py-3"><p className="font-semibold text-foundation-navy">{warning.reason}</p><p className="mt-1 text-sm text-concrete-grey">Tender {warning.tenderReference} · {new Date(warning.createdAt).toLocaleDateString('en-GB')}</p><p className="mt-2 text-sm text-foundation-navy">{warning.note}</p></div>)}</div>
           </Card>}
           {profile.isPrimaryUser && <Card>
-            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5"><div><h2 className="font-heading text-xl font-bold text-foundation-navy">Additional users</h2><p className="mt-1 text-sm text-concrete-grey">Additional users can update only their own personal details and password.</p></div><Button variant="secondary" onClick={() => setShowAdditionalUser(!showAdditionalUser)}>{showAdditionalUser ? 'Close' : 'Add user'}</Button></div>
-            {showAdditionalUser && <div className="mt-6 grid gap-5 rounded-lg border-l-4 border-safety-amber bg-amber-50/50 p-4 sm:grid-cols-2"><FieldGroup><Label htmlFor="additionalFirstName">First name</Label><Input id="additionalFirstName" value={additionalUser.firstName} onChange={(event) => setAdditionalUser({ ...additionalUser, firstName: event.target.value })} />{additionalUserErrors.firstName && <p className="text-sm text-attention">{additionalUserErrors.firstName}</p>}</FieldGroup><FieldGroup><Label htmlFor="additionalLastName">Last name</Label><Input id="additionalLastName" value={additionalUser.lastName} onChange={(event) => setAdditionalUser({ ...additionalUser, lastName: event.target.value })} />{additionalUserErrors.lastName && <p className="text-sm text-attention">{additionalUserErrors.lastName}</p>}</FieldGroup><FieldGroup><Label htmlFor="additionalEmail">Email address</Label><Input id="additionalEmail" type="email" value={additionalUser.email} onChange={(event) => setAdditionalUser({ ...additionalUser, email: event.target.value })} />{additionalUserErrors.email && <p className="text-sm text-attention">{additionalUserErrors.email}</p>}</FieldGroup><FieldGroup><Label htmlFor="additionalPhone">Phone number</Label><Input id="additionalPhone" type="tel" value={additionalUser.phoneNumber} onChange={(event) => setAdditionalUser({ ...additionalUser, phoneNumber: event.target.value })} />{additionalUserErrors.phoneNumber && <p className="text-sm text-attention">{additionalUserErrors.phoneNumber}</p>}</FieldGroup><FieldGroup wide><Label htmlFor="additionalPassword">Temporary password</Label><PasswordInput id="additionalPassword" minLength={10} value={additionalUser.password} onChange={(event) => setAdditionalUser({ ...additionalUser, password: event.target.value })} /><p className="mt-1 text-xs text-concrete-grey">Use 10-200 characters, including a capital letter and a special character.</p>{additionalUserErrors.password && <p className="text-sm text-attention">{additionalUserErrors.password}</p>}</FieldGroup><div className="sm:col-span-2"><Button onClick={addAdditionalUser} loading={saving}>Add user</Button></div></div>}
-            <div className="mt-6 divide-y divide-slate-100">{profile.additionalUsers.length === 0 ? <p className="py-5 text-sm text-concrete-grey">No additional users.</p> : profile.additionalUsers.map(({ id, user }) => <div key={id} className="py-4"><p className="font-semibold text-foundation-navy">{user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.contactName}</p><p className="text-sm text-concrete-grey">{user.email}</p></div>)}</div>
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5"><div><h2 className="font-heading text-xl font-bold text-foundation-navy">Additional users</h2><p className="mt-1 text-sm text-concrete-grey">Assign buying duties. Only an Approver can accept a quote and pay the release fee.</p></div><Button variant="secondary" onClick={() => setShowAdditionalUser(!showAdditionalUser)}>{showAdditionalUser ? 'Close' : 'Add user'}</Button></div>
+            {showAdditionalUser && <div className="mt-6 grid gap-5 rounded-lg border-l-4 border-safety-amber bg-amber-50/50 p-4 sm:grid-cols-2"><FieldGroup><Label htmlFor="additionalFirstName">First name</Label><Input id="additionalFirstName" value={additionalUser.firstName} onChange={(event) => setAdditionalUser({ ...additionalUser, firstName: event.target.value })} />{additionalUserErrors.firstName && <p className="text-sm text-attention">{additionalUserErrors.firstName}</p>}</FieldGroup><FieldGroup><Label htmlFor="additionalLastName">Last name</Label><Input id="additionalLastName" value={additionalUser.lastName} onChange={(event) => setAdditionalUser({ ...additionalUser, lastName: event.target.value })} />{additionalUserErrors.lastName && <p className="text-sm text-attention">{additionalUserErrors.lastName}</p>}</FieldGroup><FieldGroup><Label htmlFor="additionalEmail">Email address</Label><Input id="additionalEmail" type="email" value={additionalUser.email} onChange={(event) => setAdditionalUser({ ...additionalUser, email: event.target.value })} />{additionalUserErrors.email && <p className="text-sm text-attention">{additionalUserErrors.email}</p>}</FieldGroup><FieldGroup><Label htmlFor="additionalPhone">Phone number</Label><Input id="additionalPhone" type="tel" value={additionalUser.phoneNumber} onChange={(event) => setAdditionalUser({ ...additionalUser, phoneNumber: event.target.value })} />{additionalUserErrors.phoneNumber && <p className="text-sm text-attention">{additionalUserErrors.phoneNumber}</p>}</FieldGroup><FieldGroup wide><Label htmlFor="additionalPassword">Temporary password</Label><PasswordInput id="additionalPassword" minLength={10} value={additionalUser.password} onChange={(event) => setAdditionalUser({ ...additionalUser, password: event.target.value })} /><p className="mt-1 text-xs text-concrete-grey">Use 10-200 characters, including a capital letter and a special character.</p>{additionalUserErrors.password && <p className="text-sm text-attention">{additionalUserErrors.password}</p>}</FieldGroup><fieldset className="sm:col-span-2"><legend className="text-sm font-semibold text-foundation-navy">Buying duties</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{BUYER_DUTIES.map((duty) => <label key={duty} className="flex items-center gap-2 text-sm text-concrete-grey"><input type="checkbox" checked={additionalUser.duties.includes(duty)} onChange={() => setAdditionalUser((current) => ({ ...current, duties: current.duties.includes(duty) ? current.duties.filter((item) => item !== duty) : [...current.duties, duty] }))} className="h-4 w-4 accent-trade-blue" />{duty === 'RAISER' ? 'Raiser' : duty === 'ESTIMATOR' ? 'Estimator' : duty === 'APPROVER' ? 'Approver (accept and pay release)' : 'Auditor'}</label>)}</div></fieldset><div className="sm:col-span-2"><Button onClick={addAdditionalUser} loading={saving}>Add user</Button></div></div>}
+            <div className="mt-6 divide-y divide-slate-100">{profile.additionalUsers.length === 0 ? <p className="py-5 text-sm text-concrete-grey">No additional users.</p> : profile.additionalUsers.map(({ id, duties, user }) => <div key={id} className="py-4"><p className="font-semibold text-foundation-navy">{user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.contactName}</p><p className="text-sm text-concrete-grey">{user.email}</p><p className="mt-1 text-xs font-semibold uppercase tracking-wide text-steel-blue">{[...parseBuyerDuties(duties)].join(' · ') || 'No duties'}</p></div>)}</div>
           </Card>}
         </>}
       </div>

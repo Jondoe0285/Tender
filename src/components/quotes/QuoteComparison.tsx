@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { independentReviewTierDescription } from '@/lib/independentReviewTiers';
+import { allowTestPayments } from '@/lib/runtime';
 
 type QuoteCommon = {
   id: string;
@@ -14,7 +15,6 @@ type QuoteCommon = {
   status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
   submittedAt: string;
   expiresAt: string;
-  sponsoredPlacementActive?: boolean;
   providerIsSoleTrader: boolean;
   providerVerificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
   verifiedDocumentLabels: string[];
@@ -28,9 +28,11 @@ type ActiveQuote = QuoteCommon & {
   leadTimeDays: number;
   deliveryDateConfirmed: boolean;
   deliveryInfo: string;
-  lines: { tenderItemId: string; priceGbp: number | null; available: boolean; tenderItem: { category: string; subcategory: string; item: string | null; quantity: string } }[];
+  lines: { tenderItemId: string; priceGbp: number | null; available: boolean; unitRateGbp?: number | null; quantityValue?: number | null; unit?: string | null; pricingKind?: string | null; tenderItem: { category: string; subcategory: string; item: string | null; quantity: string } }[];
   charges: { id: string; description: string; priceGbp: number }[];
   releaseFeeGbp: number;
+  releaseFeeMode?: string;
+  requiresSecondApprover?: boolean;
 };
 
 type ExpiredQuote = QuoteCommon & {
@@ -69,7 +71,7 @@ type QuoteComparisonProps = {
   pendingPayment: { quoteId: string; paymentId: string } | null;
   pendingCheckoutUrl?: string | null;
   busyQuoteId: string | null;
-  onAccept: (quoteId: string, declarationAccepted?: boolean) => void;
+  onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
 };
@@ -330,7 +332,7 @@ type QuoteRowProps = {
   contact?: Contact;
   isPendingPayment: boolean;
   busy: boolean;
-  onAccept: (quoteId: string, declarationAccepted?: boolean) => void;
+  onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
   pendingCheckoutUrl?: string | null;
@@ -349,7 +351,11 @@ function QuoteBreakdown({ quote }: { quote: ActiveQuote }) {
           <li key={quoteLine.tenderItemId} className="flex items-start justify-between gap-3">
             <span>{quoteLine.tenderItem.item ?? quoteLine.tenderItem.subcategory} ({quoteLine.tenderItem.quantity})</span>
             <span className={`shrink-0 font-semibold ${quoteLine.available ? '' : 'text-attention'}`}>
-              {quoteLine.available ? `£${quoteLine.priceGbp}` : 'Cannot supply'}
+              {quoteLine.available
+                ? quoteLine.unitRateGbp != null
+                  ? `£${quoteLine.unitRateGbp}/${quoteLine.unit ?? 'unit'} · £${quoteLine.priceGbp}`
+                  : `£${quoteLine.priceGbp}`
+                : 'Cannot supply'}
             </span>
           </li>
         ))}
@@ -418,31 +424,49 @@ function DecisionActions({
   contact?: Contact;
   isPendingPayment: boolean;
   busy: boolean;
-  onAccept: (quoteId: string, declarationAccepted?: boolean) => void;
+  onAccept: (quoteId: string, declarationAccepted?: boolean, secondApproverEmail?: string) => void;
   onSimulateReleasePayment: () => void;
   onLoadContact: (quoteId: string) => void;
   pendingCheckoutUrl?: string | null;
 }) {
   const [showDeclaration, setShowDeclaration] = useState(false);
   const [declarationChecked, setDeclarationChecked] = useState(false);
+  const [secondApproverEmail, setSecondApproverEmail] = useState('');
 
   if (quote.status === 'SUBMITTED') {
     const requiresDeclaration = quote.providerVerificationStatus === 'VERIFIED' || quote.independentlyVerified;
+    const feeLabel = quote.releaseFeeMode === 'PERCENTAGE'
+      ? `Calculated platform charge: £${quote.releaseFeeGbp} excl. VAT (${quote.releaseFeeMode.toLowerCase()} of quote)`
+      : `Calculated platform charge: £${quote.releaseFeeGbp} excl. VAT (fixed)`;
+    const accept = (declarationAccepted?: boolean) => onAccept(quote.id, declarationAccepted, quote.requiresSecondApprover ? secondApproverEmail : undefined);
     return (
       <>
-        <Button onClick={() => requiresDeclaration ? setShowDeclaration(true) : onAccept(quote.id)} loading={busy}>Accept full quote · £{quote.releaseFeeGbp} excl. VAT release fee</Button>
+        <p className="mb-2 text-xs font-semibold text-foundation-navy">{feeLabel}</p>
+        {quote.requiresSecondApprover && (
+          <label className="mb-2 block text-xs font-semibold text-foundation-navy">
+            Second Approver email
+            <input
+              type="email"
+              value={secondApproverEmail}
+              onChange={(event) => setSecondApproverEmail(event.target.value)}
+              className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+              placeholder="approver@company.example"
+            />
+          </label>
+        )}
+        <Button onClick={() => requiresDeclaration ? setShowDeclaration(true) : accept()} loading={busy} disabled={Boolean(quote.requiresSecondApprover && !secondApproverEmail.trim())}>Accept full quote · £{quote.releaseFeeGbp} excl. VAT</Button>
         {showDeclaration && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-foundation-navy/50 p-4">
             <Card className="max-w-lg">
               <h3 className="font-heading text-lg font-bold text-foundation-navy">Before you proceed</h3>
             <p className="mt-3 text-sm text-concrete-grey">Trade Tender&rsquo;s automated review assesses legal-compliance evidence only and may make mistakes. You retain full responsibility for suitable independent due diligence before entering any formal agreement, and Trade Tender accepts no liability for the Provider&rsquo;s work, conduct, or the outcome of your engagement with them.</p>
               <label className="mt-4 flex items-start gap-3 text-sm text-foundation-navy">
-                <input type="checkbox" checked={declarationChecked} onChange={(event) => setDeclarationChecked(event.target.checked)} className="mt-1 h-4 w-4 accent-safety-amber" />
+                <input type="checkbox" checked={declarationChecked} onChange={(event) => setDeclarationChecked(event.target.checked)} className="mt-1 h-4 w-4 accent-trade-blue" />
                 I have read and accept this declaration.
               </label>
               <div className="mt-5 flex justify-end gap-3">
                 <Button variant="secondary" onClick={() => { setShowDeclaration(false); setDeclarationChecked(false); }}>Cancel</Button>
-                <Button disabled={!declarationChecked} loading={busy} onClick={() => { setShowDeclaration(false); onAccept(quote.id, true); }}>Accept &amp; proceed</Button>
+                <Button disabled={!declarationChecked} loading={busy} onClick={() => { setShowDeclaration(false); accept(true); }}>Accept &amp; proceed</Button>
               </div>
             </Card>
           </div>
@@ -452,9 +476,12 @@ function DecisionActions({
   }
   if (quote.status === 'ACCEPTED' && isPendingPayment) {
     if (pendingCheckoutUrl) {
-      return <a href={pendingCheckoutUrl} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-safety-amber px-5 text-sm font-semibold text-foundation-navy shadow-soft hover:bg-sky-blue">Continue payment</a>;
+      return <a href={pendingCheckoutUrl} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-trade-blue px-5 text-sm font-semibold text-site-white shadow-soft hover:bg-foundation-navy">Continue payment</a>;
     }
-    return <Button onClick={onSimulateReleasePayment} loading={busy}>Pay release fee (dev)</Button>;
+    if (allowTestPayments) {
+      return <Button onClick={onSimulateReleasePayment} loading={busy}>Complete test payment</Button>;
+    }
+    return <p className="text-sm font-semibold text-concrete-grey">Waiting for payment confirmation.</p>;
   }
   if (quote.status === 'ACCEPTED' && !contact) {
     return <Button variant="secondary" onClick={() => onLoadContact(quote.id)}>View released contact</Button>;

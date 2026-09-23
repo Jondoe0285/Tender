@@ -12,7 +12,7 @@ export function Stepper({ steps, currentStep, furthestStep = currentStep, onStep
         </p>
         <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
           <div
-            className="h-full rounded-full bg-safety-amber transition-all"
+            className="h-full rounded-full bg-trade-blue transition-all"
             style={{ width: `${(currentStep / steps.length) * 100}%` }}
           />
         </div>
@@ -29,7 +29,7 @@ export function Stepper({ steps, currentStep, furthestStep = currentStep, onStep
                 state === 'complete'
                   ? 'bg-approved text-white'
                   : state === 'current'
-                    ? 'bg-safety-amber text-foundation-navy'
+                    ? 'bg-trade-blue text-site-white'
                     : 'bg-slate-200 text-concrete-grey'
               }`}
             >
@@ -41,7 +41,7 @@ export function Stepper({ steps, currentStep, furthestStep = currentStep, onStep
           </>;
           return (
             <li key={step.id} className="flex flex-1 flex-col items-center gap-2 text-center">
-              {clickable ? <button type="button" onClick={() => onStepClick?.(step.id)} className="flex flex-col items-center gap-2 rounded-md focus:outline-none focus:ring-2 focus:ring-safety-amber">{content}</button> : content}
+              {clickable ? <button type="button" onClick={() => onStepClick?.(step.id)} className="flex flex-col items-center gap-2 rounded-md focus:outline-none focus:ring-2 focus:ring-trade-blue">{content}</button> : content}
             </li>
           );
         })}

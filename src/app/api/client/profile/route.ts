@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { passwordSchema } from '@/lib/schemas/password';
+import { additionalUserSchema, createProfileUpdateSchemaForCatalog } from '@/lib/schemas/profile';
 import { prisma } from '@/server/data/prisma';
 import { hashPassword, verifyPassword } from '@/server/auth/password';
 import { requireRole } from '@/server/auth/session';
@@ -8,51 +9,18 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { isPrimaryClientUser } from '@/lib/client-company';
 import { toErrorResponse } from '@/server/http/errors';
-import { SERVICE_CATALOG, SERVICE_NAMES } from '@/lib/categories';
 import { UK_COUNTIES, UK_REGIONS } from '@/lib/geography';
 import { matchRetailerToOpenTenders } from '@/server/domain/tenderService';
 import { parseServiceProvisions, serialiseServiceProvisions } from '@/lib/service-provisions';
 import { markUploadedDocumentsVerified } from '@/server/domain/verificationDocumentService';
 import { INDEPENDENT_REVIEW_RESET_DATA } from '@/server/domain/independentReviewService';
 import { Prisma } from '@prisma/client';
-
-const COMPANY_OPERATING_LOCATIONS = ['United Kingdom', ...UK_COUNTIES, ...UK_REGIONS] as const;
-
-const personalProfileSchema = z.object({
-  firstName: z.string().trim().min(1).max(80),
-  lastName: z.string().trim().min(1).max(80),
-  email: z.string().trim().toLowerCase().email().max(200),
-  phoneNumber: z.string().trim().max(40).optional(),
-});
-
-const profileUpdateSchema = personalProfileSchema.extend({
-  companyName: z.string().trim().min(2).max(160).optional(),
-  branchIdentifier: z.string().trim().min(2).max(120).optional(),
-  companyType: z.enum(['SOLE_TRADER', 'LIMITED_COMPANY', 'PARTNERSHIP', 'LIMITED_LIABILITY_PARTNERSHIP', 'PUBLIC_LIMITED_COMPANY', 'OTHER']).optional(),
-  services: z.array(z.enum(SERVICE_NAMES)).max(SERVICE_NAMES.length).optional(),
-  serviceProvisions: z.array(z.string().trim().min(1).max(160)).max(100).optional(),
-  operatingLocations: z.array(z.enum(COMPANY_OPERATING_LOCATIONS)).max(COMPANY_OPERATING_LOCATIONS.length).optional(),
-}).superRefine((value, context) => {
-  if (value.serviceProvisions === undefined) return;
-  const selectedServices = value.services !== undefined ? new Set(value.services) : null;
-  value.serviceProvisions.forEach((entry, index) => {
-    const [service, ...provisionParts] = entry.split('::');
-    const provision = provisionParts.join('::');
-    const categories = SERVICE_CATALOG[service as keyof typeof SERVICE_CATALOG];
-    const invalidService = selectedServices !== null && !selectedServices.has(service as typeof SERVICE_NAMES[number]);
-    if (!service || !provision || invalidService || !categories || !(provision in categories)) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ['serviceProvisions', index], message: 'Select valid provisions for the services offered by your company' });
-    }
-  });
-});
+import { getCategoryCatalog } from '@/server/domain/categoryService';
+import { ADDITIONAL_BUYER_DUTIES, serialiseBuyerDuties } from '@/lib/workspace-duties';
 
 const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1).max(200),
   newPassword: passwordSchema,
-});
-
-const additionalUserSchema = personalProfileSchema.extend({
-  password: passwordSchema,
 });
 
 async function getClientCompanyMembership(userId: string) {
@@ -65,6 +33,7 @@ async function getClientCompanyMembership(userId: string) {
 export async function GET() {
   try {
     const user = await requireRole('USER');
+    const catalog = await getCategoryCatalog();
     const [account, membership, retailerProfile, warnings] = await Promise.all([
       prisma.user.findUniqueOrThrow({
         where: { id: user.id },
@@ -88,7 +57,7 @@ export async function GET() {
       companyType: membership?.company.companyType ?? 'LIMITED_COMPANY',
       branchIdentifier: membership?.company.branchIdentifier ?? null,
       services: membership?.company.services ? membership.company.services.split(',').filter(Boolean) : [],
-      serviceProvisions: parseServiceProvisions(membership?.company.serviceProvisions, membership?.company.services.split(',').filter(Boolean) ?? []),
+      serviceProvisions: parseServiceProvisions(membership?.company.serviceProvisions, membership?.company.services.split(',').filter(Boolean) ?? [], catalog),
       operatingLocations: membership?.company.operatingLocations ? membership.company.operatingLocations.split(',').filter(Boolean) : [],
       tradeTenderId: membership?.company.tradeTenderId ?? null,
       isPrimaryUser: membership ? isPrimaryClientUser(membership.company.primaryUserId, user.id) : false,
@@ -96,7 +65,7 @@ export async function GET() {
       additionalUsers: membership && isPrimaryClientUser(membership.company.primaryUserId, user.id)
         ? await prisma.clientCompanyMember.findMany({
             where: { companyId: membership.companyId, NOT: { userId: user.id } },
-            select: { id: true, user: { select: { firstName: true, lastName: true, contactName: true, email: true } } },
+            select: { id: true, duties: true, user: { select: { firstName: true, lastName: true, contactName: true, email: true } } },
             orderBy: { createdAt: 'asc' },
           })
         : [],
@@ -112,7 +81,7 @@ export async function PUT(request: Request) {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
     const user = await requireRole('USER');
-    const parsed = profileUpdateSchema.safeParse(await request.json().catch(() => null));
+    const parsed = createProfileUpdateSchemaForCatalog(await getCategoryCatalog()).safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid profile details', issues: parsed.error.flatten() }, { status: 400 });
     }
@@ -120,7 +89,7 @@ export async function PUT(request: Request) {
     const membership = await getClientCompanyMembership(user.id);
     if (!membership) return NextResponse.json({ error: 'Client company membership is required' }, { status: 409 });
     const isPrimaryUser = isPrimaryClientUser(membership.company.primaryUserId, user.id);
-    const companyProfileChanged = parsed.data.services !== undefined || parsed.data.operatingLocations !== undefined;
+    const companyProfileChanged = parsed.data.services !== undefined || parsed.data.operatingLocations !== undefined || parsed.data.serviceProvisions !== undefined;
     if ((parsed.data.companyName !== undefined || parsed.data.branchIdentifier !== undefined || parsed.data.companyType !== undefined || parsed.data.services !== undefined || parsed.data.serviceProvisions !== undefined || parsed.data.operatingLocations !== undefined) && !isPrimaryUser) {
       return NextResponse.json({ error: 'Only the primary user can update company details' }, { status: 403 });
     }
@@ -241,7 +210,7 @@ export async function POST(request: Request) {
         contactPhone: parsed.data.phoneNumber || null,
         termsAcceptedAt: new Date(),
         roleMemberships: { create: { role: 'USER' } },
-        clientCompanyMembership: { create: { companyId: membership.companyId } },
+        clientCompanyMembership: { create: { companyId: membership.companyId, duties: serialiseBuyerDuties(parsed.data.duties ?? ADDITIONAL_BUYER_DUTIES.split(',')) } },
         ...(opportunityProfile ? { retailerProfile: { create: opportunityProfile } } : {}),
       },
       select: { id: true, email: true, firstName: true, lastName: true, contactName: true },

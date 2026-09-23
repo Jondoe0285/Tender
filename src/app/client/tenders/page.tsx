@@ -19,11 +19,11 @@ export default async function MyTendersPage() {
   });
 
   return (
-    <AppShell role="client" title="My Tenders">
+    <AppShell role="client" title="My tenders">
       <div className="mx-auto max-w-4xl">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <p className="max-w-xl text-sm text-concrete-grey">Every tender raised for your company, in one place.</p>
-          <LinkButton href="/client/tenders/new">Create Tender</LinkButton>
+          <LinkButton href="/client/tenders/new">Create tender</LinkButton>
         </div>
         {tenders.length === 0 ? (
           <Card className="py-16 text-center">

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { UrlObject } from 'url';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -73,7 +74,7 @@ export function Button({
 }
 
 type LinkButtonProps = {
-  href: string;
+  href: string | UrlObject;
   variant?: Variant;
   size?: Size;
   className?: string;

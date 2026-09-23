@@ -1,21 +1,20 @@
-import Image from 'next/image';
+type LogoVariant = 'light' | 'dark';
 
-const logoSources = {
-  light: { src: '/images/brand/Trade_Tender_Candidate_Horizontal_Logo.png', width: 279, height: 116 },
-  dark: { src: '/images/brand/Trade_Tender_Candidate_Horizontal_Logo.png', width: 279, height: 116 },
-} as const;
-
-export function TradeTenderLogo({ className = '', variant = 'light' }: { className?: string; variant?: keyof typeof logoSources }) {
-  const logo = logoSources[variant];
+/** SVG mark plus wordmark. Dark variant is for navy surfaces — no white badge. */
+export function TradeTenderLogo({ className = '', variant = 'light' }: { className?: string; variant?: LogoVariant }) {
+  const ink = variant === 'dark' ? '#FFFFFF' : '#0D1B2A';
+  const mark = variant === 'dark' ? '#FFFFFF' : '#0D1B2A';
 
   return (
-    <Image
-      src={logo.src}
-      alt="Trade Tender"
-      width={logo.width}
-      height={logo.height}
-      priority
-      className={`h-auto w-full ${className}`}
-    />
+    <span className={`inline-flex items-center gap-2.5 ${className}`}>
+      <svg viewBox="0 0 40 40" width="32" height="32" aria-hidden="true" className="h-8 w-8 flex-shrink-0">
+        <path fill="#F28C28" d="M3.5 5h21.5l-2.8 7H6.3z" />
+        <path fill={mark} d="M14 11h6.2v24H14z" />
+        <path fill={mark} d="M14 11h18l-3.4 7H14z" />
+      </svg>
+      <span className="font-heading text-lg font-bold tracking-tight sm:text-xl" style={{ color: ink }}>
+        Trade Tender
+      </span>
+    </span>
   );
 }

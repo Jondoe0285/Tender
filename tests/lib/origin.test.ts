@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 import { isSameOriginRequest } from '../../src/server/http/origin';
 import { workspaceForRole } from '../../src/lib/navigation';
@@ -105,4 +107,10 @@ test('maps only approved roles to workspaces', () => {
   assert.equal(workspaceForRole('USER'), '/user');
   assert.equal(workspaceForRole('SUPER_USER'), '/super-user');
   assert.equal(workspaceForRole('UNKNOWN'), null);
+});
+
+test('content security policy no longer trusts Clerk hosts', () => {
+  const config = readFileSync(path.join(process.cwd(), 'next.config.mjs'), 'utf8');
+  assert.match(config, /Content-Security-Policy/);
+  assert.doesNotMatch(config, /clerk/i);
 });

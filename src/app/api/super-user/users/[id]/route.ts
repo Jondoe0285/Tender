@@ -9,6 +9,7 @@ import { appUrl, passwordResetTemplate } from '@/server/notifications/emailTempl
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { markUploadedDocumentsVerified } from '@/server/domain/verificationDocumentService';
 import { independentReviewTierRank } from '@/lib/independentReviewTiers';
+import { defaultLaunchCreditExpiry } from '@/lib/launch-credits';
 
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -130,6 +131,9 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   }
 
   if (action === 'set-launch-credits') {
+    if (!admin.isOwner) {
+      return NextResponse.json({ error: 'Owner access is required to attest launch credits' }, { status: 403 });
+    }
     if (user.role !== 'USER') {
       return NextResponse.json({ error: 'Launch credits only apply to Retailer accounts' }, { status: 400 });
     }
@@ -137,21 +141,38 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     if (!Number.isInteger(launchCreditsLeft) || launchCreditsLeft < 0) {
       return NextResponse.json({ error: 'launchCreditsLeft must be a non-negative integer' }, { status: 400 });
     }
+    const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+    if (reason.length < 8) {
+      return NextResponse.json({ error: 'A reason of at least 8 characters is required to attest launch credits' }, { status: 400 });
+    }
+    const expiresAtRaw = typeof body?.expiresAt === 'string' ? body.expiresAt : '';
+    const expiresAt = expiresAtRaw ? new Date(expiresAtRaw) : defaultLaunchCreditExpiry();
+    if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
+      return NextResponse.json({ error: 'Launch credits need a future expiry date' }, { status: 400 });
+    }
+    const maxExpiry = defaultLaunchCreditExpiry();
+    maxExpiry.setUTCDate(maxExpiry.getUTCDate() + 275);
+    if (expiresAt.getTime() > maxExpiry.getTime()) {
+      return NextResponse.json({ error: 'Launch credit expiry cannot exceed one year' }, { status: 400 });
+    }
 
     const profile = await prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { launchCreditsLeft: true } });
     if (!profile) {
       return NextResponse.json({ error: 'Retailer profile not found' }, { status: 404 });
     }
 
-    await prisma.retailerProfile.update({ where: { userId: user.id }, data: { launchCreditsLeft } });
+    await prisma.retailerProfile.update({
+      where: { userId: user.id },
+      data: { launchCreditsLeft, launchCreditsExpireAt: expiresAt, launchCreditsReason: reason.slice(0, 240) },
+    });
     await recordAuditEvent({
       actorId: admin.id,
       action: 'RETAILER_LAUNCH_CREDITS_UPDATED',
       targetType: 'User',
       targetId: user.id,
-      metadata: { email: user.email, previous: profile.launchCreditsLeft, next: launchCreditsLeft },
+      metadata: { email: user.email, previous: profile.launchCreditsLeft, next: launchCreditsLeft, reason, expiresAt: expiresAt.toISOString() },
     });
-    return NextResponse.json({ status: 'launch-credits-updated', launchCreditsLeft });
+    return NextResponse.json({ status: 'launch-credits-updated', launchCreditsLeft, launchCreditsExpireAt: expiresAt, launchCreditsReason: reason });
   }
 
   if (action === 'approve-verification' || action === 'reject-verification') {

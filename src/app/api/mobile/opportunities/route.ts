@@ -4,6 +4,7 @@ import { toErrorResponse } from '@/server/http/errors';
 import { listMatchedSummariesForRetailer } from '@/server/domain/tenderService';
 import { prisma } from '@/server/data/prisma';
 import { getTenderUnlockFeeGbp } from '@/server/domain/platformSettings';
+import { effectiveLaunchCredits } from '@/lib/launch-credits';
 
 export async function GET() {
   try {
@@ -11,7 +12,7 @@ export async function GET() {
     const [matches, unlocks, profile] = await Promise.all([
       listMatchedSummariesForRetailer(user.id),
       prisma.unlock.findMany({ where: { retailerId: user.id }, select: { tenderId: true } }),
-      prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { launchCreditsLeft: true } }),
+      prisma.retailerProfile.findUnique({ where: { userId: user.id }, select: { launchCreditsLeft: true, launchCreditsExpireAt: true } }),
     ]);
     const unlockedTenderIds = new Set(unlocks.map((unlock) => unlock.tenderId));
     const opportunities = await Promise.all(matches
@@ -25,7 +26,7 @@ export async function GET() {
         closingDate: tender.closingDate,
         requirements: tender.requirements,
         isNew: !viewedAt,
-        unlockFeeGbp: (profile?.launchCreditsLeft ?? 0) > 0 ? 0 : await getTenderUnlockFeeGbp(tender.id),
+        unlockFeeGbp: effectiveLaunchCredits(profile?.launchCreditsLeft ?? 0, profile?.launchCreditsExpireAt) > 0 ? 0 : await getTenderUnlockFeeGbp(tender.id),
       })));
     return NextResponse.json({
       opportunities,

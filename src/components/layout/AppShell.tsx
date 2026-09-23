@@ -18,14 +18,14 @@ const navByRole: Record<Role, NavGroup[]> = {
 };
 
 const roleLabels: Record<Role, string> = {
-  client: 'User space',
-  retailer: 'User space',
-  'super-user': 'Super User space',
+  client: 'Workspace',
+  retailer: 'Workspace',
+  'super-user': 'Platform ops',
 };
 
 const workspaceOptions: Record<string, { label: string; path: string }> = {
-  USER: { label: 'User workspace', path: '/user' },
-  SUPER_USER: { label: 'Super User workspace', path: '/super-user' },
+  USER: { label: 'Workspace', path: '/user' },
+  SUPER_USER: { label: 'Platform ops', path: '/super-user' },
 };
 
 /** Finds the most specific nav item for the current path, so parent and child routes don't both light up. */
@@ -59,13 +59,13 @@ function SidebarNav({ groups, activeHref, unreadOpportunityCount, onNavigate }: 
                 aria-current={active ? 'page' : undefined}
                 className={`flex items-center justify-between gap-3 rounded-md px-3 py-2.5 text-sm font-semibold transition-colors ${
                   active
-                    ? 'bg-safety-amber text-foundation-navy'
+                    ? 'bg-white/15 text-site-white'
                     : 'text-site-white/80 hover:bg-white/10 hover:text-site-white'
                 }`}
               >
                 <span>{item.label}</span>
                 {showUnreadBadge && (
-                  <span className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-xs font-bold ${active ? 'bg-foundation-navy text-site-white' : 'bg-safety-amber text-foundation-navy'}`} aria-label={`${unreadOpportunityCount} unread tender opportunities`}>
+                  <span className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-xs font-bold ${active ? 'bg-trade-blue text-site-white' : 'bg-white/15 text-site-white'}`} aria-label={`${unreadOpportunityCount} unread tender opportunities`}>
                     {unreadOpportunityCount > 99 ? '99+' : unreadOpportunityCount}
                   </span>
                 )}
@@ -164,8 +164,8 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
     <div className="flex min-h-screen bg-site-white">
       {/* Desktop sidebar */}
       <aside className="hidden w-64 flex-shrink-0 bg-foundation-navy md:flex md:flex-col">
-        <Link href="/" className="mx-4 mt-4 block bg-site-white p-2" aria-label="Trade Tender home">
-          <TradeTenderLogo />
+        <Link href="/" className="mx-4 mt-5 block px-1" aria-label="Trade Tender home">
+          <TradeTenderLogo variant="dark" />
         </Link>
         <SidebarNav groups={groups} activeHref={activeHref} unreadOpportunityCount={unreadOpportunityCount} />
       </aside>
@@ -189,8 +189,8 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
             className="relative flex h-full w-72 flex-col bg-foundation-navy shadow-soft-lg"
           >
             <div className="flex items-center justify-between px-6 py-5">
-              <Link href="/" className="block w-52 bg-site-white p-2" aria-label="Trade Tender home">
-                <TradeTenderLogo />
+              <Link href="/" className="block" aria-label="Trade Tender home">
+                <TradeTenderLogo variant="dark" />
               </Link>
               <button
                 type="button"
@@ -232,7 +232,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
                 <select
                   value={role === 'super-user' ? 'SUPER_USER' : 'USER'}
                   onChange={switchWorkspace}
-                  className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-foundation-navy shadow-soft focus:border-safety-amber focus:outline-none focus:ring-2 focus:ring-safety-amber/30"
+                  className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-foundation-navy focus:border-trade-blue focus:outline-none focus:ring-2 focus:ring-trade-blue/30"
                 >
                   {availableWorkspaces.map((workspaceRole) => (
                     <option key={workspaceRole} value={workspaceRole}>
@@ -245,7 +245,7 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
             <AccountControls />
           </div>
         </header>
-        <main className="flex-1 px-6 py-8 sm:px-8">{children}</main>
+        <main id="main-content" className="flex-1 px-6 py-8 sm:px-8">{children}</main>
         <SiteFooter />
       </div>
     </div>

@@ -316,7 +316,7 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
   return (
     <div className="flex min-h-screen flex-col bg-site-white">
       <SiteHeader />
-      <main className="flex-1 px-6 py-14 sm:px-10">
+      <main id="main-content" className="flex-1 px-6 py-14 sm:px-10">
         <section className="mx-auto max-w-4xl">
           <Link href="/policies" className="inline-flex items-center text-sm font-semibold text-steel-blue underline underline-offset-4 hover:text-foundation-navy">
             ← Back to policy index

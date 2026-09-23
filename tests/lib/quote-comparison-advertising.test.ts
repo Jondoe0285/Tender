@@ -7,6 +7,7 @@ test('quote comparison excludes sponsored content from the decision surface', ()
 
   assert.doesNotMatch(source, /sponsoredQuotes/);
   assert.doesNotMatch(source, /Sponsored Retailer placement/);
+  assert.doesNotMatch(source, /sponsoredPlacementActive/);
 });
 
 test('quote sorting and filter toggles expose accessible state for assistive technology', () => {

@@ -371,6 +371,22 @@ export function getRegionForPostcode(location: string): string | null {
 
 export type RetailerCoverageScope = 'COUNTY' | 'REGION' | 'UK';
 
+/** Canonical company coverage string written at register and read at match time. */
+export function operatingLocationsFromCoverage(input: {
+  coverageScope?: RetailerCoverageScope;
+  counties?: readonly string[];
+  regions?: readonly string[];
+}): string {
+  if (input.coverageScope === 'UK') return 'United Kingdom';
+  if (input.coverageScope === 'REGION') {
+    return (input.regions ?? []).map((value) => value.trim()).filter(Boolean).join(',');
+  }
+  if (input.coverageScope === 'COUNTY') {
+    return (input.counties ?? []).map((value) => value.trim()).filter(Boolean).join(',');
+  }
+  return '';
+}
+
 /**
  * Determines whether a tender location falls inside a Retailer's selected operating area.
  * COUNTY and REGION scopes match only against the Retailer's selected counties or regions;

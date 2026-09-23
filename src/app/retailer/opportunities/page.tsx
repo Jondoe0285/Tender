@@ -7,6 +7,7 @@ import { estimateDistanceMiles } from '@/lib/geography';
 import { getTenderUnlockFeeGbp } from '@/server/domain/platformSettings';
 import { OpportunitiesExplorer } from '@/components/retailer/OpportunitiesExplorer';
 import type { OpportunityCardData } from '@/components/retailer/TenderOpportunityCard';
+import { effectiveLaunchCredits } from '@/lib/launch-credits';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,11 +27,12 @@ export default async function NewOpportunitiesPage() {
         counties: true,
         regions: true,
         launchCreditsLeft: true,
+        launchCreditsExpireAt: true,
       },
     }),
   ]);
   const unlockedIds = new Set(unlocks.map((u) => u.tenderId));
-  const hasCredits = (profile?.launchCreditsLeft ?? 0) > 0;
+  const hasCredits = effectiveLaunchCredits(profile?.launchCreditsLeft ?? 0, profile?.launchCreditsExpireAt) > 0;
   const coverageAreas = profile?.coverageAreas ?? '';
 
   const opportunities: OpportunityCardData[] = (await Promise.all(matches
@@ -66,7 +68,7 @@ export default async function NewOpportunitiesPage() {
     });
 
   return (
-    <AppShell role="retailer" title="New Opportunities">
+    <AppShell role="retailer" title="Opportunities">
       <div className="mx-auto max-w-4xl">
         <p className="mb-6 max-w-xl text-sm text-concrete-grey">
           Tenders matched to your categories and coverage areas that remain available to unlock.

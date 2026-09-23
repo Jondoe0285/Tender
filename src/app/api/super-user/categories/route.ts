@@ -4,7 +4,7 @@ import { prisma } from '@/server/data/prisma';
 import { requireFullSuperUser } from '@/server/auth/session';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { recordAuditEvent } from '@/server/audit/auditLog';
-import { CATEGORIES } from '@/lib/categories';
+import { listEditableCategoryDefinitions } from '@/server/domain/categoryService';
 
 const categorySchema = z.object({
   service: z.string().trim().min(1).max(80),
@@ -16,13 +16,7 @@ const categorySchema = z.object({
 export async function GET() {
   try {
     await requireFullSuperUser();
-    const saved = await prisma.categoryDefinition.findMany({ orderBy: [{ service: 'asc' }, { name: 'asc' }] });
-    const savedByKey = new Map(saved.map((category) => [`${category.service}:${category.name}`, category]));
-    const categories = Object.entries(CATEGORIES).flatMap(([service, categoryMap]) => Object.entries(categoryMap).map(([name, items]) => {
-      const override = savedByKey.get(`${service}:${name}`);
-      return { id: override?.id ?? null, service, name, items: override ? JSON.parse(override.itemsJson) as string[] : items, active: override?.active ?? true };
-    }));
-    return NextResponse.json({ categories });
+    return NextResponse.json(await listEditableCategoryDefinitions());
   } catch {
     return NextResponse.json({ error: 'Super User access required' }, { status: 403 });
   }

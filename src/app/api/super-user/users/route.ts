@@ -10,6 +10,7 @@ import { registerSchema } from '@/lib/schemas/register';
 import { createPasswordResetToken, PASSWORD_RESET_EXPIRY_LABEL } from '@/server/auth/passwordReset';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { accountCreatedByAdminTemplate, appUrl } from '@/server/notifications/emailTemplates';
+import { defaultLaunchCreditExpiry } from '@/lib/launch-credits';
 
 /**
  * Invites the account holder to set their own password. Delivery failure must not roll back
@@ -127,6 +128,8 @@ export async function POST(request: Request) {
             categories: (input.categories ?? []).join(','),
             coverageAreas: '',
             launchCreditsLeft: defaultLaunchCredits,
+            launchCreditsExpireAt: defaultLaunchCredits > 0 ? defaultLaunchCreditExpiry() : null,
+            launchCreditsReason: defaultLaunchCredits > 0 ? 'Owner-created account default' : null,
           },
         },
       },

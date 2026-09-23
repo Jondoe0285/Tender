@@ -5,9 +5,9 @@ import { Card } from '@/components/ui/Card';
 import { getCurrentUser } from '@/server/auth/session';
 import { listMatchedSummariesForRetailer } from '@/server/domain/tenderService';
 import { prisma } from '@/server/data/prisma';
-import { estimateDistanceMiles } from '@/lib/geography';
 import { getPaymentFeeGbp } from '@/server/domain/platformSettings';
-import { TenderOpportunityCard, type OpportunityCardData } from '@/components/retailer/TenderOpportunityCard';
+import { WorkQueue, type WorkQueueItem } from '@/components/work/WorkQueue';
+import { effectiveLaunchCredits } from '@/lib/launch-credits';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,78 +16,81 @@ export default async function RetailerPage() {
   if (!user || user.role !== 'USER') redirect('/login');
 
   const matches = await listMatchedSummariesForRetailer(user.id);
-  const [unlockCount, quoteCount, profile, unlockFeeGbp] = await Promise.all([
-    prisma.unlock.count({ where: { retailerId: user.id } }),
-    prisma.quote.count({ where: { retailerId: user.id } }),
+  const [unlocks, quotes, profile, unlockFeeGbp] = await Promise.all([
+    prisma.unlock.findMany({ where: { retailerId: user.id }, select: { tenderId: true } }),
+    prisma.quote.findMany({
+      where: { retailerId: user.id },
+      select: { tenderId: true, status: true, tender: { select: { reference: true, subcategory: true, closingDate: true } } },
+      orderBy: { submittedAt: 'desc' },
+    }),
     prisma.retailerProfile.findUnique({
       where: { userId: user.id },
-      select: {
-        categories: true,
-        launchCreditsLeft: true,
-        coverageAreas: true,
-        coverageScope: true,
-        counties: true,
-        regions: true,
-      },
+      select: { launchCreditsLeft: true, launchCreditsExpireAt: true },
     }),
     getPaymentFeeGbp('RETAILER_UNLOCK'),
   ]);
-  const unlockedIds = new Set(
-    (await prisma.unlock.findMany({ where: { retailerId: user.id }, select: { tenderId: true } })).map((u) => u.tenderId)
-  );
+  const unlockedIds = new Set(unlocks.map((unlock) => unlock.tenderId));
+  const quotedIds = new Set(quotes.map((quote) => quote.tenderId));
   const newOpportunities = matches.filter(({ tender }) => !unlockedIds.has(tender.id));
-  const hasCredits = (profile?.launchCreditsLeft ?? 0) > 0;
-  const coverageAreas = profile?.coverageAreas ?? '';
+
+  const queue: WorkQueueItem[] = [
+    ...matches
+      .filter(({ tender, viewedAt }) => !unlockedIds.has(tender.id) && !viewedAt)
+      .map(({ tender }) => ({
+        href: `/retailer/tenders/${tender.id}`,
+        reference: tender.reference,
+        title: tender.category,
+        due: tender.closingDate.toLocaleDateString('en-GB'),
+        action: 'Review new match',
+        status: 'attention' as const,
+      })),
+    ...matches
+      .filter(({ tender }) => unlockedIds.has(tender.id) && !quotedIds.has(tender.id))
+      .map(({ tender }) => ({
+        href: `/retailer/tenders/${tender.id}`,
+        reference: tender.reference,
+        title: tender.category,
+        due: tender.closingDate.toLocaleDateString('en-GB'),
+        action: 'Submit quote',
+        status: 'pending' as const,
+      })),
+    ...quotes
+      .filter((quote) => quote.status === 'SUBMITTED')
+      .slice(0, 5)
+      .map((quote) => ({
+        href: `/retailer/tenders/${quote.tenderId}`,
+        reference: quote.tender.reference,
+        title: quote.tender.subcategory,
+        due: quote.tender.closingDate.toLocaleDateString('en-GB'),
+        action: 'Awaiting award',
+        status: 'neutral' as const,
+      })),
+  ].slice(0, 8);
 
   const metrics = [
     { label: 'New opportunities', value: newOpportunities.length },
-    { label: 'Unlocked tenders', value: unlockCount },
-    { label: 'Submitted quotes', value: quoteCount },
-    { label: 'Launch credits left', value: profile?.launchCreditsLeft ?? 0 },
+    { label: 'Unlocked tenders', value: unlocks.length },
+    { label: 'Submitted quotes', value: quotes.length },
+    { label: 'Launch credits left', value: effectiveLaunchCredits(profile?.launchCreditsLeft ?? 0, profile?.launchCreditsExpireAt) },
   ];
-
-  const latest: OpportunityCardData[] = matches
-    .map(({ tender, viewedAt }) => {
-      const unlocked = unlockedIds.has(tender.id);
-      const categoryMatch = tender.categoryMatch;
-      const locationMatch = tender.locationMatch;
-      const strongMatch = categoryMatch && locationMatch;
-
-      return {
-        tenderId: tender.id,
-        reference: tender.reference,
-        category: tender.category,
-        urgency: tender.urgency,
-        location: tender.location,
-        distanceMiles: estimateDistanceMiles(coverageAreas, tender.location),
-        requirements: tender.requirements,
-        closingDate: tender.closingDate,
-        unlockFeeLabel: unlocked ? 'Unlocked' : hasCredits ? 'Free (launch credit)' : `£${unlockFeeGbp} excl. VAT`,
-        unlocked,
-        isNew: !viewedAt,
-        strongMatch,
-        categoryMatch,
-        locationMatch,
-      };
-    })
-    .sort((a, b) => {
-      if (a.strongMatch !== b.strongMatch) return Number(b.strongMatch) - Number(a.strongMatch);
-      if ((a.categoryMatch ?? false) !== (b.categoryMatch ?? false)) return Number(b.categoryMatch) - Number(a.categoryMatch);
-      if (a.isNew !== b.isNew) return Number(b.isNew) - Number(a.isNew);
-      return new Date(a.closingDate).getTime() - new Date(b.closingDate).getTime();
-    })
-    .slice(0, 5);
 
   return (
     <AppShell role="retailer" title="Dashboard">
       <div className="mx-auto max-w-4xl">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <p className="max-w-xl text-base leading-relaxed text-concrete-grey">
-            Matched tenders for materials, waste services, and plant hire. Keep your categories and
-            coverage areas current to improve every match.
+            Quote the briefs you have unlocked this week. Contact stays closed until the buyer accepts.
           </p>
-          <LinkButton href="/retailer/opportunities" size="lg">New Opportunities</LinkButton>
+          <LinkButton href="/retailer/opportunities" size="lg">Opportunities</LinkButton>
         </div>
+
+        <WorkQueue
+          title="This week"
+          items={queue}
+          emptyLabel="No matched work waiting. Keep provisions and coverage current so specified demand can reach you."
+          emptyHref="/user/profile"
+          emptyAction="Update supplying profile"
+        />
 
         <div className="mb-10 grid gap-5 sm:grid-cols-4">
           {metrics.map((metric) => (
@@ -97,25 +100,8 @@ export default async function RetailerPage() {
             </Card>
           ))}
         </div>
-
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-          <h2 className="font-heading text-xl font-bold text-foundation-navy">Latest matched tenders</h2>
-          <a href="/retailer/opportunities" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">
-            View all opportunities &rarr;
-          </a>
-        </div>
-        {latest.length === 0 ? (
-          <Card className="py-16 text-center">
-            <p className="text-sm text-concrete-grey">
-              No matched tenders are available. Keep your categories and coverage areas up to date to improve matching.
-            </p>
-          </Card>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {latest.map((item) => (
-              <TenderOpportunityCard key={item.tenderId} data={item} href={`/retailer/tenders/${item.tenderId}`} />
-            ))}
-          </div>
+        {unlockFeeGbp > 0 && (
+          <p className="text-xs text-concrete-grey">Unlock fee is £{unlockFeeGbp} excl. VAT unless a launch credit applies.</p>
         )}
       </div>
     </AppShell>
