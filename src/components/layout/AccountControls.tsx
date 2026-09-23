@@ -9,28 +9,22 @@ export function AccountControls() {
   const router = useRouter();
 
   if (status === 'loading') {
-    return <div className="h-12 w-72" aria-hidden="true" />;
+    return <div className="h-12 w-36" aria-hidden="true" />;
   }
 
   if (!session?.user) {
     return (
-      <div className="flex flex-shrink-0 items-center gap-2">
-        <LinkButton href="/login" size="lg">
-          Sign in
-        </LinkButton>
-        <LinkButton href="/register" variant="secondary" size="lg">
-          Create account
-        </LinkButton>
-      </div>
+      <LinkButton href="/register" variant="secondary" size="lg">
+        Create account
+      </LinkButton>
     );
   }
 
   return (
     <Button
       type="button"
-      variant="ghost"
-      size="md"
-      className="h-9 px-4 text-sm"
+      variant="secondary"
+      size="lg"
       onClick={() => {
         signOut({ callbackUrl: '/' }).catch(() => {
           router.replace('/');

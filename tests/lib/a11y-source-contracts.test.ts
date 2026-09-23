@@ -21,3 +21,12 @@ test('repeatable browser/axe coverage is still required on a real device for fir
   const tracker = readFileSync('docs/Action-Tracker.md', 'utf8');
   assert.match(tracker, /real-device/);
 });
+
+test('the public header always pairs Sign in with Create account', () => {
+  const header = readFileSync('src/components/layout/SiteHeader.tsx', 'utf8');
+  assert.match(header, /href="\/login"/);
+  assert.match(header, />\s*Sign in\s*</);
+  assert.match(header, /href="\/register"/);
+  assert.match(header, />\s*Create account\s*</);
+  assert.doesNotMatch(header, /session/);
+});

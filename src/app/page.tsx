@@ -15,21 +15,26 @@ export default function HomePage() {
     <div className="flex min-h-screen flex-col bg-light-grey">
       <SiteHeader />
       <main id="main-content" className="flex-1">
-        <section className="border-b border-slate-200 bg-white">
-          <div className="mx-auto max-w-6xl px-6 py-14 sm:px-10 lg:py-16">
+        <section className="flex min-h-[calc(100svh-4.75rem)] items-center border-b border-slate-200 bg-white">
+          <div className="mx-auto w-full max-w-3xl px-6 py-16 text-center sm:px-10">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-steel-blue">UK construction procurement</p>
-            <h1 className="mt-3 max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-foundation-navy sm:text-4xl">
+            <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-tight text-foundation-navy sm:text-4xl">
               Specify the job. Compare formal quotes. Award on the record.
             </h1>
-            <p className="mt-4 max-w-xl text-base leading-7 text-concrete-grey">
+            <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-concrete-grey">
               A workspace for buyers and suppliers. Raise a structured tender. Quote against a frozen specification. Contact stays private until you award.
             </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
               <LinkButton href="/login" size="lg">Sign in</LinkButton>
               <LinkButton href="/register" variant="secondary" size="lg">Create an account</LinkButton>
-              <LinkButton href="/demo" variant="secondary">Request a demo</LinkButton>
+              <LinkButton href="/demo" variant="secondary" size="lg">Request a demo</LinkButton>
             </div>
-            <dl className="mt-10 grid gap-x-8 gap-y-5 border-t border-slate-200 pt-8 sm:grid-cols-2 lg:grid-cols-4">
+          </div>
+        </section>
+
+        <section className="border-b border-slate-200 bg-white">
+          <div className="mx-auto max-w-6xl px-6 py-10 sm:px-10">
+            <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
               {[
                 ['Anonymous until award', 'Identity is withheld until contact release.'],
                 ['Specified packages', 'Item, quantity, unit, and classed documents.'],
