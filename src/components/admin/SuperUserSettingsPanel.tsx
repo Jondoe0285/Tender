@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input, Label, Select, Textarea } from '@/components/ui/Field';
 import { SERVICE_NAMES } from '@/lib/categories';
-import { VERIFICATION_DOCUMENT_TYPES } from '@/lib/verification-documents';
+import { isPreLaunchActive, toDatetimeLocalInput, datetimeLocalToIso, formatLaunchDate } from '@/lib/public-launch';
 
 export type AdminSettings = {
   fees: { retailerUnlockGbp: number; retailerUnlockMode: string; retailerUnlockPercentageLow: number; retailerUnlockPercentageHigh: number; retailerUnlockPercentageTop: number; contractorServiceUnlockGbp: number; professionalServiceUnlockGbp: number; clientReleaseGbp: number; clientReleaseMode: string; clientReleasePercentageLow: number; clientReleasePercentageHigh: number; clientReleasePercentageTop: number; quoteEstimateOffsetPercentage: number; quoteEstimateMasterReductionPercentage: number; vatPercentage: number; sponsoredPlacementActive: boolean; sponsoredPlacementFeeGbp: number; membershipTiersActive: boolean; retailerLaunchCreditsDefault: number; adspaceActive: boolean; independentReviewActive: boolean; independentReviewFeeBronzeGbp: number; independentReviewFeeSilverGbp: number; independentReviewFeeGoldGbp: number; directContactActive: boolean; directContactFeeGbp: number; humanReviewActive: boolean; signInActive: boolean; verificationDocumentRequirements: Array<[string, boolean]> };
+  publicLaunchAt?: string | null;
   supportRecipientEmail?: string | null;
   tiers: Array<{ id: string; name: string; description: string; monthlyPriceGbp: number; freeTenderOpportunitiesPerMonth: number; additionalCreditDiscountPercentage: number; active: boolean }>;
   subscriptions: Array<{ id: string; name: string; description: string; annualPriceGbp: number; active: boolean }>;
@@ -25,6 +26,8 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner, currentUserId
   const [fees, setFees] = useState(settings.fees);
   const [verificationRequirements, setVerificationRequirements] = useState<Record<string, boolean>>(Object.fromEntries(settings.fees.verificationDocumentRequirements));
   const [supportRecipientEmail, setSupportRecipientEmail] = useState(settings.supportRecipientEmail ?? '');
+  const [publicLaunchAt, setPublicLaunchAt] = useState(settings.publicLaunchAt ?? null);
+  const [launchLocal, setLaunchLocal] = useState(settings.publicLaunchAt ? toDatetimeLocalInput(settings.publicLaunchAt) : '');
   const [pendingChanges, setPendingChanges] = useState(initialSettings.pendingControlChanges ?? []);
   const [form, setForm] = useState({ name: '', description: '', monthlyPriceGbp: '', freeTenderOpportunitiesPerMonth: '', additionalCreditDiscountPercentage: '' });
   const [message, setMessage] = useState<string | null>(null);
@@ -67,6 +70,19 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner, currentUserId
       setPendingChanges(next.pendingControlChanges ?? []);
       setMessage(action === 'confirm' ? 'Change confirmed and applied.' : 'Change rejected.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to resolve change'); }
+    setSaving(false);
+  }
+
+  async function savePublicLaunchAt(nextIso: string | null) {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const data = await request('/api/super-user/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'public-launch', publicLaunchAt: nextIso }) });
+      const stored = (data.publicLaunchAt as string | null) ?? null;
+      setPublicLaunchAt(stored);
+      setLaunchLocal(stored ? toDatetimeLocalInput(stored) : '');
+      setMessage(isPreLaunchActive(stored) ? 'Pre-launch page is showing until that date and time.' : 'Live landing page is showing.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to save launch date'); }
     setSaving(false);
   }
 
@@ -143,6 +159,47 @@ export function SuperUserSettingsPanel({ initialSettings, isOwner, currentUserId
     <div className="space-y-8">
       {locked && <p role="status" className="rounded-lg border border-safety-amber/40 bg-safety-amber/10 px-4 py-3 text-sm font-semibold text-foundation-navy">Fees, affiliated partner links, membership tiers, and subscriptions are Owner-controlled. Ask an Owner to make changes here.</p>}
       {message && <p role="status" className="rounded-lg border border-steel-blue/20 bg-steel-blue/5 px-4 py-3 text-sm font-semibold text-steel-blue">{message}</p>}
+      <section>
+        <h2 className="mb-4 font-heading text-lg font-bold text-foundation-navy">Public launch</h2>
+        <Card>
+          <Label htmlFor="public-launch-at">Launch date and time</Label>
+          <p className="mt-1 max-w-3xl text-sm text-concrete-grey">
+            Until this date and time, visitors see the pre-launch page with a countdown and Register now. At that moment the live landing page takes over. Leave this empty, or choose Go live now, to show the live landing immediately. Owner sign-in stays at /login.
+          </p>
+          <p className="mt-2 text-sm font-semibold text-foundation-navy">
+            {isPreLaunchActive(publicLaunchAt) ? `Pre-launch page is showing until ${formatLaunchDate(publicLaunchAt ?? '')}.` : 'Live landing page is showing.'}
+          </p>
+          <div className="mt-4 flex max-w-xl flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <Input
+                id="public-launch-at"
+                type="datetime-local"
+                step="60"
+                value={launchLocal}
+                disabled={locked}
+                onChange={(event) => setLaunchLocal(event.target.value)}
+              />
+            </div>
+            <Button
+              disabled={locked}
+              loading={saving}
+              onClick={() => {
+                const iso = datetimeLocalToIso(launchLocal);
+                if (launchLocal && !iso) {
+                  setMessage('Enter a valid launch date and time.');
+                  return;
+                }
+                void savePublicLaunchAt(iso);
+              }}
+            >
+              Save launch date
+            </Button>
+            <Button variant="secondary" disabled={locked} loading={saving} onClick={() => void savePublicLaunchAt(null)}>
+              Go live now
+            </Button>
+          </div>
+        </Card>
+      </section>
       <section>
         <h2 className="mb-4 font-heading text-lg font-bold text-foundation-navy">Sign in access</h2>
         <Card>

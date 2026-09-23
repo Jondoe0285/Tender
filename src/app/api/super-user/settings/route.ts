@@ -11,7 +11,7 @@ import { ensureDefaultMembershipTiers } from '@/server/domain/membershipService'
 import { toErrorResponse } from '@/server/http/errors';
 
 const settingSchema = z.object({
-  action: z.enum(['fee', 'tier', 'subscription', 'support-recipient', 'verification-document']),
+  action: z.enum(['fee', 'tier', 'subscription', 'support-recipient', 'verification-document', 'public-launch']),
   id: z.string().optional(),
   key: z.enum(['RETAILER_UNLOCK_FEE_GBP', 'RETAILER_UNLOCK_FEE_MODE', 'RETAILER_UNLOCK_PERCENTAGE_LOW', 'RETAILER_UNLOCK_PERCENTAGE_HIGH', 'RETAILER_UNLOCK_PERCENTAGE_TOP', 'CONTRACTOR_SERVICE_UNLOCK_FEE_GBP', 'PROFESSIONAL_SERVICE_UNLOCK_FEE_GBP', 'CLIENT_RELEASE_FEE_GBP', 'CLIENT_RELEASE_FEE_MODE', 'CLIENT_RELEASE_PERCENTAGE_LOW', 'CLIENT_RELEASE_PERCENTAGE_HIGH', 'CLIENT_RELEASE_PERCENTAGE_TOP', 'QUOTE_ESTIMATE_OFFSET_PERCENTAGE', 'QUOTE_ESTIMATE_MASTER_REDUCTION_PERCENTAGE', 'VAT_PERCENTAGE', 'SPONSORED_PLACEMENT_ACTIVE', 'SPONSORED_PLACEMENT_FEE_GBP', 'MEMBERSHIP_TIERS_ACTIVE', 'RETAILER_LAUNCH_CREDITS_DEFAULT', 'ADSPACE_ACTIVE', 'INDEPENDENT_REVIEW_ACTIVE', 'INDEPENDENT_REVIEW_FEE_BRONZE_GBP', 'INDEPENDENT_REVIEW_FEE_SILVER_GBP', 'INDEPENDENT_REVIEW_FEE_GOLD_GBP', 'DIRECT_CONTACT_ACTIVE', 'DIRECT_CONTACT_FEE_GBP', 'HUMAN_REVIEW_ACTIVE', 'SIGN_IN_ACTIVE']).optional(),
   value: z.union([z.number(), z.enum(['FIXED', 'PERCENTAGE']), z.boolean()]).optional(),
@@ -24,6 +24,7 @@ const settingSchema = z.object({
   active: z.boolean().optional(),
   supportRecipientEmail: z.string().trim().toLowerCase().email().max(254).nullable().optional(),
   requirements: z.record(z.string(), z.boolean()).optional(),
+  publicLaunchAt: z.string().nullable().optional(),
 });
 
 export async function GET() {
@@ -64,6 +65,19 @@ export async function PATCH(request: Request) {
     }
     await recordAuditEvent({ actorId: admin.id, action: 'SUPPORT_RECIPIENT_UPDATED', targetType: 'PlatformSetting', targetId: 'SUPPORT_RECIPIENT_EMAIL', metadata: { configured: input.supportRecipientEmail !== null, changed: current?.value !== input.supportRecipientEmail } });
     return NextResponse.json({ status: 'updated' });
+  }
+
+  if (input.action === 'public-launch') {
+    if (input.publicLaunchAt === undefined) return NextResponse.json({ error: 'A launch date is required' }, { status: 400 });
+    let stored = '';
+    if (input.publicLaunchAt !== null && input.publicLaunchAt.trim() !== '') {
+      const parsed = Date.parse(input.publicLaunchAt);
+      if (!Number.isFinite(parsed)) return NextResponse.json({ error: 'Enter a valid launch date and time' }, { status: 400 });
+      stored = new Date(parsed).toISOString();
+    }
+    await prisma.platformSetting.upsert({ where: { key: 'PUBLIC_LAUNCH_AT' }, update: { value: stored }, create: { key: 'PUBLIC_LAUNCH_AT', value: stored } });
+    await recordAuditEvent({ actorId: admin.id, action: 'PUBLIC_LAUNCH_AT_UPDATED', targetType: 'PlatformSetting', targetId: 'PUBLIC_LAUNCH_AT', metadata: { publicLaunchAt: stored || null } });
+    return NextResponse.json({ status: 'updated', publicLaunchAt: stored || null });
   }
 
   if (input.action === 'fee') {

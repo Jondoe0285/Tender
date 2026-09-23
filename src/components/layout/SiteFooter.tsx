@@ -25,7 +25,7 @@ export function SiteFooter() {
         <div className="lg:col-span-1">
           <TradeTenderLogo variant="dark" />
           <p className="mt-5 max-w-sm leading-relaxed">
-            Structured tenders for UK construction supply. Trade Tender is a connection platform, not a party to the final contract.
+            Tenders and quotes for UK construction. Trade Tender connects Buyers and Suppliers. It is not a party to the final contract.
           </p>
         </div>
         <div>

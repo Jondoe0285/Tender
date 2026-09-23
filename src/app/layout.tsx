@@ -11,9 +11,9 @@ const sourceSans = Source_Sans_3({
 });
 
 export const metadata = {
-  title: 'Trade Tender | Structured tenders for UK construction supply',
+  title: 'Trade Tender | Tenders and quotes for UK construction',
   description:
-    'Specify a construction requirement, compare formal quotes from matched suppliers, and award on the record. Trade Tender is a UK construction procurement workspace.',
+    'Set out a construction job, compare quotes from matched Suppliers, and award the work. Trade Tender is for UK construction Buyers and Suppliers.',
 };
 
 export default function RootLayout({
