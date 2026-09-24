@@ -1,0 +1,31 @@
+{
+  "defaultLanguage": "en-GB",
+  "title": "Trade Tender",
+  "shortDescription": "UK construction tenders and quotes for Buyers and Suppliers.",
+  "fullDescription": "Trade Tender is for UK construction Buyers and Suppliers. Set out a job, compare quotes on the same brief, and award the work. Names and phone numbers stay private until a site visit is booked or you accept a quote.\n\nFor Buyers\nCreate a tender with the trade, quantity, location, and deadline. Matched Suppliers quote the same written brief. Compare price, lead time, and documents, then accept a quote with a purchase order number.\n\nFor Suppliers\nSee jobs that match your services and area. Unlock a tender, ask questions, and submit a quote. For contractor and professional jobs you can pay a fixed fee to contact the Buyer for a site visit.\n\nPayments and privacy\nUnlock and contact-release payments run through Stripe. The app stores your session on the device in encrypted OS storage, not in ordinary files. Trade Tender is not a party to the final contract.\n\nApplication type: Business.\nPrivacy policy: https://trade-tender.onrender.com/policies/privacy\nSupport: https://trade-tender.onrender.com/policies/support",
+  "applicationType": "APPLICATION",
+  "category": "BUSINESS",
+  "tags": ["Business", "Productivity"],
+  "contact": {
+    "website": "https://trade-tender.onrender.com",
+    "email": "james.sinclair@sinclairsafetysolutions.co.uk"
+  },
+  "privacyPolicyUrl": "https://trade-tender.onrender.com/policies/privacy",
+  "contentRating": {
+    "questionnaire": "IARC",
+    "expectedRating": "PEGI 3 / Everyone",
+    "notes": "No user-generated public social feed, no ads, no location tracking, no gambling."
+  },
+  "pricing": {
+    "free": true,
+    "inAppPurchases": true,
+    "inAppPurchaseNotes": "Buyers and Suppliers pay fixed platform fees through Stripe Checkout for tender unlock and contact release. There is no subscription in Year 1."
+  },
+  "countries": ["GB"],
+  "storeListingAssets": {
+    "icon": "../assets/icon.png",
+    "featureGraphic": "Add a 1024x500 feature graphic in Play Console before production.",
+    "phoneScreenshots": "Capture at least four 1080x1920 screenshots from a physical Android device after internal testing: sign-in, dashboard, create tender, quote comparison.",
+    "tabletScreenshots": "Optional. The app supports large phones; tablet layouts are not a separate target."
+  }
+}

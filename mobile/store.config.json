@@ -1,0 +1,46 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "copyright": "2026 Trade Tender",
+    "categories": ["BUSINESS", "PRODUCTIVITY"],
+    "info": {
+      "en-GB": {
+        "title": "Trade Tender",
+        "subtitle": "Quotes for site buying",
+        "description": "Trade Tender is for UK construction Buyers and Suppliers. Set out a job, compare quotes on the same brief, and award the work. Names and phone numbers stay private until a site visit is booked or you accept a quote.\n\nFOR BUYERS\n• Create a tender with trade, quantity, location, and deadline\n• Matched Suppliers quote the same written brief\n• Compare price, lead time, and documents in one place\n• Accept a quote with a purchase order number\n\nFOR SUPPLIERS\n• See jobs that match your services and area\n• Unlock a tender, ask questions, and submit a quote\n• For contractor and professional jobs, pay a fixed fee to contact the Buyer for a site visit\n\nPAYMENTS AND PRIVACY\nUnlock and contact-release payments run through Stripe. The app stores your session on the device in the OS keystore, not in ordinary files. Trade Tender is not a party to the final contract.\n\nSupport and the privacy policy are on the Trade Tender website.",
+        "keywords": "construction,builder,contractor,supplier,materials,plant,waste,hire,job,uk,compare,award,site,buy",
+        "releaseNotes": "First App Store release of the Trade Tender Buyer and Supplier workspace.",
+        "privacyPolicyUrl": "https://trade-tender.onrender.com/policies/privacy",
+        "supportUrl": "https://trade-tender.onrender.com/policies/support",
+        "marketingUrl": "https://trade-tender.onrender.com"
+      }
+    },
+    "advisory": {
+      "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+      "gamblingSimulated": "NONE",
+      "medicalOrTreatmentInformation": "NONE",
+      "profanityOrCrudeHumor": "NONE",
+      "sexualContentGraphicAndNudity": "NONE",
+      "sexualContentOrNudity": "NONE",
+      "horrorOrFearThemes": "NONE",
+      "matureOrSuggestiveThemes": "NONE",
+      "violenceCartoonOrFantasy": "NONE",
+      "violenceRealistic": "NONE",
+      "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+      "contests": "NONE",
+      "gambling": false,
+      "unrestrictedWebAccess": false,
+      "seventeenPlus": false
+    },
+    "release": {
+      "automaticRelease": false,
+      "phasedRelease": true
+    },
+    "review": {
+      "firstName": "James",
+      "lastName": "Sinclair",
+      "email": "james.sinclair@sinclairsafetysolutions.co.uk",
+      "notes": "Sign-in is required. Provide App Review with a verified Buyer account and a verified Supplier account before submission. Do not place live passwords in this file. The app talks to https://trade-tender.onrender.com. Stripe Checkout may open for unlock or contact-release payments. Owner and Super User consoles are web-only."
+    }
+  }
+}

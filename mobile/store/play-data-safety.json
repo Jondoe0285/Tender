@@ -1,0 +1,52 @@
+{
+  "dataCollected": [
+    {
+      "category": "Personal info",
+      "types": ["Name", "Email address", "Phone number", "User IDs"],
+      "purpose": "App functionality and account management",
+      "optional": false,
+      "ephemeral": false
+    },
+    {
+      "category": "Financial info",
+      "types": ["Purchase history"],
+      "purpose": "App functionality",
+      "optional": true,
+      "ephemeral": false,
+      "notes": "Card numbers are entered on Stripe Checkout, not stored in the app."
+    },
+    {
+      "category": "Photos and videos",
+      "types": ["Photos", "Files and docs"],
+      "purpose": "App functionality",
+      "optional": true,
+      "ephemeral": false,
+      "notes": "Only files the user attaches to a tender, quote, or verification."
+    },
+    {
+      "category": "App activity",
+      "types": ["App interactions"],
+      "purpose": "App functionality and fraud prevention",
+      "optional": false,
+      "ephemeral": false
+    }
+  ],
+  "dataShared": [
+    {
+      "category": "Financial info",
+      "types": ["Purchase history"],
+      "purpose": "App functionality",
+      "notes": "Stripe processes unlock and contact-release payments."
+    }
+  ],
+  "dataSold": false,
+  "securityPractices": {
+    "dataEncryptedInTransit": true,
+    "usersCanRequestDeletion": true,
+    "deletionNotes": "Account and data requests go through in-app Support and the published privacy policy."
+  },
+  "accountRequired": true,
+  "targetAudience": "18+",
+  "ads": false,
+  "tracking": false
+}

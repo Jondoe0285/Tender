@@ -2,6 +2,7 @@ import { Montserrat_600SemiBold, Montserrat_700Bold, useFonts as useMontserratFo
 import { SourceSans3_400Regular, SourceSans3_600SemiBold, useFonts as useSourceSansFonts } from '@expo-google-fonts/source-sans-3';
 import { StatusBar } from 'expo-status-bar';
 import * as ExpoLinking from 'expo-linking';
+import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -20,17 +21,24 @@ import { colors, fonts, tapMinHeight } from './src/theme';
 
 type PendingPayment = { kind: 'unlock' | 'release' | 'direct-contact' | 'professional-interest'; tenderId: string; quoteId?: string; paymentId?: string };
 
+void SplashScreen.preventAutoHideAsync();
+
 export default function App() {
   const [montserratLoaded] = useMontserratFonts({ Montserrat_600SemiBold, Montserrat_700Bold });
   const [sourceSansLoaded] = useSourceSansFonts({ SourceSans3_400Regular, SourceSans3_600SemiBold });
   const [session, setSession] = useState<MobileSession | null>(null);
   const [ready, setReady] = useState(false);
+  const appReady = montserratLoaded && sourceSansLoaded && ready;
 
   useEffect(() => {
     loadMobileSession().then(setSession).catch(() => setSession(null)).finally(() => setReady(true));
   }, []);
 
-  if (!montserratLoaded || !sourceSansLoaded || !ready) return null;
+  useEffect(() => {
+    if (appReady) void SplashScreen.hideAsync();
+  }, [appReady]);
+
+  if (!appReady) return null;
 
   return (
     <SafeAreaProvider>

@@ -1,4 +1,10 @@
 {
+  "cli": {
+    "version": ">= 16.0.1",
+    "appVersionSource": "remote",
+    "promptToConfigurePushNotifications": false,
+    "metadataPath": "./store.config.json"
+  },
   "build": {
     "preview": {
       "distribution": "internal",
@@ -9,6 +15,28 @@
         "EXPO_PUBLIC_API_URL": "https://tender-m0xw.onrender.com"
       }
     },
-    "production": {}
+    "production": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "resourceClass": "m-medium"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://trade-tender.onrender.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "internal",
+        "releaseStatus": "draft"
+      },
+      "ios": {}
+    }
   }
 }
