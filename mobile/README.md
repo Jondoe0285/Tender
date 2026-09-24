@@ -15,4 +15,4 @@ Set `EXPO_PUBLIC_API_URL` to the HTTPS mobile API origin. Do not place credentia
 
 ## Security boundary
 
-The existing server currently authenticates browser sessions with NextAuth cookies. Before protected workflows are enabled in this client, implement a dedicated mobile-token endpoint, server-side bearer-token validation that reloads current authorization state, secure token storage, and mobile-specific integration tests.
+The app signs in through `POST /api/mobile/auth/login`, stores the bearer session in Expo SecureStore, and reloads current authorization on the server for every protected request. Do not reuse browser cookies or weaken payment, audit, or contact-release controls.

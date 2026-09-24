@@ -16,6 +16,6 @@ test('native API clients use HTTPS and secure bearer sessions', () => {
 
   assert.match(config, /startsWith\('https:\/\/'\)/);
   assert.match(config, /10\\\.0\\\.2\\\.2/);
-  assert.match(client, /Authorization: `Bearer \$\{session\.accessToken\}`/);
+  assert.match(client, /Authorization',\s*`Bearer \$\{session\.accessToken\}`/);
   assert.match(auth, /saveMobileSession/);
 });

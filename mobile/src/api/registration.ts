@@ -1,14 +1,35 @@
-type MobileRegistration = {
+import type { CategoryCatalog, CompanyType } from '../constants';
+import { publicApiFetch } from './client';
+import { mobileApiBaseUrl } from './config';
+
+export type WorkspaceIntent = 'buying' | 'supplying' | 'both';
+
+export type MobileRegistration = {
   email: string;
   password: string;
   contactName: string;
   firstName: string;
   lastName: string;
+  contactPhone?: string;
   companyName: string;
+  companyType: CompanyType;
+  branchIdentifier: string;
   termsAccepted: boolean;
-  branchIdentifier?: string;
+  privacyAccepted: boolean;
+  categories?: string[];
+  serviceProvisions?: string[];
+  coverageScope?: 'COUNTY' | 'REGION' | 'UK';
+  counties?: string[];
+  regions?: string[];
 };
-import { mobileApiBaseUrl } from './config';
+
+export async function loadPublishedCatalog(): Promise<CategoryCatalog> {
+  const response = await publicApiFetch('/api/categories');
+  if (!response.ok) throw new Error('Unable to load the service catalogue.');
+  const body = await response.json() as { catalog?: CategoryCatalog };
+  if (!body.catalog || typeof body.catalog !== 'object') throw new Error('Unable to load the service catalogue.');
+  return body.catalog;
+}
 
 export async function registerMobileAccount(input: MobileRegistration) {
   const response = await fetch(`${mobileApiBaseUrl()}/api/auth/register`, {

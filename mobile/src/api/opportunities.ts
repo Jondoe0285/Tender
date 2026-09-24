@@ -1,6 +1,16 @@
 import { mobileApiFetch } from './client';
 
-export type MobileOpportunitySummary = { id: string; reference: string; category: string; location: string; urgency: string; closingDate: string; requirements: string; isNew: boolean; unlockFeeGbp: number };
+export type MobileOpportunitySummary = {
+  id: string;
+  reference: string;
+  category: string;
+  location: string;
+  urgency: string;
+  closingDate: string;
+  requirements: string | string[];
+  isNew: boolean;
+  unlockFeeGbp: number;
+};
 
 export async function loadOpportunities(): Promise<MobileOpportunitySummary[]> {
   const response = await mobileApiFetch('/api/mobile/opportunities');

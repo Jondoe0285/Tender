@@ -4,6 +4,9 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://tender-m0xw.onrender.com"
       }
     },
     "production": {}

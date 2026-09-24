@@ -27,7 +27,7 @@ export async function getDirectContactStatus(userId: string, tenderId: string) {
   return { active, available, feeGbp, request };
 }
 
-export async function requestDirectContact(userId: string, tenderId: string) {
+export async function requestDirectContact(userId: string, tenderId: string, mobileReturnUrl?: string) {
   if (!await isDirectContactActive()) throw new ForbiddenError('Direct contact requests are not active');
   if (!await directContactAvailableForTender(tenderId)) throw new ForbiddenError('Direct contact is not enabled for this tender');
   await assertRetailerEligibleForTender(userId, tenderId);
@@ -37,7 +37,7 @@ export async function requestDirectContact(userId: string, tenderId: string) {
   if (existing?.releasedAt) return { status: 'RELEASED' as const };
   if (existing?.payment?.status === 'PENDING') return { status: 'PAYMENT_REQUIRED' as const, paymentId: existing.payment.id, checkoutUrl: existing.payment.stripeCheckoutUrl, devMode: !existing.payment.stripeCheckoutUrl, feeGbp: existing.payment.amountGbp, vatGbp: existing.payment.vatGbp, totalAmountGbp: existing.payment.totalAmountGbp };
 
-  const payment = await createPayment({ type: 'DIRECT_CONTACT', userId, tenderId });
+  const payment = await createPayment({ type: 'DIRECT_CONTACT', userId, tenderId, mobileReturnUrl });
   try {
     await prisma.directContactRequest.upsert({
       where: { tenderId_requesterId: { tenderId, requesterId: userId } },

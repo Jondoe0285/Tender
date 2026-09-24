@@ -11,7 +11,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     if (originError) return originError;
     const user = await requireRole('USER');
     const { id } = await props.params;
-    const result = await registerProfessionalInterest(user.id, id);
+    const result = await registerProfessionalInterest(user.id, id, request.headers.get('x-mobile-payment-return') ?? undefined);
     return NextResponse.json(result, { status: result.status === 'REGISTERED' ? 200 : 201 });
   } catch (error) { return toErrorResponse(error); }
 }

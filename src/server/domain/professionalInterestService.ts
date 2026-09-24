@@ -37,7 +37,7 @@ export async function getProfessionalInterestStatus(userId: string, tenderId: st
   return { feeGbp, interest, available };
 }
 
-export async function registerProfessionalInterest(userId: string, tenderId: string) {
+export async function registerProfessionalInterest(userId: string, tenderId: string, mobileReturnUrl?: string) {
   await assertProfessionalTender(userId, tenderId);
 
   const existing = await prisma.professionalInterest.findUnique({
@@ -57,7 +57,7 @@ export async function registerProfessionalInterest(userId: string, tenderId: str
     };
   }
 
-  const payment = await createPayment({ type: 'PROFESSIONAL_INTEREST', userId, tenderId });
+  const payment = await createPayment({ type: 'PROFESSIONAL_INTEREST', userId, tenderId, mobileReturnUrl });
   try {
     await prisma.professionalInterest.upsert({
       where: { tenderId_retailerId: { tenderId, retailerId: userId } },
