@@ -20,8 +20,8 @@ export async function POST(request: Request) {
     if (!isVerificationEligible(profile.categories)) {
       return NextResponse.json({ error: 'Verification is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers' }, { status: 403 });
     }
-    if (profile.verificationStatus === 'PENDING' || profile.verificationStatus === 'VERIFIED') {
-      return NextResponse.json({ error: 'A verification request is already pending or approved for this account' }, { status: 409 });
+    if (profile.verificationStatus === 'VERIFIED') {
+      return NextResponse.json({ error: 'This account is already verified' }, { status: 409 });
     }
 
     const evaluation = profile.isSoleTrader

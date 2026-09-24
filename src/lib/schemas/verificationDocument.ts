@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { verifyVerificationDocument, MAX_TENDER_ATTACHMENT_BYTES } from '@/lib/attachment-utils';
+import { verifyVerificationDocument, MAX_VERIFICATION_DOCUMENT_BASE64_CHARS } from '@/lib/attachment-utils';
 import { VERIFICATION_DOCUMENT_TYPES, verificationDocumentExpires, type VerificationDocumentType } from '@/lib/verification-documents';
 
 const documentTypeSchema = z.enum(VERIFICATION_DOCUMENT_TYPES.map((doc) => doc.type) as [string, ...string[]]);
@@ -9,7 +9,7 @@ export const uploadVerificationDocumentSchema = z.object({
   name: z.string().trim().min(1).max(255),
   mimeType: z.string().trim().min(1).max(128),
   sizeBytes: z.number().int().nonnegative(),
-  dataBase64: z.string().min(1).max(Math.ceil(MAX_TENDER_ATTACHMENT_BYTES * 4 / 3) + 4),
+  dataBase64: z.string().min(1).max(MAX_VERIFICATION_DOCUMENT_BASE64_CHARS),
   expiryDate: z.coerce.date().optional(),
 }).transform((document, context) => {
   const expires = verificationDocumentExpires(document.documentType as VerificationDocumentType);

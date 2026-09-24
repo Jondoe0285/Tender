@@ -39,7 +39,9 @@ test('sole trader profiles can be AI verified using self-employment evidence', (
   assert.match(profileRoute, /companyType/);
   assert.doesNotMatch(verificationRoute, /Sole trader profiles cannot be AI verified/);
   assert.match(verificationRoute, /evaluateSoleTraderVerification/);
-  assert.match(verificationDocumentService, /evaluateSoleTraderVerification/);
+  assert.match(verificationDocumentService, /documentsForScore.every/);
+  assert.doesNotMatch(verificationDocumentService, /reviewDocuments.every\(\(document\) => document.aiRequiresHumanReview/);
+  assert.doesNotMatch(verificationRoute, /already pending or approved/);
   assert.match(quoteService, /providerIsSoleTrader/);
 });
 
@@ -51,7 +53,10 @@ test('provider profile and verification pages support the sole trader evidence f
   assert.doesNotMatch(profilePage, /Sole trader profiles cannot be AI verified/);
   assert.match(verificationPage, /soleTraderEvidence/);
   assert.doesNotMatch(verificationPage, /Sole traders cannot be AI verified/);
-  assert.match(verificationPage, /accept="application\/pdf,\.pdf"/);
+  assert.match(verificationPage, /isVerificationSubmitReady/);
+  assert.match(verificationPage, /Become verified/);
+  assert.match(verificationPage, /'PENDING'/);
+  assert.doesNotMatch(verificationPage, /soleTraderEvidence\?\.eligible/);
   assert.doesNotMatch(verificationPage, /\.jpg/);
   assert.match(verificationPage, /There is no human review of this upload path/);
   assert.doesNotMatch(verificationPage, /flagged this for human review/);

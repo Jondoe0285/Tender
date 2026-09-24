@@ -1,5 +1,8 @@
 export const MAX_TENDER_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export const MAX_TENDER_ATTACHMENT_TOTAL_BYTES = 25 * 1024 * 1024;
+/** Text PDFs for automated verification. Larger scans previously exhausted the Node heap on inflate. */
+export const MAX_VERIFICATION_DOCUMENT_BYTES = 2 * 1024 * 1024;
+export const MAX_VERIFICATION_DOCUMENT_BASE64_CHARS = Math.ceil(MAX_VERIFICATION_DOCUMENT_BYTES * 4 / 3) + 4;
 
 type VerifiedTenderAttachment = {
   mimeType: 'application/pdf' | 'image/jpeg' | 'image/png';
@@ -9,7 +12,27 @@ type VerifiedTenderAttachment = {
 
 // A flat character class (no repeated group) avoids V8 regex stack overflows on large decoded files.
 const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
-const PDF_ACTIVE_CONTENT_PATTERN = /\/(?:AA|EmbeddedFile|JavaScript|JS|Launch|OpenAction|RichMedia|XFA)(?=[\s/<>()\[\]{}]|$)/;
+const PDF_ACTIVE_CONTENT_NAMES = ['/AA', '/EmbeddedFile', '/JavaScript', '/JS', '/Launch', '/OpenAction', '/RichMedia', '/XFA'] as const;
+
+function isPdfNameDelimiter(byte: number | undefined): boolean {
+  if (byte == null || byte <= 32) return true;
+  return byte === 37 || byte === 40 || byte === 41 || byte === 47 || byte === 60 || byte === 62 || byte === 91 || byte === 93 || byte === 123 || byte === 125;
+}
+
+/** Search PDF name tokens in the buffer so a 10 MiB file is never copied into a latin1 string. */
+function pdfContainsActiveContent(bytes: Buffer): boolean {
+  for (const name of PDF_ACTIVE_CONTENT_NAMES) {
+    const needle = Buffer.from(name, 'ascii');
+    let from = 0;
+    while (from < bytes.length) {
+      const index = bytes.indexOf(needle, from);
+      if (index === -1) break;
+      if (isPdfNameDelimiter(bytes[index + needle.length])) return true;
+      from = index + 1;
+    }
+  }
+  return false;
+}
 
 function hasFileExtension(fileName: string, extensions: readonly string[]): boolean {
   const extension = fileName.slice(fileName.lastIndexOf('.')).toLowerCase();
@@ -47,17 +70,23 @@ export function verifyTenderAttachment(input: { name: string; mimeType: string; 
     throw new Error('Attachment filename does not match its verified file type');
   }
 
-  if (detectedMimeType === 'application/pdf' && PDF_ACTIVE_CONTENT_PATTERN.test(bytes.toString('latin1'))) {
+  if (detectedMimeType === 'application/pdf' && pdfContainsActiveContent(bytes)) {
     throw new Error('Active PDF content is not allowed');
   }
 
-  return { mimeType: detectedMimeType, sizeBytes: bytes.length, dataBase64: bytes.toString('base64') };
+  return { mimeType: detectedMimeType, sizeBytes: bytes.length, dataBase64: input.dataBase64 };
 }
 
 export function verifyVerificationDocument(input: { name: string; mimeType: string; dataBase64: string }): { mimeType: 'application/pdf'; sizeBytes: number; dataBase64: string } {
+  if (input.dataBase64.length > MAX_VERIFICATION_DOCUMENT_BASE64_CHARS) {
+    throw new Error('Verification PDF exceeds the 2 MB decoded file limit. Export a text PDF from Companies House or your insurer.');
+  }
   const verified = verifyTenderAttachment(input);
   if (verified.mimeType !== 'application/pdf') {
     throw new Error('Verification evidence must be a PDF');
+  }
+  if (verified.sizeBytes > MAX_VERIFICATION_DOCUMENT_BYTES) {
+    throw new Error('Verification PDF exceeds the 2 MB decoded file limit. Export a text PDF from Companies House or your insurer.');
   }
   return { mimeType: 'application/pdf', sizeBytes: verified.sizeBytes, dataBase64: verified.dataBase64 };
 }

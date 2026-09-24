@@ -154,7 +154,9 @@ export async function evaluateProviderVerification(retailerProfileId: string, ca
   const confidencePercent = documentsForScore.length > 0
     ? Math.min(...documentsForScore.map((document) => document.aiConfidencePercent ?? 0))
     : 0;
-  const passed = confidencePercent >= 90 && reviewDocuments.every((document) => document.aiRequiresHumanReview === false);
+  const passed = documentsForScore.length > 0
+    && confidencePercent >= 90
+    && documentsForScore.every((document) => document.aiRequiresHumanReview === false);
 
   const report = [
     'Basic legal eligibility assessment for the services declared by this User.',

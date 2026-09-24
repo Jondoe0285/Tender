@@ -2,6 +2,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
+test('mobile verification uploads use the same 2 MB PDF cap as SaaS', () => {
+  const files = readFileSync('src/files.ts', 'utf8');
+  const screen = readFileSync('src/screens/SupplyingScreens.tsx', 'utf8');
+  assert.match(files, /MAX_VERIFICATION_DOCUMENT_BYTES = 2 \* 1024 \* 1024/);
+  assert.match(files, /pickVerificationDocument/);
+  assert.match(screen, /pickVerificationDocument/);
+  assert.match(screen, /under 2 MB/);
+});
+
 test('mobile workspace covers Buyer and Supplier SaaS destinations', () => {
   const app = readFileSync('App.tsx', 'utf8');
   const tabs = readFileSync('src/navigation/types.ts', 'utf8');

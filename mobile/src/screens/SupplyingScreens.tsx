@@ -4,7 +4,7 @@ import { loadOpportunities, type MobileOpportunitySummary } from '../api/opportu
 import { loadVerificationDocuments, submitVerification, uploadVerificationDocument, type VerificationDocumentsPayload } from '../api/verification';
 import { loadSubmittedQuotes, type SubmittedQuoteRow } from '../api/workspace';
 import { formatUkDate } from '../constants';
-import { pickDocument } from '../files';
+import { pickVerificationDocument } from '../files';
 import type { Route } from '../navigation/types';
 import { Body, Card, Field, Notice, OptionList, PrimaryButton, SecondaryButton, Title } from '../ui';
 
@@ -79,7 +79,7 @@ export function VerificationScreen() {
   return (
     <View>
       <Title>Verification</Title>
-      <Body>Upload the required documents, then submit. Required types must have a future expiry date where they expire.</Body>
+      <Body>Upload the required PDF evidence (under 2 MB each), then submit. Required types must have a future expiry date where they expire. Use a text PDF from Companies House or your insurer; photographs and large scans are not accepted.</Body>
       <Notice>{message}</Notice>
       {data && (
         <>
@@ -95,7 +95,7 @@ export function VerificationScreen() {
           />
           <Field label="Expiry date (YYYY-MM-DD) if required" onChangeText={setExpiryDate} value={expiryDate} />
           <SecondaryButton label="Upload document" onPress={() => {
-            pickDocument().then(async (picked) => {
+            pickVerificationDocument().then(async (picked) => {
               if (!picked || !documentType) return;
               await uploadVerificationDocument({
                 documentType,

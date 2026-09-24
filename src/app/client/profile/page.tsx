@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Button, LinkButton } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { FieldGroup, Input, Label, PasswordInput, Select } from '@/components/ui/Field';
 import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
@@ -163,8 +163,8 @@ export default function ClientProfilePage() {
                 <StatusBadge status={profile.verificationStatus === 'VERIFIED' ? 'approved' : profile.verificationStatus === 'PENDING' ? 'pending' : profile.verificationStatus === 'REJECTED' || profile.verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
                   {profile.verificationStatus === 'VERIFIED' ? 'Verified' : profile.verificationStatus === 'PENDING' ? 'Pending review' : profile.verificationStatus === 'REJECTED' ? 'Not approved' : profile.verificationStatus === 'EXPIRED' ? 'Expired' : 'Unverified'}
                 </StatusBadge>
-                {(profile.verificationStatus === 'UNVERIFIED' || profile.verificationStatus === 'REJECTED' || profile.verificationStatus === 'EXPIRED') && <Link href="/retailer/verification"><Button>Become Verified</Button></Link>}
-                {(profile.verificationStatus === 'PENDING' || profile.verificationStatus === 'VERIFIED') && <Link href="/retailer/verification" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">View documents</Link>}
+                {(profile.verificationStatus === 'UNVERIFIED' || profile.verificationStatus === 'REJECTED' || profile.verificationStatus === 'EXPIRED' || profile.verificationStatus === 'PENDING') && <LinkButton href="/retailer/verification">Become Verified</LinkButton>}
+                {profile.verificationStatus === 'VERIFIED' && <Link href="/retailer/verification" className="text-sm font-semibold text-steel-blue hover:text-foundation-navy">View documents</Link>}
               </div>
             </div>
           </Card>}
