@@ -3,6 +3,7 @@ import { deflateRawSync } from 'node:zlib';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { parseMarketingEmailList, maskMarketingEmail } from '../../src/server/domain/marketingListParser';
+import { buildMarketingTemplateDownload } from '../../src/server/domain/marketingCampaignService';
 import { marketingTemplateForKey, tradeTenderMarketingTemplate, tradeTenderSupplierMarketingTemplate } from '../../src/server/notifications/emailTemplates';
 import { readUnsubscribeToken, signUnsubscribeToken } from '../../src/server/notifications/marketingUnsubscribe';
 
@@ -96,6 +97,7 @@ test('the Supplier marketing template sells live demand with a written brief bef
   assert.doesNotMatch(template.html, /Take the hassle out of sourcing/);
   assert.doesNotMatch(template.html, /Create a Buyer account/);
   assert.doesNotMatch(template.html, /HSEQ ConsultHub/);
+  assert.doesNotMatch(template.html, /purchased lead list|buying a lead list/);
   assert.doesNotMatch(template.html, /Amazing savings|Revolutionary|Game changing/);
 });
 
@@ -104,6 +106,19 @@ test('campaign template keys resolve to the Buyer marketplace or Supplier mailsh
   assert.equal(marketingTemplateForKey('SUPPLIERS', input).subject, 'Quote live jobs that already have a written brief');
   assert.equal(marketingTemplateForKey('MARKETPLACE', input).subject, 'Take the hassle out of sourcing for your next job');
   assert.equal(marketingTemplateForKey('HSQE_CONSULTHUB', input).subject, 'Take the hassle out of sourcing for your next job');
+});
+
+test('Owner downloads are HTML copies of both campaign emails with the subject recorded', () => {
+  const buyers = buildMarketingTemplateDownload('MARKETPLACE', 'https://tender.example.test/register');
+  const suppliers = buildMarketingTemplateDownload('SUPPLIERS', 'https://tender.example.test/register?intent=supplying');
+  assert.equal(buyers.filename, 'trade-tender-buyers.html');
+  assert.equal(suppliers.filename, 'trade-tender-suppliers.html');
+  assert.match(buyers.html, /Subject: Take the hassle out of sourcing for your next job/);
+  assert.match(suppliers.html, /Subject: Quote live jobs that already have a written brief/);
+  assert.match(buyers.html, /<title>Take the hassle out of sourcing for your next job<\/title>/);
+  assert.match(buyers.html, /Create a Buyer account/);
+  assert.match(suppliers.html, /Create a Supplier account/);
+  assert.doesNotMatch(suppliers.html, /Create a Buyer account/);
 });
 
 test('unsubscribe tokens round-trip and reject tampering', () => {
@@ -117,11 +132,15 @@ test('owner marketing routes stay Owner-gated and discard the spreadsheet after 
   const upload = readFileSync('src/app/api/super-user/owner/marketing/campaigns/route.ts', 'utf8');
   const send = readFileSync('src/app/api/super-user/owner/marketing/campaigns/[id]/send/route.ts', 'utf8');
   const preview = readFileSync('src/app/api/super-user/owner/marketing/campaigns/[id]/preview/route.ts', 'utf8');
+  const download = readFileSync('src/app/api/super-user/owner/marketing/templates/[templateKey]/route.ts', 'utf8');
   const ownerPage = readFileSync('src/app/super-user/owner/page.tsx', 'utf8');
   const panel = readFileSync('src/components/admin/OwnerMarketingPanel.tsx', 'utf8');
   assert.match(upload, /requireOwner/);
   assert.match(send, /requireOwner/);
   assert.match(preview, /requireOwner/);
+  assert.match(download, /requireOwner/);
+  assert.match(download, /Content-Disposition/);
+  assert.match(download, /trade-tender-buyers.html|filename/);
   assert.match(upload, /parseMarketingEmailList|createMarketingCampaign/);
   assert.doesNotMatch(upload, /writeFile|fs\./);
   assert.match(ownerPage, /OwnerMarketingPanel/);
@@ -131,6 +150,8 @@ test('owner marketing routes stay Owner-gated and discard the spreadsheet after 
   assert.match(panel, /templateKey/);
   assert.match(panel, /Suppliers/);
   assert.match(panel, /waste handlers/);
+  assert.match(panel, /Download Buyer template/);
+  assert.match(panel, /Download Supplier template/);
   assert.match(upload, /templateKey/);
   assert.doesNotMatch(panel, /HSEQ ConsultHub/);
 });

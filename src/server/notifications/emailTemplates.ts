@@ -609,7 +609,7 @@ const SUPPLIER_MARKETING_STEPS: Array<{ title: string; body: string; image: stri
   {
     label: 'Step 3',
     title: 'Quote the work that fits, and generate revenue',
-    body: 'Provide a quote when the job is worth your time. That is live demand from Buyers you have not previously traded with, not a purchased lead list.',
+    body: 'Provide a quote when the job is worth your time. That is live demand from Buyers you have not previously traded with.',
     image: '/images/prelaunch/supply.png',
     alt: 'A UK materials yard and plant at dusk',
   },
@@ -761,7 +761,7 @@ export function tradeTenderSupplierMarketingTemplate(input: { unsubscribeUrl: st
       heroAlt: 'A UK materials yard and plant at dusk',
       kicker: 'For UK Suppliers · plant, waste, materials, and site work',
       headlineLines: ['See the brief first.', 'Quote only the jobs that fit.'],
-      intro: 'Trade Tender puts genuine construction demand in front of plant hire companies, waste handlers, materials suppliers, and contractors. You see the scope, location, and requirements first. You only quote the jobs that interest you. That is revenue from Buyers you have not previously reached — not a purchased lead list.',
+      intro: 'Trade Tender puts genuine construction demand in front of plant hire companies, waste handlers, materials suppliers, and contractors. You see the scope, location, and requirements first. You only quote the jobs that interest you. That is revenue from Buyers you have not previously reached.',
       primaryHref,
       primaryLabel: 'Create a Supplier account',
       bodyTables: `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="620" style="width:100%;max-width:620px;margin:0 auto;background:${WHITE}">
@@ -809,6 +809,10 @@ export function marketingTemplateForKey(
 export function marketingTemplateLabel(key: string): string {
   if (key === 'SUPPLIERS') return 'Suppliers';
   return 'Buyers and mixed lists';
+}
+
+export function marketingTemplateDownloadFileName(key: string): string {
+  return key === 'SUPPLIERS' ? 'trade-tender-suppliers.html' : 'trade-tender-buyers.html';
 }
 
 function escapeHtml(value: string): string {

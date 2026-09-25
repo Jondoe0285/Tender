@@ -95,6 +95,27 @@ function normaliseService(value: string): ServiceName | null {
   return null;
 }
 
+/** Distinct catalog services stored on a company profile. A company can offer more than one. */
+export function uniqueServicesFromStoredList(categories: string | null | undefined): ServiceName[] {
+  const found: ServiceName[] = [];
+  const seen = new Set<ServiceName>();
+  for (const raw of (categories ?? '').split(',').map((value) => value.trim()).filter(Boolean)) {
+    const normalised = normaliseService(raw);
+    if (!normalised || seen.has(normalised)) continue;
+    seen.add(normalised);
+    found.push(normalised);
+  }
+  return found;
+}
+
+export const SUPPLYING_COMPANY_TYPE_LABELS: Record<ServiceName, string> = {
+  Materials: 'Materials suppliers',
+  Waste: 'Waste providers',
+  'Plant Hire': 'Plant hire companies',
+  'Contractor Services': 'Contractors',
+  'Professional Services': 'Professional services',
+};
+
 export function isValidService(value: string): value is ServiceName {
   return SERVICE_NAMES.includes(value as ServiceName) || value.toLowerCase() === 'plant hire';
 }

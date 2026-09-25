@@ -149,6 +149,15 @@ export function OwnerMarketingPanel({
 
   const selectedTemplate = TEMPLATES.find((template) => template.key === templateKey) ?? TEMPLATES[0];
 
+  function downloadHref(key: TemplateKey) {
+    const params = new URLSearchParams();
+    const trimmed = ctaUrl.trim();
+    const destination = key === templateKey && trimmed ? trimmed : defaultCtaFor(key);
+    if (destination) params.set('ctaUrl', destination);
+    const query = params.toString();
+    return `/api/super-user/owner/marketing/templates/${key}${query ? `?${query}` : ''}`;
+  }
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <Card>
@@ -157,6 +166,21 @@ export function OwnerMarketingPanel({
         <p className="mt-2 max-w-2xl text-sm leading-6 text-concrete-grey">
           Upload an Excel workbook or CSV of work email addresses. Choose the Buyer marketplace template or the Supplier template, then send. Each message includes an unsubscribe link.
         </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <a
+            href={downloadHref('MARKETPLACE')}
+            className="inline-flex h-11 items-center justify-center rounded-md border border-foundation-navy bg-site-white px-5 text-sm font-semibold text-foundation-navy hover:bg-slate-50"
+          >
+            Download Buyer template
+          </a>
+          <a
+            href={downloadHref('SUPPLIERS')}
+            className="inline-flex h-11 items-center justify-center rounded-md border border-foundation-navy bg-site-white px-5 text-sm font-semibold text-foundation-navy hover:bg-slate-50"
+          >
+            Download Supplier template
+          </a>
+        </div>
+        <p className="mt-2 text-xs text-concrete-grey">HTML copies of the two campaign emails. Open them in a browser to review photography and copy before you send.</p>
         {message && <p className="mt-4 text-sm font-semibold text-foundation-navy" role="status">{message}</p>}
         <form onSubmit={upload} className="mt-5 grid gap-4 md:grid-cols-2">
           <fieldset className="md:col-span-2">

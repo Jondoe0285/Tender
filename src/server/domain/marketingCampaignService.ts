@@ -2,10 +2,11 @@ import { prisma } from '@/server/data/prisma';
 import { ValidationError } from '@/server/auth/session';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { parseMarketingEmailList, maskMarketingEmail } from '@/server/domain/marketingListParser';
-import { marketingTemplateForKey, marketingTemplateLabel } from '@/server/notifications/emailTemplates';
+import { marketingTemplateDownloadFileName, marketingTemplateForKey, marketingTemplateLabel } from '@/server/notifications/emailTemplates';
 import { isEmailConfigured, sendTransactionalEmail } from '@/server/notifications/resend';
 import { marketingUnsubscribeApiUrl, marketingUnsubscribeUrl } from '@/server/notifications/marketingUnsubscribe';
 import { marketingCtaUrlSchema, marketingTemplateKeySchema } from '@/lib/schemas/marketing';
+import { appUrl } from '@/server/config/appUrl';
 
 export const MARKETING_SEND_BATCH_SIZE = 15;
 
@@ -278,6 +279,43 @@ export async function sendMarketingCampaignBatch(input: {
   });
 
   return { status: remaining === 0 ? 'completed' as const : 'sending' as const, remaining, sent, failed, skipped };
+}
+
+export function buildMarketingTemplateDownload(templateKey: string, ctaUrl?: string | null): {
+  templateKey: 'MARKETPLACE' | 'SUPPLIERS';
+  filename: string;
+  subject: string;
+  html: string;
+} {
+  const parsed = marketingTemplateKeySchema.safeParse(templateKey);
+  if (!parsed.success) throw new ValidationError('Choose a campaign template.');
+  const key = parsed.data;
+  const template = marketingTemplateForKey(key, {
+    unsubscribeUrl: appUrl('/unsubscribe/marketing'),
+    ctaUrl: sanitiseDownloadCta(ctaUrl),
+  });
+  const safeSubject = template.subject.replace(/--/g, ' ');
+  const html = template.html
+    .replace('<!doctype html>', `<!doctype html>\n<!-- Subject: ${safeSubject} -->`)
+    .replace('<head>', `<head><title>${safeSubject}</title>`);
+  return {
+    templateKey: key,
+    filename: marketingTemplateDownloadFileName(key),
+    subject: template.subject,
+    html,
+  };
+}
+
+function sanitiseDownloadCta(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed || trimmed.length > 2048) return null;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    return trimmed;
+  } catch {
+    return null;
+  }
 }
 
 export async function unsubscribeMarketingEmail(email: string, source: 'link' | 'one-click') {
