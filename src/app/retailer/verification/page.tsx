@@ -196,9 +196,9 @@ export default function ProviderVerificationPage() {
   const missingRequired = requiredTypes.filter((type) => !validUploadedTypes.includes(type));
   const canSubmit = isVerificationSubmitReady({ isSoleTrader, requiredTypes, validUploadedTypes });
   const canEdit = REOPEN_STATUSES.includes(verificationStatus);
-  const minExpiryDate = new Date(Math.max(now, Date.now()) + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   if (loading) return <AppShell role="retailer" title="Become Verified"><p className="text-sm text-concrete-grey">Loading...</p></AppShell>;
+  const minExpiryDate = new Date(now + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   return (
     <AppShell role="retailer" title="Become Verified">

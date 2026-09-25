@@ -31,7 +31,11 @@ test('store profiles ship an AAB and App Store binary against production, not th
     submit: { production: { android: { track: string; releaseStatus: string; serviceAccountKeyPath: string } } };
   };
   const app = JSON.parse(readFileSync('app.json', 'utf8')) as {
-    expo: { updates?: { enabled?: boolean }; ios: { config?: { usesNonExemptEncryption?: boolean } }; privacy?: string };
+    expo: {
+      updates?: { enabled?: boolean };
+      ios: { config?: { usesNonExemptEncryption?: boolean } };
+      extra?: { privacyPolicyUrl?: string };
+    };
   };
   const store = JSON.parse(readFileSync('store.config.json', 'utf8')) as {
     apple: { info: { 'en-GB': { title: string; keywords: string; privacyPolicyUrl: string } } };
@@ -51,7 +55,7 @@ test('store profiles ship an AAB and App Store binary against production, not th
   assert.equal(eas.submit.production.android.serviceAccountKeyPath, './google-service-account.json');
   assert.equal(app.expo.updates?.enabled, false);
   assert.equal(app.expo.ios.config?.usesNonExemptEncryption, false);
-  assert.equal(app.expo.privacy, 'https://trade-tender.onrender.com/policies/privacy');
+  assert.equal(app.expo.extra?.privacyPolicyUrl, 'https://trade-tender.onrender.com/policies/privacy');
   assert.equal(store.apple.info['en-GB'].title, 'Trade Tender');
   assert.equal(store.apple.info['en-GB'].privacyPolicyUrl, play.privacyPolicyUrl);
   assert.equal(keywords.includes(' '), false);

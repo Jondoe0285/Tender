@@ -9,7 +9,6 @@
     "userInterfaceStyle": "light",
     "primaryColor": "#1D6FB8",
     "description": "UK construction tenders and quotes for Buyers and Suppliers.",
-    "privacy": "https://trade-tender.onrender.com/policies/privacy",
     "updates": {
       "enabled": false
     },
@@ -34,7 +33,6 @@
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
-      "edgeToEdgeEnabled": true,
       "allowBackup": false,
       "permissions": []
     },
@@ -57,6 +55,7 @@
       "expo-document-picker"
     ],
     "extra": {
+      "privacyPolicyUrl": "https://trade-tender.onrender.com/policies/privacy",
       "eas": {
         "projectId": "0c939e10-05b9-43a0-b3e1-46a30daf5b62"
       }
