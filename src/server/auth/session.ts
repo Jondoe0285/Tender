@@ -3,12 +3,13 @@ import { headers } from 'next/headers';
 import { authOptions } from '@/server/auth/auth';
 import { prisma } from '@/server/data/prisma';
 import { verifyMobileToken } from '@/server/auth/mobileToken';
+import { isPlatformMfaActive, superUserMfaSatisfied } from '@/server/auth/platformMfa';
 
 export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'USER'; roles: SessionUser['role'][]; isOwner: boolean; isAccountant: boolean; mfaEnabled: boolean };
 
 export type CurrentAccount = { id: string; email: string; role: SessionUser['role']; suspended: boolean; isOwner: boolean; isAccountant: boolean; sessionVersion: number; mfaEnabled: boolean; roleMemberships: { role: SessionUser['role'] }[] };
 
-/** Owner accounts must complete TOTP MFA before Owner APIs. Super User and USER do not. */
+/** Owner accounts must complete TOTP MFA before Owner APIs. */
 export function privilegedMfaSatisfied(account: { role: string; isOwner: boolean; mfaEnabled: boolean }): boolean {
   if (!account.isOwner) return true;
   return account.mfaEnabled;
@@ -129,9 +130,10 @@ export async function requireOwner(): Promise<SessionUser> {
   return user;
 }
 
-/** Full Super User access excludes restricted Accountant sub-accounts. MFA is Owner-only. */
+/** Full Super User access excludes restricted Accountant sub-accounts. Owner-activated MFA applies to Super Users. */
 export async function requireFullSuperUser(): Promise<SessionUser> {
   const user = await requireRole('SUPER_USER');
   if (user.isAccountant) throw new ForbiddenError();
+  if (!superUserMfaSatisfied(user, await isPlatformMfaActive())) throw new ForbiddenError('MFA_SETUP_REQUIRED');
   return user;
 }

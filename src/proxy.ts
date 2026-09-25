@@ -8,8 +8,12 @@ export default withAuth(
     const path = request.nextUrl.pathname;
     const isOwner = Boolean(request.nextauth.token?.isOwner);
     const mfaEnabled = Boolean(request.nextauth.token?.mfaEnabled);
+    const platformMfaActive = Boolean(request.nextauth.token?.platformMfaActive);
 
     if (isOwner && !mfaEnabled && path.startsWith('/super-user/owner')) {
+      return NextResponse.redirect(appUrl('/account/security'));
+    }
+    if (role === 'SUPER_USER' && !mfaEnabled && platformMfaActive && path.startsWith('/super-user')) {
       return NextResponse.redirect(appUrl('/account/security'));
     }
 

@@ -6,6 +6,7 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { consumeRecoveryCode, decryptMfaSecret, verifyMfaCode } from '@/server/auth/mfa';
 import { signInAllowed } from '@/server/auth/signInAccess';
 import { isSignInActive } from '@/server/domain/platformSettings';
+import { isPlatformMfaActive } from '@/server/auth/platformMfa';
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
@@ -22,7 +23,7 @@ export async function authenticateCredentials(credentials: Record<string, unknow
     if (updated.failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) await prisma.user.update({ where: { id: user.id }, data: { loginLockedUntil: new Date(Date.now() + LOGIN_LOCKOUT_MS) } });
     return null;
   }
-  if (user.isOwner && user.mfaEnabled) {
+  if (user.mfaEnabled) {
     const mfaCode = typeof credentials?.mfaCode === 'string' ? credentials.mfaCode.trim() : '';
     let verified = false;
     if (mfaCode && user.mfaSecretEncrypted) verified = await verifyMfaCode(decryptMfaSecret(user.mfaSecretEncrypted), mfaCode).catch(() => false);
@@ -69,6 +70,7 @@ export const authOptions: AuthOptions = {
         token.isAccountant = (user as { isAccountant: boolean }).isAccountant;
         token.sessionVersion = (user as unknown as { sessionVersion: number }).sessionVersion;
         token.mfaEnabled = Boolean((user as { mfaEnabled?: boolean }).mfaEnabled);
+        token.platformMfaActive = (user as { role: string }).role === 'SUPER_USER' ? await isPlatformMfaActive() : false;
       }
       if (trigger === 'update' && session?.role && token.id) {
         const membership = await prisma.userRole.findUnique({
@@ -88,6 +90,7 @@ export const authOptions: AuthOptions = {
         session.user.isAccountant = Boolean(token.isAccountant);
         (session.user as typeof session.user & { sessionVersion?: number }).sessionVersion = Number(token.sessionVersion ?? 0);
         (session.user as typeof session.user & { mfaEnabled?: boolean }).mfaEnabled = Boolean(token.mfaEnabled);
+        (session.user as typeof session.user & { platformMfaActive?: boolean }).platformMfaActive = Boolean(token.platformMfaActive);
       }
       return session;
     },

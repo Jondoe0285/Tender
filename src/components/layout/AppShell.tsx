@@ -83,10 +83,17 @@ export function AppShell({ role, title, children }: { role: Role; title: string;
   const drawerRef = useRef<HTMLElement>(null);
   const isOwner = Boolean(session?.user?.isOwner);
   const isAccountant = Boolean(session?.user?.isAccountant);
+  const platformMfaActive = Boolean(session?.user?.platformMfaActive);
   const workspaceNav = userNavForCapabilities(canRaiseTender);
   const baseGroups = role === 'super-user' && isAccountant ? ACCOUNTANT_NAV : role === 'super-user' ? SUPER_USER_NAV : workspaceNav;
   const groups = baseGroups
-    .map((group) => ({ ...group, items: group.items.filter((item) => !item.ownerOnly || isOwner) }))
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        if (item.href === '/account/security') return isOwner || platformMfaActive;
+        return !item.ownerOnly || isOwner;
+      }),
+    }))
     .filter((group) => group.items.length > 0);
   const activeHref = findActiveHref(pathname, groups);
   const availableWorkspaces = (session?.user?.roles ?? []).filter((workspaceRole) => workspaceOptions[workspaceRole]);
