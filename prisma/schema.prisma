@@ -1094,7 +1094,7 @@ model PaymentWaiver {
 model MarketingCampaign {
   id                      String   @id @default(cuid())
   name                    String
-  templateKey             String   @default("HSQE_CONSULTHUB")
+  templateKey             String   @default("MARKETPLACE")
   fileName                String
   ctaUrl                  String?
   status                  String   @default("DRAFT")

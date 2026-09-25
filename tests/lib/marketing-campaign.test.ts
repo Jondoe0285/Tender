@@ -3,7 +3,7 @@ import { deflateRawSync } from 'node:zlib';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { parseMarketingEmailList, maskMarketingEmail } from '../../src/server/domain/marketingListParser';
-import { hsqeConsultHubMarketingTemplate } from '../../src/server/notifications/emailTemplates';
+import { marketingTemplateForKey, tradeTenderMarketingTemplate, tradeTenderSupplierMarketingTemplate } from '../../src/server/notifications/emailTemplates';
 import { readUnsubscribeToken, signUnsubscribeToken } from '../../src/server/notifications/marketingUnsubscribe';
 
 const previousSecret = process.env.NEXTAUTH_SECRET;
@@ -47,22 +47,63 @@ test('deflated xlsx shared strings are accepted', () => {
   assert.deepEqual(parsed.emails, ['sam@hub.test']);
 });
 
-test('the Consult Hub marketing template states the commercial offer and includes unsubscribe', () => {
-  const template = hsqeConsultHubMarketingTemplate({
+test('the Trade Tender marketing template sells the marketplace with landing photography and an unsubscribe link', () => {
+  const template = tradeTenderMarketingTemplate({
     unsubscribeUrl: 'https://tender.example.test/unsubscribe/marketing?token=test',
-    ctaUrl: 'https://consulthub.example.test',
+    ctaUrl: 'https://tender.example.test/register',
   });
-  assert.match(template.subject, /HSEQ ConsultHub/);
-  assert.match(template.html, /Consultant controlled/);
-  assert.match(template.html, /Consultants own their clients/);
-  assert.match(template.html, /Online consultancy directory/);
-  assert.match(template.html, /Transparent pricing/);
-  assert.match(template.html, /No fixed contracts/);
-  assert.match(template.html, /Scale up and down as required/);
-  assert.match(template.html, /Pay for one module and onboard five clients/);
+  assert.equal(template.subject, 'Take the hassle out of sourcing for your next job');
+  assert.match(template.html, /Set out the job/);
+  assert.match(template.html, /Compare quotes/);
+  assert.match(template.html, /Award the work/);
+  assert.match(template.html, /prelaunch\/hero\.png/);
+  assert.match(template.html, /prelaunch\/specify\.png/);
+  assert.match(template.html, /prelaunch\/compare\.png/);
+  assert.match(template.html, /prelaunch\/supply\.png/);
+  assert.match(template.html, /Stop repeating the job on the phone/);
+  assert.match(template.html, /See multiple quotes on the same specification/);
+  assert.match(template.html, /Reach firms you have not already got on speed dial/);
+  assert.match(template.html, /Run buying and supplying on one path/);
+  assert.match(template.html, /Create a Buyer account/);
+  assert.match(template.html, /Create a Supplier account/);
+  assert.match(template.html, /Create an account/);
   assert.match(template.html, /unsubscribe\/marketing/);
-  assert.match(template.html, /HSQE_ConsultHub_Stacked_Light/);
+  assert.match(template.html, /Trade_Tender_Candidate_Horizontal_Logo/);
+  assert.doesNotMatch(template.html, /HSEQ ConsultHub/);
+  assert.doesNotMatch(template.html, /Amazing savings|Revolutionary|Game changing/);
   assert.doesNotMatch(template.html, /operational message from Trade Tender/);
+});
+
+test('the Supplier marketing template sells live demand with a written brief before quoting', () => {
+  const template = tradeTenderSupplierMarketingTemplate({
+    unsubscribeUrl: 'https://tender.example.test/unsubscribe/marketing?token=test',
+    ctaUrl: 'https://tender.example.test/register?intent=supplying',
+  });
+  assert.equal(template.subject, 'Quote live jobs that already have a written brief');
+  assert.match(template.html, /See the brief first/);
+  assert.match(template.html, /Quote only the jobs that fit/);
+  assert.match(template.html, /plant hire companies/);
+  assert.match(template.html, /waste handlers/);
+  assert.match(template.html, /Genuine opportunities to generate revenue/);
+  assert.match(template.html, /Only tender for what interests you/);
+  assert.match(template.html, /Scope, location, and requirements before you commit/);
+  assert.match(template.html, /register\?intent=supplying/);
+  assert.match(template.html, /Create a Supplier account/);
+  assert.match(template.html, /prelaunch\/supply\.png/);
+  assert.match(template.html, /prelaunch\/specify\.png/);
+  assert.match(template.html, /unsubscribe\/marketing/);
+  assert.match(template.html, /Trade_Tender_Candidate_Horizontal_Logo/);
+  assert.doesNotMatch(template.html, /Take the hassle out of sourcing/);
+  assert.doesNotMatch(template.html, /Create a Buyer account/);
+  assert.doesNotMatch(template.html, /HSEQ ConsultHub/);
+  assert.doesNotMatch(template.html, /Amazing savings|Revolutionary|Game changing/);
+});
+
+test('campaign template keys resolve to the Buyer marketplace or Supplier mailshot', () => {
+  const input = { unsubscribeUrl: 'https://tender.example.test/unsubscribe/marketing?token=test' };
+  assert.equal(marketingTemplateForKey('SUPPLIERS', input).subject, 'Quote live jobs that already have a written brief');
+  assert.equal(marketingTemplateForKey('MARKETPLACE', input).subject, 'Take the hassle out of sourcing for your next job');
+  assert.equal(marketingTemplateForKey('HSQE_CONSULTHUB', input).subject, 'Take the hassle out of sourcing for your next job');
 });
 
 test('unsubscribe tokens round-trip and reject tampering', () => {
@@ -86,6 +127,12 @@ test('owner marketing routes stay Owner-gated and discard the spreadsheet after 
   assert.match(ownerPage, /OwnerMarketingPanel/);
   assert.match(panel, /confirmLawfulBasis/);
   assert.match(panel, /Excel or CSV/);
+  assert.match(panel, /Trade Tender marketing/);
+  assert.match(panel, /templateKey/);
+  assert.match(panel, /Suppliers/);
+  assert.match(panel, /waste handlers/);
+  assert.match(upload, /templateKey/);
+  assert.doesNotMatch(panel, /HSEQ ConsultHub/);
 });
 
 test('marketing emails are masked before they are shown in the Owner card', () => {

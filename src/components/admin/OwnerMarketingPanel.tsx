@@ -6,18 +6,51 @@ import { Card } from '@/components/ui/Card';
 import { FieldGroup, Input, Label } from '@/components/ui/Field';
 import type { MarketingCampaignSummary } from '@/server/domain/marketingCampaignService';
 
+const TEMPLATES = [
+  {
+    key: 'MARKETPLACE',
+    title: 'Buyers and mixed lists',
+    body: 'Sells the marketplace to Buyers: one written brief, comparable quotes, and an award with contact still private.',
+  },
+  {
+    key: 'SUPPLIERS',
+    title: 'Suppliers',
+    body: 'Sells live demand to plant hire companies, waste handlers, materials suppliers, and contractors. They see scope, location, and requirements before they quote.',
+  },
+] as const;
+
+type TemplateKey = (typeof TEMPLATES)[number]['key'];
+
 export function OwnerMarketingPanel({
   initialCampaigns,
-  defaultCtaUrl,
+  marketplaceCtaUrl,
+  supplierCtaUrl,
 }: {
   initialCampaigns: MarketingCampaignSummary[];
-  defaultCtaUrl: string;
+  marketplaceCtaUrl: string;
+  supplierCtaUrl: string;
 }) {
   const [campaigns, setCampaigns] = useState(initialCampaigns);
-  const [ctaUrl, setCtaUrl] = useState(defaultCtaUrl);
+  const [templateKey, setTemplateKey] = useState<TemplateKey>('MARKETPLACE');
+  const [ctaUrl, setCtaUrl] = useState(marketplaceCtaUrl);
   const [lawfulBasis, setLawfulBasis] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+
+  function defaultCtaFor(key: TemplateKey) {
+    return key === 'SUPPLIERS' ? supplierCtaUrl : marketplaceCtaUrl;
+  }
+
+  function selectTemplate(next: TemplateKey) {
+    setTemplateKey(next);
+    setCtaUrl((current) => {
+      const trimmed = current.trim();
+      if (!trimmed || trimmed === marketplaceCtaUrl || trimmed === supplierCtaUrl) {
+        return defaultCtaFor(next);
+      }
+      return current;
+    });
+  }
 
   async function upload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,6 +67,7 @@ export function OwnerMarketingPanel({
       const body = new FormData();
       body.set('file', fileInput.files[0]);
       body.set('ctaUrl', ctaUrl);
+      body.set('templateKey', templateKey);
       const response = await fetch('/api/super-user/owner/marketing/campaigns', { method: 'POST', body });
       const data = await response.json().catch(() => ({})) as { error?: string; campaign?: MarketingCampaignSummary };
       if (!response.ok || !data.campaign) throw new Error(data.error ?? 'Unable to read this spreadsheet');
@@ -113,16 +147,45 @@ export function OwnerMarketingPanel({
     }
   }
 
+  const selectedTemplate = TEMPLATES.find((template) => template.key === templateKey) ?? TEMPLATES[0];
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <Card>
-        <p className="text-sm font-semibold uppercase tracking-[0.12em] text-steel-blue">HSEQ ConsultHub marketing</p>
+        <p className="text-sm font-semibold uppercase tracking-[0.12em] text-steel-blue">Trade Tender marketing</p>
         <h2 className="mt-1 font-heading text-xl font-bold text-foundation-navy">Promotional email campaign</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-concrete-grey">
-          Upload an Excel workbook or CSV of work email addresses. The corporate HSEQ ConsultHub template covers consultant control, client ownership, the consultancy directory, transparent pricing, no fixed contracts, scaling up or down, and paying for one module to onboard five clients.
+          Upload an Excel workbook or CSV of work email addresses. Choose the Buyer marketplace template or the Supplier template, then send. Each message includes an unsubscribe link.
         </p>
         {message && <p className="mt-4 text-sm font-semibold text-foundation-navy" role="status">{message}</p>}
         <form onSubmit={upload} className="mt-5 grid gap-4 md:grid-cols-2">
+          <fieldset className="md:col-span-2">
+            <legend className="text-sm font-semibold text-foundation-navy">Campaign template</legend>
+            <div className="mt-2 grid gap-3 md:grid-cols-2">
+              {TEMPLATES.map((template) => {
+                const selected = template.key === templateKey;
+                return (
+                  <label
+                    key={template.key}
+                    className={`flex min-h-11 cursor-pointer items-start gap-3 rounded-md border px-3 py-3 ${selected ? 'border-trade-blue bg-light-grey' : 'border-slate-300 bg-white'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="templateKey"
+                      value={template.key}
+                      checked={selected}
+                      onChange={() => selectTemplate(template.key)}
+                      className="mt-1 h-4 w-4"
+                    />
+                    <span>
+                      <span className="block text-sm font-semibold text-foundation-navy">{template.title}</span>
+                      <span className="mt-1 block text-xs leading-5 text-concrete-grey">{template.body}</span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
           <FieldGroup>
             <Label htmlFor="marketing-file">Excel or CSV list</Label>
             <Input id="marketing-file" name="file" type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required />
@@ -131,12 +194,15 @@ export function OwnerMarketingPanel({
           <FieldGroup>
             <Label htmlFor="marketing-cta">Destination link</Label>
             <Input id="marketing-cta" type="url" value={ctaUrl} onChange={(event) => setCtaUrl(event.target.value)} placeholder="https://" />
-            <span className="text-xs text-concrete-grey">HTTPS link used on the See HSEQ ConsultHub button. Leave blank to send without a button.</span>
+            <span className="text-xs text-concrete-grey">
+              HTTPS link on the register button. {templateKey === 'SUPPLIERS' ? 'Defaults to the Supplier register page.' : 'Defaults to this environment\'s register page.'} Leave blank to use that default.
+            </span>
           </FieldGroup>
           <div className="flex items-end">
             <Button type="submit" loading={busy === 'upload'}>Load addresses</Button>
           </div>
         </form>
+        <p className="mt-4 text-xs text-concrete-grey">Selected: {selectedTemplate.title}.</p>
         <label className="mt-5 flex items-start gap-3 text-sm text-concrete-grey">
           <input
             type="checkbox"
@@ -155,7 +221,7 @@ export function OwnerMarketingPanel({
           <div key={campaign.id} className="px-6 py-5">
             <p className="font-semibold text-foundation-navy">{campaign.name}</p>
             <p className="mt-1 text-sm text-concrete-grey">
-              {campaign.fileName} · {campaign.counts.total} addresses · {campaign.counts.pending} remaining · {campaign.counts.sent} sent · {campaign.counts.failed} failed · {campaign.counts.skipped} unsubscribed
+              {campaign.templateLabel} · {campaign.fileName} · {campaign.counts.total} addresses · {campaign.counts.pending} remaining · {campaign.counts.sent} sent · {campaign.counts.failed} failed · {campaign.counts.skipped} unsubscribed
             </p>
             {campaign.sampleEmails.length > 0 && (
               <p className="mt-1 text-xs text-concrete-grey">Sample: {campaign.sampleEmails.join(', ')}</p>

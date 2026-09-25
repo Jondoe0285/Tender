@@ -557,29 +557,258 @@ export function demoRequestTemplate(input: { name: string; email: string; organi
   };
 }
 
-const CONSULTHUB_POINTS: Array<[string, string]> = [
-  ['Consultant controlled', 'You run the consultancy, the records, and the client relationship. The platform does not take over the engagement.'],
-  ['Consultants own their clients', 'Your clients stay yours. HSEQ ConsultHub is the workspace you use with them, not a marketplace that inserts itself between you.'],
-  ['Online consultancy directory', 'Buyers can find consultants who are ready to work, instead of relying only on who they already know.'],
-  ['Transparent pricing', 'See what a module costs before you start. There are no hidden platform success fees on your client work.'],
-  ['No fixed contracts', 'There is no lock-in term. Use the modules you need for as long as they earn their keep.'],
-  ['Scale up and down as required', 'Add capacity when the workload is there. Reduce it when it is not.'],
-  ['Pay for one module and onboard five clients', 'Start with a single module and bring five clients onto it. Expand only if that working pattern fits the practice.'],
+const MARKETING_STEPS: Array<{ title: string; body: string; image: string; alt: string; label: string }> = [
+  {
+    label: 'Step 1',
+    title: 'Set out the job once',
+    body: 'Put the trade, quantity, location, and deadline in writing. Matched Suppliers price that brief — not a different conversation each time someone picks up the phone.',
+    image: '/images/prelaunch/specify.png',
+    alt: 'Construction drawings and a tender pack on a site desk',
+  },
+  {
+    label: 'Step 2',
+    title: 'Compare every quote on the same brief',
+    body: 'Price, lead time, and documents sit in one table. For contractor and professional jobs, a Supplier can pay a fixed fee to visit the site before quoting. You award from evidence, not from whoever called last.',
+    image: '/images/prelaunch/compare.png',
+    alt: 'A site office table used to compare quotes',
+  },
+  {
+    label: 'Step 3',
+    title: 'Award, then share contact',
+    body: 'Accept the quote you want. Names, emails, and phone numbers stay private until a site visit is paid for, or until you accept. The job record keeps matching, quotes, and the award together.',
+    image: '/images/prelaunch/supply.png',
+    alt: 'A UK materials yard and plant at dusk',
+  },
 ];
 
-export function hsqeConsultHubMarketingTemplate(input: { unsubscribeUrl: string; ctaUrl?: string | null }): EmailTemplate {
-  const points = CONSULTHUB_POINTS.map(([title, body]) => (
-    `<tr><td style="padding:0 0 16px"><p style="margin:0 0 4px;font-size:15px;font-weight:700;color:${NAVY}">${escapeHtml(title)}</p><p style="margin:0;font-size:14px;line-height:1.6;color:${NAVY}">${escapeHtml(body)}</p></td></tr>`
+const MARKETING_WINS: Array<[string, string]> = [
+  ['Stop repeating the job on the phone', 'One written brief replaces chasing attachments and re-explaining the quantity. Buying teams spend less time qualifying quotes. Suppliers spend less time pricing the wrong version of the job.'],
+  ['See multiple quotes on the same specification', 'Matched Suppliers price the same trade, quantity, location, and deadline. Side-by-side quotes make the award a documented choice, not a guess between a phone note and a PDF.'],
+  ['Reach firms you have not already got on speed dial', 'Buyers see Suppliers they have not previously used. Suppliers see live tenders in their trade and area from Buyers they have not previously reached — without buying a lead list.'],
+  ['Run buying and supplying on one path', 'Materials, plant, waste, contractor work, and professional services sit on one platform: tender, quote, award, and contact release. It is the record of the job from brief to award, not a catalogue and not a phone directory.'],
+];
+
+export const MARKETING_TEMPLATE_KEYS = ['MARKETPLACE', 'SUPPLIERS'] as const;
+export type MarketingTemplateKey = (typeof MARKETING_TEMPLATE_KEYS)[number];
+
+const SUPPLIER_MARKETING_STEPS: Array<{ title: string; body: string; image: string; alt: string; label: string }> = [
+  {
+    label: 'Step 1',
+    title: 'See matched tenders in your trade',
+    body: 'Plant hire companies, waste handlers, materials suppliers, and contractors only see jobs that match their services and location. You are not wading through every tender on the platform.',
+    image: '/images/prelaunch/hero.png',
+    alt: 'A UK construction frame and cranes at dusk',
+  },
+  {
+    label: 'Step 2',
+    title: 'Read the scope before you quote',
+    body: 'The brief already has the location, quantity, and requirements. You decide whether the job interests you before you commit time to a quote.',
+    image: '/images/prelaunch/specify.png',
+    alt: 'Construction drawings and a tender pack on a site desk',
+  },
+  {
+    label: 'Step 3',
+    title: 'Quote the work that fits, and generate revenue',
+    body: 'Provide a quote when the job is worth your time. That is live demand from Buyers you have not previously traded with, not a purchased lead list.',
+    image: '/images/prelaunch/supply.png',
+    alt: 'A UK materials yard and plant at dusk',
+  },
+];
+
+const SUPPLIER_MARKETING_WINS: Array<[string, string]> = [
+  ['Genuine opportunities to generate revenue', 'Buyers are putting live construction jobs out now: plant, waste, materials, and site work. You quote against a written brief. That is paid work from companies you have not previously reached.'],
+  ['Only tender for what interests you', 'You set your services and area. Matched tenders arrive. Skip the rest. You are not quoting every enquiry that lands in a shared inbox.'],
+  ['Scope, location, and requirements before you commit', 'Trade, quantity, location, and deadline sit on the tender. You read them before you start a quote. You are not pricing a phone note or a forwarded PDF with missing details.'],
+  ['You choose when to engage', 'Names and phone numbers stay private until contact is released. For contractor and professional jobs, a fixed fee unlocks a site visit before you quote. Buyers do not get your number until that step.'],
+];
+
+function marketingButton(href: string, label: string): string {
+  return `<a href="${escapeAttribute(href)}" style="display:inline-block;min-height:44px;line-height:44px;background:${TRADE_BLUE};color:${WHITE};padding:0 20px;text-decoration:none;font-family:'Source Sans 3',Arial,sans-serif;font-weight:600;font-size:14px">${escapeHtml(label)}</a>`;
+}
+
+function marketingPhoto(path: string, alt: string, width = 620): string {
+  return `<img src="${escapeAttribute(appUrl(path))}" alt="${escapeHtml(alt)}" width="${width}" style="display:block;width:100%;max-width:${width}px;height:auto;border:0">`;
+}
+
+function marketingStepRows(steps: Array<{ title: string; body: string; image: string; alt: string; label: string }>): string {
+  return steps.map((step) => (
+    `<tr><td style="padding:0 0 24px;background:${WHITE}">${marketingPhoto(step.image, step.alt)}<div style="padding:18px 24px 8px"><p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${STEEL_BLUE}">${escapeHtml(step.label)}</p><p style="margin:0 0 8px;font-size:18px;line-height:1.3;font-weight:700;color:${NAVY}">${escapeHtml(step.title)}</p><p style="margin:0;font-size:14px;line-height:1.65;color:${NAVY}">${escapeHtml(step.body)}</p></div></td></tr>`
   )).join('');
-  const action = input.ctaUrl
-    ? `<p style="margin:28px 0 8px"><a href="${escapeAttribute(input.ctaUrl)}" style="display:inline-block;background:${TRADE_BLUE};color:${WHITE};padding:13px 20px;text-decoration:none;font-family:'Source Sans 3',Arial,sans-serif;font-weight:600;font-size:14px">See HSEQ ConsultHub</a></p>`
-    : '';
-  const logoSrc = escapeAttribute(appUrl('/images/HSQE_ConsultHub_Stacked_Light.png'));
+}
+
+function marketingWinRows(wins: Array<[string, string]>): string {
+  return wins.map(([title, body]) => (
+    `<tr><td style="padding:0 0 12px"><div style="border:1px solid #e2e8f0;background:${WHITE};padding:18px 20px"><p style="margin:0 0 8px;font-size:16px;font-weight:700;color:${NAVY}">${escapeHtml(title)}</p><p style="margin:0;font-size:14px;line-height:1.65;color:${CONCRETE_GREY}">${escapeHtml(body)}</p></div></td></tr>`
+  )).join('');
+}
+
+function marketingCampaignDocument(input: {
+  unsubscribeUrl: string;
+  heroPath: string;
+  heroAlt: string;
+  kicker: string;
+  headlineLines: string[];
+  intro: string;
+  primaryHref: string;
+  primaryLabel: string;
+  bodyTables: string;
+  closingTitle: string;
+  closingBody: string;
+  closingHref: string;
+  closingLabel: string;
+  closingSecondaryHref?: string;
+  closingSecondaryLabel?: string;
+}): string {
   const unsubscribeUrl = escapeAttribute(input.unsubscribeUrl);
+  const logoSrc = escapeAttribute(appUrl('/images/brand/Trade_Tender_Candidate_Horizontal_Logo.png'));
+  const headline = input.headlineLines.map((line) => escapeHtml(line)).join('<br>');
+  const secondary = input.closingSecondaryHref && input.closingSecondaryLabel
+    ? `&nbsp;&nbsp;<a href="${escapeAttribute(input.closingSecondaryHref)}" style="display:inline-block;min-height:44px;line-height:44px;color:${WHITE};padding:0 12px;text-decoration:underline;font-family:'Source Sans 3',Arial,sans-serif;font-weight:600;font-size:14px">${escapeHtml(input.closingSecondaryLabel)}</a>`
+    : '';
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet"></head><body style="margin:0;background:${LIGHT_GREY};font-family:'Source Sans 3',Arial,sans-serif;color:${NAVY}">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${LIGHT_GREY}"><tr><td style="padding:24px 12px">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="620" style="width:100%;max-width:620px;margin:0 auto;background:${NAVY}">
+  <tr><td style="padding:22px 24px 18px;background:${WHITE}"><img src="${logoSrc}" alt="Trade Tender" width="196" style="display:block;width:196px;height:auto;border:0"></td></tr>
+  <tr><td style="padding:0">${marketingPhoto(input.heroPath, input.heroAlt)}</td></tr>
+  <tr><td style="padding:28px 24px 32px;background:${NAVY}">
+    <div style="height:4px;width:64px;background:${SAFETY_AMBER};margin:0 0 16px"></div>
+    <p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:${WHITE}">${escapeHtml(input.kicker)}</p>
+    <h1 style="margin:0 0 14px;font-family:'Source Sans 3',Arial,sans-serif;font-size:28px;line-height:1.15;font-weight:700;color:${WHITE}">${headline}</h1>
+    <p style="margin:0 0 22px;font-size:16px;line-height:1.65;color:${WHITE}">${escapeHtml(input.intro)}</p>
+    ${marketingButton(input.primaryHref, input.primaryLabel)}
+  </td></tr>
+</table>
+${input.bodyTables}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="620" style="width:100%;max-width:620px;margin:0 auto;background:${NAVY}">
+  <tr><td style="padding:32px 24px">
+    <p style="margin:0 0 10px;font-size:20px;line-height:1.3;font-weight:700;color:${WHITE}">${escapeHtml(input.closingTitle)}</p>
+    <p style="margin:0 0 22px;font-size:14px;line-height:1.65;color:${WHITE}">${escapeHtml(input.closingBody)}</p>
+    ${marketingButton(input.closingHref, input.closingLabel)}${secondary}
+  </td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="620" style="width:100%;max-width:620px;margin:0 auto">
+  <tr><td style="padding:20px 8px 8px;font-size:12px;line-height:1.5;color:${CONCRETE_GREY}">Tenders and quotes for UK construction. Trade Tender connects Buyers and Suppliers. It is not a party to the final contract.</td></tr>
+  <tr><td style="padding:0 8px 28px;font-size:11px;line-height:1.5;color:${CONCRETE_GREY}"><a href="${unsubscribeUrl}" style="color:${TRADE_BLUE}">Unsubscribe</a> from future Trade Tender marketing. Account messages about tenders, quotes, and payments are not affected. Do not reply with confidential project information.</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
+/** Owner campaign mailshot for Trade Tender. Photography and navy/amber treatment follow the public landing. */
+export function tradeTenderMarketingTemplate(input: { unsubscribeUrl: string; ctaUrl?: string | null }): EmailTemplate {
+  const primaryHref = input.ctaUrl?.trim() || appUrl('/register');
+  const registerHref = appUrl('/register');
+  const demoHref = appUrl('/demo');
+  const buyerHref = appUrl('/register?intent=buying');
+  const supplierHref = appUrl('/register?intent=supplying');
   return {
-    subject: 'Run your consultancy on HSEQ ConsultHub',
-    html: `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:${LIGHT_GREY};font-family:'Source Sans 3',Arial,sans-serif;color:${NAVY}"><div style="max-width:620px;margin:0 auto;padding:32px 16px"><div style="background:${WHITE};border-top:4px solid ${TRADE_BLUE};box-shadow:0 1px 3px rgba(13,27,42,.08)"><div style="padding:24px 28px 16px;border-bottom:1px solid ${LIGHT_GREY}"><img src="${logoSrc}" alt="HSEQ ConsultHub" width="180" height="72" style="display:block;width:180px;height:auto;border:0"><p style="margin:12px 0 0;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${STEEL_BLUE}">Consultant-controlled compliance platform</p></div><div style="padding:28px"><p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${CONCRETE_GREY}">For UK HSEQ consultants</p><h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;font-weight:700;color:${NAVY}">Your clients. Your control. Transparent pricing.</h1><p style="margin:0 0 20px;font-size:16px;line-height:1.6;color:${NAVY}">HSEQ ConsultHub is for consultants who want to keep control of their own clients, work without a fixed contract, and pay only for the modules they use.</p><table style="border-collapse:collapse;width:100%">${points}</table>${action}</div></div><p style="margin:20px 8px 0;font-size:12px;line-height:1.5;color:${CONCRETE_GREY}">HSEQ ConsultHub is an affiliated partner of Trade Tender. This message is sent by Trade Tender on behalf of HSEQ ConsultHub.</p><p style="margin:10px 8px 0;font-size:11px;line-height:1.5;color:${CONCRETE_GREY}"><a href="${unsubscribeUrl}" style="color:${TRADE_BLUE}">Unsubscribe</a> from future HSEQ ConsultHub marketing. Do not reply with confidential client information.</p></div></body></html>`,
+    subject: 'Take the hassle out of sourcing for your next job',
+    html: marketingCampaignDocument({
+      unsubscribeUrl: input.unsubscribeUrl,
+      heroPath: '/images/prelaunch/hero.png',
+      heroAlt: 'A UK construction frame and cranes at dusk',
+      kicker: 'UK construction marketplace',
+      headlineLines: ['Set out the job.', 'Compare quotes.', 'Award the work.'],
+      intro: 'You already pay for every extra call that creates another version of the brief. Trade Tender is the marketplace where Buyers publish one job, matched Suppliers quote that job, and you award with names still private until you choose to share them.',
+      primaryHref,
+      primaryLabel: 'Create an account',
+      bodyTables: `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="620" style="width:100%;max-width:620px;margin:0 auto;background:${WHITE}">
+  <tr><td style="padding:28px 24px 8px">
+    <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:${STEEL_BLUE}">How it operates</p>
+    <p style="margin:0 0 8px;font-size:22px;line-height:1.25;font-weight:700;color:${NAVY}">Everyone quotes the same job</p>
+    <p style="margin:0 0 20px;font-size:14px;line-height:1.65;color:${NAVY}">Three steps from tender to award. You are not comparing different versions of the brief, and you are not handing out phone numbers to every caller.</p>
+  </td></tr>
+  ${marketingStepRows(MARKETING_STEPS)}
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="620" style="width:100%;max-width:620px;margin:0 auto;background:${LIGHT_GREY}">
+  <tr><td style="padding:28px 24px 8px">
+    <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:${STEEL_BLUE}">Why create an account</p>
+    <p style="margin:0 0 8px;font-size:22px;line-height:1.25;font-weight:700;color:${NAVY}">Win the next job on a written record</p>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.65;color:${NAVY}">Sign up to run tenders and quotes in one place — including companies you have not previously traded with.</p>
+  </td></tr>
+  <tr><td style="padding:0 24px 12px"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${marketingWinRows(MARKETING_WINS)}</table></td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="620" style="width:100%;max-width:620px;margin:0 auto;background:${WHITE}">
+  <tr><td style="padding:28px 24px 8px">
+    <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${STEEL_BLUE}">Buyers</p>
+    <p style="margin:0 0 8px;font-size:18px;font-weight:700;color:${NAVY}">Raise a tender and collect comparable quotes</p>
+    <p style="margin:0 0 14px;font-size:14px;line-height:1.65;color:${CONCRETE_GREY}">For site teams and buying teams that need materials, plant, waste, contractor work, or professional services. Publish one job and receive quotes from matched Suppliers — including firms you have not previously reached — then award from the same table.</p>
+    <p style="margin:0 0 28px">${marketingButton(buyerHref, 'Create a Buyer account')}</p>
+    <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${STEEL_BLUE}">Suppliers</p>
+    <p style="margin:0 0 8px;font-size:18px;font-weight:700;color:${NAVY}">Quote live jobs in your trade and area</p>
+    <p style="margin:0 0 14px;font-size:14px;line-height:1.65;color:${CONCRETE_GREY}">You only see tenders that match your services and location. Read the brief, then quote. That is new demand from Buyers you have not previously traded with. For contractor and professional jobs, pay a fixed fee to contact the Buyer for a site visit first.</p>
+    <p style="margin:0 0 12px">${marketingButton(supplierHref, 'Create a Supplier account')}</p>
+  </td></tr>
+</table>`,
+      closingTitle: 'Create an account and run the next job on the platform',
+      closingBody: 'Buyers publish a brief. Suppliers quote it. You award the work with a full record — not a trail of calls and forwarded PDFs.',
+      closingHref: registerHref,
+      closingLabel: 'Create an account',
+      closingSecondaryHref: demoHref,
+      closingSecondaryLabel: 'Request a demo',
+    }),
   };
+}
+
+/** Owner campaign mailshot for plant hire, waste, materials, and contractor Suppliers. */
+export function tradeTenderSupplierMarketingTemplate(input: { unsubscribeUrl: string; ctaUrl?: string | null }): EmailTemplate {
+  const primaryHref = input.ctaUrl?.trim() || appUrl('/register?intent=supplying');
+  return {
+    subject: 'Quote live jobs that already have a written brief',
+    html: marketingCampaignDocument({
+      unsubscribeUrl: input.unsubscribeUrl,
+      heroPath: '/images/prelaunch/supply.png',
+      heroAlt: 'A UK materials yard and plant at dusk',
+      kicker: 'For UK Suppliers · plant, waste, materials, and site work',
+      headlineLines: ['See the brief first.', 'Quote only the jobs that fit.'],
+      intro: 'Trade Tender puts genuine construction demand in front of plant hire companies, waste handlers, materials suppliers, and contractors. You see the scope, location, and requirements first. You only quote the jobs that interest you. That is revenue from Buyers you have not previously reached — not a purchased lead list.',
+      primaryHref,
+      primaryLabel: 'Create a Supplier account',
+      bodyTables: `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="620" style="width:100%;max-width:620px;margin:0 auto;background:${WHITE}">
+  <tr><td style="padding:28px 24px 8px">
+    <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:${STEEL_BLUE}">How it works for Suppliers</p>
+    <p style="margin:0 0 8px;font-size:22px;line-height:1.25;font-weight:700;color:${NAVY}">Read the job. Then decide whether to quote.</p>
+    <p style="margin:0 0 20px;font-size:14px;line-height:1.65;color:${NAVY}">You are not committing a quote until you have seen the written brief. Skip anything that does not fit your plant, yard, or trade.</p>
+  </td></tr>
+  ${marketingStepRows(SUPPLIER_MARKETING_STEPS)}
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="620" style="width:100%;max-width:620px;margin:0 auto;background:${LIGHT_GREY}">
+  <tr><td style="padding:28px 24px 8px">
+    <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:${STEEL_BLUE}">Why Suppliers create an account</p>
+    <p style="margin:0 0 8px;font-size:22px;line-height:1.25;font-weight:700;color:${NAVY}">Live demand, without quoting every enquiry</p>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.65;color:${NAVY}">Sign up to receive matched tenders. Quote the work that generates revenue for your business.</p>
+  </td></tr>
+  <tr><td style="padding:0 24px 12px"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${marketingWinRows(SUPPLIER_MARKETING_WINS)}</table></td></tr>
+</table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="620" style="width:100%;max-width:620px;margin:0 auto;background:${WHITE}">
+  <tr><td style="padding:28px 24px 8px">
+    <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${STEEL_BLUE}">Built for your trade</p>
+    <p style="margin:0 0 8px;font-size:18px;font-weight:700;color:${NAVY}">Plant hire, waste, materials, and contractors</p>
+    <p style="margin:0 0 14px;font-size:14px;line-height:1.65;color:${CONCRETE_GREY}">Set the services you supply and the area you cover. Matched Buyers publish a brief with scope, location, and requirements. You tender for the jobs that interest you. Contact stays private until you engage.</p>
+    <p style="margin:0 0 12px">${marketingButton(primaryHref, 'Create a Supplier account')}</p>
+  </td></tr>
+</table>`,
+      closingTitle: 'Start quoting jobs that already have a written brief',
+      closingBody: 'Create a Supplier account, set your trade and area, and only tender for the work that fits.',
+      closingHref: primaryHref,
+      closingLabel: 'Create a Supplier account',
+      closingSecondaryHref: appUrl('/demo'),
+      closingSecondaryLabel: 'Request a demo',
+    }),
+  };
+}
+
+export function marketingTemplateForKey(
+  key: string,
+  input: { unsubscribeUrl: string; ctaUrl?: string | null },
+): EmailTemplate {
+  if (key === MARKETING_TEMPLATE_KEYS[1]) return tradeTenderSupplierMarketingTemplate(input);
+  return tradeTenderMarketingTemplate(input);
+}
+
+export function marketingTemplateLabel(key: string): string {
+  if (key === 'SUPPLIERS') return 'Suppliers';
+  return 'Buyers and mixed lists';
 }
 
 function escapeHtml(value: string): string {

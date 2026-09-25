@@ -2,10 +2,10 @@ import { prisma } from '@/server/data/prisma';
 import { ValidationError } from '@/server/auth/session';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { parseMarketingEmailList, maskMarketingEmail } from '@/server/domain/marketingListParser';
-import { hsqeConsultHubMarketingTemplate } from '@/server/notifications/emailTemplates';
+import { marketingTemplateForKey, marketingTemplateLabel } from '@/server/notifications/emailTemplates';
 import { isEmailConfigured, sendTransactionalEmail } from '@/server/notifications/resend';
 import { marketingUnsubscribeApiUrl, marketingUnsubscribeUrl } from '@/server/notifications/marketingUnsubscribe';
-import { marketingCtaUrlSchema } from '@/lib/schemas/marketing';
+import { marketingCtaUrlSchema, marketingTemplateKeySchema } from '@/lib/schemas/marketing';
 
 export const MARKETING_SEND_BATCH_SIZE = 15;
 
@@ -21,6 +21,8 @@ export type MarketingCampaignSummary = {
   id: string;
   name: string;
   fileName: string;
+  templateKey: string;
+  templateLabel: string;
   ctaUrl: string | null;
   status: string;
   createdAt: string;
@@ -32,7 +34,7 @@ export async function listMarketingCampaigns(): Promise<MarketingCampaignSummary
   const campaigns = await prisma.marketingCampaign.findMany({
     orderBy: { createdAt: 'desc' },
     take: 20,
-    select: { id: true, name: true, fileName: true, ctaUrl: true, status: true, createdAt: true },
+    select: { id: true, name: true, fileName: true, templateKey: true, ctaUrl: true, status: true, createdAt: true },
   });
   if (campaigns.length === 0) return [];
 
@@ -80,6 +82,8 @@ export async function listMarketingCampaigns(): Promise<MarketingCampaignSummary
     id: campaign.id,
     name: campaign.name,
     fileName: campaign.fileName,
+    templateKey: campaign.templateKey,
+    templateLabel: marketingTemplateLabel(campaign.templateKey),
     ctaUrl: campaign.ctaUrl,
     status: campaign.status,
     createdAt: campaign.createdAt.toISOString(),
@@ -94,7 +98,11 @@ export async function createMarketingCampaign(input: {
   bytes: Buffer;
   ctaUrl: string;
   name: string;
+  templateKey: string;
 }): Promise<MarketingCampaignSummary> {
+  const parsedTemplate = marketingTemplateKeySchema.safeParse(input.templateKey);
+  if (!parsedTemplate.success) throw new ValidationError('Choose a campaign template.');
+  const templateKey = parsedTemplate.data;
   const trimmedCta = input.ctaUrl.trim();
   let ctaUrl: string | null = null;
   if (trimmedCta) {
@@ -110,11 +118,15 @@ export async function createMarketingCampaign(input: {
     })).map((row) => row.email),
   );
 
-  const name = input.name.trim().slice(0, 160) || `HSEQ ConsultHub — ${parsed.fileName}`;
+  const defaultName = templateKey === 'SUPPLIERS'
+    ? `Trade Tender Suppliers — ${parsed.fileName}`
+    : `Trade Tender — ${parsed.fileName}`;
+  const name = input.name.trim().slice(0, 160) || defaultName;
   const campaign = await prisma.marketingCampaign.create({
     data: {
       name,
       fileName: parsed.fileName,
+      templateKey,
       ctaUrl,
       createdById: input.actorId,
     },
@@ -137,7 +149,7 @@ export async function createMarketingCampaign(input: {
     action: 'MARKETING_CAMPAIGN_CREATED',
     targetType: 'MarketingCampaign',
     targetId: campaign.id,
-    metadata: { recipientCount: parsed.emails.length, skippedUnsubscribed: unsubscribed.size, ignoredCells: parsed.ignoredCells },
+    metadata: { recipientCount: parsed.emails.length, skippedUnsubscribed: unsubscribed.size, ignoredCells: parsed.ignoredCells, templateKey },
   });
 
   const pending = parsed.emails.length - unsubscribed.size;
@@ -145,6 +157,8 @@ export async function createMarketingCampaign(input: {
     id: campaign.id,
     name,
     fileName: parsed.fileName,
+    templateKey,
+    templateLabel: marketingTemplateLabel(templateKey),
     ctaUrl,
     status: 'DRAFT',
     createdAt: campaign.createdAt.toISOString(),
@@ -162,7 +176,7 @@ export async function createMarketingCampaign(input: {
 export async function previewMarketingCampaign(input: { actorId: string; actorEmail: string; campaignId: string }) {
   const campaign = await prisma.marketingCampaign.findUnique({ where: { id: input.campaignId } });
   if (!campaign) throw new ValidationError('Campaign not found.');
-  await sendConsultHubMessage(input.actorEmail, campaign.ctaUrl);
+  await sendTradeTenderMarketingMessage(input.actorEmail, campaign.ctaUrl, campaign.templateKey);
   await recordAuditEvent({
     actorId: input.actorId,
     action: 'MARKETING_CAMPAIGN_PREVIEWED',
@@ -229,7 +243,7 @@ export async function sendMarketingCampaignBatch(input: {
       continue;
     }
 
-    const result = await sendConsultHubMessage(recipient.email, campaign.ctaUrl);
+    const result = await sendTradeTenderMarketingMessage(recipient.email, campaign.ctaUrl, campaign.templateKey);
     if (result.sent) {
       await prisma.marketingCampaignRecipient.update({
         where: { id: recipient.id },
@@ -281,8 +295,8 @@ export async function unsubscribeMarketingEmail(email: string, source: 'link' | 
   });
 }
 
-async function sendConsultHubMessage(to: string, ctaUrl: string | null) {
-  const template = hsqeConsultHubMarketingTemplate({
+async function sendTradeTenderMarketingMessage(to: string, ctaUrl: string | null, templateKey: string) {
+  const template = marketingTemplateForKey(templateKey, {
     unsubscribeUrl: marketingUnsubscribeUrl(to),
     ctaUrl,
   });
@@ -291,6 +305,6 @@ async function sendConsultHubMessage(to: string, ctaUrl: string | null) {
       'List-Unsubscribe': `<${marketingUnsubscribeApiUrl(to)}>`,
       'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
     },
-    tags: [{ name: 'category', value: 'hsqe-consulthub-marketing' }],
+    tags: [{ name: 'category', value: templateKey === 'SUPPLIERS' ? 'trade-tender-supplier-marketing' : 'trade-tender-marketing' }],
   });
 }

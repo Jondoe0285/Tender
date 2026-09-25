@@ -8,6 +8,11 @@ import { PaymentWaiverPanel } from '@/components/admin/PaymentWaiverPanel';
 import { SuperUserSettingsPanel } from '@/components/admin/SuperUserSettingsPanel';
 import { getAdminSettings } from '@/server/domain/platformSettings';
 import { listMarketingCampaigns } from '@/server/domain/marketingCampaignService';
+import { appUrl } from '@/server/config/appUrl';
+
+function httpsUrlOrEmpty(value: string) {
+  return value.startsWith('https:') ? value : '';
+}
 
 export default async function OwnerConsolePage() {
   const user = await getCurrentUser();
@@ -40,7 +45,11 @@ export default async function OwnerConsolePage() {
     <AppShell role="super-user" title="Owner Console">
       <div className="space-y-8">
         <OwnerConsolePanel initialSuperUsers={superUsers} currentUserId={user.id} />
-        <OwnerMarketingPanel initialCampaigns={campaigns} defaultCtaUrl={process.env.HSQE_CONSULTHUB_URL?.trim() ?? ''} />
+        <OwnerMarketingPanel
+          initialCampaigns={campaigns}
+          marketplaceCtaUrl={httpsUrlOrEmpty(appUrl('/register'))}
+          supplierCtaUrl={httpsUrlOrEmpty(appUrl('/register?intent=supplying'))}
+        />
         <SuperUserSettingsPanel initialSettings={settings} isOwner currentUserId={user.id} />
         <PaymentWaiverPanel initialUsers={users} initialWaivers={waivers} />
       </div>

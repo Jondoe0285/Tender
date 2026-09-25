@@ -24,7 +24,7 @@ export function UnsubscribeMarketingForm({ token }: { token: string }) {
   }
 
   if (status === 'done') {
-    return <p className="mt-4 text-sm font-semibold text-foundation-navy" role="status">You are unsubscribed from HSEQ ConsultHub marketing emails.</p>;
+    return <p className="mt-4 text-sm font-semibold text-foundation-navy" role="status">You are unsubscribed from Trade Tender marketing emails.</p>;
   }
 
   return (

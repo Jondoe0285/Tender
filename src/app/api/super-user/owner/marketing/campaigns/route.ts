@@ -41,6 +41,7 @@ export async function POST(request: Request) {
       bytes,
       ctaUrl: String(form.get('ctaUrl') ?? ''),
       name: String(form.get('name') ?? ''),
+      templateKey: String(form.get('templateKey') ?? 'MARKETPLACE'),
     });
     return NextResponse.json({ campaign }, { status: 201 });
   } catch (error) {
