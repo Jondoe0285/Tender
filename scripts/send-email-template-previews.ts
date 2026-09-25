@@ -12,6 +12,7 @@ import {
   contentReviewOutcomeTemplate,
   emailVerificationTemplate,
   enhancedVerificationInvitationTemplate,
+  hsqeConsultHubMarketingTemplate,
   failedPaymentTemplate,
   newRegistrationTemplate,
   passwordResetTemplate,
@@ -57,6 +58,7 @@ const catalog: Record<Audience, Array<[string, EmailTemplate]>> = {
     ['tender-warning-escalation', tenderWarningEscalationTemplate({ activeWarningCount: 3, reviewPath: '/super-user/users/preview-client' })],
     ['support-request-notification', supportRequestNotificationTemplate({ type: 'CHANGE', submittedAt: previewDate })],
     ['configuration-test', configurationTestTemplate({ environment: 'email-trigger-simulation', sentAt: previewDate })],
+    ['hsqe-consulthub-marketing', hsqeConsultHubMarketingTemplate({ unsubscribeUrl: `${previewLink}/unsubscribe`, ctaUrl: 'https://consulthub.example.test' })],
   ],
   consultant: [
     ['enhanced-verification-invitation', enhancedVerificationInvitationTemplate({ recipientName: 'Preview Consultant', inviteLink: previewLink, expiresAt: previewDate })],

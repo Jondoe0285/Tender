@@ -38,7 +38,11 @@ export type TenderNotification = {
   requirementSummary: string;
 };
 
-export async function sendTransactionalEmail(to: string, template: EmailTemplate, options: { replyTo?: string } = {}) {
+export async function sendTransactionalEmail(
+  to: string,
+  template: EmailTemplate,
+  options: { replyTo?: string; headers?: Record<string, string>; tags?: Array<{ name: string; value: string }> } = {},
+) {
   const resend = getResendClient();
   if (!resend) return { sent: false, reason: 'RESEND_API_KEY is not configured' } as const;
 
@@ -51,6 +55,8 @@ export async function sendTransactionalEmail(to: string, template: EmailTemplate
     subject: template.subject,
     html: template.html,
     ...(options.replyTo ? { replyTo: options.replyTo } : {}),
+    ...(options.headers ? { headers: options.headers } : {}),
+    ...(options.tags ? { tags: options.tags } : {}),
   });
 
   if (result.error) return { sent: false, reason: result.error.message } as const;

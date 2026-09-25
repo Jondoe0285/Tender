@@ -200,6 +200,7 @@ model User {
   awardsGiven       Award[]   @relation("AwardActor")
   controlChangesProposed ControlChange[] @relation("ControlChangeProposer")
   controlChangesConfirmed ControlChange[] @relation("ControlChangeConfirmer")
+  marketingCampaignsCreated MarketingCampaign[] @relation("MarketingCampaignCreator")
 }
 
 model RateLimitEntry {
@@ -1088,4 +1089,45 @@ model PaymentWaiver {
   payments         Payment[]
 
   @@index([userId, feeType, revokedAt, expiresAt])
+}
+
+model MarketingCampaign {
+  id                      String   @id @default(cuid())
+  name                    String
+  templateKey             String   @default("HSQE_CONSULTHUB")
+  fileName                String
+  ctaUrl                  String?
+  status                  String   @default("DRAFT")
+  createdById             String
+  createdBy               User     @relation("MarketingCampaignCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  lawfulBasisConfirmedAt  DateTime?
+  startedAt               DateTime?
+  completedAt             DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  recipients              MarketingCampaignRecipient[]
+
+  @@index([createdById, createdAt])
+  @@index([status, createdAt])
+}
+
+model MarketingCampaignRecipient {
+  id         String    @id @default(cuid())
+  campaignId String
+  campaign   MarketingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  email      String
+  status     String    @default("PENDING")
+  error      String?
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@unique([campaignId, email])
+  @@index([campaignId, status])
+}
+
+model MarketingUnsubscribe {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  unsubscribedAt  DateTime @default(now())
+  source          String
 }

@@ -71,4 +71,11 @@ test('Owner sets launch time and the home page switches on that instant', () => 
   assert.doesNotMatch(prelaunch, /Sign in/);
   assert.match(live, /href="\/login"/);
   assert.match(live, /Sign in/);
+  assert.match(live, /Why create an account/);
+  assert.match(live, /Cost control/);
+  assert.match(live, /Multiple quotes on the same job/);
+  assert.match(live, /Reach you did not already have/);
+  assert.match(live, /New trading opportunities/);
+  assert.match(live, /complete buying and supplying path/);
+  assert.doesNotMatch(live, /Amazing savings|Revolutionary|Game changing/);
 });

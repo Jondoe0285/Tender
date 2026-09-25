@@ -557,6 +557,31 @@ export function demoRequestTemplate(input: { name: string; email: string; organi
   };
 }
 
+const CONSULTHUB_POINTS: Array<[string, string]> = [
+  ['Consultant controlled', 'You run the consultancy, the records, and the client relationship. The platform does not take over the engagement.'],
+  ['Consultants own their clients', 'Your clients stay yours. HSEQ ConsultHub is the workspace you use with them, not a marketplace that inserts itself between you.'],
+  ['Online consultancy directory', 'Buyers can find consultants who are ready to work, instead of relying only on who they already know.'],
+  ['Transparent pricing', 'See what a module costs before you start. There are no hidden platform success fees on your client work.'],
+  ['No fixed contracts', 'There is no lock-in term. Use the modules you need for as long as they earn their keep.'],
+  ['Scale up and down as required', 'Add capacity when the workload is there. Reduce it when it is not.'],
+  ['Pay for one module and onboard five clients', 'Start with a single module and bring five clients onto it. Expand only if that working pattern fits the practice.'],
+];
+
+export function hsqeConsultHubMarketingTemplate(input: { unsubscribeUrl: string; ctaUrl?: string | null }): EmailTemplate {
+  const points = CONSULTHUB_POINTS.map(([title, body]) => (
+    `<tr><td style="padding:0 0 16px"><p style="margin:0 0 4px;font-size:15px;font-weight:700;color:${NAVY}">${escapeHtml(title)}</p><p style="margin:0;font-size:14px;line-height:1.6;color:${NAVY}">${escapeHtml(body)}</p></td></tr>`
+  )).join('');
+  const action = input.ctaUrl
+    ? `<p style="margin:28px 0 8px"><a href="${escapeAttribute(input.ctaUrl)}" style="display:inline-block;background:${TRADE_BLUE};color:${WHITE};padding:13px 20px;text-decoration:none;font-family:'Source Sans 3',Arial,sans-serif;font-weight:600;font-size:14px">See HSEQ ConsultHub</a></p>`
+    : '';
+  const logoSrc = escapeAttribute(appUrl('/images/HSQE_ConsultHub_Stacked_Light.png'));
+  const unsubscribeUrl = escapeAttribute(input.unsubscribeUrl);
+  return {
+    subject: 'Run your consultancy on HSEQ ConsultHub',
+    html: `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:${LIGHT_GREY};font-family:'Source Sans 3',Arial,sans-serif;color:${NAVY}"><div style="max-width:620px;margin:0 auto;padding:32px 16px"><div style="background:${WHITE};border-top:4px solid ${TRADE_BLUE};box-shadow:0 1px 3px rgba(13,27,42,.08)"><div style="padding:24px 28px 16px;border-bottom:1px solid ${LIGHT_GREY}"><img src="${logoSrc}" alt="HSEQ ConsultHub" width="180" height="72" style="display:block;width:180px;height:auto;border:0"><p style="margin:12px 0 0;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${STEEL_BLUE}">Consultant-controlled compliance platform</p></div><div style="padding:28px"><p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${CONCRETE_GREY}">For UK HSEQ consultants</p><h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;font-weight:700;color:${NAVY}">Your clients. Your control. Transparent pricing.</h1><p style="margin:0 0 20px;font-size:16px;line-height:1.6;color:${NAVY}">HSEQ ConsultHub is for consultants who want to keep control of their own clients, work without a fixed contract, and pay only for the modules they use.</p><table style="border-collapse:collapse;width:100%">${points}</table>${action}</div></div><p style="margin:20px 8px 0;font-size:12px;line-height:1.5;color:${CONCRETE_GREY}">HSEQ ConsultHub is an affiliated partner of Trade Tender. This message is sent by Trade Tender on behalf of HSEQ ConsultHub.</p><p style="margin:10px 8px 0;font-size:11px;line-height:1.5;color:${CONCRETE_GREY}"><a href="${unsubscribeUrl}" style="color:${TRADE_BLUE}">Unsubscribe</a> from future HSEQ ConsultHub marketing. Do not reply with confidential client information.</p></div></body></html>`,
+  };
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] ?? character);
 }
