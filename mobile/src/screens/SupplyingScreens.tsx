@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { AppState, Linking, View } from 'react-native';
 import { loadOpportunities, type MobileOpportunitySummary } from '../api/opportunities';
-import { loadVerificationDocuments, submitVerification, uploadVerificationDocument, type VerificationDocumentsPayload } from '../api/verification';
+import { loadIndependentReview, loadVerificationDocuments, purchaseIndependentReview, submitVerification, uploadVerificationDocument, type IndependentReviewPayload, type VerificationDocumentsPayload } from '../api/verification';
 import { loadSubmittedQuotes, type SubmittedQuoteRow } from '../api/workspace';
 import { formatUkDate } from '../constants';
 import { pickVerificationDocument } from '../files';
@@ -60,18 +60,26 @@ export function SubmittedQuotesScreen({ go }: { go: (route: Route) => void }) {
 
 export function VerificationScreen() {
   const [data, setData] = useState<VerificationDocumentsPayload | null>(null);
+  const [review, setReview] = useState<IndependentReviewPayload | null>(null);
   const [documentType, setDocumentType] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [message, setMessage] = useState<string | null>(null);
 
   async function reload() {
-    const loaded = await loadVerificationDocuments();
+    const [loaded, independentReview] = await Promise.all([loadVerificationDocuments(), loadIndependentReview()]);
     setData(loaded);
+    setReview(independentReview);
     setDocumentType(loaded.applicableDocumentTypes[0] ?? loaded.requiredDocumentTypes[0] ?? '');
   }
 
   useEffect(() => {
     reload().catch((reason) => setMessage(reason instanceof Error ? reason.message : 'Unable to load verification.'));
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        reload().catch(() => undefined);
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   if (!data && !message) return <Body>Loading verification…</Body>;
@@ -79,7 +87,7 @@ export function VerificationScreen() {
   return (
     <View>
       <Title>Verification</Title>
-      <Body>Upload the required PDF evidence (under 2 MB each), then submit. Required types must have a future expiry date where they expire. Use a text PDF from Companies House or your insurer; photographs and large scans are not accepted.</Body>
+      <Body>Upload the required PDF evidence (under 2 MB each), then submit. Required types must have a future expiry date where they expire. Use a text PDF from Companies House or your insurer; photographs and large scans are not accepted. This is a PDF text check, not a Companies House, HMRC, or insurer lookup, and it does not confirm insurance or competence.</Body>
       <Notice>{message}</Notice>
       {data && (
         <>
@@ -113,6 +121,29 @@ export function VerificationScreen() {
             submitVerification().then((result) => setMessage(`Verification ${result.verificationStatus.toLowerCase()}.`)).catch((reason) => setMessage(reason instanceof Error ? reason.message : 'Unable to submit verification.'));
           }} />
         </>
+      )}
+      {review?.active && review.eligible && (
+        <Card>
+          <Title>Enhanced verification</Title>
+          <Body>Bronze £{review.fees.BRONZE} / Silver £{review.fees.SILVER} / Gold £{review.fees.GOLD} excl. VAT. After payment, HSQE Consult Hub starts onboarding. The auditor may award the purchased tier or a lower tier.</Body>
+          <Body>Status: {review.status === 'APPROVED' ? (review.tier ?? 'Bronze') : review.status === 'PURCHASED' ? 'Awaiting review' : review.status === 'DECLINED' ? 'Not approved' : 'Not purchased'}</Body>
+          {review.purchasableTiers.map((tier) => (
+            <SecondaryButton
+              key={tier}
+              label={`Purchase ${tier[0]}${tier.slice(1).toLowerCase()} (£${review.fees[tier]})`}
+              onPress={() => {
+                purchaseIndependentReview(tier).then(async (outcome) => {
+                  if (outcome.checkoutUrl) {
+                    await Linking.openURL(outcome.checkoutUrl);
+                    setMessage('Payment is pending. Return to the app after payment to check confirmation.');
+                    return;
+                  }
+                  setMessage('Payment is pending server confirmation.');
+                }).catch((reason) => setMessage(reason instanceof Error ? reason.message : 'Unable to start enhanced verification payment.'));
+              }}
+            />
+          ))}
+        </Card>
       )}
     </View>
   );

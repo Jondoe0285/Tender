@@ -1,4 +1,4 @@
-import { mobileApiFetch, readErrorMessage } from './client';
+import { mobileApiFetch, MOBILE_PAYMENT_RETURN, readErrorMessage } from './client';
 
 export type VerificationDocumentsPayload = {
   applicableDocumentTypes: string[];
@@ -35,4 +35,29 @@ export async function submitVerification() {
   const response = await mobileApiFetch('/api/retailer/verification', { method: 'POST' });
   if (!response.ok) throw new Error(await readErrorMessage(response, 'Unable to submit verification.'));
   return response.json() as Promise<{ verificationStatus: string }>;
+}
+
+export type IndependentReviewPayload = {
+  active: boolean;
+  eligible: boolean;
+  fees: { BRONZE: number; SILVER: number; GOLD: number };
+  status: string;
+  tier: 'BRONZE' | 'SILVER' | 'GOLD' | null;
+  purchasableTiers: Array<'BRONZE' | 'SILVER' | 'GOLD'>;
+};
+
+export async function loadIndependentReview(): Promise<IndependentReviewPayload> {
+  const response = await mobileApiFetch('/api/retailer/independent-review');
+  if (!response.ok) throw new Error(await readErrorMessage(response, 'Unable to load enhanced verification.'));
+  return response.json() as Promise<IndependentReviewPayload>;
+}
+
+export async function purchaseIndependentReview(tier: 'BRONZE' | 'SILVER' | 'GOLD') {
+  const response = await mobileApiFetch('/api/retailer/independent-review', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tier, mobileReturnUrl: MOBILE_PAYMENT_RETURN }),
+  });
+  if (!response.ok) throw new Error(await readErrorMessage(response, 'Unable to start enhanced verification payment.'));
+  return response.json() as Promise<{ checkoutUrl?: string | null; paymentId: string }>;
 }

@@ -5,10 +5,15 @@ import test from 'node:test';
 test('mobile verification uploads use the same 2 MB PDF cap as SaaS', () => {
   const files = readFileSync('src/files.ts', 'utf8');
   const screen = readFileSync('src/screens/SupplyingScreens.tsx', 'utf8');
+  const api = readFileSync('src/api/verification.ts', 'utf8');
   assert.match(files, /MAX_VERIFICATION_DOCUMENT_BYTES = 2 \* 1024 \* 1024/);
   assert.match(files, /pickVerificationDocument/);
   assert.match(screen, /pickVerificationDocument/);
   assert.match(screen, /under 2 MB/);
+  assert.match(api, /\/api\/retailer\/independent-review/);
+  assert.match(screen, /Bronze £/);
+  assert.match(screen, /purchaseIndependentReview/);
+  assert.match(screen, /PDF text check/);
 });
 
 test('mobile workspace covers Buyer and Supplier SaaS destinations', () => {
@@ -37,4 +42,6 @@ test('mobile registration and quote accept match the SaaS required fields', () =
   assert.match(quotes, /purchaseOrderNumber/);
   assert.match(quotes, /declarationAccepted/);
   assert.match(quotes, /secondApproverEmail/);
+  assert.match(quotes, /independentReviewTier/);
+  assert.match(readFileSync('src/screens/TenderScreen.tsx', 'utf8'), /paid professional review was recorded/);
 });

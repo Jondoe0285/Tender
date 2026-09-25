@@ -8,6 +8,7 @@ import { createPasswordResetToken, PASSWORD_RESET_EXPIRY_LABEL } from '@/server/
 import { appUrl, passwordResetTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import { markUploadedDocumentsVerified } from '@/server/domain/verificationDocumentService';
+import { notifyIndependentReviewDecision } from '@/server/domain/independentReviewService';
 import { independentReviewTierRank } from '@/lib/independentReviewTiers';
 import { defaultLaunchCreditExpiry } from '@/lib/launch-credits';
 
@@ -234,8 +235,9 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       action: action === 'approve-independent-review' ? 'INDEPENDENT_REVIEW_APPROVED' : 'INDEPENDENT_REVIEW_DECLINED',
       targetType: 'User',
       targetId: user.id,
-      metadata: { email: user.email, note: note ?? undefined },
+      metadata: { email: user.email, note: note ?? undefined, source: 'SUPER_USER' },
     });
+    await notifyIndependentReviewDecision(user.email, { approved: nextStatus === 'APPROVED', tier });
     return NextResponse.json({ status: 'independent-review-decided', independentReviewStatus: nextStatus, independentReviewTier: tier });
   }
 

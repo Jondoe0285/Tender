@@ -38,15 +38,15 @@ const TYPE_PHRASES: Record<VerificationDocumentType, readonly string[]> = {
   PROFESSIONAL_QUALIFICATIONS: ['qualification', 'diploma', 'nvq', 'cscs', 'degree certificate'],
   PROFESSIONAL_INDEMNITY_INSURANCE: ['professional indemnity', 'professional indemnity insurance', 'pii'],
   SSIP_ACCREDITATION: ['ssip', 'chas', 'smas', 'safecontractor', 'constructionline'],
-  HMRC_UTR_CONFIRMATION: ['unique taxpayer', 'utr', 'hmrc'],
+  HMRC_UTR_CONFIRMATION: ['unique taxpayer', 'utr confirmation'],
   SA302_TAX_CALCULATION: ['sa302', 'tax calculation', 'self assessment'],
   VAT_REGISTRATION_CERTIFICATE: ['vat registration', 'vat certificate', 'vat number'],
-  CIS_REGISTRATION_PROOF: ['construction industry scheme', 'cis registration', 'cis'],
+  CIS_REGISTRATION_PROOF: ['construction industry scheme', 'cis registration'],
   BUSINESS_BANK_STATEMENT: ['bank statement', 'sort code', 'account number', 'iban'],
   CUSTOMER_INVOICES: ['invoice', 'tax invoice'],
   CUSTOMER_QUOTATIONS_OR_CONTRACTS: ['quotation', 'quote no', 'contract'],
   TRADE_BODY_MEMBERSHIP: ['membership', 'member number', 'trade body'],
-  TRADING_ACTIVITY_EVIDENCE: ['www.', 'http', 'website', 'trading as'],
+  TRADING_ACTIVITY_EVIDENCE: ['website', 'trading as'],
 };
 
 const MONTHS: Record<string, number> = {

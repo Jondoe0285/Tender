@@ -17,7 +17,8 @@ import {
   passwordResetTemplate,
   paymentConfirmationTemplate,
   paymentReversedTemplate,
-  providerVerificationReviewRequiredTemplate,
+  providerAutomatedVerificationTemplate,
+  independentReviewDecisionTemplate,
   quoteAcceptedTemplate,
   quoteReceivedTemplate,
   supportRequestInformationTemplate,
@@ -49,7 +50,10 @@ function tagged(audience: Audience, trigger: string, template: EmailTemplate): E
 const catalog: Record<Audience, Array<[string, EmailTemplate]>> = {
   owner: [
     ['new-registration-notification', newRegistrationTemplate({ role: 'USER', email: 'client@example.test', contactName: 'Preview Client', companyName: 'Preview Construction Ltd' })],
-    ['provider-verification-human-review', providerVerificationReviewRequiredTemplate({ confidencePercent: 72, reviewPath: '/super-user/users/preview-provider' })],
+    ['provider-automated-verification-passed', providerAutomatedVerificationTemplate({ passed: true, confidencePercent: 95 })],
+    ['provider-automated-verification-failed', providerAutomatedVerificationTemplate({ passed: false, confidencePercent: 40 })],
+    ['enhanced-verification-awarded', independentReviewDecisionTemplate({ approved: true, tier: 'SILVER' })],
+    ['enhanced-verification-declined', independentReviewDecisionTemplate({ approved: false, tier: 'BRONZE' })],
     ['tender-warning-escalation', tenderWarningEscalationTemplate({ activeWarningCount: 3, reviewPath: '/super-user/users/preview-client' })],
     ['support-request-notification', supportRequestNotificationTemplate({ type: 'CHANGE', submittedAt: previewDate })],
     ['configuration-test', configurationTestTemplate({ environment: 'email-trigger-simulation', sentAt: previewDate })],

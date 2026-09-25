@@ -13,6 +13,7 @@ export type MobileQuoteSummary = {
   providerIsSoleTrader?: boolean;
   providerVerificationStatus?: string;
   independentlyVerified?: boolean;
+  independentReviewTier?: 'BRONZE' | 'SILVER' | 'GOLD' | null;
   releaseFeeGbp?: number;
   requiresSecondApprover?: boolean;
   lines?: Array<{

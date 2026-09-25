@@ -380,6 +380,68 @@ export function independentReviewPurchasedTemplate(input: { tier?: 'BRONZE' | 'S
   };
 }
 
+export function providerAutomatedVerificationTemplate(input: { passed: boolean; confidencePercent: number }): EmailTemplate {
+  if (input.passed) {
+    return {
+      subject: 'Automated verification passed',
+      html: layout({
+        eyebrow: 'Provider verification',
+        title: 'Your automated verification has passed',
+        intro: 'A PDF text check confirmed the required documents for your Provider account.',
+        body: detailRows([
+          ['Outcome', 'Verified'],
+          ['Text-check score', `${input.confidencePercent}%`],
+        ]) + note('This is a PDF text check for company identity, document type, and expiry. It is not a Companies House, HMRC, or insurer lookup, and it does not confirm insurance cover, competence, or identity. Clients still complete their own due diligence.'),
+        action: { label: 'View verification', href: appUrl('/retailer/verification') },
+      }),
+    };
+  }
+  return {
+    subject: 'Automated verification did not pass',
+    html: layout({
+      eyebrow: 'Provider verification',
+      title: 'Automated verification could not confirm your documents',
+      intro: 'A PDF text check could not confirm the required documents, so this account is not verified.',
+      body: detailRows([
+        ['Outcome', 'Not approved'],
+        ['Text-check score', `${input.confidencePercent}%`],
+      ]) + note('Use a text PDF from Companies House or your insurer, under 2 MB. Photographs and large scans cannot be read. There is no human review of this upload path. You can upload again and submit.')
+        + note('The assessment report stays inside your signed-in workspace and is not attached to this email.'),
+      action: { label: 'Upload documents', href: appUrl('/retailer/verification') },
+    }),
+  };
+}
+
+export function independentReviewDecisionTemplate(input: { approved: boolean; tier?: 'BRONZE' | 'SILVER' | 'GOLD' | null }): EmailTemplate {
+  const tierLabel = input.tier === 'SILVER' ? 'Silver' : input.tier === 'GOLD' ? 'Gold' : input.tier === 'BRONZE' ? 'Bronze' : null;
+  if (input.approved && tierLabel) {
+    return {
+      subject: `Enhanced ${tierLabel} verification awarded`,
+      html: layout({
+        eyebrow: 'Bronze, Silver and Gold verification',
+        title: `Your ${tierLabel} verification has been awarded`,
+        intro: 'A professional Health & Safety review has been recorded against your Provider account.',
+        body: detailRows([
+          ['Outcome', `Enhanced Verified · ${tierLabel}`],
+          ['Valid for', '12 months from the decision date'],
+        ]) + note('This badge means a paid professional review was recorded at this tier. It does not replace a client’s own insurance, competence, or contract checks.')
+          + note('The review comments stay inside the signed-in workspace and are not attached to this email.'),
+        action: { label: 'View your profile', href: appUrl('/retailer/profile') },
+      }),
+    };
+  }
+  return {
+    subject: 'Enhanced verification was not approved',
+    html: layout({
+      eyebrow: 'Bronze, Silver and Gold verification',
+      title: 'Enhanced verification was not approved',
+      intro: 'The professional Health & Safety review for this purchase was not approved.',
+      body: note('You can purchase a Bronze, Silver, or Gold verification again from your profile. Review comments stay inside the signed-in workspace and are not attached to this email.'),
+      action: { label: 'View enhanced verification', href: appUrl('/retailer/independent-review') },
+    }),
+  };
+}
+
 export function enhancedVerificationInvitationTemplate(input: {
   recipientName?: string | null;
   inviteLink: string;
@@ -389,12 +451,12 @@ export function enhancedVerificationInvitationTemplate(input: {
   const greeting = recipientName ? `Hello ${recipientName}.` : 'Hello.';
   const expiryFormatted = input.expiresAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
   return {
-    subject: 'Enhanced verification registration invitation',
+    subject: 'Complete enhanced verification with HSQE Consult Hub',
     html: layout({
       eyebrow: 'Enhanced verification',
-      title: 'You have been invited to complete enhanced verification',
-      intro: `${greeting} A Trade Tender Provider has purchased enhanced verification, and you have been nominated to complete the registration.`,
-      body: note('A secure invitation has been generated for you. Please use the button below when you are ready to begin.')
+      title: 'Continue enhanced verification onboarding',
+      intro: `${greeting} Your Trade Tender Provider account has a confirmed enhanced verification purchase. Use the secure link below to continue registration with HSQE Consult Hub.`,
+      body: note('This link opens the affiliated partner onboarding page. It is not a Trade Tender login or register page.')
         + `<div style="margin:20px 0;padding:16px;background:${LIGHT_GREY};border-left:4px solid ${SAFETY_AMBER}">`
         + `<p style="margin:0 0 8px;font-family:'Source Sans 3',Arial,sans-serif;font-weight:700;font-size:13px;color:${NAVY}">Please note</p>`
         + `<ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.6;color:${STEEL_BLUE}">`
@@ -403,8 +465,8 @@ export function enhancedVerificationInvitationTemplate(input: {
         + `<li>It expires on ${escapeHtml(expiryFormatted)}</li>`
         + '<li>It must not be shared</li>'
         + '</ul></div>'
-        + note('If you were not expecting this invitation, you can ignore this email. No further action is required.'),
-      action: { label: 'Begin enhanced verification', href: input.inviteLink },
+        + note('If you were not expecting this message, you can ignore it. HSQE Consult Hub may also contact you directly.'),
+      action: { label: 'Continue with HSQE Consult Hub', href: input.inviteLink },
     }),
   };
 }

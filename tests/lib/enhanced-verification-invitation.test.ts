@@ -118,6 +118,7 @@ describe('enhanced verification invitation service', () => {
     let invitationId: string | undefined;
 
     context.after(async () => {
+      delete process.env.ENHANCED_VERIFICATION_PARTNER_URL;
       if (invitationId) await prisma.enhancedVerificationInvitation.deleteMany({ where: { id: invitationId } });
       if (paymentId) await prisma.payment.deleteMany({ where: { id: paymentId } });
       if (userId) await prisma.user.deleteMany({ where: { id: userId } });
@@ -147,12 +148,13 @@ describe('enhanced verification invitation service', () => {
     });
     paymentId = payment.id;
 
-    const recipientEmail = `nominated-${suffix}@example.test`;
+    process.env.ENHANCED_VERIFICATION_PARTNER_URL = 'https://hsqe.example.test/onboard';
+    const recipientEmail = `purchaser-${suffix}@example.test`;
     const result = await createEnhancedVerificationInvitation({
       userId,
       paymentId: payment.id,
       recipientEmail,
-      recipientName: 'Nominated Reviewer',
+      recipientName: 'Valid Purchaser',
       purchasedTier: 'SILVER',
     });
 
@@ -161,7 +163,9 @@ describe('enhanced verification invitation service', () => {
     assert.equal(result.status, 'SUCCESS');
     assert.ok(result.invitationId);
     assert.ok(result.expiryUtc);
+    assert.ok(result.registrationLink.includes('https://hsqe.example.test/onboard'));
     assert.ok(result.registrationLink.includes('token='));
+    assert.doesNotMatch(result.registrationLink, /\/register\?/);
 
     const dbRecord = await prisma.enhancedVerificationInvitation.findUnique({
       where: { id: invitationId },
@@ -195,8 +199,11 @@ describe('enhanced verification invitation service', () => {
     const service = readFileSync('src/server/domain/enhancedVerificationInvitationService.ts', 'utf8');
     assert.match(service, /getIndependentReviewPartnerUrl/);
     assert.doesNotMatch(service, /registrationUrl/);
+    assert.doesNotMatch(service, /\/register\?token=/);
     assert.match(service, /notifyConsulthubOfPurchase/);
     assert.match(service, /Idempotency-Key/);
+    assert.match(service, /retry/);
+    assert.match(service, /forceNew/);
   });
 
   test('invite API route is Owner/Super User resend only and does not return the signed token', () => {
@@ -204,6 +211,9 @@ describe('enhanced verification invitation service', () => {
 
     assert.match(route, /requireFullSuperUser\(\)/);
     assert.match(route, /createEnhancedVerificationInvitation/);
+    assert.match(route, /notifyConsulthubOfPurchase/);
+    assert.match(route, /forceNew: true/);
+    assert.match(route, /retry: true/);
     assert.doesNotMatch(route, /signedToken/);
     assert.doesNotMatch(route, /registrationUrl/);
   });

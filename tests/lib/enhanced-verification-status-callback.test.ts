@@ -33,6 +33,7 @@ test('partner status callback route requires valid shared secret authentication 
   assert.match(route, /timingSafeEqual/);
   assert.match(route, /Unauthorized: Invalid or missing shared secret/);
   assert.match(route, /Awarded tier cannot exceed the purchased verification product/);
+  assert.match(route, /notifyIndependentReviewDecision/);
   assert.doesNotMatch(route, /rawEmail/);
   assert.doesNotMatch(route, /providerUserId/);
 });
@@ -57,7 +58,7 @@ async function seedPurchasedProvider(tier: 'BRONZE' | 'SILVER' | 'GOLD') {
   const payment = await prisma.payment.create({
     data: {
       type: 'INDEPENDENT_REVIEW',
-      amountGbp: 150,
+      amountGbp: 295,
       totalAmountGbp: 180,
       vatGbp: 30,
       status: 'CONFIRMED',

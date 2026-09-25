@@ -5,7 +5,7 @@ import { rejectCrossOrigin } from '@/server/http/origin';
 import { createRateLimitResponse } from '@/server/http/rateLimit';
 import { toErrorResponse } from '@/server/http/errors';
 import { recordAuditEvent } from '@/server/audit/auditLog';
-import { createEnhancedVerificationInvitation } from '@/server/domain/enhancedVerificationInvitationService';
+import { createEnhancedVerificationInvitation, notifyConsulthubOfPurchase } from '@/server/domain/enhancedVerificationInvitationService';
 import { isIndependentReviewTier } from '@/lib/independentReviewTiers';
 import { prisma } from '@/server/data/prisma';
 
@@ -46,14 +46,39 @@ export async function POST(request: Request) {
       recipientEmail: payment.user.email,
       recipientName: payment.user.contactName,
       purchasedTier: payment.independentReviewTier,
+      forceNew: true,
     });
+
+    const profile = await prisma.retailerProfile.findUnique({
+      where: { userId: payment.user.id },
+      select: { companyName: true },
+    });
+    try {
+      await notifyConsulthubOfPurchase({
+        invitation: result,
+        userId: payment.user.id,
+        paymentId: payment.id,
+        purchasedTier: payment.independentReviewTier,
+        companyName: profile?.companyName ?? '',
+        recipientEmail: payment.user.email,
+        retry: true,
+      });
+    } catch (error) {
+      await recordAuditEvent({
+        actorId: admin.id,
+        action: 'ENHANCED_VERIFICATION_OUTBOUND_FAILED',
+        targetType: 'Payment',
+        targetId: payment.id,
+        metadata: { reason: error instanceof Error ? error.message : 'Outbound onboarding failed', resent: true },
+      });
+    }
 
     await recordAuditEvent({
       actorId: admin.id,
       action: 'ENHANCED_VERIFICATION_INVITATION_RESENT',
       targetType: 'EnhancedVerificationInvitation',
       targetId: result.invitationId,
-      metadata: { paymentId: payment.id },
+      metadata: { paymentId: payment.id, emailSent: result.emailSent },
     });
 
     return NextResponse.json({

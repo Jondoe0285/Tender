@@ -8,6 +8,7 @@ import { createRateLimitResponse } from '@/server/http/rateLimit';
 import { getIndependentReviewSharedSecret } from '@/server/domain/platformSettings';
 import { resolveSigningSecret, verifyInvitationToken } from '@/server/domain/enhancedVerificationInvitationService';
 import { independentReviewTierAtMost, isIndependentReviewTier, type IndependentReviewTier } from '@/lib/independentReviewTiers';
+import { notifyIndependentReviewDecision } from '@/server/domain/independentReviewService';
 
 const statusUpdateSchema = z.object({
   token: z.string().optional().nullable(),
@@ -185,6 +186,8 @@ export async function POST(request: Request) {
         paymentId: confirmedPayment.id,
       },
     });
+
+    await notifyIndependentReviewDecision(profile.user.email, { approved: nextStatus === 'APPROVED', tier: awardedTier });
 
     return NextResponse.json({
       status: 'SUCCESS',

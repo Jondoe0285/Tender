@@ -11,11 +11,11 @@ export function OpsExceptionBoard({ data }: { data: OpsExceptions }) {
   return (
     <div className="mb-10">
       <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-steel-blue">Exceptions</p>
-      <p className="mb-5 max-w-2xl text-sm text-concrete-grey">Failed payments, harvest flags, verification backlog, Owner MFA, and SLA. Analytics stay below this row.</p>
+      <p className="mb-5 max-w-2xl text-sm text-concrete-grey">Failed payments, harvest flags, leftover verification rows, Owner MFA, and SLA. Automated verification does not queue for human review. Analytics stay below this row.</p>
       {empty ? (
         <Card>
           <p className="text-sm font-semibold text-foundation-navy">No open exceptions</p>
-          <p className="mt-1 text-sm text-concrete-grey">Failed payments, harvest caps, pending verification, Owner MFA, and closing tenders appear here first.</p>
+          <p className="mt-1 text-sm text-concrete-grey">Failed payments, harvest caps, leftover PENDING verification rows, Owner MFA, and closing tenders appear here first.</p>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
@@ -66,8 +66,8 @@ export function OpsExceptionBoard({ data }: { data: OpsExceptions }) {
             )}
           </Card>
           <Card>
-            <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">Pending verification</p>
-            {data.pendingVerification.length === 0 ? <p className="mt-2 text-sm text-concrete-grey">None</p> : (
+            <p className="text-xs font-semibold uppercase tracking-wide text-steel-blue">Leftover verification rows</p>
+            {data.pendingVerification.length === 0 ? <p className="mt-2 text-sm text-concrete-grey">None. Automated verification does not queue for human review.</p> : (
               <ul className="mt-3 flex flex-col gap-2 text-sm">
                 {data.pendingVerification.map((row) => (
                   <li key={row.userId}><Link href={`/super-user/users/${row.userId}`} className="hover:text-trade-blue">{row.companyName}</Link></li>

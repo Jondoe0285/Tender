@@ -58,7 +58,7 @@ test('provider profile and verification pages support the sole trader evidence f
   assert.match(verificationPage, /'PENDING'/);
   assert.doesNotMatch(verificationPage, /soleTraderEvidence\?\.eligible/);
   assert.doesNotMatch(verificationPage, /\.jpg/);
-  assert.match(verificationPage, /There is no human review of this upload path/);
+  assert.match(verificationPage, /There is no human review of this\s+upload path/);
   assert.doesNotMatch(verificationPage, /flagged this for human review/);
 });
 
@@ -80,4 +80,8 @@ test('verification policy and quote comparison document all 6 verification level
   assert.match(quoteComparison, />Bronze</);
   assert.match(quoteComparison, />Silver</);
   assert.match(quoteComparison, />Gold</);
+  assert.doesNotMatch(quoteComparison, /Sinclair Safety Solutions Ltd completed/);
+  assert.match(quoteComparison, /paid professional Health and Safety review was recorded/);
+  assert.match(quoteComparison, /PDF text check of required documents/);
+  assert.match(quoteComparison, /Verified is a PDF text check/);
 });

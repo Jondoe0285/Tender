@@ -159,7 +159,7 @@ export default function RetailerProfilePage() {
               </div>
               <div className="flex items-center gap-3">
                 <StatusBadge status={profile.verificationStatus === 'VERIFIED' ? 'approved' : profile.verificationStatus === 'PENDING' ? 'pending' : profile.verificationStatus === 'REJECTED' || profile.verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
-                  {profile.verificationStatus === 'VERIFIED' ? 'Verified' : profile.verificationStatus === 'PENDING' ? 'Pending review' : profile.verificationStatus === 'REJECTED' ? 'Not approved' : profile.verificationStatus === 'EXPIRED' ? 'Expired' : (profile.isSoleTrader ? 'Sole Trader' : 'Unverified')}
+                  {profile.verificationStatus === 'VERIFIED' ? 'Verified' : profile.verificationStatus === 'PENDING' ? 'Pending' : profile.verificationStatus === 'REJECTED' ? 'Not approved' : profile.verificationStatus === 'EXPIRED' ? 'Expired' : (profile.isSoleTrader ? 'Sole Trader' : 'Unverified')}
                 </StatusBadge>
                 {(profile.verificationStatus === 'UNVERIFIED' || profile.verificationStatus === 'REJECTED' || profile.verificationStatus === 'EXPIRED' || profile.verificationStatus === 'PENDING') && (
                   <LinkButton href="/retailer/verification">Become Verified</LinkButton>

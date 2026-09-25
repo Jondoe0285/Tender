@@ -220,8 +220,8 @@ export function TenderScreen({
             <Card key={quote.id}>
               <Title>{quote.reference}</Title>
               <Body>{quote.status}{quote.expired ? ' · expired' : ''}{typeof quote.priceGbp === 'number' ? ` · £${quote.priceGbp} excl. VAT` : ''}</Body>
-              {quote.providerVerificationStatus ? <Body>Verification: {quote.providerVerificationStatus}</Body> : null}
-              {quote.independentlyVerified ? <Body>Independently verified</Body> : null}
+              {quote.providerVerificationStatus ? <Body>Verification: {quote.providerVerificationStatus === 'VERIFIED' ? 'Verified (PDF text check — not insurance or competence assurance)' : quote.providerVerificationStatus}</Body> : null}
+              {quote.independentlyVerified ? <Body>Enhanced {quote.independentReviewTier === 'SILVER' ? 'Silver' : quote.independentReviewTier === 'GOLD' ? 'Gold' : 'Bronze'} — a paid professional review was recorded. This does not replace your own due diligence.</Body> : null}
               {quote.lines?.map((line) => (
                 <Body key={line.tenderItemId}>{line.tenderItem?.item ?? line.tenderItem?.subcategory ?? 'Line'} · {line.available ? `£${line.priceGbp ?? line.unitRateGbp ?? 0}` : 'Unavailable'}</Body>
               ))}

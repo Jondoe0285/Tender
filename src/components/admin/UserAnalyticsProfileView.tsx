@@ -165,7 +165,7 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
           </div>
           <div className="flex items-center gap-3">
             <StatusBadge status={verificationStatus === 'VERIFIED' ? 'approved' : verificationStatus === 'PENDING' ? 'pending' : verificationStatus === 'REJECTED' || verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
-              {verificationStatus === 'VERIFIED' ? 'Verified' : verificationStatus === 'PENDING' ? 'Pending review' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : (profile.isSoleTrader ? 'Sole Trader' : 'Unverified')}
+              {verificationStatus === 'VERIFIED' ? 'Verified' : verificationStatus === 'PENDING' ? 'Leftover pending' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : (profile.isSoleTrader ? 'Sole Trader' : 'Unverified')}
             </StatusBadge>
           </div>
         </div>
@@ -196,6 +196,7 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
           </ul>
         )}
         {verificationStatus === 'PENDING' && <div className="mt-4 border-t border-slate-100 pt-4">
+          <p className="mb-3 text-sm text-concrete-grey">Leftover pending row. Automated verification does not queue for human review. Approve or reject only to clear this exception.</p>
           <Label htmlFor="verification-comment">Review comments</Label>
           <Textarea
             id="verification-comment"

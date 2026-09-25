@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { VERIFICATION_DOCUMENT_TYPES, isUploadedVerificationDocumentCurrent, isVerificationSubmitReady, verificationDocumentExpires, type VerificationDocumentType } from '@/lib/verification-documents';
 import { buildSafeAttachmentName, MAX_VERIFICATION_DOCUMENT_BYTES } from '@/lib/attachment-utils';
-import { INDEPENDENT_REVIEW_TIER_DESCRIPTIONS, INDEPENDENT_REVIEW_TIER_LABELS, INDEPENDENT_REVIEW_TIERS, type IndependentReviewTier } from '@/lib/independentReviewTiers';
+import { DEFAULT_INDEPENDENT_REVIEW_FEES_GBP, INDEPENDENT_REVIEW_TIER_DESCRIPTIONS, INDEPENDENT_REVIEW_TIER_LABELS, INDEPENDENT_REVIEW_TIERS, type IndependentReviewTier } from '@/lib/independentReviewTiers';
 
 type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
 const REOPEN_STATUSES: VerificationStatus[] = ['UNVERIFIED', 'REJECTED', 'EXPIRED', 'PENDING'];
@@ -248,7 +248,7 @@ export default function ProviderVerificationPage() {
                 </StatusBadge>
               </div>
               <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-steel-blue">
-                Professional H&amp;S Review &middot; Bronze £{enhancedReview?.fees.BRONZE ?? 150} / Silver £{enhancedReview?.fees.SILVER ?? 250} / Gold £{enhancedReview?.fees.GOLD ?? 400} excl. VAT
+                Professional H&amp;S Review &middot; Bronze £{enhancedReview?.fees.BRONZE ?? DEFAULT_INDEPENDENT_REVIEW_FEES_GBP.BRONZE} / Silver £{enhancedReview?.fees.SILVER ?? DEFAULT_INDEPENDENT_REVIEW_FEES_GBP.SILVER} / Gold £{enhancedReview?.fees.GOLD ?? DEFAULT_INDEPENDENT_REVIEW_FEES_GBP.GOLD} excl. VAT
               </p>
               <p className="mt-2 text-xs leading-relaxed text-concrete-grey">
                 Purchase Bronze, Silver, or Gold. After payment, HSQE Consult Hub starts onboarding. The auditor may award the purchased tier or a lower tier.
@@ -322,7 +322,7 @@ export default function ProviderVerificationPage() {
                   </p>
                 </div>
                 <StatusBadge status={verificationStatus === 'VERIFIED' ? 'approved' : verificationStatus === 'PENDING' ? 'pending' : verificationStatus === 'REJECTED' || verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
-                  {verificationStatus === 'VERIFIED' ? 'Verified' : verificationStatus === 'PENDING' ? 'Pending review' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : (isSoleTrader ? 'Sole Trader' : 'Unverified')}
+                  {verificationStatus === 'VERIFIED' ? 'Verified' : verificationStatus === 'PENDING' ? 'Pending' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : (isSoleTrader ? 'Sole Trader' : 'Unverified')}
                 </StatusBadge>
               </div>
             </Card>
@@ -332,10 +332,11 @@ export default function ProviderVerificationPage() {
         <Card>
           <p className="text-sm font-semibold text-foundation-navy">Compliance score disclaimer</p>
           <p className="mt-2 text-sm text-concrete-grey">
-            The automated check assesses legal-compliance evidence only and may make mistakes. Each uploaded PDF
-            receives a compliance score from 0-100%. Required documents must together reach at least 90%. If automated
-            assessment cannot confirm the documents, verification fails. There is no human review of this upload path.
-            Trade Tender does not replace client due diligence, and clients must carry out suitable
+            The automated check is a PDF text check for company identity, document type, and expiry. It is not a
+            Companies House, HMRC, or insurer lookup, and it does not confirm insurance cover or competence. Each
+            uploaded PDF receives a score from 0-100%. Required documents must together reach at least 90%. If
+            automated assessment cannot confirm the documents, verification fails. There is no human review of this
+            upload path. Trade Tender does not replace client due diligence, and clients must carry out suitable
             checks before entering any formal agreement.
           </p>
         </Card>
