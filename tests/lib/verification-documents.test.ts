@@ -4,6 +4,7 @@ import {
   getApplicableVerificationDocuments,
   getRequiredVerificationDocumentTypes,
   isVerificationDocumentApplicable,
+  isVerificationSubmitReady,
   verificationDocumentExpires,
 } from '../../src/lib/verification-documents';
 
@@ -41,6 +42,15 @@ test('does not apply service-specific documents to unrelated services', () => {
   assert.equal(isVerificationDocumentApplicable('WASTE_CARRIERS_LICENCE', ['Materials']), false);
   assert.equal(isVerificationDocumentApplicable('PROFESSIONAL_INDEMNITY_INSURANCE', ['Plant Hire']), false);
   assert.equal(isVerificationDocumentApplicable('SSIP_ACCREDITATION', ['Materials']), true);
+});
+
+test('enables verification submit from current uploads, including when no document is marked required', () => {
+  assert.equal(isVerificationSubmitReady({ isSoleTrader: false, requiredTypes: ['CERTIFICATE_OF_INCORPORATION'], validUploadedTypes: [] }), false);
+  assert.equal(isVerificationSubmitReady({ isSoleTrader: false, requiredTypes: ['CERTIFICATE_OF_INCORPORATION'], validUploadedTypes: ['CERTIFICATE_OF_INCORPORATION'] }), true);
+  assert.equal(isVerificationSubmitReady({ isSoleTrader: false, requiredTypes: [], validUploadedTypes: [] }), false);
+  assert.equal(isVerificationSubmitReady({ isSoleTrader: false, requiredTypes: [], validUploadedTypes: ['PUBLIC_LIABILITY_INSURANCE'] }), true);
+  assert.equal(isVerificationSubmitReady({ isSoleTrader: true, requiredTypes: [], validUploadedTypes: ['HMRC_UTR_CONFIRMATION'] }), true);
+  assert.equal(isVerificationSubmitReady({ isSoleTrader: true, requiredTypes: [], validUploadedTypes: ['BUSINESS_BANK_STATEMENT'] }), false);
 });
 
 test('Certificate of Incorporation does not require an expiry date, unlike other document types', () => {

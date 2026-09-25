@@ -5,11 +5,14 @@
   "dependencies": {
     "@expo-google-fonts/montserrat": "^0.4.2",
     "@expo-google-fonts/source-sans-3": "^0.4.1",
-    "expo": "~57.0.24",
+    "expo": "~57.0.25",
     "expo-constants": "~57.0.19",
+    "expo-document-picker": "~57.0.2",
+    "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
-    "expo-linking": "~57.0.10",
+    "expo-linking": "~57.0.11",
     "expo-secure-store": "~57.0.4",
+    "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-native": "0.86.3",
@@ -28,7 +31,9 @@
     "type-check": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "build:android": "npx eas-cli@latest build --platform android --profile preview",
-    "build:ios": "npx eas-cli@latest build --platform ios --profile preview"
+    "build:ios": "npx eas-cli@latest build --platform ios --profile preview",
+    "build:android:store": "npx eas-cli@latest build --platform android --profile production",
+    "build:ios:store": "npx eas-cli@latest build --platform ios --profile production"
   },
   "engines": {
     "node": ">=22.13"

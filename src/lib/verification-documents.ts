@@ -72,6 +72,23 @@ export function isSoleTraderEvidenceSufficient(validDocumentTypes: readonly Veri
   return moderateCount >= 2;
 }
 
+export function isUploadedVerificationDocumentCurrent(expiryDate: Date | string | null | undefined, now = Date.now()): boolean {
+  if (!expiryDate) return true;
+  return new Date(expiryDate).getTime() > now;
+}
+
+/** Client and server share this so the Submit control enables as soon as the uploaded set meets the rule. */
+export function isVerificationSubmitReady(input: {
+  isSoleTrader: boolean;
+  requiredTypes: readonly VerificationDocumentType[];
+  validUploadedTypes: readonly VerificationDocumentType[];
+}): boolean {
+  if (input.isSoleTrader) return isSoleTraderEvidenceSufficient(input.validUploadedTypes);
+  const uploaded = new Set(input.validUploadedTypes);
+  if (input.requiredTypes.length === 0) return uploaded.size > 0;
+  return input.requiredTypes.every((type) => uploaded.has(type));
+}
+
 export function verificationDocumentExpires(documentType: VerificationDocumentType): boolean {
   return VERIFICATION_DOCUMENT_TYPES.find((doc) => doc.type === documentType)?.expires ?? true;
 }

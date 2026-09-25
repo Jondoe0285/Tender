@@ -38,15 +38,15 @@ const TYPE_PHRASES: Record<VerificationDocumentType, readonly string[]> = {
   PROFESSIONAL_QUALIFICATIONS: ['qualification', 'diploma', 'nvq', 'cscs', 'degree certificate'],
   PROFESSIONAL_INDEMNITY_INSURANCE: ['professional indemnity', 'professional indemnity insurance', 'pii'],
   SSIP_ACCREDITATION: ['ssip', 'chas', 'smas', 'safecontractor', 'constructionline'],
-  HMRC_UTR_CONFIRMATION: ['unique taxpayer', 'utr', 'hmrc'],
+  HMRC_UTR_CONFIRMATION: ['unique taxpayer', 'utr confirmation'],
   SA302_TAX_CALCULATION: ['sa302', 'tax calculation', 'self assessment'],
   VAT_REGISTRATION_CERTIFICATE: ['vat registration', 'vat certificate', 'vat number'],
-  CIS_REGISTRATION_PROOF: ['construction industry scheme', 'cis registration', 'cis'],
+  CIS_REGISTRATION_PROOF: ['construction industry scheme', 'cis registration'],
   BUSINESS_BANK_STATEMENT: ['bank statement', 'sort code', 'account number', 'iban'],
   CUSTOMER_INVOICES: ['invoice', 'tax invoice'],
   CUSTOMER_QUOTATIONS_OR_CONTRACTS: ['quotation', 'quote no', 'contract'],
   TRADE_BODY_MEMBERSHIP: ['membership', 'member number', 'trade body'],
-  TRADING_ACTIVITY_EVIDENCE: ['www.', 'http', 'website', 'trading as'],
+  TRADING_ACTIVITY_EVIDENCE: ['website', 'trading as'],
 };
 
 const MONTHS: Record<string, number> = {
@@ -75,16 +75,24 @@ function decodePdfLiteral(raw: string): string {
     .replace(/\\([0-7]{1,3})/g, (_match, oct: string) => String.fromCharCode(parseInt(oct, 8)));
 }
 
+const MAX_CATALOG_WINDOW_BYTES = 512 * 1024;
+const MAX_COMPRESSED_STREAM_BYTES = 128 * 1024;
+const MAX_INFLATED_STREAM_BYTES = 256 * 1024;
+const MAX_STREAMS_TO_INFLATE = 32;
+const MAX_EXTRACTED_TEXT_CHARS = 64 * 1024;
+const MAX_HEX_STRING_CHARS = 512;
+const IMAGE_STREAM_PATTERN = /\/(?:Subtype\s*\/Image|DCTDecode|JPXDecode|CCITTFaxDecode|JBIG2Decode)\b/;
+
 function extractPdfStrings(source: string): string {
   const parts: string[] = [];
   const literals = /\((?:\\.|[^\\)])*\)/g;
   for (const match of source.matchAll(literals)) {
     parts.push(decodePdfLiteral(match[0].slice(1, -1)));
   }
-  const hexStrings = /<([0-9A-Fa-f \r\n]+)>/g;
+  const hexStrings = /<([0-9A-Fa-f \r\n]{4,512})>/g;
   for (const match of source.matchAll(hexStrings)) {
     const hex = match[1].replace(/\s+/g, '');
-    if (hex.length < 4 || hex.length % 2 !== 0) continue;
+    if (hex.length < 4 || hex.length % 2 !== 0 || hex.length > MAX_HEX_STRING_CHARS) continue;
     try {
       parts.push(Buffer.from(hex, 'hex').toString('latin1'));
     } catch {
@@ -94,19 +102,26 @@ function extractPdfStrings(source: string): string {
   return parts.join(' ');
 }
 
-function streamPayload(raw: string): Buffer {
-  let payload = raw;
-  if (payload.startsWith('\r\n')) payload = payload.slice(2);
-  else if (payload.startsWith('\n') || payload.startsWith('\r')) payload = payload.slice(1);
-  if (payload.endsWith('\r\n')) payload = payload.slice(0, -2);
-  else if (payload.endsWith('\n') || payload.endsWith('\r')) payload = payload.slice(0, -1);
-  return Buffer.from(payload, 'latin1');
+function isPdfDelimiter(byte: number | undefined): boolean {
+  if (byte == null || byte <= 32) return true;
+  return byte === 37 || byte === 40 || byte === 41 || byte === 47 || byte === 60 || byte === 62 || byte === 91 || byte === 93 || byte === 123 || byte === 125;
+}
+
+function trimStreamPayload(bytes: Buffer): Buffer {
+  let start = 0;
+  let end = bytes.length;
+  if (bytes[0] === 0x0d && bytes[1] === 0x0a) start = 2;
+  else if (bytes[0] === 0x0a || bytes[0] === 0x0d) start = 1;
+  if (end - start >= 2 && bytes[end - 2] === 0x0d && bytes[end - 1] === 0x0a) end -= 2;
+  else if (end > start && (bytes[end - 1] === 0x0a || bytes[end - 1] === 0x0d)) end -= 1;
+  return bytes.subarray(start, end);
 }
 
 function inflatePdfStream(payload: Buffer): string | null {
+  if (payload.length === 0 || payload.length > MAX_COMPRESSED_STREAM_BYTES) return null;
   for (const inflate of [inflateSync, inflateRawSync]) {
     try {
-      return inflate(payload).toString('latin1');
+      return inflate(payload, { maxOutputLength: MAX_INFLATED_STREAM_BYTES }).toString('latin1');
     } catch {
       continue;
     }
@@ -114,18 +129,70 @@ function inflatePdfStream(payload: Buffer): string | null {
   return null;
 }
 
+function printableSnippet(source: string, maxChars: number): string {
+  let out = '';
+  for (let i = 0; i < source.length && out.length < maxChars; i++) {
+    const code = source.charCodeAt(i);
+    if (code === 10 || (code >= 32 && code <= 126)) out += source[i];
+  }
+  return out;
+}
+
+function pushExtracted(parts: string[], budget: { remaining: number }, piece: string) {
+  if (!piece || budget.remaining <= 0) return;
+  const slice = piece.length > budget.remaining ? piece.slice(0, budget.remaining) : piece;
+  parts.push(slice);
+  budget.remaining -= slice.length;
+}
+
+function findNextStreamKeyword(bytes: Buffer, from: number): number {
+  const needle = Buffer.from('stream');
+  let offset = from;
+  while (offset < bytes.length) {
+    const index = bytes.indexOf(needle, offset);
+    if (index === -1) return -1;
+    const after = bytes[index + 6];
+    if (isPdfDelimiter(bytes[index - 1]) && (after === 0x0d || after === 0x0a || after === 0x20)) {
+      return index;
+    }
+    offset = index + 1;
+  }
+  return -1;
+}
+
+function streamLooksLikeImage(bytes: Buffer, streamKeywordIndex: number): boolean {
+  const dictStart = Math.max(0, streamKeywordIndex - 512);
+  return IMAGE_STREAM_PATTERN.test(bytes.subarray(dictStart, streamKeywordIndex).toString('latin1'));
+}
+
 export function extractDocumentText(content: Buffer, mimeType: string): string | null {
   if (mimeType !== 'application/pdf') return null;
-  const latin1 = content.toString('latin1');
-  const chunks = [extractPdfStrings(latin1), latin1.replace(/[^\x20-\x7E\n]/g, ' ')];
-  const streamPattern = /stream\r?\n([\s\S]*?)endstream/g;
-  for (const match of latin1.matchAll(streamPattern)) {
-    const inflated = inflatePdfStream(streamPayload(match[1]));
+
+  const parts: string[] = [];
+  const budget = { remaining: MAX_EXTRACTED_TEXT_CHARS };
+  const catalog = content.subarray(0, Math.min(content.length, MAX_CATALOG_WINDOW_BYTES)).toString('latin1');
+  pushExtracted(parts, budget, extractPdfStrings(catalog));
+  pushExtracted(parts, budget, printableSnippet(catalog, 4096));
+
+  const endMarker = Buffer.from('endstream');
+  let offset = 0;
+  let streams = 0;
+  while (budget.remaining > 0 && streams < MAX_STREAMS_TO_INFLATE) {
+    const start = findNextStreamKeyword(content, offset);
+    if (start === -1) break;
+    streams += 1;
+    const payloadStart = start + 6;
+    const end = content.indexOf(endMarker, payloadStart);
+    if (end === -1) break;
+    offset = end + endMarker.length;
+    if (streamLooksLikeImage(content, start)) continue;
+    const inflated = inflatePdfStream(trimStreamPayload(content.subarray(payloadStart, end)));
     if (!inflated) continue;
-    chunks.push(extractPdfStrings(inflated));
-    chunks.push(inflated.replace(/[^\x20-\x7E\n]/g, ' '));
+    pushExtracted(parts, budget, extractPdfStrings(inflated));
+    pushExtracted(parts, budget, printableSnippet(inflated, 4096));
   }
-  const text = normalise(chunks.join(' '));
+
+  const text = normalise(parts.join(' '));
   return text.length > 0 ? text : null;
 }
 
@@ -194,7 +261,12 @@ export function assessVerificationDocument(input: DocumentAssessmentInput): Docu
   const now = new Date();
   const expires = verificationDocumentExpires(input.documentType);
   const isPdf = input.mimeType === 'application/pdf';
-  const text = isPdf ? extractDocumentText(input.content, input.mimeType) : null;
+  let text: string | null = null;
+  try {
+    text = isPdf ? extractDocumentText(input.content, input.mimeType) : null;
+  } catch {
+    text = null;
+  }
 
   let confidencePercent = 40;
   const notes: string[] = [];

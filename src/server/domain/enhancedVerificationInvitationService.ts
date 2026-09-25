@@ -71,6 +71,8 @@ export type CreateInvitationInput = {
   recipientEmail: string;
   recipientName?: string | null;
   purchasedTier: IndependentReviewTier;
+  /** Super User resend: mint a new token even if outbound was already recorded. */
+  forceNew?: boolean;
 };
 
 export type InvitationResult = {
@@ -132,7 +134,7 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
     where: { paymentId: input.paymentId },
     orderBy: { createdAt: 'desc' },
   });
-  if (existing && outboundSent) {
+  if (existing && outboundSent && !input.forceNew) {
     return {
       status: 'SUCCESS',
       invitationId: existing.id,
@@ -191,20 +193,24 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
 
   const registrationLink = buildRegistrationLink(await getIndependentReviewPartnerUrl(), signedToken);
 
-  const template = enhancedVerificationInvitationTemplate({
-    recipientName: input.recipientName,
-    inviteLink: registrationLink,
-    expiresAt,
-  });
+  let emailSent = false;
+  if (registrationLink) {
+    const template = enhancedVerificationInvitationTemplate({
+      recipientName: input.recipientName,
+      inviteLink: registrationLink,
+      expiresAt,
+    });
 
-  const emailResult = await sendTransactionalEmail(recipientEmail, template).catch((error: unknown) => ({
-    sent: false as const,
-    reason: error instanceof Error ? error.message : 'Email delivery failed',
-  }));
+    const emailResult = await sendTransactionalEmail(recipientEmail, template).catch((error: unknown) => ({
+      sent: false as const,
+      reason: error instanceof Error ? error.message : 'Email delivery failed',
+    }));
+    emailSent = emailResult.sent;
+  }
 
   await recordAuditEvent({
     actorId: input.userId,
-    action: emailResult.sent ? 'ENHANCED_VERIFICATION_INVITATION_CREATED' : 'ENHANCED_VERIFICATION_INVITATION_EMAIL_FAILED',
+    action: emailSent ? 'ENHANCED_VERIFICATION_INVITATION_CREATED' : 'ENHANCED_VERIFICATION_INVITATION_EMAIL_FAILED',
     targetType: 'EnhancedVerificationInvitation',
     targetId: invitationId,
     metadata: {
@@ -213,7 +219,8 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
       recipientName: input.recipientName,
       purchasedTier: input.purchasedTier,
       expiresAt: expiresAt.toISOString(),
-      emailSent: emailResult.sent,
+      emailSent,
+      partnerLinkIssued: Boolean(registrationLink),
     },
   });
 
@@ -221,20 +228,18 @@ export async function createEnhancedVerificationInvitation(input: CreateInvitati
     status: 'SUCCESS',
     invitationId,
     expiryUtc: expiresAt.toISOString(),
-    emailSent: emailResult.sent,
-    registrationLink,
+    emailSent,
+    registrationLink: registrationLink ?? '',
     signedToken,
     purchasedTier: input.purchasedTier,
   };
 }
 
-function buildRegistrationLink(configuredPartnerUrl: string, signedToken: string): string {
+function buildRegistrationLink(configuredPartnerUrl: string, signedToken: string): string | null {
   const targetUrl = configuredPartnerUrl.trim();
-  if (targetUrl) {
-    const separator = targetUrl.includes('?') ? '&' : '?';
-    return `${targetUrl}${separator}token=${encodeURIComponent(signedToken)}&verificationToken=${encodeURIComponent(signedToken)}`;
-  }
-  return appUrl(`/register?token=${encodeURIComponent(signedToken)}&verificationToken=${encodeURIComponent(signedToken)}`);
+  if (!targetUrl) return null;
+  const separator = targetUrl.includes('?') ? '&' : '?';
+  return `${targetUrl}${separator}token=${encodeURIComponent(signedToken)}&verificationToken=${encodeURIComponent(signedToken)}`;
 }
 
 export async function notifyConsulthubOfPurchase(input: {
@@ -244,12 +249,13 @@ export async function notifyConsulthubOfPurchase(input: {
   purchasedTier: IndependentReviewTier;
   companyName: string;
   recipientEmail: string;
+  retry?: boolean;
 }) {
   const alreadySent = await prisma.auditLog.findFirst({
     where: { action: 'ENHANCED_VERIFICATION_OUTBOUND_SENT', targetType: 'Payment', targetId: input.paymentId },
     select: { id: true },
   });
-  if (alreadySent) return { sent: true, skipped: true };
+  if (alreadySent && !input.retry) return { sent: true, skipped: true };
 
   const outboundUrl = (await getIndependentReviewPartnerUrl()).trim();
   const secret = await getIndependentReviewSharedSecret();
@@ -289,7 +295,7 @@ export async function notifyConsulthubOfPurchase(input: {
         headers: {
           'Content-Type': 'application/json',
           'X-Hub-Signature-256': `sha256=${signature}`,
-          'Idempotency-Key': input.paymentId,
+          'Idempotency-Key': input.retry ? `${input.paymentId}:${input.invitation.invitationId}` : input.paymentId,
         },
         body,
       });

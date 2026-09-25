@@ -1,0 +1,25 @@
+---
+description: Keep the Expo mobile app in line whenever the SaaS platform changes
+alwaysApply: true
+---
+
+# Mobile SaaS parity
+
+When the main Next.js SaaS platform changes, bring `mobile/` in line in the **same change**. Do not leave Buyer/Supplier behaviour as web-only.
+
+## Same change set
+
+- Update the Expo/React Native client in `mobile/` for every user-facing Buyer or Supplier workflow, copy, validation, API contract, payment/unlock/release path, or error behaviour you change in the web app.
+- If the server API used by mobile changes, update `mobile/src/api/` clients and screens together so an installed client that is rebuilt against this SHA stays compatible.
+- Do not finish a marketplace feature as browser-only. Native Expo work is required; do not substitute a PWA, WebView, Capacitor wrapper, or “open this in the browser”.
+
+## Out of scope unless asked
+
+- Owner, Super User, operator, billing, and other privileged consoles stay web unless the user explicitly asks for them on mobile.
+- Do not register store listings, change package IDs, or configure release signing.
+- Do not add EAS Update/OTA or auto-publish store builds unless asked. This order is **source parity**, not a phone auto-update. Installed binaries still need a later EAS build.
+
+## Security
+
+- Keep mobile auth on bearer tokens and `expo-secure-store`. Do not reuse browser cookies.
+- Do not weaken server-side auth, payment, audit, or contact-release controls to make mobile easier.

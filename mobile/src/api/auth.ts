@@ -1,5 +1,6 @@
 import { saveMobileSession, type MobileSession } from '../auth/session';
 import { mobileApiBaseUrl } from './config';
+import { readErrorMessage } from './client';
 
 type LoginResponse = {
   accessToken: string;
@@ -25,4 +26,22 @@ export async function signInWithPassword(email: string, password: string): Promi
   };
   await saveMobileSession(session);
   return session;
+}
+
+export async function requestPasswordReset(email: string) {
+  const response = await fetch(`${mobileApiBaseUrl()}/api/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!response.ok) throw new Error(await readErrorMessage(response, 'Unable to request a password reset.'));
+}
+
+export async function resetPasswordWithToken(token: string, password: string) {
+  const response = await fetch(`${mobileApiBaseUrl()}/api/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, password }),
+  });
+  if (!response.ok) throw new Error(await readErrorMessage(response, 'Unable to set a new password.'));
 }

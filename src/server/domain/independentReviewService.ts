@@ -1,6 +1,6 @@
 import { prisma } from '@/server/data/prisma';
 import { recordAuditEvent } from '@/server/audit/auditLog';
-import { independentReviewPurchasedTemplate } from '@/server/notifications/emailTemplates';
+import { independentReviewPurchasedTemplate, independentReviewDecisionTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
 import {
   independentReviewTierRank,
@@ -174,4 +174,8 @@ export async function revokeIndependentReviewForPayment(paymentId: string) {
       independentReviewNote: 'Enhanced verification removed after the related payment was reversed.',
     },
   });
+}
+
+export async function notifyIndependentReviewDecision(email: string, input: { approved: boolean; tier?: IndependentReviewTier | null }) {
+  await sendTransactionalEmail(email, independentReviewDecisionTemplate(input)).catch(() => undefined);
 }

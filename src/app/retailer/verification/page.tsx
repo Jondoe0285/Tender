@@ -6,12 +6,12 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { VERIFICATION_DOCUMENT_TYPES, verificationDocumentExpires, type VerificationDocumentType } from '@/lib/verification-documents';
-import { buildSafeAttachmentName } from '@/lib/attachment-utils';
-import { INDEPENDENT_REVIEW_TIER_DESCRIPTIONS, INDEPENDENT_REVIEW_TIER_LABELS, INDEPENDENT_REVIEW_TIERS, type IndependentReviewTier } from '@/lib/independentReviewTiers';
+import { VERIFICATION_DOCUMENT_TYPES, isUploadedVerificationDocumentCurrent, isVerificationSubmitReady, verificationDocumentExpires, type VerificationDocumentType } from '@/lib/verification-documents';
+import { buildSafeAttachmentName, MAX_VERIFICATION_DOCUMENT_BYTES } from '@/lib/attachment-utils';
+import { DEFAULT_INDEPENDENT_REVIEW_FEES_GBP, INDEPENDENT_REVIEW_TIER_DESCRIPTIONS, INDEPENDENT_REVIEW_TIER_LABELS, INDEPENDENT_REVIEW_TIERS, type IndependentReviewTier } from '@/lib/independentReviewTiers';
 
 type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
-const REOPEN_STATUSES: VerificationStatus[] = ['UNVERIFIED', 'REJECTED', 'EXPIRED'];
+const REOPEN_STATUSES: VerificationStatus[] = ['UNVERIFIED', 'REJECTED', 'EXPIRED', 'PENDING'];
 
 type UploadedDocument = {
   documentType: VerificationDocumentType;
@@ -23,10 +23,16 @@ type UploadedDocument = {
 };
 
 async function fileToBase64(file: File): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = '';
-  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-  return btoa(binary);
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? '');
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Unable to read this PDF.'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function formatFileSize(sizeBytes: number) {
@@ -109,6 +115,10 @@ export default function ProviderVerificationPage() {
       setError('Upload a PDF. Photographs and other file types are not accepted.');
       return;
     }
+    if (file.size > MAX_VERIFICATION_DOCUMENT_BYTES) {
+      setError('Use a PDF smaller than 2 MB. Export a text PDF from Companies House or your insurer; large scans are not accepted.');
+      return;
+    }
     setUploadingType(documentType);
     setError(null);
     setMessage(null);
@@ -181,13 +191,14 @@ export default function ProviderVerificationPage() {
     ? VERIFICATION_DOCUMENT_TYPES.filter((doc) => soleTraderEvidence.strongTypes.includes(doc.type) || soleTraderEvidence.moderateTypes.includes(doc.type))
     : [];
   const now = currentTime;
-  const validUploadedTypes = new Set(documents.filter((doc) => !doc.expiryDate || new Date(doc.expiryDate).getTime() > now).map((doc) => doc.documentType));
-  const requiredUploaded = requiredTypes.filter((type) => validUploadedTypes.has(type));
-  const canSubmit = isSoleTrader ? Boolean(soleTraderEvidence?.eligible) : (requiredTypes.length > 0 && requiredUploaded.length === requiredTypes.length);
+  const validUploadedTypes = documents.filter((doc) => isUploadedVerificationDocumentCurrent(doc.expiryDate, now)).map((doc) => doc.documentType);
+  const requiredUploaded = requiredTypes.filter((type) => validUploadedTypes.includes(type));
+  const missingRequired = requiredTypes.filter((type) => !validUploadedTypes.includes(type));
+  const canSubmit = isVerificationSubmitReady({ isSoleTrader, requiredTypes, validUploadedTypes });
   const canEdit = REOPEN_STATUSES.includes(verificationStatus);
-  const minExpiryDate = new Date(now + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   if (loading) return <AppShell role="retailer" title="Become Verified"><p className="text-sm text-concrete-grey">Loading...</p></AppShell>;
+  const minExpiryDate = new Date(now + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   return (
     <AppShell role="retailer" title="Become Verified">
@@ -237,7 +248,7 @@ export default function ProviderVerificationPage() {
                 </StatusBadge>
               </div>
               <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-steel-blue">
-                Professional H&amp;S Review &middot; Bronze £{enhancedReview?.fees.BRONZE ?? 150} / Silver £{enhancedReview?.fees.SILVER ?? 250} / Gold £{enhancedReview?.fees.GOLD ?? 400} excl. VAT
+                Professional H&amp;S Review &middot; Bronze £{enhancedReview?.fees.BRONZE ?? DEFAULT_INDEPENDENT_REVIEW_FEES_GBP.BRONZE} / Silver £{enhancedReview?.fees.SILVER ?? DEFAULT_INDEPENDENT_REVIEW_FEES_GBP.SILVER} / Gold £{enhancedReview?.fees.GOLD ?? DEFAULT_INDEPENDENT_REVIEW_FEES_GBP.GOLD} excl. VAT
               </p>
               <p className="mt-2 text-xs leading-relaxed text-concrete-grey">
                 Purchase Bronze, Silver, or Gold. After payment, HSQE Consult Hub starts onboarding. The auditor may award the purchased tier or a lower tier.
@@ -311,7 +322,7 @@ export default function ProviderVerificationPage() {
                   </p>
                 </div>
                 <StatusBadge status={verificationStatus === 'VERIFIED' ? 'approved' : verificationStatus === 'PENDING' ? 'pending' : verificationStatus === 'REJECTED' || verificationStatus === 'EXPIRED' ? 'attention' : 'neutral'}>
-                  {verificationStatus === 'VERIFIED' ? 'Verified' : verificationStatus === 'PENDING' ? 'Pending review' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : (isSoleTrader ? 'Sole Trader' : 'Unverified')}
+                  {verificationStatus === 'VERIFIED' ? 'Verified' : verificationStatus === 'PENDING' ? 'Pending' : verificationStatus === 'REJECTED' ? 'Not approved' : verificationStatus === 'EXPIRED' ? 'Expired' : (isSoleTrader ? 'Sole Trader' : 'Unverified')}
                 </StatusBadge>
               </div>
             </Card>
@@ -321,10 +332,11 @@ export default function ProviderVerificationPage() {
         <Card>
           <p className="text-sm font-semibold text-foundation-navy">Compliance score disclaimer</p>
           <p className="mt-2 text-sm text-concrete-grey">
-            The automated check assesses legal-compliance evidence only and may make mistakes. Each uploaded PDF
-            receives a compliance score from 0-100%. Required documents must together reach at least 90%. If automated
-            assessment cannot confirm the documents, verification fails. There is no human review of this upload path.
-            Trade Tender does not replace client due diligence, and clients must carry out suitable
+            The automated check is a PDF text check for company identity, document type, and expiry. It is not a
+            Companies House, HMRC, or insurer lookup, and it does not confirm insurance cover or competence. Each
+            uploaded PDF receives a score from 0-100%. Required documents must together reach at least 90%. If
+            automated assessment cannot confirm the documents, verification fails. There is no human review of this
+            upload path. Trade Tender does not replace client due diligence, and clients must carry out suitable
             checks before entering any formal agreement.
           </p>
         </Card>
@@ -360,7 +372,7 @@ export default function ProviderVerificationPage() {
                 <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-slate-100 pt-4">
                   <label className="flex flex-col gap-1 text-sm">
                     <span className="font-semibold text-foundation-navy">PDF</span>
-                    <span className="text-xs font-normal text-concrete-grey">PDF only. Text PDFs can be read; photographs are not accepted.</span>
+                    <span className="text-xs font-normal text-concrete-grey">PDF only, under 2 MB. Text PDFs can be read; photographs and large scans are not accepted.</span>
                     <input
                       type="file"
                       accept="application/pdf,.pdf"
@@ -371,6 +383,11 @@ export default function ProviderVerificationPage() {
                         if (!isPdfFile(file)) {
                           event.target.value = '';
                           setError('Upload a PDF. Photographs and other file types are not accepted.');
+                          return;
+                        }
+                        if (file.size > MAX_VERIFICATION_DOCUMENT_BYTES) {
+                          event.target.value = '';
+                          setError('Use a PDF smaller than 2 MB. Export a text PDF from Companies House or your insurer; large scans are not accepted.');
                           return;
                         }
                         setError(null);
@@ -408,14 +425,23 @@ export default function ProviderVerificationPage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <p className="text-sm text-concrete-grey">
               {verificationStatus === 'VERIFIED' && 'This account is verified. No further action is required.'}
-              {verificationStatus === 'PENDING' && 'Your request is under review. You can still upload or replace documents while it is pending.'}
-              {canEdit && isSoleTrader && !canSubmit && 'Upload one strong evidence PDF, or at least two moderate evidence PDFs, then submit for automated verification.'}
-              {canEdit && isSoleTrader && canSubmit && 'Your sole trader evidence meets the verification rule. Submit for automated verification.'}
-              {canEdit && !isSoleTrader && !canSubmit && 'Upload every required PDF above, with a future expiry date, then submit for automated verification.'}
-              {canEdit && !isSoleTrader && canSubmit && 'All required PDFs are uploaded. Submit for automated verification.'}
+              {verificationStatus === 'PENDING' && canSubmit && 'Documents are uploaded. Submit for automated verification. This is not a human review queue.'}
+              {verificationStatus === 'PENDING' && !canSubmit && (isSoleTrader
+                ? 'Upload one strong evidence PDF, or at least two moderate evidence PDFs, then submit for automated verification.'
+                : missingRequired.length > 0
+                  ? `Still needed: ${missingRequired.map(documentLabel).join(', ')}.`
+                  : 'Upload at least one applicable PDF, then submit for automated verification.')}
+              {canEdit && verificationStatus !== 'PENDING' && isSoleTrader && !canSubmit && 'Upload one strong evidence PDF, or at least two moderate evidence PDFs, then submit for automated verification.'}
+              {canEdit && verificationStatus !== 'PENDING' && isSoleTrader && canSubmit && 'Your sole trader evidence meets the verification rule. Submit for automated verification.'}
+              {canEdit && verificationStatus !== 'PENDING' && !isSoleTrader && !canSubmit && (missingRequired.length > 0
+                ? `Still needed: ${missingRequired.map(documentLabel).join(', ')}.`
+                : 'Upload at least one applicable PDF, then submit for automated verification.')}
+              {canEdit && verificationStatus !== 'PENDING' && !isSoleTrader && canSubmit && (requiredTypes.length > 0
+                ? 'All required PDFs are uploaded. Submit for automated verification.'
+                : 'Evidence is uploaded. Submit for automated verification.')}
             </p>
             {canEdit && (
-              <Button onClick={handleSubmitForReview} loading={submitting} disabled={!canSubmit}>Submit verification</Button>
+              <Button type="button" onClick={() => void handleSubmitForReview()} loading={submitting} disabled={!canSubmit}>Become verified</Button>
             )}
           </div>
         </Card>

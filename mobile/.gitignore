@@ -17,6 +17,9 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+google-service-account.json
+AuthKey_*.p8
+.env.eas-simulator
 
 # Metro
 .metro-health-check*

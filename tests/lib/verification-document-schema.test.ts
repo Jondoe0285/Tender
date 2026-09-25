@@ -39,3 +39,11 @@ test('rejects image uploads for automated verification', () => {
   });
   assert.equal(result.success, false);
 });
+
+test('rejects verification payloads larger than the 2 MB cap', () => {
+  const result = uploadVerificationDocumentSchema.safeParse(pdfPayload({
+    sizeBytes: 3 * 1024 * 1024,
+    dataBase64: 'A'.repeat(Math.ceil(2 * 1024 * 1024 * 4 / 3) + 8),
+  }));
+  assert.equal(result.success, false);
+});

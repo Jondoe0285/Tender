@@ -4,8 +4,7 @@ This plan delivers a packaged Android and iOS client that reproduces the approve
 
 ## Release Constraints
 
-- Use React Native with Expo only.
-- Use the approved working name and existing brand assets for internal development. Defer external package-ID registration, release signing, store-listing setup, and submission until the final name is approved.
+- Use React Native with Expo only. Product name is Trade Tender. Package identifiers are `com.tradetender.app`. Store listing copy and production EAS profiles live in `mobile/`; do not submit or auto-publish until Apple Developer, Play Console, production `MOBILE_AUTH_SECRET`, and reviewer demo accounts are in place.
 - Preserve server-side authentication, authorization, payment, audit, and contact-release controls.
 - Do not enable a protected mobile workflow until its server API and native integration tests are complete.
 
@@ -16,8 +15,8 @@ This plan delivers a packaged Android and iOS client that reproduces the approve
 3. Port account setup, profile, tender creation, tender opportunities, tender unlock, quote comparison, quote acceptance, and contact-release workflows as native screens.
 4. Add password-change token revocation, bearer-only mobile logout, explicit terms acceptance, interactive Provider opportunities, and verified payment return handling using the existing server-side payment controls and audited webhook flow.
 5. Add native UI/integration, accessibility, Android, and iOS device tests for every protected workflow, and include mobile checks in CI.
-6. Approve final product identity, app icons, store metadata, privacy disclosures, package identifiers, signing, and release accounts.
-7. Produce internal Android and iOS builds, validate staging against the approved source behavior, then complete store review and production release approval.
+6. Store identity is Trade Tender / `com.tradetender.app`. App icons, splash, privacy URLs, Play/App Store copy, and production EAS profiles are in `mobile/`. Outstanding before submit: Apple Developer Program, Play Console app, Play service account JSON, App Store Connect record, 1024x500 Play feature graphic, device screenshots, and reviewer demo accounts.
+7. Produce internal Android and iOS builds, validate staging against the approved source behavior, then complete store review and production release approval. Production store binaries must use `EXPO_PUBLIC_API_URL=https://trade-tender.onrender.com`.
 
 ## Completion Criteria
 
@@ -30,7 +29,7 @@ This plan delivers a packaged Android and iOS client that reproduces the approve
 
 The `preview` EAS profile produces an Android APK for internal testing. Before creating it, configure a public HTTPS test API origin and a non-secret `EXPO_PUBLIC_API_URL` in the EAS build environment. The server must separately hold `MOBILE_AUTH_SECRET`; never include it in the APK.
 
-Run `npm run build:android` from `mobile/` while signed in to the approved Expo account. Install the generated APK only on internal test devices. Final package-ID registration, release signing, Play Console setup, and public distribution remain deferred until final name approval.
+Run `npm run build:android` from `mobile/` while signed in to the approved Expo account for an internal staging APK. Store binaries use `npm run build:android:store` and `npm run build:ios:store`. Do not run `eas submit` until the Play service account and App Store Connect app exist. Never include `MOBILE_AUTH_SECRET` in the binary.
 
 ## Mobile Stress-Test Gate
 

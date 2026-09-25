@@ -7,10 +7,23 @@
     "icon": "./assets/icon.png",
     "scheme": "tradetender",
     "userInterfaceStyle": "light",
+    "primaryColor": "#1D6FB8",
+    "description": "UK construction tenders and quotes for Buyers and Suppliers.",
+    "updates": {
+      "enabled": false
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tradetender.app",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "usesAppleSignIn": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Trade Tender uses a photo or file you choose so you can attach it to a tender or quote.",
+        "CFBundleAllowMixedLocalizations": true
+      }
     },
     "android": {
       "package": "com.tradetender.app",
@@ -19,11 +32,34 @@
         "backgroundColor": "#F2F4F7",
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "allowBackup": false,
+      "permissions": []
     },
     "plugins": [
-      "expo-secure-store",
-      "expo-font"
-    ]
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
+      ],
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F2F4F7",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200
+        }
+      ],
+      "expo-document-picker"
+    ],
+    "extra": {
+      "privacyPolicyUrl": "https://trade-tender.onrender.com/policies/privacy",
+      "eas": {
+        "projectId": "0c939e10-05b9-43a0-b3e1-46a30daf5b62"
+      }
+    },
+    "owner": "jondoe0285"
   }
 }

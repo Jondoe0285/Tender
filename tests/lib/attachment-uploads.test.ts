@@ -59,3 +59,15 @@ test('verification evidence must be a PDF', () => {
   });
   assert.equal(pdf.mimeType, 'application/pdf');
 });
+
+test('rejects verification PDFs over 2 MB', () => {
+  const oversized = Buffer.concat([
+    Buffer.from('%PDF-1.7\n'),
+    Buffer.alloc((2 * 1024 * 1024) + 1, 0x20),
+  ]);
+  assert.throws(() => verifyVerificationDocument({
+    name: 'certificate.pdf',
+    mimeType: 'application/pdf',
+    dataBase64: oversized.toString('base64'),
+  }), /2 MB/);
+});

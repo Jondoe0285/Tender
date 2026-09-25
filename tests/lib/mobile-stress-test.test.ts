@@ -22,6 +22,26 @@ test('mobile stress test fails closed and generates readiness reports without st
   }
 });
 
+test('mobile contract inspector follows split auth and payment screens', () => {
+  const output = mkdtempSync(path.join(tmpdir(), 'mobile-stress-contract-'));
+  try {
+    try {
+      execFileSync('node', ['scripts/mobile/run-stress-test.mjs'], {
+        env: { ...process.env, MOBILE_STRESS_RESULTS_DIR: output, ANDROID_STAGING_BASE_URL: '', IOS_STAGING_BASE_URL: '', MOBILE_STRESS_DEVICE_EVIDENCE: '' },
+        stdio: 'pipe',
+      });
+    } catch {
+      // Missing staging origins remains a fail-closed CRITICAL; the split-screen contract must not add false HIGHs.
+    }
+    const readiness = JSON.parse(readFileSync(path.join(output, 'launch-readiness.json'), 'utf8')) as { findings: { detail: string }[] };
+    assert.equal(readiness.findings.some((finding) => finding.detail.includes('terms consent')), false);
+    assert.equal(readiness.findings.some((finding) => finding.detail.includes('Payment return')), false);
+    assert.equal(readiness.findings.some((finding) => finding.detail.includes('bearer credential')), false);
+  } finally {
+    rmSync(output, { recursive: true, force: true });
+  }
+});
+
 test('production deployment depends on the mobile readiness gate', () => {
   const workflow = readFileSync('.github/workflows/deploy-production.yml', 'utf8');
   assert.match(workflow, /mobile-stress-test:/);

@@ -2,7 +2,7 @@ import type { PaymentType } from '@prisma/client';
 import { prisma } from '@/server/data/prisma';
 import { listPendingControlChanges } from '@/server/domain/controlChangeService';
 import { CLIENT_RELEASE_FEE_GBP, RETAILER_UNLOCK_FEE_GBP, SERVICE_NAMES } from '@/lib/categories';
-import { type IndependentReviewTier } from '@/lib/independentReviewTiers';
+import { DEFAULT_INDEPENDENT_REVIEW_FEES_GBP, LEGACY_INDEPENDENT_REVIEW_FEES_GBP, type IndependentReviewTier } from '@/lib/independentReviewTiers';
 import { VERIFICATION_DOCUMENT_TYPES, type VerificationDocumentType } from '@/lib/verification-documents';
 import { applyMasterEstimateReduction, estimateTenderQuoteValue, getReviewedQuoteEstimateBaselines } from '@/server/domain/quoteEstimateService';
 import { parsePublicLaunchAt } from '@/lib/public-launch';
@@ -29,12 +29,12 @@ const defaultSettings: Record<string, string> = {
   RETAILER_LAUNCH_CREDITS_DEFAULT: '3',
   ADSPACE_ACTIVE: 'false',
   INDEPENDENT_REVIEW_ACTIVE: 'true',
-  INDEPENDENT_REVIEW_FEE_BRONZE_GBP: '150',
-  INDEPENDENT_REVIEW_FEE_SILVER_GBP: '250',
-  INDEPENDENT_REVIEW_FEE_GOLD_GBP: '400',
+  INDEPENDENT_REVIEW_FEE_BRONZE_GBP: String(DEFAULT_INDEPENDENT_REVIEW_FEES_GBP.BRONZE),
+  INDEPENDENT_REVIEW_FEE_SILVER_GBP: String(DEFAULT_INDEPENDENT_REVIEW_FEES_GBP.SILVER),
+  INDEPENDENT_REVIEW_FEE_GOLD_GBP: String(DEFAULT_INDEPENDENT_REVIEW_FEES_GBP.GOLD),
   DIRECT_CONTACT_ACTIVE: 'false',
   DIRECT_CONTACT_FEE_GBP: '25',
-  HUMAN_REVIEW_ACTIVE: 'true',
+  HUMAN_REVIEW_ACTIVE: 'false',
   SIGN_IN_ACTIVE: 'true',
   PUBLIC_LAUNCH_AT: '',
   VERIFICATION_DOCUMENT_REQUIREMENTS: '{}',
@@ -267,7 +267,29 @@ const TIER_FEE_KEYS: Record<IndependentReviewTier, keyof typeof defaultSettings>
   GOLD: 'INDEPENDENT_REVIEW_FEE_GOLD_GBP',
 };
 
+let independentReviewFeesEnsurePromise: Promise<void> | null = null;
+
+async function ensureIndependentReviewProductFees(): Promise<void> {
+  if (!independentReviewFeesEnsurePromise) {
+    independentReviewFeesEnsurePromise = (async () => {
+      for (const [tier, key] of Object.entries(TIER_FEE_KEYS) as Array<[IndependentReviewTier, keyof typeof defaultSettings]>) {
+        const current = await prisma.platformSetting.findUnique({ where: { key } });
+        const legacy = String(LEGACY_INDEPENDENT_REVIEW_FEES_GBP[tier]);
+        if (!current || current.value === legacy) {
+          await prisma.platformSetting.upsert({
+            where: { key },
+            update: { value: defaultSettings[key] },
+            create: { key, value: defaultSettings[key] },
+          });
+        }
+      }
+    })();
+  }
+  await independentReviewFeesEnsurePromise;
+}
+
 export async function getIndependentReviewFeeGbp(tier: IndependentReviewTier): Promise<number> {
+  await ensureIndependentReviewProductFees();
   return getConfiguredFeeGbp(TIER_FEE_KEYS[tier]);
 }
 
@@ -311,9 +333,9 @@ export async function isDirectContactActive(): Promise<boolean> {
   return await getPlatformSetting('DIRECT_CONTACT_ACTIVE') === 'true';
 }
 
-/** Owner-controlled: when disabled, a verification request that would need a human decision is declined automatically instead of queuing for review. */
+/** Leftover Owner flag. Automated verification does not queue for human review. */
 export async function isHumanReviewActive(): Promise<boolean> {
-  return await getPlatformSetting('HUMAN_REVIEW_ACTIVE') !== 'false';
+  return await getPlatformSetting('HUMAN_REVIEW_ACTIVE') === 'true';
 }
 
 /** Owner-controlled: registration stays open. Non-Owner sign-in is blocked when this is false. */
@@ -354,6 +376,7 @@ export async function getVerificationDocumentRequirements(): Promise<Record<stri
 }
 
 export async function getAdminSettings(includeSupportRecipient = false) {
+  await ensureIndependentReviewProductFees();
   const [settings, tiers, subscriptions, categoryDefinitions, verificationDocumentRequirements, pendingControlChanges] = await Promise.all([
     prisma.platformSetting.findMany({ orderBy: { key: 'asc' } }),
     prisma.membershipTier.findMany({ orderBy: { createdAt: 'asc' } }),

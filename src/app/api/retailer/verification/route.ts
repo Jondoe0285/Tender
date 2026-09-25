@@ -6,6 +6,8 @@ import { recordAuditEvent } from '@/server/audit/auditLog';
 import { toErrorResponse } from '@/server/http/errors';
 import { isVerificationEligible } from '@/lib/categories';
 import { evaluateProviderVerification, evaluateSoleTraderVerification, markUploadedDocumentsVerified } from '@/server/domain/verificationDocumentService';
+import { providerAutomatedVerificationTemplate } from '@/server/notifications/emailTemplates';
+import { sendTransactionalEmail } from '@/server/notifications/resend';
 
 export async function POST(request: Request) {
   try {
@@ -20,8 +22,8 @@ export async function POST(request: Request) {
     if (!isVerificationEligible(profile.categories)) {
       return NextResponse.json({ error: 'Verification is only available for Materials, Waste, Plant Hire, Contractor Services, or Professional Services providers' }, { status: 403 });
     }
-    if (profile.verificationStatus === 'PENDING' || profile.verificationStatus === 'VERIFIED') {
-      return NextResponse.json({ error: 'A verification request is already pending or approved for this account' }, { status: 409 });
+    if (profile.verificationStatus === 'VERIFIED') {
+      return NextResponse.json({ error: 'This account is already verified' }, { status: 409 });
     }
 
     const evaluation = profile.isSoleTrader
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
       });
       await markUploadedDocumentsVerified(profile.id, profile.categories, true, profile.isSoleTrader);
       await recordAuditEvent({ actorId: user.id, action: 'PROVIDER_VERIFICATION_AUTO_APPROVED', targetType: 'User', targetId: user.id, metadata: { confidencePercent: evaluation.confidencePercent } });
+      await sendTransactionalEmail(user.email, providerAutomatedVerificationTemplate({ passed: true, confidencePercent: evaluation.confidencePercent })).catch(() => undefined);
       return NextResponse.json({ verificationStatus: updated.verificationStatus, verificationRequestedAt: updated.verificationRequestedAt }, { status: 200 });
     }
 
@@ -61,6 +64,7 @@ export async function POST(request: Request) {
       },
     });
     await recordAuditEvent({ actorId: user.id, action: 'PROVIDER_VERIFICATION_AUTO_DECLINED', targetType: 'User', targetId: user.id, metadata: { confidencePercent: evaluation.confidencePercent } });
+    await sendTransactionalEmail(user.email, providerAutomatedVerificationTemplate({ passed: false, confidencePercent: evaluation.confidencePercent })).catch(() => undefined);
     return NextResponse.json({ verificationStatus: updated.verificationStatus, verificationRequestedAt: updated.verificationRequestedAt }, { status: 200 });
   } catch (error) {
     return toErrorResponse(error);

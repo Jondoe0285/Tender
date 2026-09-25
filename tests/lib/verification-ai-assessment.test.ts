@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { deflateSync } from 'node:zlib';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import {
   assessVerificationDocument,
@@ -185,4 +186,32 @@ test('passes an HMRC UTR PDF that names the registered company', async () => {
   assert.equal(result.matchedDocumentType, true);
   assert.equal(result.matchedCompanyName, true);
   assert.equal(result.passed, true);
+});
+
+test('does not treat a stray CIS mention as CIS registration proof', async () => {
+  const content = await pdfWithText([
+    'Certificate of Incorporation',
+    'Ridgeway Brickworks Ltd',
+    'This filing mentions CIS in passing',
+  ]);
+  const result = assessVerificationDocument({
+    documentType: 'CIS_REGISTRATION_PROOF',
+    mimeType: 'application/pdf',
+    content,
+    expiryDate: null,
+    companyName: 'Ridgeway Brickworks Ltd',
+    address: null,
+  });
+  assert.equal(result.matchedDocumentType, false);
+  assert.equal(result.passed, false);
+});
+
+test('caps inflated PDF streams so a highly compressed scan cannot exhaust memory', () => {
+  const compressed = deflateSync(Buffer.alloc(16 * 1024 * 1024, 0x41));
+  const header = Buffer.from(`%PDF-1.7\n1 0 obj\n<< /Length ${compressed.length} /Filter /FlateDecode >>\nstream\n`);
+  const pdf = Buffer.concat([header, compressed, Buffer.from('\nendstream\nendobj\n')]);
+  const started = Date.now();
+  const text = extractDocumentText(pdf, 'application/pdf');
+  assert.ok(Date.now() - started < 2000);
+  assert.ok((text ?? '').length < 80_000);
 });

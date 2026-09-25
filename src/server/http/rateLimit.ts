@@ -5,6 +5,7 @@ import { prisma } from '@/server/data/prisma';
 export type RateLimitOptions = {
   maxRequests: number;
   windowMs: number;
+  nowMs?: number;
 };
 
 export function resolveClientIp(headers: Headers): string {
@@ -44,7 +45,7 @@ export async function checkRateLimit(headers: Headers, scope: string, options: R
     throw new Error('Rate limit options must be positive integers.');
   }
 
-  const now = new Date(Date.now());
+  const now = new Date(options.nowMs ?? Date.now());
   const windowCutoff = new Date(now.getTime() - options.windowMs);
   const expiresAt = new Date(now.getTime() + options.windowMs);
   const identifierHash = getIdentifierHash(headers, scope);

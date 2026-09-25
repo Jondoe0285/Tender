@@ -8,9 +8,9 @@ It is intentionally stored in the repository so it travels with the code across 
 
 The ambition is **enterprise-ready**: a specified package workspace that a Tier 1 contractor can trust for closed regional procurement, then national use. Bar is 70. Last honest score on staging `d0699a4` was **59/100**. Live rail remains 12. Production remains **BLOCKED**.
 
-Work top to bottom — live-rail config first, then remaining operational evidence. Specify → Compare → Award was re-walked on localhost (23 September 2026). Localhost axe WCAG 2 A/AA was clean on the public first-journey pages and the signed-in dashboard. Real-device confirmation is still outstanding.
+Work top to bottom — live-rail config first, then remaining operational evidence. Specify → Compare → Award was re-walked on localhost (23 September 2026). Localhost axe WCAG 2 A/AA was clean on the public first-journey pages and the signed-in dashboard. Real-device confirmation is still outstanding. Expo Buyer/Supplier workspace, production EAS store profiles, and Play/App Store listing copy are in `mobile/`; Apple/Google Console accounts, reviewer demos, device screenshots, and the Stripe-versus-store-billing decision remain open. Do not submit store binaries until production APIs match the packaged app.
 
-Repository engineering for payment ledger, privileged MFA, trusted client IP, own-tender IDOR, Project/Award schema, frozen package revision, PO on accept, four-eyes ControlChange, conversion funnel, measured contractor units, Award/Project backfill, county operating-location remap, `/user` buying URLs, Year 1 fixed release fees, sandbox password repair, workspace 403, Trade Tender IDs, and automated-verification copy is in code. Live Stripe, Resend, Sentry, retention, an approved staging deploy SHA, real-device QA, and paid-plan capacity evidence remain Before Production items.
+Repository engineering for payment ledger, privileged MFA, trusted client IP, own-tender IDOR, Project/Award schema, frozen package revision, PO on accept, four-eyes ControlChange, conversion funnel, measured contractor units, Award/Project backfill, county operating-location remap, `/user` buying URLs, Year 1 fixed release fees, sandbox password repair, workspace 403, Trade Tender IDs, automated-verification copy, and native store packaging is in code. Live Stripe, Resend, Sentry, retention, an approved staging deploy SHA, real-device QA, store Console setup, and paid-plan capacity evidence remain Before Production items.
 
 Actions below include the 2026-09-22 enterprise due-diligence recommendations. Existing tracker items were kept where still open; due-diligence items that already appeared here or were closed as Year 1 product decisions were not duplicated.
 
@@ -41,6 +41,16 @@ Actions below include the 2026-09-22 enterprise due-diligence recommendations. E
 
 - [ ] Complete accessibility, real-device, and first-journey QA, including a repeatable axe pass on a physical device (P2-M01 / P2-M03). Localhost axe WCAG 2 A/AA was clean on `/`, `/login`, `/register`, `/security`, `/demo`, and `/user` on 23 September 2026. Mobile nav hit targets are 44px. Real-device confirmation is still outstanding.
 - [ ] Establish production capacity and availability evidence. Free-tier Render services have no demonstrated path to the required 1,000 concurrent users. Select an appropriate plan, document connection/scaling limits, configure alerts, and pass representative load and recovery tests.
+
+### Native app and store release
+
+- [ ] Confirm `MOBILE_AUTH_SECRET` (32+ characters) is set on Tender Staging and Trade Tender production in Render. Do not commit or paste the value. Staging `POST /api/mobile/auth/login` is live; the secret is only proven after a successful mobile login.
+- [ ] Walk the internal preview APK against staging: register or use verified Buyer and Supplier accounts, create a tender, unlock, quote, accept with a purchase order number, then messages / site-visit contact. Keep that evidence for the mobile stress-test gate. Do not use this APK as a store binary.
+- [ ] Enrol in the Apple Developer Program, create the App Store Connect app with bundle ID `com.tradetender.app`, and configure EAS iOS distribution credentials plus an App Store Connect API key. Listing copy is in `mobile/store.config.json`. Do not submit for public review until production serves the current mobile APIs.
+- [ ] Create the Google Play Console app with package `com.tradetender.app`, link a Play Developer API service account, and store `mobile/google-service-account.json` locally (gitignored). Paste listing and Data safety from `mobile/store/play-en-GB.json` and `mobile/store/play-data-safety.json`. First `eas submit` stays internal/draft.
+- [ ] Capture phone screenshots for both stores and a 1024×500 Play feature graphic from a physical device. Add App Review / Play review demo accounts (verified Buyer and Supplier) in the consoles only — never in git.
+- [ ] Decide before any store submit whether Stripe Checkout for unlock and contact-release fees is acceptable under Apple 3.1.1 and Google Play Billing, or whether store in-app purchase products are required. Do not weaken server-side payment, audit, or contact-release controls to get a listing.
+- [ ] Build production AAB and iOS store binaries (`npm run build:android:store` / `npm run build:ios:store` from `mobile/`) only after `https://trade-tender.onrender.com` serves the current mobile JSON APIs and production `MOBILE_AUTH_SECRET`. Upload as TestFlight / Play internal draft. Do not auto-release or enable EAS Update.
 
 ### Data, Product, and Marketplace
 

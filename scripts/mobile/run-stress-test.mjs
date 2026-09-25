@@ -16,13 +16,15 @@ function add(severity, category, detail, recommendation) {
 function inspectMobileContract() {
   const app = JSON.parse(readFileSync('mobile/app.json', 'utf8'));
   const appSource = readFileSync('mobile/App.tsx', 'utf8');
+  const authFlow = readFileSync('mobile/src/screens/AuthFlow.tsx', 'utf8');
+  const tenderScreen = readFileSync('mobile/src/screens/TenderScreen.tsx', 'utf8');
   const session = readFileSync('mobile/src/auth/session.ts', 'utf8');
   const client = readFileSync('mobile/src/api/client.ts', 'utf8');
   if (!app.expo.android?.package || !app.expo.ios?.bundleIdentifier) add('CRITICAL', 'security', 'Android or iOS package identity is missing.', 'Configure package identities before creating test artifacts.');
   if (!session.includes('SecureStore')) add('CRITICAL', 'security', 'Mobile credentials are not stored in secure device storage.', 'Use Expo SecureStore for every device credential.');
-  if (!client.includes('Authorization: `Bearer')) add('CRITICAL', 'security', 'Protected mobile calls do not send a bearer credential.', 'Use the server-issued mobile bearer token for protected calls.');
-  if (!appSource.includes('ExpoLinking.parse') || !appSource.includes('loadMobileReleaseStatus')) add('HIGH', 'security', 'Payment return does not refresh a server-confirmed state.', 'Refresh unlock and contact-release status after a payment return.');
-  if (!appSource.includes('termsAccepted')) add('HIGH', 'security', 'Mobile registration lacks explicit terms consent.', 'Require a user-driven terms acknowledgement.');
+  if (!client.includes("headers.set('Authorization'") || !client.includes('Bearer ${session.accessToken}')) add('CRITICAL', 'security', 'Protected mobile calls do not send a bearer credential.', 'Use the server-issued mobile bearer token for protected calls.');
+  if (!appSource.includes('ExpoLinking.parse') || !tenderScreen.includes('finalizeQuoteRelease') || !tenderScreen.includes('finalizeTenderUnlock')) add('HIGH', 'security', 'Payment return does not refresh a server-confirmed state.', 'Refresh unlock and contact-release status after a payment return.');
+  if (!authFlow.includes('termsAccepted')) add('HIGH', 'security', 'Mobile registration lacks explicit terms consent.', 'Require a user-driven terms acknowledgement.');
 }
 
 async function probe(platform, configuredUrl) {
