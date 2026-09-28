@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { passwordSchema } from '@/lib/schemas/password';
 import { additionalUserSchema, createProfileUpdateSchemaForCatalog } from '@/lib/schemas/profile';
 import { prisma } from '@/server/data/prisma';
-import { hashPassword, verifyPassword } from '@/server/auth/password';
-import { requireRole } from '@/server/auth/session';
+import { hashPassword } from '@/server/auth/password';
+import { requireRole, getCurrentUser } from '@/server/auth/session';
+import { changeAuthenticatedPassword } from '@/server/auth/changePassword';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { isPrimaryClientUser } from '@/lib/client-company';
@@ -185,16 +186,12 @@ export async function PATCH(request: Request) {
   try {
     const originError = rejectCrossOrigin(request);
     if (originError) return originError;
-    const user = await requireRole('USER');
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    if (user.role !== 'USER') return NextResponse.json({ error: 'Not permitted' }, { status: 403 });
     const parsed = passwordChangeSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: 'Invalid password details' }, { status: 400 });
-
-    const account = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { passwordHash: true } });
-    if (!await verifyPassword(parsed.data.currentPassword, account.passwordHash)) {
-      return NextResponse.json({ error: 'Unable to change password with those details' }, { status: 400 });
-    }
-    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(parsed.data.newPassword), sessionVersion: { increment: 1 } } });
-    await recordAuditEvent({ actorId: user.id, action: 'CLIENT_PASSWORD_CHANGED', targetType: 'User', targetId: user.id });
+    await changeAuthenticatedPassword(user.id, parsed.data.currentPassword, parsed.data.newPassword);
     return NextResponse.json({ status: 'updated' });
   } catch (error) {
     return toErrorResponse(error);

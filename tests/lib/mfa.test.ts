@@ -25,6 +25,11 @@ test('MFA enrollment keeps the current session valid until the code is verified'
   assert.match(route, /MFA_ENABLED/);
   assert.match(route, /MFA_DISABLED/);
   assert.match(route, /sessionVersion: \{ increment: 1 \}/);
+  assert.match(route, /where: \{ mfaEnabled: true \}/);
+  assert.match(route, /deactivatedCount/);
+  assert.match(route, /requireMfaEnrollmentAccount/);
+  assert.match(route, /requireOwnerAccount/);
+  assert.doesNotMatch(route, /where: \{ id: user\.id, mfaEnabled: true \}, data: \{ mfaEnabled: false/);
 });
 
 test('MFA settings load current enabled state before showing setup controls', () => {
@@ -32,6 +37,8 @@ test('MFA settings load current enabled state before showing setup controls', ()
 
   assert.match(source, /fetch\('\/api\/auth\/mfa'\)/);
   assert.match(source, /setEnabled\(Boolean\(data\?\.enabled\)\)/);
+  assert.match(source, /Deactivate MFA for all users/);
+  assert.match(source, /every Super User must enrol/);
 });
 
 test('login forwards the authenticator code to the credentials provider', () => {

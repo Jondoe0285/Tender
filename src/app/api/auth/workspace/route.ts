@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/server/auth/session';
+import { isPlatformMfaActive, superUserMfaSatisfied } from '@/server/auth/platformMfa';
 import { appUrl } from '@/server/config/appUrl';
 import { workspaceForRole } from '@/lib/navigation';
 
@@ -11,6 +12,14 @@ export async function GET() {
 
   if (!workspace) {
     return NextResponse.redirect(appUrl('/login?error=workspace'));
+  }
+
+  if (user?.mustChangePassword) {
+    return NextResponse.redirect(appUrl('/change-password'));
+  }
+
+  if (user && !superUserMfaSatisfied(user, await isPlatformMfaActive())) {
+    return NextResponse.redirect(appUrl('/account/security'));
   }
 
   return NextResponse.redirect(appUrl(workspace));

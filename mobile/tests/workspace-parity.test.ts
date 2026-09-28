@@ -27,6 +27,7 @@ test('mobile workspace covers Buyer and Supplier SaaS destinations', () => {
   assert.match(tabs, /Activity and payments/);
   assert.match(tabs, /Profile/);
   assert.match(tabs, /Support/);
+  assert.match(app, /ForcedPasswordChange/);
   assert.match(app, /DashboardScreen/);
   assert.match(app, /CreateTenderScreen/);
   assert.match(app, /TenderScreen/);

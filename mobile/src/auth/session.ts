@@ -7,6 +7,7 @@ export type MobileSession = {
   expiresAt: number;
   email: string;
   role: 'SUPER_USER' | 'USER';
+  mustChangePassword?: boolean;
 };
 
 export async function saveMobileSession(session: MobileSession) {
@@ -24,7 +25,13 @@ export async function loadMobileSession(): Promise<MobileSession | null> {
       await clearMobileSession();
       return null;
     }
-    return session as MobileSession;
+    return {
+      accessToken: session.accessToken,
+      expiresAt: session.expiresAt,
+      email: session.email,
+      role: session.role,
+      mustChangePassword: session.mustChangePassword === true,
+    };
   } catch {
     await clearMobileSession();
     return null;

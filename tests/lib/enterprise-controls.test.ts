@@ -53,6 +53,7 @@ test('accept, four-eyes, masking, conversion, and measured units are wired', () 
   assert.match(ops, /isAssignablePlatformOwnerEmail/);
   assert.match(table, /maskEmail\(account\.email\)/);
   assert.match(dashboard, /ConversionFunnel/);
+  assert.match(dashboard, /RegisteredCompanyCounts/);
   assert.match(compiler, /MEASURED_CONTRACTOR_UNITS/);
   assert.match(readFileSync('src/components/admin/OpsExceptionBoard.tsx', 'utf8'), /Owner MFA/);
   assert.match(readFileSync('render.yaml', 'utf8'), /PLATFORM_OWNER_EMAIL/);

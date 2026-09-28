@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { prisma } from '../../src/server/data/prisma';
+import { restorePlatformSetting } from './restore-platform-setting';
 import { requestUnlock } from '../../src/server/domain/unlockService';
 
 test('a zero-cost unlock fee waives payment and opens the tender immediately', async (context) => {
@@ -23,16 +24,8 @@ test('a zero-cost unlock fee waives payment and opens the tender immediately', a
     if (retailerId) await prisma.retailerProfile.deleteMany({ where: { userId: retailerId } });
     const userIds = [clientId, retailerId].filter((id): id is string => Boolean(id));
     if (userIds.length > 0) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
-    if (originalMembershipTiersSetting) {
-      await prisma.platformSetting.update({ where: { id: originalMembershipTiersSetting.id }, data: { value: originalMembershipTiersSetting.value } });
-    } else {
-      await prisma.platformSetting.deleteMany({ where: { key: 'MEMBERSHIP_TIERS_ACTIVE' } });
-    }
-    if (originalUnlockFeeSetting) {
-      await prisma.platformSetting.update({ where: { id: originalUnlockFeeSetting.id }, data: { value: originalUnlockFeeSetting.value } });
-    } else {
-      await prisma.platformSetting.deleteMany({ where: { key: 'RETAILER_UNLOCK_FEE_GBP' } });
-    }
+    await restorePlatformSetting('MEMBERSHIP_TIERS_ACTIVE', originalMembershipTiersSetting);
+    await restorePlatformSetting('RETAILER_UNLOCK_FEE_GBP', originalUnlockFeeSetting);
   });
 
   await prisma.platformSetting.upsert({
@@ -116,11 +109,7 @@ test('an active membership allowance cannot unlock a tender while membership tie
     const userIds = [clientId, retailerId].filter((id): id is string => Boolean(id));
     if (userIds.length > 0) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     if (tierId) await prisma.membershipTier.deleteMany({ where: { id: tierId } });
-    if (originalMembershipTiersSetting) {
-      await prisma.platformSetting.update({ where: { id: originalMembershipTiersSetting.id }, data: { value: originalMembershipTiersSetting.value } });
-    } else {
-      await prisma.platformSetting.deleteMany({ where: { key: 'MEMBERSHIP_TIERS_ACTIVE' } });
-    }
+    await restorePlatformSetting('MEMBERSHIP_TIERS_ACTIVE', originalMembershipTiersSetting);
   });
 
   await prisma.platformSetting.upsert({

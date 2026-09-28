@@ -58,6 +58,8 @@ export async function getUserAnalyticsProfile(userId: string, period: ActivityPe
     contactPhone: user.contactPhone,
     role: user.role,
     suspended: user.suspended,
+    emailVerifiedAt: user.emailVerifiedAt,
+    mustChangePassword: user.mustChangePassword,
     createdAt: user.createdAt,
     lastLoginAt: user.lastLoginAt,
     lastLogoutAt: user.lastLogoutAt,

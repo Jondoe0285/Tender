@@ -12,6 +12,8 @@ import {
   contentReviewOutcomeTemplate,
   emailVerificationTemplate,
   enhancedVerificationInvitationTemplate,
+  tradeTenderMarketingTemplate,
+  tradeTenderSupplierMarketingTemplate,
   failedPaymentTemplate,
   newRegistrationTemplate,
   passwordResetTemplate,
@@ -57,6 +59,8 @@ const catalog: Record<Audience, Array<[string, EmailTemplate]>> = {
     ['tender-warning-escalation', tenderWarningEscalationTemplate({ activeWarningCount: 3, reviewPath: '/super-user/users/preview-client' })],
     ['support-request-notification', supportRequestNotificationTemplate({ type: 'CHANGE', submittedAt: previewDate })],
     ['configuration-test', configurationTestTemplate({ environment: 'email-trigger-simulation', sentAt: previewDate })],
+    ['trade-tender-marketing', tradeTenderMarketingTemplate({ unsubscribeUrl: `${previewLink}/unsubscribe`, ctaUrl: `${previewLink}/register` })],
+    ['trade-tender-supplier-marketing', tradeTenderSupplierMarketingTemplate({ unsubscribeUrl: `${previewLink}/unsubscribe`, ctaUrl: `${previewLink}/register?intent=supplying` })],
   ],
   consultant: [
     ['enhanced-verification-invitation', enhancedVerificationInvitationTemplate({ recipientName: 'Preview Consultant', inviteLink: previewLink, expiresAt: previewDate })],

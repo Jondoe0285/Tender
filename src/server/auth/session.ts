@@ -3,12 +3,13 @@ import { headers } from 'next/headers';
 import { authOptions } from '@/server/auth/auth';
 import { prisma } from '@/server/data/prisma';
 import { verifyMobileToken } from '@/server/auth/mobileToken';
+import { isPlatformMfaActive, superUserMfaSatisfied } from '@/server/auth/platformMfa';
 
-export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'USER'; roles: SessionUser['role'][]; isOwner: boolean; isAccountant: boolean; mfaEnabled: boolean };
+export type SessionUser = { id: string; email: string; role: 'SUPER_USER' | 'USER'; roles: SessionUser['role'][]; isOwner: boolean; isAccountant: boolean; mfaEnabled: boolean; mustChangePassword: boolean };
 
-export type CurrentAccount = { id: string; email: string; role: SessionUser['role']; suspended: boolean; isOwner: boolean; isAccountant: boolean; sessionVersion: number; mfaEnabled: boolean; roleMemberships: { role: SessionUser['role'] }[] };
+export type CurrentAccount = { id: string; email: string; role: SessionUser['role']; suspended: boolean; isOwner: boolean; isAccountant: boolean; sessionVersion: number; mfaEnabled: boolean; mustChangePassword: boolean; roleMemberships: { role: SessionUser['role'] }[] };
 
-/** Owner accounts must complete TOTP MFA before Owner APIs. Super User and USER do not. */
+/** Owner accounts must complete TOTP MFA before Owner APIs. */
 export function privilegedMfaSatisfied(account: { role: string; isOwner: boolean; mfaEnabled: boolean }): boolean {
   if (!account.isOwner) return true;
   return account.mfaEnabled;
@@ -18,7 +19,7 @@ export function resolveCurrentUser(identity: { requestedRole: SessionUser['role'
   if (!current || current.suspended) return null;
   const roles = current.roleMemberships.length > 0 ? current.roleMemberships.map((membership) => membership.role) : [current.role];
   if (!roles.includes(identity.requestedRole)) return null;
-  return { id: current.id, email: current.email, role: identity.requestedRole, roles, isOwner: current.isOwner, isAccountant: current.isAccountant, mfaEnabled: current.mfaEnabled };
+  return { id: current.id, email: current.email, role: identity.requestedRole, roles, isOwner: current.isOwner, isAccountant: current.isAccountant, mfaEnabled: current.mfaEnabled, mustChangePassword: current.mustChangePassword };
 }
 
 /** Resolves the authenticated user from the server-side session only — never trust client-supplied identity. */
@@ -44,6 +45,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       isAccountant: true,
       sessionVersion: true,
       mfaEnabled: true,
+      mustChangePassword: true,
       roleMemberships: { select: { role: true } },
     },
   });
@@ -66,6 +68,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     isOwner: current.isOwner,
     isAccountant: current.isAccountant,
     mfaEnabled: current.mfaEnabled,
+    mustChangePassword: current.mustChangePassword,
   };
 }
 
@@ -75,7 +78,7 @@ export async function getCurrentMobileUser(): Promise<SessionUser | null> {
   if (!bearerToken) return null;
   const identity = await verifyMobileToken(bearerToken);
   if (!identity) return null;
-  const current = await prisma.user.findUnique({ where: { id: identity.userId }, select: { id: true, email: true, role: true, suspended: true, isOwner: true, isAccountant: true, sessionVersion: true, mfaEnabled: true, roleMemberships: { select: { role: true } } } });
+  const current = await prisma.user.findUnique({ where: { id: identity.userId }, select: { id: true, email: true, role: true, suspended: true, isOwner: true, isAccountant: true, sessionVersion: true, mfaEnabled: true, mustChangePassword: true, roleMemberships: { select: { role: true } } } });
   if (!current || current.sessionVersion !== identity.authVersion) return null;
   return resolveCurrentUser({ requestedRole: identity.role }, current);
 }
@@ -83,6 +86,7 @@ export async function getCurrentMobileUser(): Promise<SessionUser | null> {
 export async function requireMobileUser(): Promise<SessionUser> {
   const user = await getCurrentMobileUser();
   if (!user) throw new UnauthorizedError();
+  if (user.mustChangePassword) throw new ForbiddenError('PASSWORD_CHANGE_REQUIRED');
   return user;
 }
 
@@ -112,6 +116,7 @@ export async function requireRole(...roles: SessionUser['role'][]): Promise<Sess
   const user = await getCurrentUser();
   if (!user) throw new UnauthorizedError();
   if (roles.length > 0 && !roles.includes(user.role)) throw new ForbiddenError();
+  if (user.mustChangePassword) throw new ForbiddenError('PASSWORD_CHANGE_REQUIRED');
   return user;
 }
 
@@ -129,9 +134,10 @@ export async function requireOwner(): Promise<SessionUser> {
   return user;
 }
 
-/** Full Super User access excludes restricted Accountant sub-accounts. MFA is Owner-only. */
+/** Full Super User access excludes restricted Accountant sub-accounts. Owner-activated MFA applies to Super Users. */
 export async function requireFullSuperUser(): Promise<SessionUser> {
   const user = await requireRole('SUPER_USER');
   if (user.isAccountant) throw new ForbiddenError();
+  if (!superUserMfaSatisfied(user, await isPlatformMfaActive())) throw new ForbiddenError('MFA_SETUP_REQUIRED');
   return user;
 }

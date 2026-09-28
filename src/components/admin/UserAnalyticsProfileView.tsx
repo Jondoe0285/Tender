@@ -8,9 +8,11 @@ import { Input, Label, Select, Textarea } from '@/components/ui/Field';
 import type { UserAnalyticsProfile } from '@/server/domain/userProfileService';
 import { VERIFICATION_DOCUMENT_TYPES, type VerificationDocumentType } from '@/lib/verification-documents';
 
-function formatDateTime(value: Date | null) {
+function formatDateTime(value: Date | string | null) {
   if (!value) return 'Never';
-  return value.toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Never';
+  return date.toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
 }
 
 function formatDuration(totalSeconds: number) {
@@ -46,6 +48,10 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
   const [independentReviewComment, setIndependentReviewComment] = useState('');
   const [currentTime, setCurrentTime] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
+  const [emailVerifiedAt, setEmailVerifiedAt] = useState(profile.emailVerifiedAt);
+  const [mustChangePassword, setMustChangePassword] = useState(profile.mustChangePassword);
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
+  const [accountActionPending, setAccountActionPending] = useState(false);
 
   useEffect(() => {
     setCurrentTime(Date.now());
@@ -101,6 +107,34 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
     setMessage('Credits updated.');
   }
 
+  async function markActive() {
+    setAccountActionPending(true);
+    setMessage(null);
+    const response = await fetch(`/api/super-user/users/${profile.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'mark-active' }) });
+    const data = await response.json().catch(() => null);
+    setAccountActionPending(false);
+    if (!response.ok) return setMessage(data?.error ?? 'Unable to mark this account as active.');
+    setEmailVerifiedAt(new Date());
+    setMessage('Account marked active. They can sign in without the email verification link.');
+  }
+
+  async function setTemporaryPasswordForUser() {
+    if (!window.confirm('This replaces their current password with a temporary one. Copy it now — it is shown only once. They must change it at next sign-in. Continue?')) return;
+    setAccountActionPending(true);
+    setMessage(null);
+    setTemporaryPassword(null);
+    const response = await fetch(`/api/super-user/users/${profile.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-temporary-password' }) });
+    const data = await response.json().catch(() => null);
+    setAccountActionPending(false);
+    if (!response.ok) return setMessage(data?.error ?? 'Unable to set a temporary password.');
+    setMustChangePassword(true);
+    setEmailVerifiedAt((current) => current ?? new Date());
+    setTemporaryPassword(typeof data?.temporaryPassword === 'string' ? data.temporaryPassword : null);
+    setMessage('Temporary password set. Give it to the user once. They must change it at first sign-in.');
+  }
+
+  const accountStatus = profile.suspended ? 'Suspended' : emailVerifiedAt ? 'Active' : 'Unverified';
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       {message && <p role="status" className="rounded-lg border border-steel-blue/20 bg-steel-blue/5 px-4 py-3 text-sm font-semibold text-steel-blue">{message}</p>}
@@ -111,7 +145,7 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
             <h2 className="mt-1 font-heading text-xl font-bold text-foundation-navy">{profile.company ?? profile.contactName}</h2>
             <p className="mt-1 text-sm text-concrete-grey">{profile.contactName}</p>
           </div>
-          <StatusBadge status={profile.suspended ? 'attention' : 'approved'}>{profile.suspended ? 'Suspended' : 'Active'}</StatusBadge>
+          <StatusBadge status={profile.suspended ? 'attention' : emailVerifiedAt ? 'approved' : 'pending'}>{accountStatus}</StatusBadge>
         </div>
 
         <dl className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -135,7 +169,26 @@ export function UserAnalyticsProfileView({ profile }: { profile: UserAnalyticsPr
             <dt className="text-xs font-semibold uppercase tracking-wide text-concrete-grey">Registered</dt>
             <dd className="mt-1 text-sm text-foundation-navy">{formatDateTime(profile.createdAt)}</dd>
           </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-concrete-grey">Email verified</dt>
+            <dd className="mt-1 text-sm text-foundation-navy">{emailVerifiedAt ? formatDateTime(emailVerifiedAt) : 'Not verified'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-concrete-grey">Password</dt>
+            <dd className="mt-1 text-sm text-foundation-navy">{mustChangePassword ? 'Temporary — must change at next sign-in' : 'Set by the user'}</dd>
+          </div>
         </dl>
+        {profile.role === 'USER' && (
+          <div className="mt-6 flex flex-wrap gap-3 border-t border-slate-100 pt-4">
+            <Button type="button" variant="secondary" disabled={accountActionPending || Boolean(emailVerifiedAt)} onClick={() => { void markActive(); }}>Mark as active</Button>
+            <Button type="button" variant="secondary" disabled={accountActionPending} onClick={() => { void setTemporaryPasswordForUser(); }}>Set temporary password</Button>
+          </div>
+        )}
+        {temporaryPassword && (
+          <p role="status" className="mt-4 rounded-lg border border-steel-blue/20 bg-steel-blue/5 px-4 py-3 text-sm text-foundation-navy">
+            Temporary password: <span className="font-semibold">{temporaryPassword}</span>
+          </p>
+        )}
       </Card>
 
       <Card>

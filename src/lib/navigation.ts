@@ -85,4 +85,5 @@ export const SUPER_USER_NAV: NavGroup[] = [
 /** Accountant nav: restricted to the Accounting Space only. */
 export const ACCOUNTANT_NAV: NavGroup[] = [
   { label: null, items: [{ label: 'Accounting', href: '/super-user/accounting' }] },
+  { label: 'Account', items: [{ label: 'Security', href: '/account/security', ownerOnly: true }] },
 ];

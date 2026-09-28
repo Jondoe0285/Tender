@@ -5,7 +5,7 @@ import { LinkButton } from '@/components/ui/Button';
 
 const controls = [
   { title: 'Staged anonymity', body: 'Buyers and suppliers do not exchange names, numbers, or emails until a quote is accepted and the release fee is confirmed. Direct contact and professional interest stay off unless the buyer opts in on that tender.' },
-  { title: 'Privileged MFA and session control', body: 'Owner sessions require TOTP. Super User and marketplace accounts do not. Session versioning invalidates stolen cookies after a password or privilege change.' },
+  { title: 'Privileged MFA and session control', body: 'When an Owner turns MFA on, Super Users must enrol TOTP on first sign-in. Marketplace accounts do not. Only an Owner can deactivate MFA, and that turns it off for every enrolled account. Session versioning invalidates stolen cookies after a password or privilege change.' },
   { title: 'Trusted client IP in production', body: 'Rate limits use a configured edge header, not spoofable X-Forwarded-For. Production rejects unknown forwarded chains.' },
   { title: 'Payments on the record', body: 'Unlock and release charges go through Stripe checkout and a signed webhook ledger. Contact is not released on a browser confirmation alone.' },
   { title: 'Need-to-know operations', body: 'Accountants cannot reach account management. Super User file access follows authorised tender workflows. Harvest caps stop unlock-without-quote scraping.' },

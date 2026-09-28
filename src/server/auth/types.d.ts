@@ -9,7 +9,9 @@ declare module 'next-auth' {
       isOwner: boolean;
       isAccountant: boolean;
       mfaEnabled?: boolean;
+      platformMfaActive?: boolean;
       sessionVersion?: number;
+      mustChangePassword?: boolean;
     } & DefaultSession['user'];
   }
 
@@ -20,7 +22,9 @@ declare module 'next-auth' {
     isOwner: boolean;
     isAccountant: boolean;
     mfaEnabled?: boolean;
+    platformMfaActive?: boolean;
     sessionVersion?: number;
+    mustChangePassword?: boolean;
   }
 }
 
@@ -32,6 +36,8 @@ declare module 'next-auth/jwt' {
     isOwner: boolean;
     isAccountant: boolean;
     mfaEnabled?: boolean;
+    platformMfaActive?: boolean;
     sessionVersion?: number;
+    mustChangePassword?: boolean;
   }
 }

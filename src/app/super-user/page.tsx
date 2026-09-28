@@ -6,7 +6,9 @@ import { getCurrentUser } from '@/server/auth/session';
 import { getAnalytics, parseAnalyticsFilters } from '@/server/domain/analyticsService';
 import { getOpsExceptions } from '@/server/domain/opsExceptions';
 import { getConversionFunnel } from '@/server/domain/conversionFunnel';
+import { getRegisteredCompanyCounts } from '@/server/domain/registeredCompanyCounts';
 import { ConversionFunnel } from '@/components/admin/ConversionFunnel';
+import { RegisteredCompanyCounts } from '@/components/admin/RegisteredCompanyCounts';
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -16,15 +18,17 @@ export default async function SuperUserPage(props: { searchParams?: Promise<Sear
   if (!user || user.role !== 'SUPER_USER') redirect('/login');
   if (user.isAccountant) redirect('/super-user/accounting');
 
-  const [data, exceptions, funnel] = await Promise.all([
+  const [data, exceptions, funnel, companyCounts] = await Promise.all([
     getAnalytics(parseAnalyticsFilters(searchParams ?? {})),
     getOpsExceptions(),
     getConversionFunnel(),
+    getRegisteredCompanyCounts(),
   ]);
 
   return (
     <AppShell role="super-user" title="Dashboard">
       <OpsExceptionBoard data={exceptions} />
+      <RegisteredCompanyCounts data={companyCounts} />
       <ConversionFunnel data={funnel} />
       <ExecutiveDashboard data={data} />
     </AppShell>

@@ -27,6 +27,7 @@ test('rejects placeholder support and owner addresses', () => {
   assert.equal(isAssignablePlatformOwnerEmail('owner@example.com'), false);
   assert.equal(isAssignablePlatformOwnerEmail('test'), false);
   assert.equal(isAssignablePlatformOwnerEmail('owner@tradetender.co.uk'), true);
+  assert.equal(isAssignablePlatformOwnerEmail('james.sinclair@sinclairsafetysolutions.co.uk'), true);
 });
 
 test('buying chrome stays on /user rather than /contractor', () => {

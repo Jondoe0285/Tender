@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { prisma } from '../../src/server/data/prisma';
+import { restorePlatformSetting } from './restore-platform-setting';
 import { ForbiddenError } from '../../src/server/auth/session';
 import { ensureDefaultMembershipTiers, requestMembershipTierPurchase } from '../../src/server/domain/membershipService';
 
@@ -39,16 +40,8 @@ test('membership purchases use the active server-side tier price and remain disa
     if (retailerId) await prisma.payment.deleteMany({ where: { userId: retailerId } });
     if (tierId) await prisma.membershipTier.deleteMany({ where: { id: tierId } });
     if (retailerId) await prisma.user.deleteMany({ where: { id: retailerId } });
-    if (originalMembershipTiersSetting) {
-      await prisma.platformSetting.update({ where: { id: originalMembershipTiersSetting.id }, data: { value: originalMembershipTiersSetting.value } });
-    } else {
-      await prisma.platformSetting.deleteMany({ where: { key: 'MEMBERSHIP_TIERS_ACTIVE' } });
-    }
-    if (originalVatSetting) {
-      await prisma.platformSetting.update({ where: { id: originalVatSetting.id }, data: { value: originalVatSetting.value } });
-    } else {
-      await prisma.platformSetting.deleteMany({ where: { key: 'VAT_PERCENTAGE' } });
-    }
+    await restorePlatformSetting('MEMBERSHIP_TIERS_ACTIVE', originalMembershipTiersSetting);
+    await restorePlatformSetting('VAT_PERCENTAGE', originalVatSetting);
   });
 
   const retailer = await prisma.user.create({ data: { email: `membership-billing-${suffix}@example.test`, passwordHash: 'not-used', role: 'USER', contactName: 'Membership Billing Retailer' } });

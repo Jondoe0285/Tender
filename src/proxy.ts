@@ -8,9 +8,23 @@ export default withAuth(
     const path = request.nextUrl.pathname;
     const isOwner = Boolean(request.nextauth.token?.isOwner);
     const mfaEnabled = Boolean(request.nextauth.token?.mfaEnabled);
+    const platformMfaActive = Boolean(request.nextauth.token?.platformMfaActive);
+
+    const mustChangePassword = Boolean(request.nextauth.token?.mustChangePassword);
 
     if (isOwner && !mfaEnabled && path.startsWith('/super-user/owner')) {
       return NextResponse.redirect(appUrl('/account/security'));
+    }
+    if (role === 'SUPER_USER' && !mfaEnabled && platformMfaActive && path.startsWith('/super-user')) {
+      return NextResponse.redirect(appUrl('/account/security'));
+    }
+    if (role === 'USER' && mustChangePassword && path !== '/change-password') {
+      return NextResponse.redirect(appUrl('/change-password'));
+    }
+    if (path === '/change-password') {
+      if (role !== 'USER') return NextResponse.redirect(appUrl(role === 'SUPER_USER' ? '/super-user' : '/login'));
+      if (!mustChangePassword) return NextResponse.redirect(appUrl('/user'));
+      return NextResponse.next();
     }
 
     // The proxied request host is the internal listener, so redirect against the public origin.
@@ -55,5 +69,5 @@ export default withAuth(
 );
 
 export const config = {
-  matcher: ['/client/:path*', '/contractor/:path*', '/retailer/:path*', '/provider/:path*', '/user/:path*', '/super-user/:path*'],
+  matcher: ['/client/:path*', '/contractor/:path*', '/retailer/:path*', '/provider/:path*', '/user/:path*', '/super-user/:path*', '/change-password'],
 };
