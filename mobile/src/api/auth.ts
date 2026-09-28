@@ -5,6 +5,7 @@ import { readErrorMessage } from './client';
 type LoginResponse = {
   accessToken: string;
   expiresIn: number;
+  mustChangePassword?: boolean;
   user: { email: string; role: 'SUPER_USER' | 'USER' };
 };
 
@@ -23,6 +24,7 @@ export async function signInWithPassword(email: string, password: string): Promi
     expiresAt: Date.now() + body.expiresIn * 1000,
     email: body.user.email,
     role: body.user.role,
+    mustChangePassword: body.mustChangePassword === true,
   };
   await saveMobileSession(session);
   return session;

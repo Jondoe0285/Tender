@@ -147,6 +147,7 @@ model User {
   contactPhone      String?
   suspended         Boolean  @default(false)
   emailVerifiedAt   DateTime?
+  mustChangePassword Boolean @default(false)
   termsAcceptedAt   DateTime?
   termsVersion      String?
   privacyAcceptedAt DateTime?

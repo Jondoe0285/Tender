@@ -14,6 +14,10 @@ export async function GET() {
     return NextResponse.redirect(appUrl('/login?error=workspace'));
   }
 
+  if (user?.mustChangePassword) {
+    return NextResponse.redirect(appUrl('/change-password'));
+  }
+
   if (user && !superUserMfaSatisfied(user, await isPlatformMfaActive())) {
     return NextResponse.redirect(appUrl('/account/security'));
   }

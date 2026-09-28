@@ -10,6 +10,7 @@ import { loadMobileSession, type MobileSession } from './src/auth/session';
 import { revokeMobileSession } from './src/api/client';
 import { loadCapabilities, type BuyerCapabilities } from './src/api/workspace';
 import { AuthFlow } from './src/screens/AuthFlow';
+import { ForcedPasswordChange } from './src/screens/ForcedPasswordChange';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { AwardedScreen, CreateTenderScreen, TendersScreen } from './src/screens/BuyingScreens';
 import { TenderScreen } from './src/screens/TenderScreen';
@@ -44,7 +45,15 @@ export default function App() {
     <SafeAreaProvider>
       <SafeAreaView style={styles.screen}>
         <StatusBar style="light" />
-        {session ? <Workspace session={session} onSignedOut={() => setSession(null)} /> : <AuthFlow onSignedIn={setSession} />}
+        {session ? (
+          session.mustChangePassword
+            ? (
+              <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+                <ForcedPasswordChange email={session.email} onCompleted={setSession} />
+              </ScrollView>
+            )
+            : <Workspace session={session} onSignedOut={() => setSession(null)} />
+        ) : <AuthFlow onSignedIn={setSession} />}
       </SafeAreaView>
     </SafeAreaProvider>
   );

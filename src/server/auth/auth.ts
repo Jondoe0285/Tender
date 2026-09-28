@@ -39,7 +39,7 @@ export async function authenticateCredentials(credentials: Record<string, unknow
   if (!signInAllowed(user, await isSignInActive())) throw new Error('LOGIN_DISABLED');
   await prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, loginLockedUntil: null } });
   const roles = user.roleMemberships.length > 0 ? user.roleMemberships.map((membership) => membership.role) : [user.role];
-  return { id: user.id, email: user.email, role: user.role, roles, isOwner: user.isOwner, isAccountant: user.isAccountant, sessionVersion: user.sessionVersion, mfaEnabled: user.mfaEnabled };
+  return { id: user.id, email: user.email, role: user.role, roles, isOwner: user.isOwner, isAccountant: user.isAccountant, sessionVersion: user.sessionVersion, mfaEnabled: user.mfaEnabled, mustChangePassword: user.mustChangePassword };
 }
 
 export const authOptions: AuthOptions = {
@@ -70,6 +70,7 @@ export const authOptions: AuthOptions = {
         token.isAccountant = (user as { isAccountant: boolean }).isAccountant;
         token.sessionVersion = (user as unknown as { sessionVersion: number }).sessionVersion;
         token.mfaEnabled = Boolean((user as { mfaEnabled?: boolean }).mfaEnabled);
+        token.mustChangePassword = Boolean((user as { mustChangePassword?: boolean }).mustChangePassword);
         token.platformMfaActive = (user as { role: string }).role === 'SUPER_USER' ? await isPlatformMfaActive() : false;
       }
       if (trigger === 'update' && session?.role && token.id) {
@@ -90,6 +91,7 @@ export const authOptions: AuthOptions = {
         session.user.isAccountant = Boolean(token.isAccountant);
         (session.user as typeof session.user & { sessionVersion?: number }).sessionVersion = Number(token.sessionVersion ?? 0);
         (session.user as typeof session.user & { mfaEnabled?: boolean }).mfaEnabled = Boolean(token.mfaEnabled);
+        (session.user as typeof session.user & { mustChangePassword?: boolean }).mustChangePassword = Boolean(token.mustChangePassword);
         (session.user as typeof session.user & { platformMfaActive?: boolean }).platformMfaActive = Boolean(token.platformMfaActive);
       }
       return session;

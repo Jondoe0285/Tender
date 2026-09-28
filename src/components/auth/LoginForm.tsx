@@ -82,6 +82,7 @@ export function LoginForm({ notices = {}, signInActive = true }: { notices?: Log
       {notices.verification === 'verified' && <p role="status" className="mt-4 text-sm font-semibold text-approved">{signInActive ? 'Your email address is verified. You can now sign in.' : 'Your email address is verified. Sign in will be available when access is opened.'}</p>}
       {notices.verification === 'invalid' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">This verification link is invalid or has expired. Register again with the same details to request a new link.</p>}
       {notices.password === 'set' && <p role="status" className="mt-4 text-sm font-semibold text-approved">{signInActive ? 'Your password is set. Sign in with your new password.' : 'Your password is set. Sign in will be available when access is opened.'}</p>}
+      {notices.password === 'changed' && <p role="status" className="mt-4 text-sm font-semibold text-approved">Your password is updated. Sign in with your new password.</p>}
       {notices.error === 'workspace' && <p role="alert" className="mt-4 text-sm font-semibold text-attention">Your account is not assigned to an approved workspace.</p>}
       {!signInActive && <p role="status" className="mt-4 text-sm font-semibold text-foundation-navy">Sign in is currently closed. You can still create an account. Access will open when the Owner enables it.</p>}
 

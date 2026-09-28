@@ -6,13 +6,14 @@ import test from 'node:test';
 const routePath = path.join(process.cwd(), 'src/app/api/super-user/users/[id]/route.ts');
 const tablePath = path.join(process.cwd(), 'src/components/admin/AccountManagementTable.tsx');
 
-test('Super User password resets issue the existing expiring reset link by email', () => {
+test('Super User password resets email a reset link and can also issue a temporary password', () => {
   const source = readFileSync(routePath, 'utf8');
 
   assert.ok(source.includes('createPasswordResetToken(user.id)'));
   assert.ok(source.includes('passwordResetTemplate'));
   assert.ok(source.includes('sendTransactionalEmail'));
-  assert.ok(!source.includes('temporaryPassword'));
+  assert.ok(source.includes("action === 'set-temporary-password'"));
+  assert.ok(source.includes('temporaryPassword'));
 });
 
 test('Super User account deletion is authenticated, cross-origin protected, and audited', () => {

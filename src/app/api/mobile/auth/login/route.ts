@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const accessToken = await issueMobileToken({ userId: user.id, role: 'USER', authVersion: user.sessionVersion });
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     await recordAuditEvent({ actorId: user.id, action: 'USER_LOGIN', targetType: 'User', targetId: user.id, metadata: { channel: 'mobile' } });
-    return NextResponse.json({ accessToken, expiresIn: 28800, user: { email: user.email, role: user.role, roles: user.roles } });
+    return NextResponse.json({ accessToken, expiresIn: 28800, mustChangePassword: Boolean(user.mustChangePassword), user: { email: user.email, role: user.role, roles: user.roles } });
   } catch {
     return NextResponse.json({ error: 'Mobile access is unavailable.' }, { status: 503 });
   }

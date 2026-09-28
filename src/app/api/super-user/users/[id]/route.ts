@@ -4,6 +4,8 @@ import { requireFullSuperUser } from '@/server/auth/session';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { isManagedAccountRole } from '@/lib/admin-permissions';
 import { recordAuditEvent } from '@/server/audit/auditLog';
+import { hashPassword } from '@/server/auth/password';
+import { generateTemporaryPassword } from '@/server/auth/temporaryPassword';
 import { createPasswordResetToken, PASSWORD_RESET_EXPIRY_LABEL } from '@/server/auth/passwordReset';
 import { appUrl, passwordResetTemplate } from '@/server/notifications/emailTemplates';
 import { sendTransactionalEmail } from '@/server/notifications/resend';
@@ -76,6 +78,45 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       metadata: { email: user.email },
     });
     return NextResponse.json({ status: 'activated' });
+  }
+
+  if (action === 'mark-active') {
+    if (user.emailVerifiedAt) {
+      return NextResponse.json({ error: 'This account is already active.' }, { status: 409 });
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerifiedAt: new Date() },
+    });
+    await recordAuditEvent({
+      actorId: admin.id,
+      action: 'USER_MARKED_ACTIVE',
+      targetType: 'User',
+      targetId: user.id,
+      metadata: { email: user.email },
+    });
+    return NextResponse.json({ status: 'marked-active', emailVerifiedAt: new Date().toISOString() });
+  }
+
+  if (action === 'set-temporary-password') {
+    const temporaryPassword = generateTemporaryPassword();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: await hashPassword(temporaryPassword),
+        mustChangePassword: true,
+        emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+        sessionVersion: { increment: 1 },
+      },
+    });
+    await recordAuditEvent({
+      actorId: admin.id,
+      action: 'USER_TEMPORARY_PASSWORD_SET',
+      targetType: 'User',
+      targetId: user.id,
+      metadata: { email: user.email },
+    });
+    return NextResponse.json({ status: 'temporary-password-set', temporaryPassword, mustChangePassword: true });
   }
 
   if (action === 'reset-password') {
