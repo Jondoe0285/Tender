@@ -6,6 +6,8 @@ import { createSupportRequest, loadPayments, loadSupportRequests, type PaymentsP
 import { COMPANY_TYPE_LABELS, COMPANY_TYPES, DATA_SUBJECT_RIGHTS, OPERATING_LOCATIONS, PAYMENT_TYPE_LABELS, SUPPORT_TYPES, formatUkDate, type CategoryCatalog, type CompanyType } from '../constants';
 import type { Route } from '../navigation/types';
 import { Body, Card, ChipSelect, Field, Metric, Notice, OptionList, PrimaryButton, SecondaryButton, Title } from '../ui';
+import { BiometricSettings } from './BiometricSettings';
+import { requireMobileStepUp } from '../auth/stepUp';
 
 export function ProfileScreen({ email, go, onSignOut }: { email: string; go: (route: Route) => void; onSignOut: () => void }) {
   const [profile, setProfile] = useState<MobileProfile | null>(null);
@@ -31,6 +33,7 @@ export function ProfileScreen({ email, go, onSignOut }: { email: string; go: (ro
     if (!profile) return;
     setMessage(null);
     try {
+      await requireMobileStepUp('profile-update', 'Confirm it is you before changing account information.');
       await updateMobileProfile({
         firstName: profile.firstName,
         lastName: profile.lastName,
@@ -74,12 +77,13 @@ export function ProfileScreen({ email, go, onSignOut }: { email: string; go: (ro
         </>
       )}
       <PrimaryButton label="Save profile" onPress={() => { void save(); }} />
+      <BiometricSettings email={email} />
       <Card>
         <Title>Password</Title>
         <Field label="Current password" onChangeText={setCurrentPassword} secureTextEntry value={currentPassword} />
         <Field label="New password" onChangeText={setNewPassword} secureTextEntry value={newPassword} />
         <SecondaryButton label="Update password" onPress={() => {
-          changeMobilePassword(currentPassword, newPassword).then(() => setMessage('Password updated.')).catch((reason) => setMessage(reason instanceof Error ? reason.message : 'Unable to update your password.'));
+          requireMobileStepUp('password-change', 'Confirm it is you before changing your password.').then(() => changeMobilePassword(currentPassword, newPassword)).then(() => setMessage('Password updated.')).catch((reason) => setMessage(reason instanceof Error ? reason.message : 'Unable to update your password.'));
         }} />
       </Card>
       {profile.isPrimaryUser && (
@@ -91,7 +95,7 @@ export function ProfileScreen({ email, go, onSignOut }: { email: string; go: (ro
           <Field autoCapitalize="none" keyboardType="email-address" label="Email" onChangeText={(next) => setNewUser((current) => ({ ...current, email: next }))} value={newUser.email} />
           <Field label="Password" onChangeText={(password) => setNewUser((current) => ({ ...current, password }))} secureTextEntry value={newUser.password} />
           <SecondaryButton label="Add user" onPress={() => {
-            addAdditionalUser(newUser).then(async () => {
+            requireMobileStepUp('additional-user', 'Confirm it is you before creating another user.').then(() => addAdditionalUser(newUser)).then(async () => {
               setProfile(await loadMobileProfile());
               setMessage('Additional user created.');
             }).catch((reason) => setMessage(reason instanceof Error ? reason.message : 'Unable to add the additional user.'));
@@ -172,17 +176,23 @@ export function SupportScreen() {
       <Field label="Title" onChangeText={setTitle} value={title} />
       <Field label="Description" multiline onChangeText={setDescription} value={description} />
       <PrimaryButton label="Submit request" onPress={() => {
-        createSupportRequest({
-          type,
-          title,
-          description,
-          dataSubjectRight: type === 'DATA_PRIVACY' ? dataSubjectRight : undefined,
-        }).then(async () => {
-          setTitle('');
-          setDescription('');
-          setRequests(await loadSupportRequests());
-          setMessage('Request submitted.');
-        }).catch((reason) => setMessage(reason instanceof Error ? reason.message : 'Unable to submit the support request.'));
+        void (async () => {
+          try {
+            if (type === 'DATA_PRIVACY') await requireMobileStepUp('data-export', 'Confirm it is you before submitting a data-protection request.');
+            await createSupportRequest({
+              type,
+              title,
+              description,
+              dataSubjectRight: type === 'DATA_PRIVACY' ? dataSubjectRight : undefined,
+            });
+            setTitle('');
+            setDescription('');
+            setRequests(await loadSupportRequests());
+            setMessage('Request submitted.');
+          } catch (reason) {
+            setMessage(reason instanceof Error ? reason.message : 'Unable to submit the support request.');
+          }
+        })();
       }} />
       <Notice>{message}</Notice>
       {requests.map((request) => <Body key={request.id}>{request.title} · {request.status}</Body>)}

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { signInWithPassword, requestPasswordReset, resetPasswordWithToken } from '../api/auth';
+import { inspectBiometricAvailability, biometricMethodLabel } from '../auth/biometrics';
+import { loadBiometricMeta, readBiometricVault } from '../auth/biometricStore';
+import { refreshWithRefreshToken } from '../api/sessionRefresh';
 import { loadPublishedCatalog, registerMobileAccount, type WorkspaceIntent } from '../api/registration';
 import { COMPANY_TYPE_LABELS, COMPANY_TYPES, UK_COUNTIES, UK_REGIONS, type CategoryCatalog, type CompanyType } from '../constants';
 import { mobileApiBaseUrl } from '../api/config';
@@ -40,14 +43,42 @@ function SignInForm({
 }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+  const [needsMfa, setNeedsMfa] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [biometricLabel, setBiometricLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const meta = await loadBiometricMeta();
+      if (!meta?.enabled) return;
+      const availability = await inspectBiometricAvailability();
+      if (availability.canProtectSecrets) setBiometricLabel(biometricMethodLabel(availability.types));
+    })();
+  }, []);
 
   async function handleSignIn() {
     setSubmitting(true);
     setError(null);
     try {
-      onSignedIn(await signInWithPassword(email.trim(), password));
+      onSignedIn(await signInWithPassword(email.trim(), password, needsMfa ? mfaCode.trim() : undefined));
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : 'Unable to sign in.';
+      if (message.includes('authenticator')) setNeedsMfa(true);
+      setError(message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleBiometric() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const vault = await readBiometricVault();
+      if (!vault) throw new Error('Secure credential unavailable. Sign in with email and password.');
+      onSignedIn(await refreshWithRefreshToken(vault.refreshToken));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to sign in.');
     } finally {
@@ -57,10 +88,12 @@ function SignInForm({
 
   return (
     <Card>
+      {biometricLabel ? <PrimaryButton label={`Unlock with ${biometricLabel}`} loading={submitting} onPress={() => { void handleBiometric(); }} /> : null}
       <Field autoCapitalize="none" autoComplete="email" keyboardType="email-address" label="Email" onChangeText={setEmail} value={email} />
       <Field autoComplete="current-password" label="Password" onChangeText={setPassword} secureTextEntry value={password} />
+      {needsMfa ? <Field autoCapitalize="none" keyboardType="number-pad" label="Authenticator code" onChangeText={setMfaCode} value={mfaCode} /> : null}
       <Notice>{error}</Notice>
-      <PrimaryButton disabled={!email || !password} label="Sign in" loading={submitting} onPress={handleSignIn} />
+      <PrimaryButton disabled={!email || !password || submitting} label="Sign in" loading={submitting} onPress={handleSignIn} />
       <SecondaryButton label="Create account" onPress={onRegister} />
       <Pressable accessibilityRole="button" onPress={onForgot}><Text style={styles.link}>Forgot password</Text></Pressable>
     </Card>

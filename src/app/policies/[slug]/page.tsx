@@ -133,6 +133,10 @@ const policies = [
         content: 'Trade Tender processes account data, profile information, tender and quote data, payment and audit records, contact-release records, support request content, and operational metadata needed to run the platform securely and lawfully.',
       },
       {
+        heading: 'Device authentication',
+        content: 'The Trade Tender mobile application can use the operating system’s Face ID, Touch ID, fingerprint, or device passcode to unlock a device-bound refresh token after you have signed in with your account. The application does not collect, store or process your fingerprint, facial image or biometric template. Biometric verification is performed by your device’s operating system. The application receives only the authentication result required to provide the biometric-login feature. The platform also records a device registration identifier, platform, registration status, and authentication audit events needed to operate and secure that feature. Those records are not biometric data. You can disable biometric login for a device in the app Profile settings or by signing out. Email and password sign-in remains available.',
+      },
+      {
         heading: 'Purposes of processing',
         content: 'Data is processed to create and manage user accounts, match tenders to relevant Providers, support quote comparison and payment workflows, maintain audit records, enforce access and retention policies, provide support, and protect the platform from fraud or abuse.',
       },

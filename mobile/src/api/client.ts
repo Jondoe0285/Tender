@@ -1,5 +1,7 @@
-import { clearMobileSession, loadMobileSession } from '../auth/session';
+import { clearMobileSession, getCachedMobileSession, loadMobileSession } from '../auth/session';
+import { clearBiometricLogin, loadBiometricMeta, readBiometricVault } from '../auth/biometricStore';
 import { mobileApiBaseUrl } from './config';
+import { refreshWithRefreshToken } from './sessionRefresh';
 
 export const MOBILE_PAYMENT_RETURN = 'tradetender://payment/return';
 
@@ -16,12 +18,37 @@ export async function publicApiFetch(path: string, init: RequestInit = {}) {
   return fetch(`${mobileApiBaseUrl()}${path}`, init);
 }
 
-export async function mobileApiFetch(path: string, init: RequestInit = {}) {
-  const session = await loadMobileSession();
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function restoreSessionFromBiometricVault() {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    try {
+      const vault = await readBiometricVault();
+      if (!vault) return false;
+      await refreshWithRefreshToken(vault.refreshToken);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
+}
+
+export async function mobileApiFetch(path: string, init: RequestInit = {}, allowRefresh = true) {
+  const session = getCachedMobileSession() ?? await loadMobileSession();
   if (!session) throw new Error('Sign in is required.');
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${session.accessToken}`);
   const response = await fetch(`${mobileApiBaseUrl()}${path}`, { ...init, headers });
+  if (response.status === 401 && allowRefresh && (await loadBiometricMeta())?.enabled) {
+    const restored = await restoreSessionFromBiometricVault();
+    if (restored) return mobileApiFetch(path, init, false);
+    await clearMobileSession();
+    throw new Error('Your session has expired. Sign in again.');
+  }
   if (response.status === 401) {
     await clearMobileSession();
     throw new Error('Your session has expired. Sign in again.');
@@ -30,9 +57,28 @@ export async function mobileApiFetch(path: string, init: RequestInit = {}) {
 }
 
 export async function revokeMobileSession() {
+  const meta = await loadBiometricMeta();
   try {
-    await mobileApiFetch('/api/mobile/auth/logout', { method: 'POST' });
+    await mobileApiFetch('/api/mobile/auth/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId: meta?.deviceId }),
+    }, false);
+  } catch {
+    try {
+      const vault = await readBiometricVault();
+      if (vault) {
+        await fetch(`${mobileApiBaseUrl()}/api/mobile/auth/devices/revoke`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: vault.refreshToken }),
+        });
+      }
+    } catch {
+      // Local credentials are still removed below.
+    }
   } finally {
     await clearMobileSession();
+    await clearBiometricLogin();
   }
 }

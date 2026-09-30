@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { authenticateCredentials } from '@/server/auth/auth';
 import { issueMobileToken } from '@/server/auth/mobileToken';
+import { getMobileAuthPolicy } from '@/server/auth/mobileAuthPolicy';
 import { createRateLimitResponse } from '@/server/http/rateLimit';
 import { prisma } from '@/server/data/prisma';
 import { recordAuditEvent } from '@/server/audit/auditLog';
@@ -16,16 +17,24 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     if (message.includes('LOGIN_DISABLED')) return NextResponse.json({ error: 'Sign in is currently closed.' }, { status: 403 });
+    if (message.includes('MFA_REQUIRED')) return NextResponse.json({ error: 'Enter the authenticator code for this account.' }, { status: 401 });
+    if (message.includes('MFA_INVALID')) return NextResponse.json({ error: 'That authenticator code is not valid.' }, { status: 401 });
     throw error;
   }
   if (!user) return NextResponse.json({ error: 'Incorrect email or password.' }, { status: 401 });
   const role = user.role;
   if (role !== 'USER') return NextResponse.json({ error: 'Mobile access is unavailable.' }, { status: 403 });
   try {
-    const accessToken = await issueMobileToken({ userId: user.id, role: 'USER', authVersion: user.sessionVersion });
+    const policy = await getMobileAuthPolicy();
+    const accessToken = await issueMobileToken({ userId: user.id, role: 'USER', authVersion: user.sessionVersion }, policy.accessTokenLifetimeSeconds);
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     await recordAuditEvent({ actorId: user.id, action: 'USER_LOGIN', targetType: 'User', targetId: user.id, metadata: { channel: 'mobile' } });
-    return NextResponse.json({ accessToken, expiresIn: 28800, mustChangePassword: Boolean(user.mustChangePassword), user: { email: user.email, role: user.role, roles: user.roles } });
+    return NextResponse.json({
+      accessToken,
+      expiresIn: policy.accessTokenLifetimeSeconds,
+      mustChangePassword: Boolean(user.mustChangePassword),
+      user: { email: user.email, role: user.role, roles: user.roles },
+    });
   } catch {
     return NextResponse.json({ error: 'Mobile access is unavailable.' }, { status: 503 });
   }

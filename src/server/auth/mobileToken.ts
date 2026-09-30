@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify } from 'jose';
 
 const ISSUER = 'trade-tender-api';
 const AUDIENCE = 'trade-tender-mobile';
-const TOKEN_LIFETIME_SECONDS = 8 * 60 * 60;
+export const DEFAULT_MOBILE_ACCESS_TOKEN_LIFETIME_SECONDS = 8 * 60 * 60;
 
 type MobileRole = 'SUPER_USER' | 'USER';
 
@@ -19,14 +19,15 @@ function tokenKey() {
   return new TextEncoder().encode(secret);
 }
 
-export async function issueMobileToken(identity: Omit<MobileTokenIdentity, 'issuedAt'>) {
+export async function issueMobileToken(identity: Omit<MobileTokenIdentity, 'issuedAt'>, lifetimeSeconds = DEFAULT_MOBILE_ACCESS_TOKEN_LIFETIME_SECONDS) {
+  const expiresIn = Number.isSafeInteger(lifetimeSeconds) && lifetimeSeconds > 0 ? lifetimeSeconds : DEFAULT_MOBILE_ACCESS_TOKEN_LIFETIME_SECONDS;
   return new SignJWT({ role: identity.role, authVersion: identity.authVersion, tokenUse: 'mobile-access' })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setIssuer(ISSUER)
     .setAudience(AUDIENCE)
     .setSubject(identity.userId)
     .setIssuedAt()
-    .setExpirationTime(`${TOKEN_LIFETIME_SECONDS}s`)
+    .setExpirationTime(`${expiresIn}s`)
     .sign(tokenKey());
 }
 

@@ -1,3 +1,17 @@
+### 2026-09-30 - Optional device biometric login for the native app
+
+- Changed: Buyer/Supplier mobile login can optionally use Face ID, Touch ID, fingerprint, or the device passcode on that device only. The OS verifies presence; a hashed, rotated refresh token is stored in Keychain/Keystore behind biometric access. The server still issues the existing access JWT and still decides whether the account, role, and session are valid. Password login, USER-only mobile access, payment, unlock, and contact-release controls are unchanged. Sign-out revokes that device.
+- Affects: `prisma/schema.prisma`, `prisma/migrations/20260930070000_add_mobile_devices/migration.sql`, `src/server/auth/mobileDevice.ts`, `src/server/auth/mobileAuthPolicy.ts`, `src/app/api/mobile/auth/*`, `mobile/src/auth/*`, `mobile/src/screens/Biometric*.tsx`, `mobile/app.json`, `docs/Mobile-Biometric-Authentication.md`.
+- Environment: additive `MobileDevice` table. No new app secrets. Rebuild the native binary so Face ID usage strings are included.
+- Validation: `npx tsx --test tests/lib/mobile-biometric-auth.test.ts tests/lib/mobile-token.test.ts` and `npm test` in `mobile/`. Physical-device biometric checks remain before store submit.
+
+### 2026-09-27 - Year 1 store fees stay on Stripe Checkout
+
+- Changed: recorded the founder decision that tender unlock and contact-release fees stay on Stripe Checkout for the native app. Year 1 will not add App Store or Google Play Billing in-app products for those fees. Server-side payment, audit, and contact-release controls are unchanged. Listing and review copy now state that these are fixed platform fees for real-world UK construction marketplace services, not store IAP. App Review and Play review can still reject this; that residual risk is not a Year 1 reopen.
+- Affects: `docs/Action-Tracker.md`, `docs/Native-Mobile-Delivery-Plan.md`, `mobile/store.config.json`, `mobile/store/play-en-GB.json`, `mobile/tests/mobile-config.test.ts`.
+- Environment: no schema or migration change. Do not put Stripe secrets in the mobile binary.
+- Validation: `npx tsx --test tests/mobile-config.test.ts` from `mobile/`.
+
 ### 2026-09-22 - Payment ledger, privileged MFA, trusted IP, and governing-document canon
 
 - Changed: Stripe webhooks now persist an append-only `StripeEvent` ledger, reject charged-total/currency mismatches, and apply monotonic payment transitions. Super User/Owner administrative APIs and `/super-user` require enrolled TOTP MFA (login and MFA enrollment remain available). Production rate limiting keys only from `TRUSTED_CLIENT_IP_HEADER` (`x-real-ip` on Render) and ignores spoofed `X-Forwarded-For`. A User cannot unlock or quote their own tender. Field placeholders and focus rings meet AA contrast. Architecture, product, and security documents now record unified `USER`, Owner-set £10-default fees, and Neon Lakebase Postgres.

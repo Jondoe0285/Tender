@@ -5,7 +5,7 @@ This plan delivers a packaged Android and iOS client that reproduces the approve
 ## Release Constraints
 
 - Use React Native with Expo only. Product name is Trade Tender. Package identifiers are `com.tradetender.app`. Store listing copy and production EAS profiles live in `mobile/`; do not submit or auto-publish until Apple Developer, Play Console, production `MOBILE_AUTH_SECRET`, and reviewer demo accounts are in place.
-- Preserve server-side authentication, authorization, payment, audit, and contact-release controls.
+- Preserve server-side authentication, authorization, payment, audit, and contact-release controls. Year 1 unlock and contact-release fees stay on Stripe Checkout (founder decision 2026-09-27). Do not add App Store or Play Billing in-app products for those fees, and do not weaken server controls to obtain a listing. Optional biometric login is device-native OS verification plus a server refresh; it must not bypass those controls.
 - Do not enable a protected mobile workflow until its server API and native integration tests are complete.
 
 ## Delivery Sequence
