@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { loadMobileSession, saveMobileSession, type MobileSession } from '../auth/session';
 import { clearBiometricLogin, loadBiometricMeta, saveBiometricVault } from '../auth/biometricStore';
+import { clearStepUp } from '../auth/stepUp';
 import { mobileApiBaseUrl } from './config';
 import { mobileApiFetch, publicApiFetch, readErrorMessage } from './client';
 
@@ -41,6 +42,7 @@ export async function signInWithPassword(email: string, password: string, mfaCod
     throw new Error(body && 'error' in body && typeof body.error === 'string' ? body.error : 'Unable to sign in.');
   }
   const session = sessionFromLogin(body);
+  clearStepUp();
   const meta = await loadBiometricMeta();
   if (meta && meta.email !== session.email) await clearBiometricLogin();
   await saveMobileSession(session, { persistAccessToken: true });

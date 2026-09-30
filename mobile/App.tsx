@@ -9,7 +9,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { loadMobileSession, clearMobileSession, type MobileSession } from './src/auth/session';
 import { loadBiometricMeta } from './src/auth/biometricStore';
 import { inspectBiometricAvailability } from './src/auth/biometrics';
-import { cacheMobileAuthPolicy, startStepUpLifecycle } from './src/auth/stepUp';
+import { cacheMobileAuthPolicy, clearStepUp, startStepUpLifecycle } from './src/auth/stepUp';
 import { loadMobileAuthPolicy, type MobileAuthPolicy } from './src/api/auth';
 import { revokeMobileSession } from './src/api/client';
 import { loadCapabilities, type BuyerCapabilities } from './src/api/workspace';
@@ -80,6 +80,7 @@ export default function App() {
       if (Date.now() - started < current.inactivityTimeoutSeconds * 1000) return;
       void (async () => {
         if (!(await loadBiometricMeta())?.enabled) return;
+        clearStepUp();
         await clearMobileSession();
         setSession(null);
         setBiometricUnlock(true);
@@ -93,6 +94,7 @@ export default function App() {
   }, [appReady]);
 
   async function handleSignedIn(next: MobileSession) {
+    clearStepUp();
     setSession(next);
     setBiometricUnlock(false);
     if (next.mustChangePassword) return;
@@ -122,10 +124,12 @@ export default function App() {
           <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
             <BiometricLock
               onUnlocked={(next) => {
+                clearStepUp();
                 setSession(next);
                 setBiometricUnlock(false);
               }}
               onUsePassword={() => {
+                clearStepUp();
                 setBiometricUnlock(false);
                 setSession(null);
               }}

@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../../src/server/data/prisma';
-import { hashMobileRefreshToken, refreshMobileDeviceSession, registerBiometricDevice, revokeMobileDevice } from '../../src/server/auth/mobileDevice';
+import { hashMobileRefreshToken, listMobileDevices, mobileDeviceWithinMaxAge, refreshMobileDeviceSession, registerBiometricDevice, revokeMobileDevice } from '../../src/server/auth/mobileDevice';
 import { restorePlatformSetting } from './restore-platform-setting';
 import { ForbiddenError, UnauthorizedError } from '../../src/server/auth/session';
 
@@ -98,4 +98,46 @@ test('refresh token hashes are not reversible from the stored value', () => {
   assert.equal(hashed, hashMobileRefreshToken(token));
   assert.notEqual(hashed, token);
   assert.match(hashed, /^[a-f0-9]{64}$/);
+});
+
+test('device max age is measured from registration time, not sliding refresh expiry', () => {
+  const now = new Date('2026-09-30T00:00:00.000Z');
+  assert.equal(mobileDeviceWithinMaxAge(new Date('2026-07-03T00:00:00.000Z'), 90, now), true);
+  assert.equal(mobileDeviceWithinMaxAge(new Date('2026-07-02T00:00:00.000Z'), 90, now), false);
+});
+
+test('refresh rejects a device older than MOBILE_DEVICE_MAX_AGE_DAYS', async (context) => {
+  const previousSecret = process.env.MOBILE_AUTH_SECRET;
+  process.env.MOBILE_AUTH_SECRET = 'a'.repeat(32);
+  const suffix = randomUUID();
+  let userId: string | undefined;
+
+  context.after(async () => {
+    if (userId) {
+      await prisma.mobileDevice.deleteMany({ where: { userId } });
+      await prisma.user.deleteMany({ where: { id: userId } });
+    }
+    process.env.MOBILE_AUTH_SECRET = previousSecret;
+  });
+
+  const user = await prisma.user.create({
+    data: {
+      email: `biometric-age-${suffix}@example.test`,
+      passwordHash: 'not-used',
+      role: 'USER',
+      contactName: 'Biometric Age User',
+      emailVerifiedAt: new Date(),
+    },
+  });
+  userId = user.id;
+
+  const registered = await registerBiometricDevice(user.id, 'ios');
+  const session = await refreshMobileDeviceSession(registered.refreshToken);
+  await prisma.mobileDevice.update({
+    where: { id: registered.deviceId },
+    data: { createdAt: new Date(Date.now() - 91 * 24 * 60 * 60 * 1000) },
+  });
+  await assert.rejects(() => refreshMobileDeviceSession(session.refreshToken!), UnauthorizedError);
+  const listed = await listMobileDevices(user.id);
+  assert.equal(listed.find((device) => device.id === registered.deviceId)?.biometricEnabled, false);
 });

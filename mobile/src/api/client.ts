@@ -1,5 +1,6 @@
 import { clearMobileSession, getCachedMobileSession, loadMobileSession } from '../auth/session';
 import { clearBiometricLogin, loadBiometricMeta, readBiometricVault } from '../auth/biometricStore';
+import { clearStepUp } from '../auth/stepUp';
 import { mobileApiBaseUrl } from './config';
 import { refreshWithRefreshToken } from './sessionRefresh';
 
@@ -78,6 +79,7 @@ export async function revokeMobileSession() {
       // Local credentials are still removed below.
     }
   } finally {
+    clearStepUp();
     await clearMobileSession();
     await clearBiometricLogin();
   }

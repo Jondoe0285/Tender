@@ -1,3 +1,10 @@
+### 2026-09-30 - Close biometric session-boundary gaps
+
+- Changed: mobile step-up is cleared on password sign-in, sign-out, biometric lock/unlock, and inactivity re-lock. Refresh writes the rotated token to the biometric vault before saving the access session and revokes the new token if that write fails. Refresh and device listing now enforce `MOBILE_DEVICE_MAX_AGE_DAYS` from registration time so sliding `expiresAt` cannot keep a device alive past the cap.
+- Affects: `src/server/auth/mobileDevice.ts`, `mobile/src/auth/stepUp.ts`, `mobile/src/api/sessionRefresh.ts`, `mobile/src/api/auth.ts`, `mobile/src/api/client.ts`, `mobile/App.tsx`, `docs/Mobile-Biometric-Authentication.md`.
+- Environment: no schema or secret change.
+- Validation: `npx tsx --test tests/lib/mobile-biometric-auth.test.ts` and `npm test` in `mobile/`.
+
 ### 2026-09-30 - Optional device biometric login for the native app
 
 - Changed: Buyer/Supplier mobile login can optionally use Face ID, Touch ID, fingerprint, or the device passcode on that device only. The OS verifies presence; a hashed, rotated refresh token is stored in Keychain/Keystore behind biometric access. The server still issues the existing access JWT and still decides whether the account, role, and session are valid. Password login, USER-only mobile access, payment, unlock, and contact-release controls are unchanged. Sign-out revokes that device.

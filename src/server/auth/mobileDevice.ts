@@ -33,6 +33,12 @@ export function hashMobileRefreshToken(token: string) {
   return createHash('sha256').update(token).digest('hex');
 }
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+export function mobileDeviceWithinMaxAge(createdAt: Date, deviceMaxAgeDays: number, now = new Date()) {
+  return now.getTime() - createdAt.getTime() < deviceMaxAgeDays * MS_PER_DAY;
+}
+
 function createRefreshToken() {
   return randomBytes(32).toString('base64url');
 }
@@ -75,7 +81,9 @@ export async function registerBiometricDevice(userId: string, platformValue: unk
 
   const refreshToken = createRefreshToken();
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + policy.refreshTokenLifetimeSeconds * 1000);
+  const slidingExpiry = new Date(now.getTime() + policy.refreshTokenLifetimeSeconds * 1000);
+  const maxAgeExpiry = new Date(now.getTime() + policy.deviceMaxAgeDays * MS_PER_DAY);
+  const expiresAt = slidingExpiry < maxAgeExpiry ? slidingExpiry : maxAgeExpiry;
   const device = await prisma.mobileDevice.create({
     data: {
       userId: user.id,
@@ -135,6 +143,7 @@ export async function refreshMobileDeviceSession(refreshToken: string) {
   if (device.revokedAt || !device.biometricEnabled) await reject('revoked');
   if (device.expiresAt <= new Date()) await reject('expired');
   const policy = await getMobileAuthPolicy();
+  if (!mobileDeviceWithinMaxAge(device.createdAt, policy.deviceMaxAgeDays)) await reject('max-age');
   if (policy.biometricLoginPolicy === 'disabled') await reject('policy');
   try {
     await assertMobileUserEligible(device.user);
@@ -145,7 +154,9 @@ export async function refreshMobileDeviceSession(refreshToken: string) {
   if (device.authVersion !== device.user.sessionVersion) await reject('session');
 
   const nextRefreshToken = createRefreshToken();
-  const expiresAt = new Date(Date.now() + policy.refreshTokenLifetimeSeconds * 1000);
+  const slidingExpiry = new Date(Date.now() + policy.refreshTokenLifetimeSeconds * 1000);
+  const maxAgeExpiry = new Date(device.createdAt.getTime() + policy.deviceMaxAgeDays * MS_PER_DAY);
+  const expiresAt = slidingExpiry < maxAgeExpiry ? slidingExpiry : maxAgeExpiry;
   const rotated = await prisma.mobileDevice.updateMany({
     where: { id: device.id, refreshTokenHash: device.refreshTokenHash, revokedAt: null },
     data: {
@@ -197,6 +208,8 @@ export async function revokeMobileDevice(input: { actorId?: string; deviceId?: s
 }
 
 export async function listMobileDevices(userId: string) {
+  const policy = await getMobileAuthPolicy();
+  const now = new Date();
   const devices = await prisma.mobileDevice.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },
@@ -213,7 +226,11 @@ export async function listMobileDevices(userId: string) {
   return devices.map((device) => ({
     id: device.id,
     platform: device.platform,
-    biometricEnabled: device.biometricEnabled && !device.revokedAt && device.expiresAt > new Date(),
+    biometricEnabled:
+      device.biometricEnabled
+      && !device.revokedAt
+      && device.expiresAt > now
+      && mobileDeviceWithinMaxAge(device.createdAt, policy.deviceMaxAgeDays, now),
     createdAt: device.createdAt.toISOString(),
     lastUsedAt: device.lastUsedAt?.toISOString() ?? null,
     revokedAt: device.revokedAt?.toISOString() ?? null,

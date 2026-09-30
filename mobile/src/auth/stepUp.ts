@@ -30,7 +30,8 @@ export function noteAppState(status: AppStateStatus, policy: MobileAuthPolicy | 
   }
   if (status === 'active' && backgroundedAt && policy) {
     const awayMs = Date.now() - backgroundedAt;
-    if (awayMs > policy.stepUpValiditySeconds * 1000) lastStepUp = null;
+    if (policy.inactivityTimeoutSeconds > 0 && awayMs >= policy.inactivityTimeoutSeconds * 1000) lastStepUp = null;
+    else if (awayMs > policy.stepUpValiditySeconds * 1000) lastStepUp = null;
   }
   backgroundedAt = null;
 }

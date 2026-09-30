@@ -61,6 +61,9 @@ test('enrolment and settings copy stay optional and device-specific', () => {
 test('step-up covers unlock, contact release, and biometric settings', () => {
   const tender = readFileSync('src/screens/TenderScreen.tsx', 'utf8');
   const stepUp = readFileSync('src/auth/stepUp.ts', 'utf8');
+  const app = readFileSync('App.tsx', 'utf8');
+  const auth = readFileSync('src/api/auth.ts', 'utf8');
+  const client = readFileSync('src/api/client.ts', 'utf8');
   assert.match(tender, /tender-unlock/);
   assert.match(tender, /quote-accept/);
   assert.match(tender, /contact-release/);
@@ -68,4 +71,22 @@ test('step-up covers unlock, contact release, and biometric settings', () => {
   assert.match(tender, /professional-interest/);
   assert.match(stepUp, /stepUpValiditySeconds/);
   assert.match(stepUp, /STEP_UP_REQUESTED/);
+  assert.match(stepUp, /export function clearStepUp/);
+  assert.match(auth, /clearStepUp\(\)/);
+  assert.match(client, /clearStepUp\(\)/);
+  assert.match(app, /clearStepUp\(\)/);
+  assert.match(app, /setBiometricUnlock\(true\)/);
+});
+
+test('refresh stores the rotated refresh token before the new access session', () => {
+  const refresh = readFileSync('src/api/sessionRefresh.ts', 'utf8');
+  const body = refresh.slice(refresh.indexOf('export async function refreshWithRefreshToken'));
+  const vaultWrite = body.indexOf('replaceBiometricRefreshToken');
+  const sessionSave = body.indexOf('saveMobileSession');
+  assert.notEqual(vaultWrite, -1);
+  assert.notEqual(sessionSave, -1);
+  assert.ok(vaultWrite < sessionSave);
+  assert.match(body, /\/api\/mobile\/auth\/devices\/revoke/);
+  assert.match(body, /clearBiometricLogin/);
+  assert.match(body, /clearMobileSession/);
 });

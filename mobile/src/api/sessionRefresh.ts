@@ -1,5 +1,5 @@
-import { saveMobileSession, type MobileSession } from '../auth/session';
-import { replaceBiometricRefreshToken } from '../auth/biometricStore';
+import { clearMobileSession, saveMobileSession, type MobileSession } from '../auth/session';
+import { clearBiometricLogin, replaceBiometricRefreshToken } from '../auth/biometricStore';
 import { mobileApiBaseUrl } from './config';
 
 type LoginResponse = {
@@ -32,9 +32,21 @@ export async function refreshWithRefreshToken(refreshToken: string): Promise<Mob
     throw new Error(body && 'error' in body && typeof body.error === 'string' ? body.error : 'Your session has expired. Sign in again.');
   }
   const session = sessionFromLogin(body);
-  await saveMobileSession(session, { persistAccessToken: false });
-  if (typeof body.refreshToken === 'string' && typeof body.deviceId === 'string') {
-    await replaceBiometricRefreshToken(body.refreshToken, body.deviceId, session.email);
+  if (typeof body.refreshToken !== 'string' || typeof body.deviceId !== 'string') {
+    throw new Error('Your session has expired. Sign in again.');
   }
+  try {
+    await replaceBiometricRefreshToken(body.refreshToken, body.deviceId, session.email);
+  } catch (error) {
+    await fetch(`${mobileApiBaseUrl()}/api/mobile/auth/devices/revoke`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: body.refreshToken }),
+    }).catch(() => undefined);
+    await clearBiometricLogin();
+    await clearMobileSession();
+    throw error instanceof Error ? error : new Error('Secure credential unavailable. Sign in with email and password.');
+  }
+  await saveMobileSession(session, { persistAccessToken: false });
   return session;
 }

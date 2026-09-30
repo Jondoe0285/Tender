@@ -32,7 +32,7 @@ Enrolment is never automatic. Policy `required` still leaves email/password avai
 | Password, MFA secret | Not stored on device | Server only |
 | Device meta (id, email, enabled) | SecureStore without biometric | Not a credential |
 
-Refresh tokens are opaque, hashed with SHA-256 on the server, rotated on each refresh, bound to `sessionVersion`, and expire according to `MOBILE_REFRESH_TOKEN_LIFETIME_SECONDS` (default 90 days). Password change, password reset, MFA enable/disable, and Super User temporary passwords increment `sessionVersion`, which rejects both old access JWTs and device refresh.
+Refresh tokens are opaque, hashed with SHA-256 on the server, rotated on each refresh, bound to `sessionVersion`, and expire according to `MOBILE_REFRESH_TOKEN_LIFETIME_SECONDS` (default 90 days). `MOBILE_DEVICE_MAX_AGE_DAYS` (default 90) is an absolute cap from `MobileDevice.createdAt`; refresh rotation cannot extend past it. The client writes the rotated refresh token to the biometric vault before treating refresh as success; if that write fails, the new token is revoked. Password change, password reset, MFA enable/disable, and Super User temporary passwords increment `sessionVersion`, which rejects both old access JWTs and device refresh.
 
 ## Biometric login flow
 
@@ -59,7 +59,7 @@ When biometric login is enabled, the app asks for a fresh OS verification immedi
 - professional interest
 - data-protection support requests
 
-Validity is `MOBILE_STEP_UP_VALIDITY_SECONDS` (default 120) and is per action. App launch unlock does not satisfy step-up. Server payment, unlock, and contact-release rules are unchanged. Step-up is local presence, not a permission grant.
+Validity is `MOBILE_STEP_UP_VALIDITY_SECONDS` (default 120) and is per action. App launch unlock does not satisfy step-up. The in-memory last step-up is cleared on password sign-in, sign-out, biometric lock/unlock, and inactivity re-lock, so a previous confirmation cannot cover a new session. Server payment, unlock, and contact-release rules are unchanged. Step-up is local presence, not a permission grant.
 
 Owner, Super User, billing, and other operator consoles remain web-only.
 
@@ -85,7 +85,7 @@ Stored as `PlatformSetting` keys with defaults. There is no Owner UI in this cha
 - `MOBILE_BIOMETRIC_LOGIN_POLICY`: `disabled` \| `optional` \| `recommended` \| `required` (default `optional`)
 - `MOBILE_DEVICE_CREDENTIAL_FALLBACK`: `true`
 - `MOBILE_STEP_UP_VALIDITY_SECONDS`: `120`
-- `MOBILE_DEVICE_MAX_AGE_DAYS`: `90`
+- `MOBILE_DEVICE_MAX_AGE_DAYS`: `90` (absolute age from device registration; refresh also checks this, not only `expiresAt`)
 - `MOBILE_REFRESH_TOKEN_LIFETIME_SECONDS`: `7776000`
 - `MOBILE_ACCESS_TOKEN_LIFETIME_SECONDS`: `28800`
 - `MOBILE_INACTIVITY_TIMEOUT_SECONDS`: `0` (disabled; matches current product)
@@ -125,8 +125,8 @@ Device registrations and audit events **are** personal/operational data and are 
 
 ## Test coverage
 
-- Server: register, refresh rotation, `sessionVersion` invalidation, revoke, disabled policy, no refresh token in audit metadata.
-- Mobile source: Face ID usage string, SecureStore `requireAuthentication`, enrolment copy, no password in the biometric vault, step-up action list, logout clears the vault.
+- Server: register, refresh rotation, `sessionVersion` invalidation, revoke, disabled policy, device max-age, no refresh token in audit metadata.
+- Mobile source: Face ID usage string, SecureStore `requireAuthentication`, enrolment copy, no password in the biometric vault, step-up action list, step-up cleared on session boundaries, vault write before session save on refresh, logout clears the vault.
 - Physical Android and iOS devices are still required before store submit. Simulators do not prove biometric security.
 
 ## Known limitations
