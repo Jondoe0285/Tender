@@ -240,7 +240,7 @@ function RegisterForm({ onBack }: { onBack: () => void }) {
         counties: supplies && coverageScope === 'COUNTY' ? counties : undefined,
         regions: supplies && coverageScope === 'REGION' ? regions : undefined,
       });
-      setMessage(status === 'verification_sent' ? 'Check your email to verify the account before signing in.' : 'Account created. Check your email to verify it before signing in.');
+      setMessage(status === 'verified' ? 'Account created. You can sign in now.' : status === 'verification_sent' ? 'Check your email to verify the account before signing in.' : 'Account created. Check your email to verify it before signing in.');
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : 'Unable to create account.');
     } finally {

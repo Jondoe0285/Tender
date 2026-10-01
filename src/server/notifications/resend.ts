@@ -10,6 +10,14 @@ function hasUsableSecret(value: string | undefined): boolean {
   return Boolean(trimmed && !PLACEHOLDER_SECRET_VALUES.has(trimmed.toLowerCase()));
 }
 
+function parseFromAddress(value: string): string | null {
+  const trimmed = value.trim();
+  const angled = trimmed.match(/^[^<>]*<([^<>]+)>$/);
+  const address = (angled ? angled[1] : trimmed).trim();
+  if (!address.includes('@') || address.startsWith('@') || address.endsWith('@')) return null;
+  return trimmed;
+}
+
 function getResendClient(): Resend | null {
   const apiKey = process.env.RESEND_API_KEY;
   if (!hasUsableSecret(apiKey)) return null;
@@ -20,8 +28,8 @@ function getResendClient(): Resend | null {
 /** No fallback: an unroutable default would silently send from an invalid domain. */
 function getFromAddress(): string | null {
   const from = process.env.EMAIL_FROM?.trim();
-  if (!from) return null;
-  return PLACEHOLDER_SECRET_VALUES.has(from.toLowerCase()) ? null : from;
+  if (!from || PLACEHOLDER_SECRET_VALUES.has(from.toLowerCase())) return null;
+  return parseFromAddress(from);
 }
 
 /** True once both the key and sender are configured for this environment. */
@@ -49,18 +57,22 @@ export async function sendTransactionalEmail(
   const from = getFromAddress();
   if (!from) return { sent: false, reason: 'EMAIL_FROM is not configured' } as const;
 
-  const result = await resend.emails.send({
-    from,
-    to,
-    subject: template.subject,
-    html: template.html,
-    ...(options.replyTo ? { replyTo: options.replyTo } : {}),
-    ...(options.headers ? { headers: options.headers } : {}),
-    ...(options.tags ? { tags: options.tags } : {}),
-  });
+  try {
+    const result = await resend.emails.send({
+      from,
+      to,
+      subject: template.subject,
+      html: template.html,
+      ...(options.replyTo ? { replyTo: options.replyTo } : {}),
+      ...(options.headers ? { headers: options.headers } : {}),
+      ...(options.tags ? { tags: options.tags } : {}),
+    });
 
-  if (result.error) return { sent: false, reason: result.error.message } as const;
-  return { sent: true, id: result.data?.id ?? null } as const;
+    if (result.error) return { sent: false, reason: result.error.message || 'Resend rejected the message' } as const;
+    return { sent: true, id: result.data?.id ?? null } as const;
+  } catch (error) {
+    return { sent: false, reason: error instanceof Error ? error.message : 'Email delivery failed' } as const;
+  }
 }
 
 export type HealthReportEmail = { subject: string; html: string; text?: string };

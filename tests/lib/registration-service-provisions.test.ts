@@ -68,10 +68,19 @@ test('registration writes coverage onto the company locations matching reads', (
 });
 
 
-test('registration requires privacy policy acknowledgement and records versioned acceptance evidence', () => {
+test('registration records versioned acceptance evidence', () => {
   assert.equal(registerSchema.safeParse({ ...baseRegistration, privacyAccepted: false }).success, false);
   const route = readFileSync('src/app/api/auth/register/route.ts', 'utf8');
   assert.match(route, /termsVersion: CURRENT_TERMS_VERSION/);
   assert.match(route, /privacyVersion: CURRENT_PRIVACY_VERSION/);
   assert.match(route, /LEGAL_DOCUMENTS_ACCEPTED/);
+});
+
+test('registration verification email follows the request host and does not crash when mail is unconfigured', () => {
+  const route = readFileSync('src/app/api/auth/register/route.ts', 'utf8');
+  const resend = readFileSync('src/server/notifications/resend.ts', 'utf8');
+  assert.match(route, /requestAppUrl\(headers/);
+  assert.match(route, /EMAIL_VERIFICATION_LOCAL_FALLBACK/);
+  assert.match(route, /isEmailConfigured\(\)/);
+  assert.match(resend, /catch \(error\)/);
 });

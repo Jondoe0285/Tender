@@ -1,6 +1,6 @@
 import { withAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
-import { appUrl } from '@/server/config/appUrl';
+import { inAppRedirect } from '@/server/http/inAppRedirect';
 
 export default withAuth(
   function proxy(request) {
@@ -13,32 +13,31 @@ export default withAuth(
     const mustChangePassword = Boolean(request.nextauth.token?.mustChangePassword);
 
     if (isOwner && !mfaEnabled && path.startsWith('/super-user/owner')) {
-      return NextResponse.redirect(appUrl('/account/security'));
+      return inAppRedirect('/account/security');
     }
     if (role === 'SUPER_USER' && !mfaEnabled && platformMfaActive && path.startsWith('/super-user')) {
-      return NextResponse.redirect(appUrl('/account/security'));
+      return inAppRedirect('/account/security');
     }
     if (role === 'USER' && mustChangePassword && path !== '/change-password') {
-      return NextResponse.redirect(appUrl('/change-password'));
+      return inAppRedirect('/change-password');
     }
     if (path === '/change-password') {
-      if (role !== 'USER') return NextResponse.redirect(appUrl(role === 'SUPER_USER' ? '/super-user' : '/login'));
-      if (!mustChangePassword) return NextResponse.redirect(appUrl('/user'));
+      if (role !== 'USER') return inAppRedirect(role === 'SUPER_USER' ? '/super-user' : '/login');
+      if (!mustChangePassword) return inAppRedirect('/user');
       return NextResponse.next();
     }
 
-    // The proxied request host is the internal listener, so redirect against the public origin.
     const isClientPath = path.startsWith('/client') || path.startsWith('/contractor') || path.startsWith('/user');
     const isRetailerPath = path.startsWith('/retailer') || path.startsWith('/provider');
 
     if (isClientPath && role !== 'USER') {
-      return NextResponse.redirect(appUrl('/login'));
+      return inAppRedirect('/login');
     }
     if (isRetailerPath && role !== 'USER') {
-      return NextResponse.redirect(appUrl('/login'));
+      return inAppRedirect('/login');
     }
     if (path.startsWith('/super-user') && role !== 'SUPER_USER') {
-      return NextResponse.redirect(appUrl(role === 'USER' ? '/forbidden' : '/login'));
+      return inAppRedirect(role === 'USER' ? '/forbidden' : '/login');
     }
 
     if (path.startsWith('/user')) {
@@ -50,10 +49,10 @@ export default withAuth(
       return NextResponse.rewrite(new URL(path.replace(/^\/user/, '/client'), request.url));
     }
     if (path.startsWith('/client') || path.startsWith('/contractor')) {
-      return NextResponse.redirect(new URL(path.replace(/^\/(client|contractor)/, '/user'), request.url));
+      return inAppRedirect(path.replace(/^\/(client|contractor)/, '/user'));
     }
     if (path.startsWith('/retailer')) {
-      return NextResponse.redirect(new URL(path.replace(/^\/retailer/, '/provider'), request.url));
+      return inAppRedirect(path.replace(/^\/retailer/, '/provider'));
     }
     if (path.startsWith('/provider')) {
       return NextResponse.rewrite(new URL(path.replace(/^\/provider/, '/retailer'), request.url));

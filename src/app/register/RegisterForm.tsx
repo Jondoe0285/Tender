@@ -150,13 +150,13 @@ export function RegisterForm({ initialIntent }: { initialIntent: WorkspaceIntent
       }),
     });
 
+    const data = await response.json().catch(() => null) as { error?: string; status?: string } | null;
     if (!response.ok) {
       setSubmitting(false);
-      const data = await response.json().catch(() => null);
       setError(data?.error ?? 'Unable to complete registration. Check your details and try again.');
       return;
     }
-    router.push('/login?verification=pending');
+    router.push(data?.status === 'verified' ? '/login?verification=verified' : '/login?verification=pending');
   }
 
   const workspaceOptions: Array<{ value: WorkspaceIntent; title: string; body: string }> = [

@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { additionalAllowedOrigins, appUrl, getAppUrl } from '../../src/server/config/appUrl';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { additionalAllowedOrigins, appUrl, getAppUrl, publicOriginFromHeaders, requestAppUrl } from '../../src/server/config/appUrl';
+import { inAppRedirect } from '../../src/server/http/inAppRedirect';
 
 function withEnvironment(values: Record<string, string | undefined>, run: () => void) {
   const previous: Record<string, string | undefined> = {};
@@ -67,4 +70,57 @@ test('treats missing additional origins as an empty list', () => {
   withEnvironment({ ADDITIONAL_ALLOWED_ORIGINS: undefined }, () => {
     assert.deepEqual(additionalAllowedOrigins(), []);
   });
+});
+
+test('in-app redirects stay on the current host instead of NEXTAUTH_URL', () => {
+  const response = inAppRedirect('/account/security');
+  assert.equal(response.status, 307);
+  assert.equal(response.headers.get('location'), '/account/security');
+  assert.throws(() => inAppRedirect('https://old.example/account/security'), /root-relative path/);
+});
+
+test('owner marketing links follow the request host when that origin is allowed', () => {
+  withEnvironment({
+    NEXTAUTH_URL: 'https://old.example',
+    ADDITIONAL_ALLOWED_ORIGINS: 'https://new.example',
+  }, () => {
+    const headers = new Headers({
+      'x-forwarded-host': 'new.example',
+      'x-forwarded-proto': 'https',
+    });
+    assert.equal(publicOriginFromHeaders(headers), 'https://new.example');
+    assert.equal(requestAppUrl(headers, '/register'), 'https://new.example/register');
+  });
+});
+
+test('uses the request host in development when it is localhost', () => {
+  withEnvironment({ NEXTAUTH_URL: 'http://localhost:3000', NODE_ENV: 'development' }, () => {
+    const headers = new Headers({ host: 'localhost:3010' });
+    assert.equal(publicOriginFromHeaders(headers), 'http://localhost:3010');
+    assert.equal(requestAppUrl(headers, '/api/auth/verify-email?token=abc'), 'http://localhost:3010/api/auth/verify-email?token=abc');
+  });
+});
+
+test('falls back to NEXTAUTH_URL when the request host is not an allowed origin', () => {
+  withEnvironment({
+    NEXTAUTH_URL: 'https://old.example',
+    ADDITIONAL_ALLOWED_ORIGINS: undefined,
+  }, () => {
+    const headers = new Headers({
+      'x-forwarded-host': 'unlisted.example',
+      'x-forwarded-proto': 'https',
+    });
+    assert.equal(publicOriginFromHeaders(headers), 'https://old.example');
+  });
+});
+
+test('proxy and workspace redirects do not send Owners to NEXTAUTH_URL', () => {
+  const proxy = readFileSync(path.join(process.cwd(), 'src/proxy.ts'), 'utf8');
+  const workspace = readFileSync(path.join(process.cwd(), 'src/app/api/auth/workspace/route.ts'), 'utf8');
+  const owner = readFileSync(path.join(process.cwd(), 'src/app/super-user/owner/page.tsx'), 'utf8');
+  assert.match(proxy, /inAppRedirect\('\/account\/security'\)/);
+  assert.doesNotMatch(proxy, /redirect\(appUrl/);
+  assert.match(workspace, /inAppRedirect\(workspace\)/);
+  assert.doesNotMatch(workspace, /appUrl\(/);
+  assert.match(owner, /requestAppUrl\(requestHeaders, '\/register'\)/);
 });

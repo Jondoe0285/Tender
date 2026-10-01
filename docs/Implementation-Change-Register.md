@@ -1,3 +1,24 @@
+### 2026-10-01 - Unblock registration when verification email cannot send
+
+- Changed: registration records why verification email failed, uses the request host for the verify link, and in local development marks the account verified when Resend is not configured so sign-in can continue. Production still fail-closes until `RESEND_API_KEY` and a verified `EMAIL_FROM` are set.
+- Affects: `src/app/api/auth/register/route.ts`, `src/server/notifications/resend.ts`, `src/server/config/appUrl.ts`, `src/app/register/RegisterForm.tsx`, `mobile/src/screens/AuthFlow.tsx`.
+- Environment: production/staging still need a verified Resend domain. Local `.env` currently has no usable Resend key.
+- Validation: `npx tsx --test tests/lib/emailService.test.ts tests/lib/registration-service-provisions.test.ts tests/lib/appUrl.test.ts`.
+
+### 2026-10-01 - Patch Next.js RCE and high-severity npm audit findings
+
+- Changed: upgraded Next.js and `eslint-config-next` to 16.3.8 (fixes critical `next/og` ImageResponse RCE). Overrode `brace-expansion` 1.x/5.x and `fast-uri` 3.x so the remaining high-severity transitive DoS and URI-injection advisories are patched without a Prisma major bump.
+- Affects: `package.json`, `package-lock.json`.
+- Environment: no secret or schema change. Redeploy so production runs 16.3.8.
+- Validation: `npm audit --audit-level=high` reports 0 vulnerabilities.
+
+### 2026-10-01 - Keep Owner redirects on the current public host
+
+- Changed: Owner console, login workspace routing, and other in-app auth redirects now use a root-relative Location instead of `NEXTAUTH_URL`. Changing the Render URL or adding a custom domain no longer bounces the Owner page to the previous hostname. Marketing CTA defaults follow the request host when that origin is allowed.
+- Affects: `src/server/http/inAppRedirect.ts`, `src/proxy.ts`, `src/app/api/auth/workspace/route.ts`, `src/app/api/auth/verify-email/route.ts`, `src/app/super-user/owner/page.tsx`, `src/server/config/appUrl.ts`.
+- Environment: set production `NEXTAUTH_URL` to the live public origin. If the onrender host and a custom domain both serve the app, list the extra origin in `ADDITIONAL_ALLOWED_ORIGINS`. Email and Stripe links still use `NEXTAUTH_URL`.
+- Validation: `npx tsx --test tests/lib/appUrl.test.ts tests/lib/privileged-mfa.test.ts tests/lib/origin.test.ts`.
+
 ### 2026-09-30 - Close biometric session-boundary gaps
 
 - Changed: mobile step-up is cleared on password sign-in, sign-out, biometric lock/unlock, and inactivity re-lock. Refresh writes the rotated token to the biometric vault before saving the access session and revokes the new token if that write fails. Refresh and device listing now enforce `MOBILE_DEVICE_MAX_AGE_DAYS` from registration time so sliding `expiresAt` cannot keep a device alive past the cap.

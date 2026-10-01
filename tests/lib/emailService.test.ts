@@ -44,6 +44,15 @@ test('treats a missing api key as unconfigured', () => {
   });
 });
 
+test('treats a placeholder or non-address sender as unconfigured', () => {
+  withEnvironment({ RESEND_API_KEY: 'test-key', EMAIL_FROM: 'test' }, () => {
+    assert.equal(isEmailConfigured(), false);
+  });
+  withEnvironment({ RESEND_API_KEY: 'test-key', EMAIL_FROM: 'Trade Tender' }, () => {
+    assert.equal(isEmailConfigured(), false);
+  });
+});
+
 test('names the environment in the delivery test and leaks no account data', () => {
   const previousAppUrl = process.env.NEXTAUTH_URL;
   process.env.NEXTAUTH_URL = 'https://tender.example.test';
