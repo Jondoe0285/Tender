@@ -40,8 +40,11 @@ export default function App() {
   const [policy, setPolicy] = useState<MobileAuthPolicy | null>(null);
   const policyRef = useRef<MobileAuthPolicy | null>(null);
   const backgroundedAt = useRef<number | null>(null);
-  policyRef.current = policy;
   const appReady = montserratLoaded && sourceSansLoaded && ready;
+
+  useEffect(() => {
+    policyRef.current = policy;
+  }, [policy]);
 
   useEffect(() => {
     startStepUpLifecycle(() => policyRef.current);
