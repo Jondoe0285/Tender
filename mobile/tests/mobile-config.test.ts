@@ -8,6 +8,7 @@ test('native package declares Android and iOS app identities with secure storage
 
   assert.equal(app.expo.ios.bundleIdentifier, app.expo.android.package);
   assert.equal(pluginNames.includes('expo-secure-store'), true);
+  assert.equal(pluginNames.includes('expo-local-authentication'), true);
 });
 
 test('native API clients use HTTPS and secure bearer sessions', () => {
@@ -23,12 +24,18 @@ test('native API clients use HTTPS and secure bearer sessions', () => {
 
 test('store profiles ship an AAB and App Store binary against production, not the staging APK', () => {
   const eas = JSON.parse(readFileSync('eas.json', 'utf8')) as {
-    cli: { appVersionSource: string; metadataPath: string };
+    cli: { appVersionSource: string };
     build: {
       preview: { android: { buildType: string }; env: { EXPO_PUBLIC_API_URL: string } };
+      'production-apk': { android: { buildType: string }; env: { EXPO_PUBLIC_API_URL: string } };
       production: { distribution: string; android: { buildType: string }; env: { EXPO_PUBLIC_API_URL: string } };
     };
-    submit: { production: { android: { track: string; releaseStatus: string; serviceAccountKeyPath: string } } };
+    submit: {
+      production: {
+        android: { track: string; releaseStatus: string; serviceAccountKeyPath: string };
+        ios: { metadataPath: string };
+      };
+    };
   };
   const app = JSON.parse(readFileSync('app.json', 'utf8')) as {
     expo: {
@@ -38,21 +45,29 @@ test('store profiles ship an AAB and App Store binary against production, not th
     };
   };
   const store = JSON.parse(readFileSync('store.config.json', 'utf8')) as {
-    apple: { info: { 'en-GB': { title: string; keywords: string; privacyPolicyUrl: string } } };
+    apple: { info: { 'en-GB': { title: string; keywords: string; privacyPolicyUrl: string } }; review?: { notes: string } };
   };
-  const play = JSON.parse(readFileSync('store/play-en-GB.json', 'utf8')) as { title: string; privacyPolicyUrl: string };
+  const play = JSON.parse(readFileSync('store/play-en-GB.json', 'utf8')) as {
+    title: string;
+    privacyPolicyUrl: string;
+    pricing: { inAppPurchases: boolean; googlePlayBilling?: boolean; inAppPurchaseNotes: string };
+  };
+  const storeReviewNotes = store.apple.review?.notes ?? '';
   const ignore = readFileSync('.gitignore', 'utf8');
   const keywords = store.apple.info['en-GB'].keywords;
 
   assert.equal(eas.cli.appVersionSource, 'remote');
   assert.equal(eas.build.preview.android.buildType, 'apk');
   assert.equal(eas.build.preview.env.EXPO_PUBLIC_API_URL, 'https://tender-m0xw.onrender.com');
+  assert.equal(eas.build['production-apk'].android.buildType, 'apk');
+  assert.equal(eas.build['production-apk'].env.EXPO_PUBLIC_API_URL, 'https://trade-tender.onrender.com');
   assert.equal(eas.build.production.distribution, 'store');
   assert.equal(eas.build.production.android.buildType, 'app-bundle');
   assert.equal(eas.build.production.env.EXPO_PUBLIC_API_URL, 'https://trade-tender.onrender.com');
   assert.equal(eas.submit.production.android.track, 'internal');
   assert.equal(eas.submit.production.android.releaseStatus, 'draft');
   assert.equal(eas.submit.production.android.serviceAccountKeyPath, './google-service-account.json');
+  assert.equal(eas.submit.production.ios.metadataPath, './store.config.json');
   assert.equal(app.expo.updates?.enabled, false);
   assert.equal(app.expo.ios.config?.usesNonExemptEncryption, false);
   assert.equal(app.expo.extra?.privacyPolicyUrl, 'https://trade-tender.onrender.com/policies/privacy');
@@ -61,4 +76,9 @@ test('store profiles ship an AAB and App Store binary against production, not th
   assert.equal(keywords.includes(' '), false);
   assert.ok(keywords.length <= 100);
   assert.match(ignore, /google-service-account\.json/);
+  assert.equal(play.pricing.inAppPurchases, false);
+  assert.equal(play.pricing.googlePlayBilling, false);
+  assert.match(play.pricing.inAppPurchaseNotes, /Stripe Checkout/);
+  assert.match(storeReviewNotes, /Stripe Checkout/);
+  assert.doesNotMatch(storeReviewNotes, /App Store in-app purchase products are required/i);
 });

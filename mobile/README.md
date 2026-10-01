@@ -9,6 +9,7 @@ Use Node 22.13 or later, then run `npm install` and `npm run android` from this 
 ## Packaged builds
 
 - `npm run build:android` / `npm run build:ios` create internal-distribution builds against Tender Staging.
+- `npm run build:android:main` creates an internal APK against production (`https://trade-tender.onrender.com`).
 - `npm run build:android:store` produces a Play Store Android App Bundle against production (`https://trade-tender.onrender.com`).
 - `npm run build:ios:store` produces an App Store iOS build against production.
 
@@ -20,4 +21,7 @@ Listing copy lives in `store.config.json` (App Store) and `store/play-en-GB.json
 
 ## Security boundary
 
-The app signs in through `POST /api/mobile/auth/login`, stores the bearer session in Expo SecureStore, and reloads current authorization on the server for every protected request. Do not reuse browser cookies or weaken payment, audit, or contact-release controls.
+The app signs in through `POST /api/mobile/auth/login`, stores the bearer session in Expo SecureStore, and reloads current authorization on the server for every protected request. Optional biometric login unlocks a device-bound refresh token with Face ID, Touch ID, fingerprint, or the device passcode. The OS performs verification; the app does not receive biometric data. Sign-out revokes that device and requires email and password before biometric login can be turned on again. Do not reuse browser cookies or weaken payment, audit, or contact-release controls.
+
+See `docs/Mobile-Biometric-Authentication.md` for architecture, policy keys, and the user support guide.
+

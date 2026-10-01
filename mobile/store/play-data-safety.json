@@ -28,7 +28,8 @@
       "types": ["App interactions"],
       "purpose": "App functionality and fraud prevention",
       "optional": false,
-      "ephemeral": false
+      "ephemeral": false,
+      "notes": "Includes authentication audit events and an app-generated device registration identifier for optional biometric login. Biometric templates stay on the device and are not collected."
     }
   ],
   "dataShared": [

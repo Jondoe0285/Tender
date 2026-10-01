@@ -6,9 +6,9 @@ import { getCategoryCatalog } from '@/server/domain/categoryService';
 import { recordAuditEvent } from '@/server/audit/auditLog';
 import { rejectCrossOrigin } from '@/server/http/origin';
 import { verifyPassword } from '@/server/auth/password';
-import { newRegistrationTemplate } from '@/server/notifications/emailTemplates';
-import { sendTransactionalEmail } from '@/server/notifications/resend';
-import { appUrl, emailVerificationTemplate } from '@/server/notifications/emailTemplates';
+import { emailVerificationTemplate, newRegistrationTemplate } from '@/server/notifications/emailTemplates';
+import { isEmailConfigured, sendTransactionalEmail } from '@/server/notifications/resend';
+import { requestAppUrl } from '@/server/config/appUrl';
 import { createEmailVerificationToken } from '@/server/auth/emailVerification';
 import { buildClientTradeTenderId } from '@/lib/identifiers';
 import { createRateLimitResponse } from '@/server/http/rateLimit';
@@ -19,11 +19,53 @@ import { serialiseServiceProvisions } from '@/lib/service-provisions';
 import { operatingLocationsFromCoverage } from '@/lib/geography';
 import { defaultLaunchCreditExpiry } from '@/lib/launch-credits';
 
-async function sendVerificationEmail(userId: string, email: string) {
+async function sendVerificationEmail(userId: string, email: string, headers: Headers) {
   const token = await createEmailVerificationToken(userId);
-  return sendTransactionalEmail(email, emailVerificationTemplate({
-    verificationLink: appUrl(`/api/auth/verify-email?token=${encodeURIComponent(token)}`),
-  }));
+  let verificationLink: string;
+  try {
+    verificationLink = requestAppUrl(headers, `/api/auth/verify-email?token=${encodeURIComponent(token)}`);
+  } catch (error) {
+    return { sent: false as const, reason: error instanceof Error ? error.message : 'Application URL is not configured' };
+  }
+  try {
+    return await sendTransactionalEmail(email, emailVerificationTemplate({ verificationLink }));
+  } catch (error) {
+    return { sent: false as const, reason: error instanceof Error ? error.message : 'Email delivery failed' };
+  }
+}
+
+function verificationDeliveryError() {
+  if (!isEmailConfigured()) {
+    return 'Email delivery is not configured. Set RESEND_API_KEY and a verified EMAIL_FROM for this environment.';
+  }
+  return 'Unable to send verification email. Please contact support.';
+}
+
+async function completeVerificationDelivery(
+  userId: string,
+  emailResult: { sent: boolean; reason?: string },
+  successStatus: 201 | 202,
+) {
+  if (emailResult.sent) {
+    await recordAuditEvent({ actorId: null, action: 'EMAIL_VERIFICATION_SENT', targetType: 'User', targetId: userId });
+    return NextResponse.json({ status: 'verification_sent' }, { status: successStatus });
+  }
+
+  await recordAuditEvent({
+    actorId: null,
+    action: 'EMAIL_VERIFICATION_DELIVERY_FAILED',
+    targetType: 'User',
+    targetId: userId,
+    metadata: { reason: emailResult.reason ?? 'unknown' },
+  });
+
+  if (process.env.NODE_ENV !== 'production' && !isEmailConfigured()) {
+    await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() } });
+    await recordAuditEvent({ actorId: null, action: 'EMAIL_VERIFICATION_LOCAL_FALLBACK', targetType: 'User', targetId: userId });
+    return NextResponse.json({ status: 'verified' }, { status: successStatus });
+  }
+
+  return NextResponse.json({ error: verificationDeliveryError() }, { status: 503 });
 }
 
 export async function POST(request: Request) {
@@ -59,9 +101,8 @@ export async function POST(request: Request) {
     }
 
     if (hasRole && !existing.emailVerifiedAt) {
-      const emailResult = await sendVerificationEmail(existing.id, existing.email);
-      if (!emailResult.sent) return NextResponse.json({ error: 'Unable to send verification email. Please contact support.' }, { status: 503 });
-      return NextResponse.json({ status: 'verification_sent' }, { status: 202 });
+      const emailResult = await sendVerificationEmail(existing.id, existing.email, request.headers);
+      return completeVerificationDelivery(existing.id, emailResult, 202);
     }
     if (hasRole) return NextResponse.json({ status: 'verification_pending' }, { status: 202 });
 
@@ -161,12 +202,9 @@ export async function POST(request: Request) {
   });
   if (user.role === 'USER') await matchRetailerToOpenTenders(user.id);
 
-  const verificationResult = await sendVerificationEmail(user.id, user.email);
-  if (!verificationResult.sent) {
-    await recordAuditEvent({ actorId: null, action: 'EMAIL_VERIFICATION_DELIVERY_FAILED', targetType: 'User', targetId: user.id });
-    return NextResponse.json({ error: 'Unable to send verification email. Please contact support.' }, { status: 503 });
-  }
-  await recordAuditEvent({ actorId: null, action: 'EMAIL_VERIFICATION_SENT', targetType: 'User', targetId: user.id });
+  const verificationResult = await sendVerificationEmail(user.id, user.email, request.headers);
+  const verificationResponse = await completeVerificationDelivery(user.id, verificationResult, 201);
+  if (!verificationResponse.ok) return verificationResponse;
 
   const notificationRecipient = process.env.REGISTRATION_NOTIFICATION_EMAIL;
   if (notificationRecipient) {
@@ -188,5 +226,5 @@ export async function POST(request: Request) {
     });
   }
 
-  return NextResponse.json({ status: 'verification_sent' }, { status: 201 });
+  return verificationResponse;
 }

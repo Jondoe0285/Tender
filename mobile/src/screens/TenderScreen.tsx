@@ -24,6 +24,7 @@ import {
   type MobileTenderMessage,
 } from '../api/quotes';
 import { FULL_QUOTE_ACCEPTANCE_COPY, formatUkDate, isSpecifiedItemService } from '../constants';
+import { requireMobileStepUp } from '../auth/stepUp';
 import type { BuyerCapabilities } from '../api/workspace';
 import { Body, Card, Checkbox, Field, Notice, PrimaryButton, SecondaryButton, Title } from '../ui';
 
@@ -124,6 +125,7 @@ export function TenderScreen({
   async function handleUnlock() {
     setNotice(null);
     try {
+      await requireMobileStepUp('tender-unlock', 'Confirm it is you before unlocking this tender.');
       const outcome = await requestTenderUnlock(tenderId);
       if (outcome.status === 'PAYMENT_REQUIRED') {
         await openCheckout(outcome.checkoutUrl, { kind: 'unlock', tenderId, paymentId: outcome.paymentId });
@@ -139,6 +141,7 @@ export function TenderScreen({
   async function handleAccept(quote: MobileQuoteSummary) {
     setNotice(null);
     try {
+      await requireMobileStepUp('quote-accept', 'Confirm it is you before accepting this quote and releasing contact details.');
       const outcome = await acceptMobileQuote(quote.id, {
         purchaseOrderNumber: purchaseOrders[quote.id]?.trim() ?? '',
         declarationAccepted: declarations[quote.id] === true,
@@ -237,7 +240,9 @@ export function TenderScreen({
                 </>
               )}
               {quote.status === 'ACCEPTED' && (
-                <SecondaryButton label="View released contact" onPress={() => { loadReleasedContact(quote.id).then(setReleasedContact).catch((reason) => setNotice(reason instanceof Error ? reason.message : 'Contact details are not available.')); }} />
+                <SecondaryButton label="View released contact" onPress={() => {
+                  requireMobileStepUp('contact-release', 'Confirm it is you before viewing released contact details.').then(() => loadReleasedContact(quote.id)).then(setReleasedContact).catch((reason) => setNotice(reason instanceof Error ? reason.message : 'Contact details are not available.'));
+                }} />
               )}
             </Card>
           ))}
@@ -280,7 +285,7 @@ export function TenderScreen({
                 <Body>{professional.registered ? 'Registered.' : `Fee £${String(professional.feeGbp ?? 10)}`}</Body>
                 {professional.contact && typeof professional.contact === 'object' ? <Body>{JSON.stringify(professional.contact)}</Body> : null}
                 {!professional.registered && <SecondaryButton label="Register professional interest" onPress={() => {
-                  registerProfessionalInterest(tenderId).then(async (outcome) => {
+                  requireMobileStepUp('professional-interest', 'Confirm it is you before registering professional interest.').then(() => registerProfessionalInterest(tenderId)).then(async (outcome) => {
                     if (outcome.status === 'PAYMENT_REQUIRED') await openCheckout(outcome.checkoutUrl, { kind: 'professional-interest', tenderId, paymentId: outcome.paymentId });
                     else { setNotice('Professional interest registered.'); await reload(); }
                   }).catch((reason) => setNotice(reason instanceof Error ? reason.message : 'Unable to register professional interest.'));
@@ -298,7 +303,7 @@ export function TenderScreen({
               <>
                 <Body>{direct.released ? 'Contact released.' : `Fee £${String(direct.feeGbp ?? 10)}`}</Body>
                 {!direct.released && <SecondaryButton label="Request direct contact" onPress={() => {
-                  requestDirectContact(tenderId).then(async (outcome) => {
+                  requireMobileStepUp('direct-contact', 'Confirm it is you before requesting direct contact.').then(() => requestDirectContact(tenderId)).then(async (outcome) => {
                     if (outcome.status === 'PAYMENT_REQUIRED') await openCheckout(outcome.checkoutUrl, { kind: 'direct-contact', tenderId, paymentId: outcome.paymentId });
                     else { setNotice('Direct contact released.'); await reload(); }
                   }).catch((reason) => setNotice(reason instanceof Error ? reason.message : 'Unable to request direct contact.'));

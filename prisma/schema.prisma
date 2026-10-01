@@ -161,6 +161,7 @@ model User {
   lastLogoutAt      DateTime?
   totalTimeOnlineSeconds Int @default(0)
 
+  mobileDevices     MobileDevice[]
   pageViews         PageView[]
 
   retailerProfile   RetailerProfile?
@@ -202,6 +203,22 @@ model User {
   controlChangesProposed ControlChange[] @relation("ControlChangeProposer")
   controlChangesConfirmed ControlChange[] @relation("ControlChangeConfirmer")
   marketingCampaignsCreated MarketingCampaign[] @relation("MarketingCampaignCreator")
+}
+
+model MobileDevice {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform          String
+  refreshTokenHash  String    @unique
+  authVersion       Int
+  biometricEnabled  Boolean   @default(true)
+  revokedAt         DateTime?
+  lastUsedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  expiresAt         DateTime
+
+  @@index([userId, revokedAt])
 }
 
 model RateLimitEntry {

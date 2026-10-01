@@ -21,6 +21,7 @@
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
+        "NSFaceIDUsageDescription": "Trade Tender uses Face ID so you can unlock this app on this device. Trade Tender does not receive, store, or process your fingerprint, facial image, or biometric template.",
         "NSPhotoLibraryUsageDescription": "Trade Tender uses a photo or file you choose so you can attach it to a tender or quote.",
         "CFBundleAllowMixedLocalizations": true
       }
@@ -40,7 +41,14 @@
       [
         "expo-secure-store",
         {
-          "configureAndroidBackup": true
+          "configureAndroidBackup": true,
+          "faceIDPermission": "Trade Tender uses Face ID so you can unlock this app on this device. Trade Tender does not receive, store, or process your fingerprint, facial image, or biometric template."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Trade Tender uses Face ID so you can unlock this app on this device. Trade Tender does not receive, store, or process your fingerprint, facial image, or biometric template."
         }
       ],
       "expo-font",

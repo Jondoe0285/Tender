@@ -3,14 +3,20 @@ import { SourceSans3_400Regular, SourceSans3_600SemiBold, useFonts as useSourceS
 import { StatusBar } from 'expo-status-bar';
 import * as ExpoLinking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useMemo, useState } from 'react';
-import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View, AppState } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { loadMobileSession, type MobileSession } from './src/auth/session';
+import { loadMobileSession, clearMobileSession, type MobileSession } from './src/auth/session';
+import { loadBiometricMeta } from './src/auth/biometricStore';
+import { inspectBiometricAvailability } from './src/auth/biometrics';
+import { cacheMobileAuthPolicy, clearStepUp, startStepUpLifecycle } from './src/auth/stepUp';
+import { loadMobileAuthPolicy, type MobileAuthPolicy } from './src/api/auth';
 import { revokeMobileSession } from './src/api/client';
 import { loadCapabilities, type BuyerCapabilities } from './src/api/workspace';
 import { AuthFlow } from './src/screens/AuthFlow';
 import { ForcedPasswordChange } from './src/screens/ForcedPasswordChange';
+import { BiometricLock } from './src/screens/BiometricLock';
+import { BiometricEnrolment } from './src/screens/BiometricEnrolment';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { AwardedScreen, CreateTenderScreen, TendersScreen } from './src/screens/BuyingScreens';
 import { TenderScreen } from './src/screens/TenderScreen';
@@ -29,15 +35,87 @@ export default function App() {
   const [sourceSansLoaded] = useSourceSansFonts({ SourceSans3_400Regular, SourceSans3_600SemiBold });
   const [session, setSession] = useState<MobileSession | null>(null);
   const [ready, setReady] = useState(false);
+  const [biometricUnlock, setBiometricUnlock] = useState(false);
+  const [offerEnrolment, setOfferEnrolment] = useState(false);
+  const [policy, setPolicy] = useState<MobileAuthPolicy | null>(null);
+  const policyRef = useRef<MobileAuthPolicy | null>(null);
+  const backgroundedAt = useRef<number | null>(null);
   const appReady = montserratLoaded && sourceSansLoaded && ready;
 
   useEffect(() => {
-    loadMobileSession().then(setSession).catch(() => setSession(null)).finally(() => setReady(true));
+    policyRef.current = policy;
+  }, [policy]);
+
+  useEffect(() => {
+    startStepUpLifecycle(() => policyRef.current);
+    void (async () => {
+      try {
+        const nextPolicy = await loadMobileAuthPolicy();
+        setPolicy(nextPolicy);
+        cacheMobileAuthPolicy(nextPolicy);
+      } catch {
+        cacheMobileAuthPolicy(null);
+      }
+      try {
+        if ((await loadBiometricMeta())?.enabled) {
+          setBiometricUnlock(true);
+          return;
+        }
+        setSession(await loadMobileSession());
+      } catch {
+        setSession(null);
+      } finally {
+        setReady(true);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (status) => {
+      if (status !== 'active') {
+        backgroundedAt.current = Date.now();
+        return;
+      }
+      const started = backgroundedAt.current;
+      backgroundedAt.current = null;
+      const current = policyRef.current;
+      if (!current || current.inactivityTimeoutSeconds <= 0 || started == null) return;
+      if (Date.now() - started < current.inactivityTimeoutSeconds * 1000) return;
+      void (async () => {
+        if (!(await loadBiometricMeta())?.enabled) return;
+        clearStepUp();
+        await clearMobileSession();
+        setSession(null);
+        setBiometricUnlock(true);
+      })();
+    });
+    return () => subscription.remove();
   }, []);
 
   useEffect(() => {
     if (appReady) void SplashScreen.hideAsync();
   }, [appReady]);
+
+  async function handleSignedIn(next: MobileSession) {
+    clearStepUp();
+    setSession(next);
+    setBiometricUnlock(false);
+    if (next.mustChangePassword) return;
+    try {
+      const [nextPolicy, availability, meta] = await Promise.all([
+        loadMobileAuthPolicy(),
+        inspectBiometricAvailability(),
+        loadBiometricMeta(),
+      ]);
+      setPolicy(nextPolicy);
+      cacheMobileAuthPolicy(nextPolicy);
+      if (!meta && nextPolicy.biometricLoginPolicy !== 'disabled' && availability.canProtectSecrets) {
+        setOfferEnrolment(true);
+      }
+    } catch {
+      return;
+    }
+  }
 
   if (!appReady) return null;
 
@@ -45,15 +123,40 @@ export default function App() {
     <SafeAreaProvider>
       <SafeAreaView style={styles.screen}>
         <StatusBar style="light" />
-        {session ? (
+        {biometricUnlock ? (
+          <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+            <BiometricLock
+              onUnlocked={(next) => {
+                clearStepUp();
+                setSession(next);
+                setBiometricUnlock(false);
+              }}
+              onUsePassword={() => {
+                clearStepUp();
+                setBiometricUnlock(false);
+                setSession(null);
+              }}
+            />
+          </ScrollView>
+        ) : session ? (
           session.mustChangePassword
             ? (
               <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-                <ForcedPasswordChange email={session.email} onCompleted={setSession} />
+                <ForcedPasswordChange email={session.email} onCompleted={handleSignedIn} />
               </ScrollView>
             )
-            : <Workspace session={session} onSignedOut={() => setSession(null)} />
-        ) : <AuthFlow onSignedIn={setSession} />}
+            : offerEnrolment
+              ? (
+                <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+                  <BiometricEnrolment
+                    email={session.email}
+                    onEnabled={() => setOfferEnrolment(false)}
+                    onSkip={() => setOfferEnrolment(false)}
+                  />
+                </ScrollView>
+              )
+              : <Workspace session={session} onSignedOut={() => { setSession(null); setOfferEnrolment(false); }} />
+        ) : <AuthFlow onSignedIn={handleSignedIn} />}
       </SafeAreaView>
     </SafeAreaProvider>
   );

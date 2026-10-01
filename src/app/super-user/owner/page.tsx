@@ -8,7 +8,8 @@ import { PaymentWaiverPanel } from '@/components/admin/PaymentWaiverPanel';
 import { SuperUserSettingsPanel } from '@/components/admin/SuperUserSettingsPanel';
 import { getAdminSettings } from '@/server/domain/platformSettings';
 import { listMarketingCampaigns } from '@/server/domain/marketingCampaignService';
-import { appUrl } from '@/server/config/appUrl';
+import { requestAppUrl } from '@/server/config/appUrl';
+import { headers } from 'next/headers';
 
 function httpsUrlOrEmpty(value: string) {
   return value.startsWith('https:') ? value : '';
@@ -40,6 +41,7 @@ export default async function OwnerConsolePage() {
     getAdminSettings(true),
     listMarketingCampaigns(),
   ]);
+  const requestHeaders = await headers();
 
   return (
     <AppShell role="super-user" title="Owner Console">
@@ -47,8 +49,8 @@ export default async function OwnerConsolePage() {
         <OwnerConsolePanel initialSuperUsers={superUsers} currentUserId={user.id} />
         <OwnerMarketingPanel
           initialCampaigns={campaigns}
-          marketplaceCtaUrl={httpsUrlOrEmpty(appUrl('/register'))}
-          supplierCtaUrl={httpsUrlOrEmpty(appUrl('/register?intent=supplying'))}
+          marketplaceCtaUrl={httpsUrlOrEmpty(requestAppUrl(requestHeaders, '/register'))}
+          supplierCtaUrl={httpsUrlOrEmpty(requestAppUrl(requestHeaders, '/register?intent=supplying'))}
         />
         <SuperUserSettingsPanel initialSettings={settings} isOwner currentUserId={user.id} />
         <PaymentWaiverPanel initialUsers={users} initialWaivers={waivers} />

@@ -1,3 +1,45 @@
+### 2026-10-01 - Unblock registration when verification email cannot send
+
+- Changed: registration records why verification email failed, uses the request host for the verify link, and in local development marks the account verified when Resend is not configured so sign-in can continue. Production still fail-closes until `RESEND_API_KEY` and a verified `EMAIL_FROM` are set.
+- Affects: `src/app/api/auth/register/route.ts`, `src/server/notifications/resend.ts`, `src/server/config/appUrl.ts`, `src/app/register/RegisterForm.tsx`, `mobile/src/screens/AuthFlow.tsx`.
+- Environment: production/staging still need a verified Resend domain. Local `.env` currently has no usable Resend key.
+- Validation: `npx tsx --test tests/lib/emailService.test.ts tests/lib/registration-service-provisions.test.ts tests/lib/appUrl.test.ts`.
+
+### 2026-10-01 - Patch Next.js RCE and high-severity npm audit findings
+
+- Changed: upgraded Next.js and `eslint-config-next` to 16.3.8 (fixes critical `next/og` ImageResponse RCE). Overrode `brace-expansion` 1.x/5.x and `fast-uri` 3.x so the remaining high-severity transitive DoS and URI-injection advisories are patched without a Prisma major bump.
+- Affects: `package.json`, `package-lock.json`.
+- Environment: no secret or schema change. Redeploy so production runs 16.3.8.
+- Validation: `npm audit --audit-level=high` reports 0 vulnerabilities.
+
+### 2026-10-01 - Keep Owner redirects on the current public host
+
+- Changed: Owner console, login workspace routing, and other in-app auth redirects now use a root-relative Location instead of `NEXTAUTH_URL`. Changing the Render URL or adding a custom domain no longer bounces the Owner page to the previous hostname. Marketing CTA defaults follow the request host when that origin is allowed.
+- Affects: `src/server/http/inAppRedirect.ts`, `src/proxy.ts`, `src/app/api/auth/workspace/route.ts`, `src/app/api/auth/verify-email/route.ts`, `src/app/super-user/owner/page.tsx`, `src/server/config/appUrl.ts`.
+- Environment: set production `NEXTAUTH_URL` to the live public origin. If the onrender host and a custom domain both serve the app, list the extra origin in `ADDITIONAL_ALLOWED_ORIGINS`. Email and Stripe links still use `NEXTAUTH_URL`.
+- Validation: `npx tsx --test tests/lib/appUrl.test.ts tests/lib/privileged-mfa.test.ts tests/lib/origin.test.ts`.
+
+### 2026-09-30 - Close biometric session-boundary gaps
+
+- Changed: mobile step-up is cleared on password sign-in, sign-out, biometric lock/unlock, and inactivity re-lock. Refresh writes the rotated token to the biometric vault before saving the access session and revokes the new token if that write fails. Refresh and device listing now enforce `MOBILE_DEVICE_MAX_AGE_DAYS` from registration time so sliding `expiresAt` cannot keep a device alive past the cap.
+- Affects: `src/server/auth/mobileDevice.ts`, `mobile/src/auth/stepUp.ts`, `mobile/src/api/sessionRefresh.ts`, `mobile/src/api/auth.ts`, `mobile/src/api/client.ts`, `mobile/App.tsx`, `docs/Mobile-Biometric-Authentication.md`.
+- Environment: no schema or secret change.
+- Validation: `npx tsx --test tests/lib/mobile-biometric-auth.test.ts` and `npm test` in `mobile/`.
+
+### 2026-09-30 - Optional device biometric login for the native app
+
+- Changed: Buyer/Supplier mobile login can optionally use Face ID, Touch ID, fingerprint, or the device passcode on that device only. The OS verifies presence; a hashed, rotated refresh token is stored in Keychain/Keystore behind biometric access. The server still issues the existing access JWT and still decides whether the account, role, and session are valid. Password login, USER-only mobile access, payment, unlock, and contact-release controls are unchanged. Sign-out revokes that device.
+- Affects: `prisma/schema.prisma`, `prisma/migrations/20260930070000_add_mobile_devices/migration.sql`, `src/server/auth/mobileDevice.ts`, `src/server/auth/mobileAuthPolicy.ts`, `src/app/api/mobile/auth/*`, `mobile/src/auth/*`, `mobile/src/screens/Biometric*.tsx`, `mobile/app.json`, `docs/Mobile-Biometric-Authentication.md`.
+- Environment: additive `MobileDevice` table. No new app secrets. Rebuild the native binary so Face ID usage strings are included.
+- Validation: `npx tsx --test tests/lib/mobile-biometric-auth.test.ts tests/lib/mobile-token.test.ts` and `npm test` in `mobile/`. Physical-device biometric checks remain before store submit.
+
+### 2026-09-27 - Year 1 store fees stay on Stripe Checkout
+
+- Changed: recorded the founder decision that tender unlock and contact-release fees stay on Stripe Checkout for the native app. Year 1 will not add App Store or Google Play Billing in-app products for those fees. Server-side payment, audit, and contact-release controls are unchanged. Listing and review copy now state that these are fixed platform fees for real-world UK construction marketplace services, not store IAP. App Review and Play review can still reject this; that residual risk is not a Year 1 reopen.
+- Affects: `docs/Action-Tracker.md`, `docs/Native-Mobile-Delivery-Plan.md`, `mobile/store.config.json`, `mobile/store/play-en-GB.json`, `mobile/tests/mobile-config.test.ts`.
+- Environment: no schema or migration change. Do not put Stripe secrets in the mobile binary.
+- Validation: `npx tsx --test tests/mobile-config.test.ts` from `mobile/`.
+
 ### 2026-09-22 - Payment ledger, privileged MFA, trusted IP, and governing-document canon
 
 - Changed: Stripe webhooks now persist an append-only `StripeEvent` ledger, reject charged-total/currency mismatches, and apply monotonic payment transitions. Super User/Owner administrative APIs and `/super-user` require enrolled TOTP MFA (login and MFA enrollment remain available). Production rate limiting keys only from `TRUSTED_CLIENT_IP_HEADER` (`x-real-ip` on Render) and ignores spoofed `X-Forwarded-For`. A User cannot unlock or quote their own tender. Field placeholders and focus rings meet AA contrast. Architecture, product, and security documents now record unified `USER`, Owner-set £10-default fees, and Neon Lakebase Postgres.
